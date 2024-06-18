@@ -1,5 +1,5 @@
         % varargout = return any number of output arguments
-function varargout=A1_open_JPK(varargin)
+function [Alpha,varargout]=A1_open_JPK(varargin)
 
 %
 % This function opens .JPK image files and .JPK-force curves.

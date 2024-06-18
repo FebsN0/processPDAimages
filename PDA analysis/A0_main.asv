@@ -31,15 +31,8 @@ Cropped_Images(strcmp({Cropped_Images.Channel_name},'Height (measured)')).Croppe
 %% extract only-glass friction coefficient
 %%%%%%%%%%%%------------- IMPORTANT NOTE -------------%%%%%%%%%%%%
 %%%%%% for the next function, the glass only friction coefficient is required!
-%%%%%% When measurement for a PDA sample is done, also run measurements on only glass using the same conditions
-%%%%%% Example: if you run 20 experiments with 2 different speeds and 10 different setpoints, then run the
-%%%%%% same 20 experiments but only on glass.
-%%%%%% For each experiment (with Hover Mode OFF, thus TRACE-RETRACE), you will get lateral and vertical signals
-%%%%%%      - verSignals (V) ==> verForce (N)
-%%%%%%      - latSignals (V) ==> latForce (N) (using alpha calibration factor)
-%%%%%% after that, obtain the slope (y=lateral, x=vertical) which correspond to the glass friction
-%%%%%% average any glass friction coefficient from the different experiments
-
+%%%%%% When measurement for a PDA sample is done, also run measurements on only glass using the same condition
+%%%%%%
 
 %% Substitute to the AFM cropped channels the baseline adapted LD
-[Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked_TRCDA(Cropped_Images,alpha,AFM_height_IO,'Low');
+[Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked_TRCDA(Cropped_Images,alpha,AFM_height_IO,varargin);
