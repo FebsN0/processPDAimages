@@ -1,4 +1,4 @@
-function [AFM_noBk,Cropped_Images,IO_Image,Rect,fit_decision_final]=A3_2_El_AFM(input,varargin)
+function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_2_El_AFM(input,secondMonitorMain,varargin)
 
 % The function extracts Images from the experiments.
 % It removes baseline and extracts foreground from the AFM image.
@@ -47,13 +47,7 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect,fit_decision_final]=A3_2_El_AFM(
     parse(p,input,varargin{:});
     clearvars argName defaultVal
 
-    question= 'Do you want to show the figures into a maximized window in a second monitor? [Y/N]: ';
-    possibleAnswers= {'y','n'};
-    secondMonitor = getValidAnswer(question,possibleAnswers);
-    if strcmpi(secondMonitor,'y')
-        question= 'Is the second monitor a main monitor? [Y/N]: ';
-        secondMonitorMain = getValidAnswer(question,possibleAnswers);
-    end
+  
 
     % Extract the height channel
     raw_data_Or=input(strcmp({input.Channel_name},'Height (measured)')).AFM_image;
@@ -99,7 +93,7 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect,fit_decision_final]=A3_2_El_AFM(
     
     wb=waitbar(0/size(cropped_image,1),sprintf('Removing Polynomial Baseline %.0f of %.0f',0,size(cropped_image,1)),...
         'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
-    if strcmpi(secondMonitor,'y'), objInSecondMonitor(wb,secondMonitorMain), end
+    if ~isempty(secondMonitorMain), objInSecondMonitor(wb,secondMonitorMain), end
     setappdata(wb,'canceling',0);
     N_Cycluse_waitbar=size(cropped_image,2);
 
@@ -169,12 +163,7 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect,fit_decision_final]=A3_2_El_AFM(
     % Subtraction of fitted polynomial background
     filt_data_no_Bk=minus(poly_filt_data,fit_surf);
     filt_data_no_Bk=filt_data_no_Bk-min(min(filt_data_no_Bk));
-    filt_data_no_Bk_visible_data=filt_data_no_Bk/max(max(filt_data_no_Bk));
-    filt_data_no_Bk_visible_data=imadjust(filt_data_no_Bk_visible_data);
-    
-
-    
-  
+   
     warning ('off','all');
     fit_decision_final=nan(size(filt_data_no_Bk,2),13);
     Bk_iterative=zeros(size(filt_data_no_Bk,1),size(filt_data_no_Bk,2));
@@ -363,7 +352,7 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect,fit_decision_final]=A3_2_El_AFM(
     AFM_noBk_visible_data=AFM_noBk/max(max(AFM_noBk));
     AFM_noBk_visible_data=imadjust(AFM_noBk_visible_data);
     
-    if strcmpi(secondMonitor,'y'), f2=figure; objInSecondMonitor(f2,secondMonitorMain,'maximized'); else, figure; end
+    if ~isempty(secondMonitorMain), f2=figure; objInSecondMonitor(f2,secondMonitorMain,'maximized'); else, figure; end
     subplot(121), imshow(AFM_noBk_visible_data),colormap parula, title('Usable Partial of Image')
     satisfied='Manual Selection';
     first_In=1;
@@ -416,11 +405,9 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect,fit_decision_final]=A3_2_El_AFM(
     
     % converts any nonzero element of the yellow/blue image into a logical image.
     IO_Image=logical(seg_dial);
-    close all
     if(exist('wb','var'))
         delete (wb)
     end
-
 end
 
 

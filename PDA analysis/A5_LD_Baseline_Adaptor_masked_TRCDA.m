@@ -1,0 +1,363 @@
+% Function to process and subtract the AFM LD images, this updated function
+% uses the AFM IO image as a mask to select the background, thus a more
+% precise fitting is possible.
+% Check manually the processed image afterwards and compare with the AFM VD
+% image!
+
+function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked_TRCDA(AFM_Cropped,Alpha,AFM_height_IO,varargin)
+
+%enter the friction coefficient (determined by separate measurements) here:
+avg_fc=0.2920
+
+
+p=inputParser();
+argName = 'Silent';
+defaultVal = 'Yes';
+addOptional(p,argName,defaultVal);
+argName = 'Accuracy';
+defaultVal = 'Low';
+addOptional(p,argName,defaultVal);
+
+if(~isempty(varargin))
+    if(size(varargin,2)==1)
+        if(iscell(varargin{1,1}))
+            varargin=vertcat(varargin{:});
+        end
+    end
+end
+parse(p,varargin{:});
+
+if(strcmp(p.Results.Silent,'Yes'))
+    SeeMe='off';
+else
+    SeeMe='on';
+end
+
+index_ch=find(strcmp({AFM_Cropped.Channel_name},'Lateral Deflection')==1);
+POI=index_ch(1,find(ismember(find(strcmp({AFM_Cropped.Channel_name},'Lateral Deflection')==1),find(strcmp({AFM_Cropped.Trace_type},'Trace')==1))));
+raw_data_LD_Trace=AFM_Cropped(index_ch(1,find(ismember(find(strcmp({AFM_Cropped.Channel_name},'Lateral Deflection')==1),find(strcmp({AFM_Cropped.Trace_type},'Trace')==1))))).Cropped_AFM_image;
+
+if(size(index_ch,2)==2)
+    raw_data_LD_ReTrace=AFM_Cropped(index_ch(1,find(ismember(find(strcmp({AFM_Cropped.Channel_name},'Lateral Deflection')==1),find(strcmp({AFM_Cropped.Trace_type},'ReTrace')==1))))).Cropped_AFM_image;
+end
+
+index_ch=find(strcmp({AFM_Cropped.Channel_name},'Vertical Deflection')==1);
+raw_data_VD_Trace=AFM_Cropped(index_ch(1,find(ismember(find(strcmp({AFM_Cropped.Channel_name},'Vertical Deflection')==1),find(strcmp({AFM_Cropped.Trace_type},'Trace')==1))))).Cropped_AFM_image;
+
+if(exist('raw_data_LD_ReTrace','var'))
+    figure('visible',SeeMe),imshow(imadjust(raw_data_LD_ReTrace/max(max(raw_data_LD_ReTrace)))), colormap parula
+    raw_data_LD_Trace_NO_Bl=minus(raw_data_LD_Trace,raw_data_LD_ReTrace);
+else
+    raw_data_LD_Trace_NO_Bl=raw_data_LD_Trace;
+end
+
+%Subtract the minimum of the image
+raw_data_LD_Trace_NO_Bl=minus(raw_data_LD_Trace_NO_Bl,min(min(raw_data_LD_Trace_NO_Bl)));
+
+figure('visible',SeeMe),imshow(imadjust(raw_data_LD_Trace/max(max(raw_data_LD_Trace)))), colormap parula
+figure('visible',SeeMe),imshow(imadjust(raw_data_VD_Trace/max(max(raw_data_VD_Trace)))), colormap parula
+figure('visible',SeeMe),imshow(imadjust(raw_data_LD_Trace_NO_Bl/max(max(raw_data_LD_Trace_NO_Bl)))), colormap parula
+
+if(strcmp(SeeMe,'on'))
+wb=waitbar(0/size(raw_data_LD_Trace_NO_Bl,1),sprintf('Removing Polynomial Baseline %.0f of %.0f',0,size(raw_data_LD_Trace_NO_Bl,1)),...
+    'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
+setappdata(wb,'canceling',0);
+end
+
+% Polynomial baseline fitting (line by line)
+
+warning ('off','all');
+fit_decision_final=nan(size(raw_data_LD_Trace_NO_Bl,2),13);
+Bk_iterative=zeros(size(raw_data_LD_Trace_NO_Bl,1),size(raw_data_LD_Trace_NO_Bl,2));
+N_Cycluse_waitbar=size(raw_data_LD_Trace_NO_Bl,2);
+limit=9;
+fit_decision=zeros(3,limit);
+for i=1:size(raw_data_LD_Trace_NO_Bl,2)
+    if(strcmp(SeeMe,'on'))
+        waitbar(i/N_Cycluse_waitbar,wb,sprintf('Preparing for best fit ... Line %.0f Completeted  %2.1f %%',i,i/N_Cycluse_waitbar*100));
+    else
+        if(i==1)
+            fprintf('\n\n Starting Optimization \n');
+        end
+        fprintf('.');
+        if(rem(i,100)==0)
+            fprintf('\n');
+        end
+    end
+    
+    % Mask to cut the PDA from the baseline fitting
+    raw_data_LD_Trace_NO_Bl(AFM_height_IO==1)=5; %added on 19012020
+    
+    flag_signal_y=raw_data_LD_Trace_NO_Bl(:,i);
+    flag_signal_x=(1:size(flag_signal_y,1))';
+    %flag_signal_y(flag_signal_y>=median(raw_data_LD_Trace_NO_Bl(:,i)))=nan;
+    %flag_signal_x(flag_signal_y>=median(raw_data_LD_Trace_NO_Bl(:,i)))=nan;
+    %[pos_outliner]=isoutlier(flag_signal_y);
+
+    %while(any(pos_outliner))
+        %flag_signal_y(pos_outliner==1)=nan;
+       % flag_signal_x(pos_outliner==1)=nan;
+%         flag_signal_y(find(pos_outliner==1))=nan;
+%         flag_signal_x(find(pos_outliner==1))=nan;
+        %[pos_outliner]=isoutlier(flag_signal_y,'gesd');
+    %end
+    
+    [xData, yData] = prepareCurveData(flag_signal_x,flag_signal_y);
+   
+    
+    if(size(xData,1)>2)
+        opts = fitoptions( 'Method', 'LinearLeastSquares' );
+        opts.Robust = 'LAR';
+        
+        for z=1:limit
+            if (z==1)&&((strcmp(p.Results.Accuracy,'Low'))||(strcmp(p.Results.Accuracy,'Medium'))||(strcmp(p.Results.Accuracy,'High')))
+                ft = fittype( 'poly1' );
+                if(strcmp(SeeMe,'on'))
+                waitbar(i/N_Cycluse_waitbar,wb,sprintf('Observing 1st Ord Pol fit ... Line %.0f Completeted  %2.1f %%',i,i/N_Cycluse_waitbar*100));
+                end
+            elseif (z==2)&&((strcmp(p.Results.Accuracy,'Low'))||(strcmp(p.Results.Accuracy,'Medium'))||(strcmp(p.Results.Accuracy,'High')))
+                ft = fittype( 'poly2' );
+                if(strcmp(SeeMe,'on'))
+                waitbar(i/N_Cycluse_waitbar,wb,sprintf('Observing 2st Ord Pol fit ... Line %.0f Completeted  %2.1f %%',i,i/N_Cycluse_waitbar*100));
+                end
+            elseif (z==3)&&(strcmp(p.Results.Accuracy,'Medium')||(strcmp(p.Results.Accuracy,'High')))
+                ft = fittype( 'poly3' );
+                if(strcmp(SeeMe,'on'))
+                waitbar(i/N_Cycluse_waitbar,wb,sprintf('Observing 3st Ord Pol fit ... Line %.0f Completeted  %2.1f %%',i,i/N_Cycluse_waitbar*100));
+                end
+            elseif (z==4)&&((strcmp(p.Results.Accuracy,'Low'))||(strcmp(p.Results.Accuracy,'Medium'))||(strcmp(p.Results.Accuracy,'High')))
+                ft = fittype( 'poly4' );
+                if(strcmp(SeeMe,'on'))
+                waitbar(i/N_Cycluse_waitbar,wb,sprintf('Observing 4st Ord Pol fit ... Line %.0f Completeted  %2.1f %%',i,i/N_Cycluse_waitbar*100));
+                end
+            elseif (z==5)&&(strcmp(p.Results.Accuracy,'High'))
+                ft = fittype( 'poly5' );
+                if(strcmp(SeeMe,'on'))
+                waitbar(i/N_Cycluse_waitbar,wb,sprintf('Observing 5th Ord Pol fit ... Line %.0f Completeted  %2.1f %%',i,i/N_Cycluse_waitbar*100));
+                end
+            elseif (z==6)&&(strcmp(p.Results.Accuracy,'High'))
+                ft = fittype( 'poly6' );
+                if(strcmp(SeeMe,'on'))
+                waitbar(i/N_Cycluse_waitbar,wb,sprintf('Observing 6th Ord Pol fit ... Line %.0f Completeted  %2.1f %%',i,i/N_Cycluse_waitbar*100));
+                end
+            elseif (z==7)&&(strcmp(p.Results.Accuracy,'High'))
+                ft = fittype( 'poly7' );
+                if(strcmp(SeeMe,'on'))
+                waitbar(i/N_Cycluse_waitbar,wb,sprintf('Observing 7th Ord Pol fit ... Line %.0f Completeted  %2.1f %%',i,i/N_Cycluse_waitbar*100));
+                end
+            elseif (z==8)&&(strcmp(p.Results.Accuracy,'High'))
+                ft = fittype( 'poly8' );
+                if(strcmp(SeeMe,'on'))
+                waitbar(i/N_Cycluse_waitbar,wb,sprintf('Observing 8th Ord Pol fit ... Line %.0f Completeted  %2.1f %%',i,i/N_Cycluse_waitbar*100));
+                end
+            elseif (z==9)&&(strcmp(p.Results.Accuracy,'High'))
+                ft = fittype( 'poly9' );
+                if(strcmp(SeeMe,'on'))
+                waitbar(i/N_Cycluse_waitbar,wb,sprintf('Observing 9th Ord Pol fit ... Line %.0f Completeted  %2.1f %%',i,i/N_Cycluse_waitbar*100));
+                end
+            end
+             
+            
+            PDA=excludedata(xData, yData,'range',[-1 1]);
+            [~, gof] = fit( xData, yData, ft,'Exclude', yData > 1 ); %added the exclusion on 19012020
+            
+            if(gof.adjrsquare<0)
+                gof.adjrsquare=0.001;
+            end
+            
+            if(~exist('fit_decision','var'))
+                fit_decision(1,z)=abs(gof.sse)/gof.adjrsquare;
+                fit_decision(2,z)=gof.sse;
+                fit_decision(3,z)=gof.adjrsquare;
+            else
+                if (size(fit_decision,2)<limit+1)
+                    fit_decision(1,z)=abs(gof.sse)/gof.adjrsquare;
+                    fit_decision(2,z)=gof.sse;
+                    fit_decision(3,z)=gof.adjrsquare;
+                else
+                    fit_decision(1,z)=(fit_decision(1,z)+(abs(gof.sse)/gof.adjrsquare))/2;
+                    fit_decision(2,z)=gof.sse;
+                    fit_decision(3,z)=gof.adjrsquare;
+                end
+            end
+        end
+        
+        clearvars Ind
+        [~,Ind]=nanmin(fit_decision(1,:));
+        
+        if (Ind==1)
+            ft = fittype( 'poly1' );
+            if(strcmp(SeeMe,'on'))
+            waitbar(i/N_Cycluse_waitbar,wb,sprintf('Applying 1st Ord Pol fit ... Line %.0f Completeted  %2.1f %%',i,i/N_Cycluse_waitbar*100));
+            end
+        elseif (Ind==2)
+            ft = fittype( 'poly2' );
+            if(strcmp(SeeMe,'on'))
+            waitbar(i/N_Cycluse_waitbar,wb,sprintf('Applying 2nd Ord Pol fit ... Line %.0f Completeted  %2.1f %%',i,i/N_Cycluse_waitbar*100));
+            end
+        elseif (Ind==3)
+            ft = fittype( 'poly3' );
+            if(strcmp(SeeMe,'on'))
+            waitbar(i/N_Cycluse_waitbar,wb,sprintf('Applying 3rd Ord Pol fit ... Line %.0f Completeted  %2.1f %%',i,i/N_Cycluse_waitbar*100));
+            end
+        elseif (Ind==4)
+            ft = fittype( 'poly4' );
+            if(strcmp(SeeMe,'on'))
+            waitbar(i/N_Cycluse_waitbar,wb,sprintf('Applying 4st Ord Pol fit ... Line %.0f Completeted  %2.1f %%',i,i/N_Cycluse_waitbar*100));
+            end
+        elseif (Ind==5)
+            ft = fittype( 'poly5' );
+            if(strcmp(SeeMe,'on'))
+            waitbar(i/N_Cycluse_waitbar,wb,sprintf('Applying 5th Ord Pol fit ... Line %.0f Completeted  %2.1f %%',i,i/N_Cycluse_waitbar*100)); 
+            end
+        elseif (Ind==6)
+            ft = fittype( 'poly6' );
+            if(strcmp(SeeMe,'on'))
+            waitbar(i/N_Cycluse_waitbar,wb,sprintf('Applying 6th Ord Pol fit ... Line %.0f Completeted  %2.1f %%',i,i/N_Cycluse_waitbar*100));
+            end
+        elseif (Ind==7)
+            ft = fittype( 'poly7' );
+            if(strcmp(SeeMe,'on'))
+            waitbar(i/N_Cycluse_waitbar,wb,sprintf('Applying 7th Ord Pol fit ... Line %.0f Completeted  %2.1f %%',i,i/N_Cycluse_waitbar*100));
+            end
+        elseif (Ind==8)
+            ft = fittype( 'poly8' );
+            if(strcmp(SeeMe,'on'))
+            waitbar(i/N_Cycluse_waitbar,wb,sprintf('Applying 8th Ord Pol fit ... Line %.0f Completeted  %2.1f %%',i,i/N_Cycluse_waitbar*100));
+            end
+        elseif (Ind==9)
+            ft = fittype( 'poly9' );
+            if(strcmp(SeeMe,'on'))
+            waitbar(i/N_Cycluse_waitbar,wb,sprintf('Applying 9th Ord Pol fit ... Line %.0f Completeted  %2.1f %%',i,i/N_Cycluse_waitbar*100));
+            end
+        else
+        end
+        
+        fit_decision_final(i,1)=Ind;
+        fit_decision_final(i,2)=fit_decision(2,Ind);
+        fit_decision_final(i,3)=fit_decision(3,Ind);
+        [fitresult, ~] = fit( xData, yData, ft, 'Exclude', yData > 1 );
+        
+        x=1:size(raw_data_LD_Trace_NO_Bl,1);
+    else
+        Ind=0;
+    end
+
+    if(Ind==1)
+        Bk_iterative(:,i)=fitresult.p1*x+fitresult.p2;
+        fit_decision_final(i,4)=fitresult.p1;
+        fit_decision_final(i,5)=fitresult.p2;
+    elseif(Ind==2)
+        Bk_iterative(:,i)=fitresult.p1*(x).^2+fitresult.p2*x+fitresult.p3;
+        fit_decision_final(i,4)=fitresult.p1;
+        fit_decision_final(i,5)=fitresult.p2;
+        fit_decision_final(i,6)=fitresult.p3;
+    elseif(Ind==3)
+        Bk_iterative(:,i)=fitresult.p1*(x).^3+fitresult.p2*(x).^2+fitresult.p3*x+fitresult.p4;
+        fit_decision_final(i,4)=fitresult.p1;
+        fit_decision_final(i,5)=fitresult.p2;
+        fit_decision_final(i,6)=fitresult.p3;
+        fit_decision_final(i,7)=fitresult.p4;
+    elseif(Ind==4)
+        Bk_iterative(:,i)=fitresult.p1*(x).^4+fitresult.p2*(x).^3+fitresult.p3*(x).^2+fitresult.p4*x+fitresult.p5;
+        fit_decision_final(i,4)=fitresult.p1;
+        fit_decision_final(i,5)=fitresult.p2;
+        fit_decision_final(i,6)=fitresult.p3;
+        fit_decision_final(i,7)=fitresult.p4;
+        fit_decision_final(i,8)=fitresult.p5;
+    elseif(Ind==5)
+        Bk_iterative(:,i)=fitresult.p1*(x).^5+fitresult.p2*(x).^4+fitresult.p3*(x).^3+fitresult.p4*(x).^2+fitresult.p5*x+fitresult.p6;
+        fit_decision_final(i,4)=fitresult.p1;
+        fit_decision_final(i,5)=fitresult.p2;
+        fit_decision_final(i,6)=fitresult.p3;
+        fit_decision_final(i,7)=fitresult.p4;
+        fit_decision_final(i,8)=fitresult.p5;
+        fit_decision_final(i,9)=fitresult.p6;
+    elseif(Ind==6)
+        Bk_iterative(:,i)=fitresult.p1*(x).^6+fitresult.p2*(x).^5+fitresult.p3*(x).^4+fitresult.p4*(x).^3+fitresult.p5*(x).^2+fitresult.p6*x+fitresult.p7;
+        fit_decision_final(i,4)=fitresult.p1;
+        fit_decision_final(i,5)=fitresult.p2;
+        fit_decision_final(i,6)=fitresult.p3;
+        fit_decision_final(i,7)=fitresult.p4;
+        fit_decision_final(i,8)=fitresult.p5;
+        fit_decision_final(i,9)=fitresult.p6;
+        fit_decision_final(i,10)=fitresult.p7;
+    elseif(Ind==7)
+        Bk_iterative(:,i)=fitresult.p1*(x).^7+fitresult.p2*(x).^6+fitresult.p3*(x).^5+fitresult.p4*(x).^4+fitresult.p5*(x).^3+fitresult.p6*(x).^2+fitresult.p7*x+fitresult.p8;
+        fit_decision_final(i,4)=fitresult.p1;
+        fit_decision_final(i,5)=fitresult.p2;
+        fit_decision_final(i,6)=fitresult.p3;
+        fit_decision_final(i,7)=fitresult.p4;
+        fit_decision_final(i,8)=fitresult.p5;
+        fit_decision_final(i,9)=fitresult.p6;
+        fit_decision_final(i,10)=fitresult.p7;
+        fit_decision_final(i,11)=fitresult.p8;
+    elseif(Ind==8)
+        Bk_iterative(:,i)=fitresult.p1*(x).^8+fitresult.p2*(x).^7+fitresult.p3*(x).^6+fitresult.p4*(x).^5+fitresult.p5*(x).^4+fitresult.p6*(x).^3+fitresult.p7*(x).^2+fitresult.p8*x+fitresult.p9;
+        fit_decision_final(i,4)=fitresult.p1;
+        fit_decision_final(i,5)=fitresult.p2;
+        fit_decision_final(i,6)=fitresult.p3;
+        fit_decision_final(i,7)=fitresult.p4;
+        fit_decision_final(i,8)=fitresult.p5;
+        fit_decision_final(i,9)=fitresult.p6;
+        fit_decision_final(i,10)=fitresult.p7;
+        fit_decision_final(i,11)=fitresult.p8;
+        fit_decision_final(i,12)=fitresult.p9;
+    elseif(Ind==9)
+        Bk_iterative(:,i)=fitresult.p1*(x).^9+fitresult.p2*(x).^8+fitresult.p3*(x).^7+fitresult.p4*(x).^6+fitresult.p5*(x).^5+fitresult.p6*(x).^4+fitresult.p7*(x).^3+fitresult.p8*(x).^2+fitresult.p9*x+fitresult.p10;
+        fit_decision_final(i,4)=fitresult.p1;
+        fit_decision_final(i,5)=fitresult.p2;
+        fit_decision_final(i,6)=fitresult.p3;
+        fit_decision_final(i,7)=fitresult.p4;
+        fit_decision_final(i,8)=fitresult.p5;
+        fit_decision_final(i,9)=fitresult.p6;
+        fit_decision_final(i,10)=fitresult.p7;
+        fit_decision_final(i,11)=fitresult.p8;
+        fit_decision_final(i,12)=fitresult.p9;
+        fit_decision_final(i,13)=fitresult.p10;
+    else
+    end
+    if(strcmp(SeeMe,'on'))
+        if getappdata(wb,'canceling')
+            break
+        end
+    end
+end
+
+to_avg=find(fit_decision_final(:,3)<0.95);
+if(exist('to_avg','var'))
+    for i=1:size(to_avg,1)-1
+        if(to_avg(i,1)~=1)
+            Bk_iterative(:,to_avg(i,1))=(Bk_iterative(:,to_avg(i,1)-1)+Bk_iterative(:,to_avg(i,1)+1))/2;
+        elseif(to_avg(i,1)==1)
+            Bk_iterative(:,to_avg(i,1))=Bk_iterative(:,to_avg(i,1)+1);
+        elseif(to_avg(i,1)==size(Bk_iterative,2))
+            Bk_iterative(:,to_avg(i,1))=Bk_iterative(:,to_avg(i,1)-1);
+        end
+    end
+end
+% The fitted backround:
+% Bk_iterative_visible_data=imadjust(Bk_iterative);
+Bk_iterative_visible_data=Bk_iterative/max(max(Bk_iterative));
+Bk_iterative_visible_data=imadjust(Bk_iterative_visible_data);
+figure('visible',SeeMe);title('Usable Partial of Image'),imshow(Bk_iterative_visible_data),colormap parula
+
+% To remove the minimum of the image and then the background (friction on glass should be zero afterwards):
+raw_data_LD_Trace_NO_Bl=minus(raw_data_LD_Trace,min(min(raw_data_LD_Trace)));
+raw_data_LD_Trace_NO_BK=minus(raw_data_LD_Trace_NO_Bl,Bk_iterative);
+figure('visible',SeeMe),imshow(imadjust(raw_data_LD_Trace_NO_BK/max(max(raw_data_LD_Trace_NO_BK)))), colormap parula
+Baseline_Friction=times(raw_data_VD_Trace,avg_fc);
+raw_data_LD_Trace_Adapt_N=times(raw_data_LD_Trace_NO_BK,Alpha);
+
+% To readd the baseline friction, to obtain the processed image:
+Corrected_LD_Trace=plus(raw_data_LD_Trace_Adapt_N,Baseline_Friction);
+figure,imshow(imadjust(Corrected_LD_Trace/max(max(Corrected_LD_Trace)))), colormap parula
+
+AFM_Elab=AFM_Cropped;
+AFM_Elab(POI).Cropped_AFM_image=Corrected_LD_Trace;
+
+if(strcmp(SeeMe,'off'))
+    fprintf('\n');
+end
+
+end
