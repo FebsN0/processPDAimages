@@ -3,7 +3,7 @@
 % Author updates: Altieri F.
 % University of Tokyo
 % 
-% Last update 17.June.2024
+% Last update 26.June.2024
 % 
 % 
 % INPUT: OUTPUT of A1_open_JPK (single struct data)
@@ -25,10 +25,11 @@ function [Selected_AFM_data]=A2_CleanUpData2_AFM(arg)
                    error('Invalid Input!');
                end
            end
-           %find only those rows of interest (trace, latDefle, Height and vertDefle)
+           %find only those rows of interest (trace: latDefle, Height and vertDefle, retrace: latDefle)
            traceMask=strcmpi({arg.Trace_type},'trace');
-           channelMask=strcmpi({arg.Channel_name},'Height (measured)') | strcmpi({arg.Channel_name},'Lateral Deflection') | strcmpi({arg.Channel_name},'Vertical Deflection');
-           defMask= traceMask & channelMask;
+           channelMask1= strcmpi({arg.Channel_name},'Height (measured)') | strcmpi({arg.Channel_name},'Lateral Deflection');
+           channelMask2= strcmpi({arg.Channel_name},'Vertical Deflection');
+           defMask= (traceMask & channelMask1) | channelMask2;
            Selected_AFM_data = arg(defMask);
         else
            error('Invalid Input!');
