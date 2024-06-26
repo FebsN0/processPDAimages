@@ -31,10 +31,10 @@ function avg_fc=A5_frictionGlassCalc_method1(alphaGlass,dataGlass,secondMonitorM
     verForce = round(verForce,8);
  
     % average trace and retrace scan lines (lateral deflection) to cancel out errors.
-    % Delta = loop offset
-    % W = half-width loop
+    % Calc Delta (loop offset)
     Delta =  (latDefl_trace + latDefl_retrace)/2;
-    W = latDefl_trace -  Delta;                     
+    % Calc W (half-width loop)
+    W = latDefl_trace - Delta;                     
     
     if ~isempty(secondMonitorMain), f1=figure; objInSecondMonitor(f1,secondMonitorMain,'maximized'); else, figure; end
     surf(W,'LineStyle','none'), title('W half-width loop','FontSize',20)

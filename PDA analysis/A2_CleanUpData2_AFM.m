@@ -25,11 +25,12 @@ function [Selected_AFM_data]=A2_CleanUpData2_AFM(arg)
                    error('Invalid Input!');
                end
            end
-           %find only those rows of interest (trace: latDefle, Height and vertDefle, retrace: latDefle)
+           %find only those rows of interest (trace: latDefle, Height and vertDefle, retrace: latDefle, vertDefle)
            traceMask=strcmpi({arg.Trace_type},'trace');
-           channelMask1= strcmpi({arg.Channel_name},'Height (measured)') | strcmpi({arg.Channel_name},'Lateral Deflection');
+           channelMask1= strcmpi({arg.Channel_name},'Height (measured)');
            channelMask2= strcmpi({arg.Channel_name},'Vertical Deflection');
-           defMask= (traceMask & channelMask1) | channelMask2;
+           channelMask3= strcmpi({arg.Channel_name},'Lateral Deflection');
+           defMask= (traceMask & channelMask1) | channelMask2 | channelMask3;
            Selected_AFM_data = arg(defMask);
         else
            error('Invalid Input!');

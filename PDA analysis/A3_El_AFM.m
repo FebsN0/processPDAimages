@@ -34,7 +34,7 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(input,secondMonitorMa
     p=inputParser();    %init instance of inputParser
     % Add required parameter and also check if it is a struct by a inner function end if the Trace_type are
     % all Trace
-    addRequired(p, 'input', @(x) isstruct(x) && all(strcmp({x.Trace_type},'Trace')==1));
+    addRequired(p, 'input', @(x) isstruct(x));
     %Add default parameters. When call the function, use 'argName' as well you use 'LineStyle' in plot! And
     %then the values
     argName = 'Accuracy';

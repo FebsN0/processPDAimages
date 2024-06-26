@@ -27,7 +27,7 @@ function [AFM_noBk]=A4_El_AFM_masked(Cropped_Images,AFM_height_IO,secondMonitorM
     % and properties of inputs. This helps to make functions more robust and user-friendly.
     p=inputParser();    %init instance of inputParser
     % Add required parameter and also check if it is a struct by a inner function end if the Trace_type are all Trace
-    addRequired(p, 'Cropped_Images', @(x) isstruct(x) && all(strcmp({x.Trace_type},'Trace')==1));
+    addRequired(p, 'Cropped_Images', @(x) isstruct(x));
     % validate and parse the inputs
     parse(p,Cropped_Images);
     clearvars argName defaultVal
@@ -65,7 +65,7 @@ function [AFM_noBk]=A4_El_AFM_masked(Cropped_Images,AFM_height_IO,secondMonitorM
     AFM_noBk_visible_data=AFM_noBk/max(max(AFM_noBk));
     AFM_noBk_visible_data=imadjust(AFM_noBk_visible_data);
     if ~isempty(secondMonitorMain), f2=figure; objInSecondMonitor(f2,secondMonitorMain,'maximized'); else, figure; end
-    imshow(AFM_noBk_visible_data),colormap parula, title('(Optimized)Usable Partial of Image')
+    imshow(AFM_noBk_visible_data),colormap parula, title('(Optimized) Usable Partial of Image')
     if(exist('wb','var'))
         delete(wb)
     end
