@@ -76,8 +76,12 @@ function avg_fc=A5_frictionGlassCalc_method1(alphaGlass,dataGlass,secondMonitorM
     hold on
     plot(x,y), plot(setpoints,force_avg_singleSetpoint,'k*')
     errorbar(setpoints,force_avg_singleSetpoint,force_std_singleSetpoint, 'k', 'LineStyle', 'none', 'Marker','none','LineWidth', 1.5);
+    xlim([0,max(setpoints) * 1.1]);
     hold off, xlabel('Vertical Deflection [N]','FontSize',15), ylabel('Lateral Deflection [N]','FontSize',15), grid on
     legend('fitted curve','experimental data','Location','northwest','FontSize',15)
+    eqn = sprintf('Linear: y = %0.3g x %0.3g', fitresult.p1, fitresult.p2);
+    title({'Delta Offset vs Set Point'; eqn});
+    
     avg_fc=fitresult.p1;
 end
 

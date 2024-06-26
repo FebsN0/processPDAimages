@@ -1,5 +1,5 @@
 function avg_fc2=A5_frictionGlassCalc_method2(alpha,Cropped_Images,AFM_height_IO,secondMonitorMain)
-
+%
 % This function opens the AFM cropped data previously created to calculate the glass friction
 % coefficient. This method is more accurated than the method 1.
 %
@@ -11,76 +11,64 @@ function avg_fc2=A5_frictionGlassCalc_method2(alpha,Cropped_Images,AFM_height_IO
 %
 % Last update 26/6/2024
 
-
-% Convert Selected_AFM_data -> AFM_cropped_channels
-% AFM_cropped_channels data is different as follows:
-%  - Cropped from Selected_AFM_data
-%  - Data origin is right-bottom (Selected_AFM_data is top-left).
-
-
     % extract data (lateral deflection Trace and Retrace, vertical deflection) and then mask (glass-PDA) elementXelement
     % ONLY in correspondence with the glass!
-    Lateral_Trace_img_masked    = (Cropped_Images(strcmpi({Cropped_Images.Channel_name},'Lateral Deflection') & strcmpi({Cropped_Images.Trace_type},'Trace')).Cropped_AFM_image).*(~AFM_height_IO);
-    Lateral_ReTrace_img_masked  = (Cropped_Images(strcmpi({Cropped_Images.Channel_name},'Lateral Deflection') & strcmpi({Cropped_Images.Trace_type},'ReTrace')).Cropped_AFM_image).*(~AFM_height_IO);
-    vertical_Trace_img_masked   = (Cropped_Images(strcmpi({Cropped_Images.Channel_name},'Vertical Deflection') & strcmpi({Cropped_Images.Trace_type},'Trace')).Cropped_AFM_image).* (~AFM_height_IO);
-    vertical_ReTrace_img_masked = (Cropped_Images(strcmpi({Cropped_Images.Channel_name},'Vertical Deflection') & strcmpi({Cropped_Images.Trace_type},'ReTrace')).Cropped_AFM_image).* (~AFM_height_IO);
+    Lateral_Trace_masked    = (Cropped_Images(strcmpi({Cropped_Images.Channel_name},'Lateral Deflection') & strcmpi({Cropped_Images.Trace_type},'Trace')).Cropped_AFM_image).*(~AFM_height_IO);
+    Lateral_ReTrace_masked  = (Cropped_Images(strcmpi({Cropped_Images.Channel_name},'Lateral Deflection') & strcmpi({Cropped_Images.Trace_type},'ReTrace')).Cropped_AFM_image).*(~AFM_height_IO);
+    vertical_Trace   = (Cropped_Images(strcmpi({Cropped_Images.Channel_name},'Vertical Deflection') & strcmpi({Cropped_Images.Trace_type},'Trace')).Cropped_AFM_image);
+    vertical_ReTrace = (Cropped_Images(strcmpi({Cropped_Images.Channel_name},'Vertical Deflection') & strcmpi({Cropped_Images.Trace_type},'ReTrace')).Cropped_AFM_image);
 
     % Calc Delta (offset loop) 
-    Delta = (Lateral_Trace_img_masked - Lateral_ReTrace_img_masked) / 2;
-    W = Lateral_Trace_img_masked - Delta;      
+    Delta = (Lateral_Trace_masked - Lateral_ReTrace_masked) / 2;
+    W = Lateral_Trace_masked - Delta;      
         
     % convert W into force (in Newton units) using alpha calibration factor and show results.
     force=W*alpha;
     % flip and rotate to have the start of scan line to left and the low setpoint to bottom)
     force=rot90(flipud(force));
-    vertical_Trace_img_masked=rot90(flipud(vertical_Trace_img_masked));
-    vertical_ReTrace_img_masked=rot90(flipud(vertical_ReTrace_img_masked));
+    vertical_Trace=rot90(flipud(vertical_Trace));
+    vertical_ReTrace=rot90(flipud(vertical_ReTrace));
 
     if ~isempty(secondMonitorMain), f1=figure; objInSecondMonitor(f1,secondMonitorMain,'maximized'); else, figure; end
     subplot(121)
     contourf(force,'LineStyle','none')
     c= colorbar; c.Label.String = 'Force [N]'; c.FontSize = 15;
-    title('Force in glass regions','FontSize',20)
+    title({'Force in glass regions';'(PDA masked out)'},'FontSize',20)
     xlabel(' fast direction - scan line','FontSize',15), ylabel('slow direction','FontSize',15)
     subplot(122)
-    contourf(vertical_Trace_img_masked,'LineStyle','none','ShowText','on')
+    contourf(vertical_Trace,'LineStyle','none','ShowText','on')
     
-    title('Vertical Deflection','FontSize',20)
+    title('Vertical Deflection (masked)','FontSize',20)
     xlabel(' fast direction - scan line','FontSize',15), ylabel('slow direction','FontSize',15)
    
     % average force along fast scan line
     force_avg = mean(force,2);
 
-    % Detect over the threshold 
+    % Detect over the threshold. Remove those with vertical force values too outside from theoritical value
     Th = 0.4e-8;
-    Ave_VD_Trace = mean(vertical_Trace_img_masked,2);
-    Ave_VD_ReTrace = mean(vertical_ReTrace_img_masked,2);
-    Diff_VD = abs(Ave_VD_Trace - Ave_VD_ReTrace);
-    Idx = Diff_VD < Th;
+    vertTrace_avg = mean(vertical_Trace,2);
+    vertReTrace_avg = mean(vertical_ReTrace,2);
+    Idx = abs(vertTrace_avg - vertReTrace_avg) < Th;
+    % based on the idx, remove the outliers
+    force_avg_fix = force_avg(Idx);
+    vertTrace_avg_fix = (vertTrace_avg + vertReTrace_avg) / 2;
+    vertTrace_avg_fix = vertTrace_avg_fix(Idx);
+    figure;
+    plot(vertTrace_avg_fix, force_avg_fix, 'x');
+    xlabel('Set Point (N)'); ylabel('Delta Offset (N)');
+    xlim([0,max(vertTrace_avg_fix) * 1.1]);
 
-%% making figure offset vs vd
+    % Linear fitting
+    p = polyfit(vertTrace_avg_fix, force_avg_fix, 1);
+    yfit = polyval(p, vertTrace_avg_fix);
 
-New_Ave_Offset = force_avg(Idx);
-New_Ave_VD = (Ave_VD_Trace + Ave_VD_ReTrace) / 2;
-New_Ave_VD = New_Ave_VD(Idx);
-figure;
-plot(New_Ave_VD, New_Ave_Offset, 'x');
-xlabel('Set Point (N)');
-ylabel('Delta Offset (N)');
-xlim([0,max(New_Ave_VD) * 1.1]);
+    % plot
+    hold on;
+    plot(vertTrace_avg_fix, yfit, 'r-.'); grid on
+    legend('fitted curve','experimental data','Location','northwest','FontSize',15)
+    eqn = sprintf('Linear: y = %0.3g x %0.3g', p(1), p(2));
+    title({'Delta Offset vs Set Point'; eqn});
+    hold off
 
-
-%% Linear fitting
-x = New_Ave_VD;
-y = New_Ave_Offset;
-p = polyfit(x, y, 1);
-yfit = polyval(p, x);
-
-hold on;
-plot(x, yfit, 'r-.');
-
-%eqn = string("Linear: y = " + p(1)) + "x + " + string(p(2));
-%text(min(x), max(y), eqn, "HorizontalAlignment", "Left", "VerticalAlignment","top");
-eqn = sprintf('Linear: y = %f x %+g', p(1), p(2));
-
-title({'Delta Offset vs Set Point'; eqn});
+    avg_fc2=p(1);
+end
