@@ -7,7 +7,19 @@ function avg_fc=A5_frictionGlassCalc_method1(alphaGlass,dataGlass,secondMonitorM
 % University of Tokyo
 % 
 % Last update 26.June.2024
-    
+
+%%%%%%%%%%%%------------- IMPORTANT NOTE -------------%%%%%%%%%%%%
+%%%%%% for the next function, the glass only friction coefficient is required!
+%%%%%% When measurement for a PDA sample is done, also run measurements on only glass using the same conditions
+%%%%%% Example: if you run 20 experiments with 2 different speeds and 10 different setpoints, then run the
+%%%%%% same 20 experiments but only on glass.
+%%%%%% For each experiment (with Hover Mode OFF, thus TRACE-RETRACE), you will get lateral and vertical signals
+%%%%%%      - verSignals (V) ==> verForce (N)
+%%%%%%      - latSignals (V) ==> latForce (N) (using alpha calibration factor)
+%%%%%% after that, obtain the slope (y=lateral, x=vertical) which correspond to the glass friction
+%%%%%% average any glass friction coefficient from the different experiments
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
     % extract the needed data
     % latDefl expressed in Volt
     latDefl_trace   = dataGlass(strcmpi({dataGlass.Channel_name},'Lateral Deflection') & strcmpi({dataGlass.Trace_type},'Trace')).AFM_image;
@@ -25,8 +37,8 @@ function avg_fc=A5_frictionGlassCalc_method1(alphaGlass,dataGlass,secondMonitorM
     W = latDefl_trace -  Delta;                     
     
     if ~isempty(secondMonitorMain), f1=figure; objInSecondMonitor(f1,secondMonitorMain,'maximized'); else, figure; end
-    surf(W,'LineStyle','none'), title('W half-width loop')
-    xlabel(' fast direction - scan line'), zlabel('W [V]'), ylabel('slow direction')
+    surf(W,'LineStyle','none'), title('W half-width loop','FontSize',20)
+    xlabel(' fast direction - scan line','FontSize',15), zlabel('W [V]','FontSize',15), ylabel('slow direction','FontSize',15)
 
     % convert W into force (in Newton units) using alpha calibration factor
     force=W*alphaGlass;
@@ -63,8 +75,9 @@ function avg_fc=A5_frictionGlassCalc_method1(alphaGlass,dataGlass,secondMonitorM
     if ~isempty(secondMonitorMain), f2=figure; objInSecondMonitor(f2,secondMonitorMain,'maximized'); else, figure; end
     hold on
     plot(x,y), plot(setpoints,force_avg_singleSetpoint,'k*')
-    hold off, xlabel('Vertical Deflection [N]'), ylabel('Lateral Deflection [N]'), grid on
-    legend('fitted curve','experimental data','Location','northwest')
+    errorbar(setpoints,force_avg_singleSetpoint,force_std_singleSetpoint, 'k', 'LineStyle', 'none', 'Marker','none','LineWidth', 1.5);
+    hold off, xlabel('Vertical Deflection [N]','FontSize',15), ylabel('Lateral Deflection [N]','FontSize',15), grid on
+    legend('fitted curve','experimental data','Location','northwest','FontSize',15)
     avg_fc=fitresult.p1;
 end
 
