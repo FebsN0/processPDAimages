@@ -1,18 +1,14 @@
         % varargout = return any number of output arguments
-function [Alpha,varargout]=A1_open_JPK(varargin)
+function [varargout]=A1_open_JPK(varargin)
 
-%
 % This function opens .JPK image files and .JPK-force curves.
 % It is also able to import a number of parameters relative to the hile.
 %
 % Image:
-% [Image,Details of the image]=open_JPK(Path_to_File)
+% [Image,Details of the image (metadata), path_to_file]=open_JPK(Path_to_File)
 %
 % Force Curve:
 % [Force Curve]=open_JPK(Path_to_File);
-%
-% <<Path_to_File>> is optional, if not found then the user is prompted to
-% select file through GUI.
 %
 % In case a JPK Nanowizard AFM is used and an image is imported, in combination with the following
 % micromash [https://www.spmtips.com/] tips HQ:CSC38/Cr-Au or HQ:CSC37/Cr-Au, the SW also calibrates
@@ -294,7 +290,8 @@ if(strcmp(extension,valid_extensions{1,1}))
     end
     delete (wb)
     [~,index] = sortrows({Image.Channel_name}.'); Image = Image(index); clear index
-    % save the output image data
+    % save the output image data. NOTE: the data is already expressed in the correct unit.
+    % I.E. lateral deflection data is expressed in Volt
     varargout{1}=Image;
     % save the output metadata
     varargout{2}=Details_Img;

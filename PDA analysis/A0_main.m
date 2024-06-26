@@ -12,7 +12,7 @@ end
 clear question
 % open jpk, it returns the AFM file, the details (position of tip, IGain, Pgain, Sn, Kn and
 % calculates alpha, based on the pub), it returns the location of the file.
-[alpha,data]=A1_open_JPK(fullfile(filePathData,fileName));
+[data,metadata]=A1_open_JPK(fullfile(filePathData,fileName));
 
 %% Remove unnecessary channels to elaboration (necessary for memory save)
 filtData=A2_CleanUpData2_AFM(data);
@@ -39,7 +39,12 @@ Cropped_Images(strcmp({Cropped_Images.Channel_name},'Height (measured)')).Croppe
 %%%%%%      - latSignals (V) ==> latForce (N) (using alpha calibration factor)
 %%%%%% after that, obtain the slope (y=lateral, x=vertical) which correspond to the glass friction
 %%%%%% average any glass friction coefficient from the different experiments
+
+% get the friction glass experiment .jpk file
 [fileNameFriction, filePathDataFriction] = uigetfile('*.jpk', 'Select the .jpk AFM images where extract friction coefficient on glass-only');
+[dataGlass,metaDataGlass]=A1_open_JPK(fullfile(filePathDataFriction,fileNameFriction));
+%%%%%%% IMPORTANT CHECK ABOUT THIS. USE THE ALPHA FROM GLASS OR FROM PDA?
+avg_fc=A5_frictionGlassCalc_method1(metaDataGlass.Alpha,dataGlass,secondMonitorMain);
 
 %% Substitute to the AFM cropped channels the baseline adapted LD
 [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked_TRCDA(Cropped_Images,alpha,AFM_height_IO,'Low');
