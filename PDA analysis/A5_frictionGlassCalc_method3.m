@@ -84,6 +84,10 @@ function avg_fc=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_height
         wb=waitbar(0/size(force,1),sprintf('Processing the Outliers Removal Mode %d (pixel size %d / %d) \n\t Line %.0f Completeted  %2.1f %%',fOutlierRemoval,0,pixData(1),0,0),...
                  'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
         setappdata(wb,'canceling',0);
+        % open a new figure where plot the fitting curve
+        if ~isempty(secondMonitorMain), f1=figure; objInSecondMonitor(f1,secondMonitorMain,'maximized'); else, figure; end
+        xlim([min(min(vertical_Trace))*0.9 max(max(vertical_Trace))*1.1])
+        Cnt=1;
         for pix = 0:pixData(2):pixData(1)
             % init matrix with the same size of cropped AFM image. Double is already default
             filteredForce = zeros(size(force));
@@ -100,31 +104,16 @@ function avg_fc=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_height
                     end
                 end
             end           
-        
-        
-            figure; imagesc(flip(filteredForce)); colorbar; title('Offset')
-            
-        
-            % calc average
-        
-            % Exclude the zero value for averaging. (2023/07/18)
-            %Ave = mean(Offset,1);
-            Ave = zeros(1, sx);
-            for i=1:sx
-                tmp = filteredForce(:,i);
-                ind = tmp ~= 0;
-                % If there is no data remained, the Ave(i) = NaN;
-                Ave(i) = mean(tmp(ind));
+           
+            % calc average along fast scan line, ignore zero values
+            force_avg = zeros(1, size(force,1));
+            for i=1:size(force,1)
+                tmp = filteredForce(i,:);
+                force_avg(i) = mean(tmp(tmp~=0));
             end
-        
-
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-            % average force along fast scan line
-            force_avg = mean(force,2);
-        
             % Detect over the threshold. Remove those with vertical force values too outside from theoritical value
             Th = 0.4e-8;
             vertTrace_avg = mean(vertical_Trace,2);
@@ -132,27 +121,38 @@ function avg_fc=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_height
             Idx = abs(vertTrace_avg - vertReTrace_avg) < Th;
             % based on the idx, remove the outliers
             force_avg_fix = force_avg(Idx);
-            vertTrace_avg_fix = (vertTrace_avg + vertReTrace_avg) / 2;
-            vertTrace_avg_fix = vertTrace_avg_fix(Idx);
-            figure;
-            plot(vertTrace_avg_fix, force_avg_fix, 'x');
+            vert_avg_fix = (vertTrace_avg + vertReTrace_avg) / 2;
+            vert_avg_fix = vert_avg_fix(Idx);
+            % remove NaN data
+            force_avg_fix = force_avg_fix(~isnan(force_avg_fix));
+            vert_avg_fix = vert_avg_fix(~isnan(force_avg_fix));
+            
+            % delete previous experimental data, keep curve fitting. Update the latter
+            if exist('xyExp','var')
+                delete(xyExp)
+            end
+
+            hold on
+            xyExp=plot(vert_avg_fix, force_avg_fix, 'x');
             xlabel('Set Point (N)'); ylabel('Delta Offset (N)');
-            xlim([0,max(vertTrace_avg_fix) * 1.1]);
-        
             % Linear fitting
-            p = polyfit(vertTrace_avg_fix, force_avg_fix, 1);
-            yfit = polyval(p, vertTrace_avg_fix);
-        
-            % plot
-            hold on;
-            plot(vertTrace_avg_fix, yfit, 'r-.'); grid on
+            p = polyfit(vert_avg_fix, force_avg_fix, 1);
+            yfit = polyval(p, vert_avg_fix);
+            % plot curve fitting
+            plot(vert_avg_fix, yfit, 'r-.'); grid on
             legend('fitted curve','experimental data','Location','northwest','FontSize',15)
             eqn = sprintf('Linear: y = %0.3g x %0.3g', p(1), p(2));
             title({'Delta Offset vs Set Point'; eqn},'FontSize',15);
             hold off
         
-            avg_fc=p(1);
+            %% Store coef data
+            avg_fc(Cnt) = p(1);
+            Cnt = Cnt+1;
         end
         delete(wb)
     end
+    figure;
+    plot(0:pixData(2):pixData(1), avg_fc, 'bx-'); grid on
+    xlabel('Pixel size'); ylabel('Glass friction coefficient');
+    title('Result Method 3 (Mask + Outliers Removal','FontSize',15);
 end
