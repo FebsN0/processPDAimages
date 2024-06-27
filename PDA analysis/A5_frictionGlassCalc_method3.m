@@ -43,16 +43,16 @@ function avg_fc=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_height
     force=rot90(flipud(force));
     vertical_Trace=rot90(flipud(vertical_Trace));
     vertical_ReTrace=rot90(flipud(vertical_ReTrace));
-    % plot lateral (masked force, N) and vertical data (force, N)
+    % plot lateral (masked force, N) and vertical data (masked force, N)
+    % NOTE: vertical data is not directly masked, rather just only for the rapresentation to provide better show
     if ~isempty(secondMonitorMain), f1=figure; objInSecondMonitor(f1,secondMonitorMain,'maximized'); else, figure; end
     subplot(121)
-    mesh(force)
-    xlim tight, ylim tight
+    imagesc(flip(force))
     c= colorbar; c.Label.String = 'Force [N]'; c.FontSize = 15;
     title({'Force in glass regions';'(PDA masked out)'},'FontSize',20)
     xlabel(' fast direction - scan line','FontSize',15), ylabel('slow direction','FontSize',15)
     subplot(122)
-    mesh(vertical_Trace)
+    imagesc(flip(vertical_Trace.*(~rot90(flipud(AFM_height_IO)))))
     xlim tight, ylim tight
     title('Vertical Deflection (masked)','FontSize',20)
     xlabel(' fast direction - scan line','FontSize',15), ylabel('slow direction','FontSize',15)
@@ -77,27 +77,33 @@ function avg_fc=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_height
                 ' 2) Apply outlier removal to one large connected segment after pixel reduction.\n' ...
                 ' Enter the mode: '];
     fOutlierRemoval = str2double(getValidAnswer(question,{'0','1','2'}));
-
-    Offset_org = force;
-    fOutlierRemoval = 1;     
+   
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-    if fOutlierRemoval ~=0
+    if fOutlierRemoval ~= 0
+        % show a dialog box indicating the index of fast scan line along slow direction and which pixel size is processing
+        wb=waitbar(0/size(force,1),sprintf('Processing the Outliers Removal Mode %d (pixel size %d / %d) \n\t Line %.0f Completeted  %2.1f %%',fOutlierRemoval,0,pixData(1),0,0),...
+                 'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
+        setappdata(wb,'canceling',0);
         for pix = 0:pixData(2):pixData(1)
-            [sy, sx] = size(Offset_org);
+            % init matrix with the same size of cropped AFM image. Double is already default
+            filteredForce = zeros(size(force));
+                                 
+            % process the single fast scan line with a given pixel size
+            for i=1:size(force,2)
+                filteredForce(i,:) = A5_method3feature_DeleteEdgeDataAndOutlierRemoval(force(i,:), pix, fOutlierRemoval);
+                % update dialog box and check if cancel is clicked
+                waitbar(i/size(force,1),wb,sprintf('Processing the Outliers Removal Mode %d with a pixel size %d\n\t Line %.0f Completeted  %2.1f %%',fOutlierRemoval,pix,i,i/size(force,1)*100));
+                if(exist('wb','var'))
+                    %if cancel is clicked, stop and delete dialog
+                    if getappdata(wb,'canceling')
+                        delete(wb), break
+                    end
+                end
+            end           
         
-            tmpOffset = zeros(sy, sx, 'double');
-            for i=1:sx
-                LineData = Offset_org(:,i);
-                LineData2 = DeleteEdgeDataAndOutlierRemoval(LineData, pix, fOutlierRemoval);
-                tmpOffset(:,i) = LineData2(:);
-            end
-            Offset = tmpOffset;
         
-            %figure; mesh(Offset); title('Offset')
-            figure; imagesc(Offset); colorbar; title('Offset')
-            movegui('southwest');
-            drawnow;
+            figure; imagesc(flip(filteredForce)); colorbar; title('Offset')
+            
         
             % calc average
         
@@ -105,7 +111,7 @@ function avg_fc=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_height
             %Ave = mean(Offset,1);
             Ave = zeros(1, sx);
             for i=1:sx
-                tmp = Offset(:,i);
+                tmp = filteredForce(:,i);
                 ind = tmp ~= 0;
                 % If there is no data remained, the Ave(i) = NaN;
                 Ave(i) = mean(tmp(ind));
@@ -147,5 +153,6 @@ function avg_fc=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_height
         
             avg_fc=p(1);
         end
+        delete(wb)
     end
 end
