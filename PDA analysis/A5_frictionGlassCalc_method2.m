@@ -1,4 +1,4 @@
-function avg_fc2=A5_frictionGlassCalc_method2(alpha,Cropped_Images,AFM_height_IO,secondMonitorMain)
+function avg_fc=A5_frictionGlassCalc_method2(alpha,Cropped_Images,AFM_height_IO,secondMonitorMain)
 %
 % This function opens the AFM cropped data previously created to calculate the glass friction
 % coefficient. This method is more accurated than the method 1.
@@ -28,16 +28,17 @@ function avg_fc2=A5_frictionGlassCalc_method2(alpha,Cropped_Images,AFM_height_IO
     force=rot90(flipud(force));
     vertical_Trace=rot90(flipud(vertical_Trace));
     vertical_ReTrace=rot90(flipud(vertical_ReTrace));
-
+    % plot lateral (masked force, N) and vertical data (force, N)
     if ~isempty(secondMonitorMain), f1=figure; objInSecondMonitor(f1,secondMonitorMain,'maximized'); else, figure; end
     subplot(121)
-    contourf(force,'LineStyle','none')
+    mesh(force)
+    xlim tight, ylim tight
     c= colorbar; c.Label.String = 'Force [N]'; c.FontSize = 15;
     title({'Force in glass regions';'(PDA masked out)'},'FontSize',20)
     xlabel(' fast direction - scan line','FontSize',15), ylabel('slow direction','FontSize',15)
     subplot(122)
-    contourf(vertical_Trace,'LineStyle','none','ShowText','on')
-    
+    mesh(vertical_Trace)
+    xlim tight, ylim tight
     title('Vertical Deflection (masked)','FontSize',20)
     xlabel(' fast direction - scan line','FontSize',15), ylabel('slow direction','FontSize',15)
    
@@ -67,8 +68,8 @@ function avg_fc2=A5_frictionGlassCalc_method2(alpha,Cropped_Images,AFM_height_IO
     plot(vertTrace_avg_fix, yfit, 'r-.'); grid on
     legend('fitted curve','experimental data','Location','northwest','FontSize',15)
     eqn = sprintf('Linear: y = %0.3g x %0.3g', p(1), p(2));
-    title({'Delta Offset vs Set Point'; eqn});
+    title({'Delta Offset vs Set Point'; eqn},'FontSize',15);
     hold off
 
-    avg_fc2=p(1);
+    avg_fc=p(1);
 end

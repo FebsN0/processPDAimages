@@ -20,13 +20,13 @@ clear data
 
 %% Extract the (1) height no Bk, which is not used, (2) cropped AFM channels, (3) I/O image of Height and
 % (4) info of the cropped area
-[~,Cropped_Images,AFM_height_IO,Rect]=A3_El_AFM(filtData,secondMonitorMain,'High');
+[~,AFM_cropped_Images,AFM_height_IO,Rect]=A3_El_AFM(filtData,secondMonitorMain,'High');
 clear filtData
 
 %% Using the AFM_height_IO, fit the background again, yielding a more accurate height image
-[AFM_H_NoBk]=A4_El_AFM_masked(Cropped_Images,AFM_height_IO,secondMonitorMain);
+[AFM_H_NoBk]=A4_El_AFM_masked(AFM_cropped_Images,AFM_height_IO,secondMonitorMain);
 % substitutes to the raw cropped date the Height with no BK
-Cropped_Images(strcmp({Cropped_Images.Channel_name},'Height (measured)')).Cropped_AFM_image=AFM_H_NoBk;
+AFM_cropped_Images(strcmp({AFM_cropped_Images.Channel_name},'Height (measured)')).Cropped_AFM_image=AFM_H_NoBk;
 
 %% extract only-glass friction coefficient
 
@@ -38,7 +38,10 @@ Cropped_Images(strcmp({Cropped_Images.Channel_name},'Height (measured)')).Croppe
 avg_fc1=A5_frictionGlassCalc_method1(metaDataGlass.Alpha,dataGlass,secondMonitorMain);
 
 % method 2
-avg_fc2=A5_frictionGlassCalc_method2(metadata.Alpha,Cropped_Images,AFM_height_IO,secondMonitorMain);
+avg_fc2=A5_frictionGlassCalc_method2(metadata.Alpha,AFM_cropped_Images,AFM_height_IO,secondMonitorMain);
+
+% method 3
+avg_fc3=A5_frictionGlassCalc_method3(metadata.Alpha,AFM_cropped_Images,AFM_height_IO,secondMonitorMain);
 
 %% Substitute to the AFM cropped channels the baseline adapted LD
 %[Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_masked(Cropped_Images,alpha,AFM_height_IO,'Low');

@@ -64,8 +64,8 @@ function avg_fc=A5_frictionGlassCalc_method1(alphaGlass,dataGlass,secondMonitorM
         force_avg_singleSetpoint(i)=mean(mean(force(start_indices(i):last,:),2));
         force_std_singleSetpoint(i)=std(mean(force(start_indices(i):last,:),2));
         setpoints(i)=mean(mean(verForce(start_indices(i):last,:),2));
-    end
-    
+    end  
+
     %FITTING VERTICAl and LATERAL DEFLECTION (both expressed in Newton)
     % group of coefficients: p1 and p2 ==> val(x) = p1*x + p2
     [fitresult,~]=fit(setpoints,force_avg_singleSetpoint, 'poly1' );
@@ -80,7 +80,7 @@ function avg_fc=A5_frictionGlassCalc_method1(alphaGlass,dataGlass,secondMonitorM
     hold off, xlabel('Vertical Deflection [N]','FontSize',15), ylabel('Lateral Deflection [N]','FontSize',15), grid on
     legend('fitted curve','experimental data','Location','northwest','FontSize',15)
     eqn = sprintf('Linear: y = %0.3g x %0.3g', fitresult.p1, fitresult.p2);
-    title({'Delta Offset vs Set Point'; eqn});
+    title({'Delta Offset vs Set Point'; eqn},'FontSize',15);
     
     avg_fc=fitresult.p1;
 end
