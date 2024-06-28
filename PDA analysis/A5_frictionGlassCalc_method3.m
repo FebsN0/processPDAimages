@@ -1,4 +1,4 @@
-function avg_fc=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_height_IO,secondMonitorMain)
+function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_height_IO,secondMonitorMain)
 %
 % This function opens the AFM cropped data previously created to calculate the glass friction
 % coefficient. This method is more accurated than the method 2.
@@ -76,10 +76,10 @@ function avg_fc=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_height
                 ' 1) Apply outlier removal to each segment after pixel reduction\n'...
                 ' 2) Apply outlier removal to one large connected segment after pixel reduction.\n' ...
                 ' Enter the mode: '];
-    fOutlierRemoval = str2double(getValidAnswer(question,{'0','1','2'}));
+    fOutlierRemoval = getValidAnswer(question,{'0','1','2'});
    
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    if fOutlierRemoval ~= 0
+    if fOutlierRemoval ~= '0'
         % show a dialog box indicating the index of fast scan line along slow direction and which pixel size is processing
         wb=waitbar(0/size(force,1),sprintf('Processing the Outliers Removal Mode %d (pixel size %d / %d) \n\t Line %.0f Completeted  %2.1f %%',fOutlierRemoval,0,pixData(1),0,0),...
                  'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
@@ -96,7 +96,7 @@ function avg_fc=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_height
             for i=1:size(force,2)
                 filteredForce(i,:) = A5_method3feature_DeleteEdgeDataAndOutlierRemoval(force(i,:), pix, fOutlierRemoval);
                 % update dialog box and check if cancel is clicked
-                waitbar(i/size(force,1),wb,sprintf('Processing the Outliers Removal Mode %d with a pixel size %d\n\t Line %.0f Completeted  %2.1f %%',fOutlierRemoval,pix,i,i/size(force,1)*100));
+                waitbar(i/size(force,1),wb,sprintf('Processing the Outliers Removal Mode %d with a pixel size %d\n\t Line %.0f Completeted  %2.1f %%',str2double(fOutlierRemoval),pix,i,i/size(force,1)*100));
                 if(exist('wb','var'))
                     %if cancel is clicked, stop and delete dialog
                     if getappdata(wb,'canceling')
@@ -154,5 +154,7 @@ function avg_fc=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_height
     figure;
     plot(0:pixData(2):pixData(1), avg_fc, 'bx-'); grid on
     xlabel('Pixel size'); ylabel('Glass friction coefficient');
-    title('Result Method 3 (Mask + Outliers Removal','FontSize',15);
+    title({'Result Method 3 (Mask + Outliers Removal';'Click on the plot to select the most suited glass friction coefficient'},'FontSize',16);
+    avg_fc_def=avg_fc(selectRangeGInput(1,1,0:pixData(2):pixData(1),avg_fc));
+    title({'Result Method 3 (Mask + Outliers Removal'},'FontSize',16);
 end
