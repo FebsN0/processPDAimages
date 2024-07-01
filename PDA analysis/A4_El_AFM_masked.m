@@ -40,7 +40,6 @@ function [AFM_noBk]=A4_El_AFM_masked(Cropped_Images,AFM_height_IO,secondMonitorM
     
     wb=waitbar(0/size(cropped_image,1),sprintf('Removing Polynomial Baseline %.0f of %.0f',0,size(cropped_image,1)),...
         'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
-    if ~isempty(secondMonitorMain), objInSecondMonitor(wb,secondMonitorMain), end
     setappdata(wb,'canceling',0);
     N_Cycluse_waitbar=size(cropped_image,2);
     
@@ -64,7 +63,7 @@ function [AFM_noBk]=A4_El_AFM_masked(Cropped_Images,AFM_height_IO,secondMonitorM
     AFM_noBk=AFM_noBk-min(min(AFM_noBk));
     AFM_noBk_visible_data=AFM_noBk/max(max(AFM_noBk));
     AFM_noBk_visible_data=imadjust(AFM_noBk_visible_data);
-    if ~isempty(secondMonitorMain), f2=figure; objInSecondMonitor(f2,secondMonitorMain,'maximized'); else, figure; end
+    if ~isempty(secondMonitorMain), f2=figure; objInSecondMonitor(secondMonitorMain,f2); else, figure; end
     imshow(AFM_noBk_visible_data),colormap parula, title('(Optimized) Usable Partial of Image')
     if(exist('wb','var'))
         delete(wb)

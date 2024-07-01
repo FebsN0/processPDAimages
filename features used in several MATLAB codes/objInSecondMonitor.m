@@ -13,9 +13,9 @@ function res=objInSecondMonitor(varargin)
             if strcmpi(getValidAnswer(question,{'y','n'}),'y')
                 question= 'Is the second monitor a main monitor? [Y/N]: ';
                 res = getValidAnswer(question,{'y','n'});
-            else
-                res = [];
             end
+        else
+            res = [];
         end
     else 
         % if the second monitor is a main monitor, then put the obj in the first monitor (second row

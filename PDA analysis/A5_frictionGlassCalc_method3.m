@@ -20,7 +20,6 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_he
 %           4) secondMonitorMain
 %           5) PixData: contain max size and step of fitlering window
 %           5) fOutlierRemoval: mode of outlier removal:
-%               0: No outlier removal.
 %               1: Apply outlier removal to each segment after pixel reduction.
 %               2: Apply outlier removal to one large connected segment after pixel reduction.
 
@@ -45,7 +44,7 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_he
     vertical_ReTrace=rot90(flipud(vertical_ReTrace));
     % plot lateral (masked force, N) and vertical data (masked force, N)
     % NOTE: vertical data is not directly masked, rather just only for the rapresentation to provide better show
-    if ~isempty(secondMonitorMain), f1=figure; objInSecondMonitor(f1,secondMonitorMain,'maximized'); else, figure; end
+    if ~isempty(secondMonitorMain), f1=figure; objInSecondMonitor(secondMonitorMain,f1); else, figure; end
     subplot(121)
     imagesc(flip(force))
     c= colorbar; c.Label.String = 'Force [N]'; c.FontSize = 15;
@@ -66,95 +65,94 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_he
     while true
         v = input(text{i},'s'); v_num = str2double(v);
         if isnan(v_num), disp('Invalid input! Please enter a numeric value');
-        else pixData(i) = v_num;
+        else, pixData(i) = v_num;
             if i==2, break, else, i=i+1; end
         end
     end
     % choose the removal modality    
     question= ['Modality of removal outliers:\n' ...
-                ' 0) No outlier removal\n'...
                 ' 1) Apply outlier removal to each segment after pixel reduction\n'...
                 ' 2) Apply outlier removal to one large connected segment after pixel reduction.\n' ...
                 ' Enter the mode: '];
-    fOutlierRemoval = getValidAnswer(question,{'0','1','2'});
+    fOutlierRemoval = getValidAnswer(question,{'1','2'});
    
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    if fOutlierRemoval ~= '0'
-        % show a dialog box indicating the index of fast scan line along slow direction and which pixel size is processing
-        wb=waitbar(0/size(force,1),sprintf('Processing the Outliers Removal Mode %d (pixel size %d / %d) \n\t Line %.0f Completeted  %2.1f %%',fOutlierRemoval,0,pixData(1),0,0),...
-                 'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
-        setappdata(wb,'canceling',0);
-        % open a new figure where plot the fitting curve
-        if ~isempty(secondMonitorMain), f1=figure; objInSecondMonitor(f1,secondMonitorMain,'maximized'); else, figure; end
-        xlim([min(min(vertical_Trace))*0.9 max(max(vertical_Trace))*1.1])
-        Cnt=1;
-        for pix = 0:pixData(2):pixData(1)
-            % init matrix with the same size of cropped AFM image. Double is already default
-            filteredForce = zeros(size(force));
-                                 
-            % process the single fast scan line with a given pixel size
-            for i=1:size(force,2)
-                filteredForce(i,:) = A5_method3feature_DeleteEdgeDataAndOutlierRemoval(force(i,:), pix, fOutlierRemoval);
-                % update dialog box and check if cancel is clicked
-                waitbar(i/size(force,1),wb,sprintf('Processing the Outliers Removal Mode %d with a pixel size %d\n\t Line %.0f Completeted  %2.1f %%',str2double(fOutlierRemoval),pix,i,i/size(force,1)*100));
-                if(exist('wb','var'))
-                    %if cancel is clicked, stop and delete dialog
-                    if getappdata(wb,'canceling')
-                        delete(wb), break
-                    end
+    % show a dialog box indicating the index of fast scan line along slow direction and which pixel size is processing
+    wb=waitbar(0/size(force,1),sprintf('Processing the Outliers Removal Mode %d (pixel size %d / %d) \n\t Line %.0f Completeted  %2.1f %%',fOutlierRemoval,0,pixData(1),0,0),...
+             'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
+    setappdata(wb,'canceling',0);
+    % open a new figure where plot the fitting curve
+    if ~isempty(secondMonitorMain), f2=figure; objInSecondMonitor(secondMonitorMain,f2); else, figure; end
+    xlim([min(min(vertical_Trace))*0.9 max(max(vertical_Trace))*1.1])
+    ylim([min(min(force))*0.9 max(max(force))*1.1])
+    Cnt=1;
+    for pix = 0:pixData(2):pixData(1)
+        % init matrix with the same size of cropped AFM image. Double is already default
+        filteredForce = zeros(size(force));
+                             
+        % process the single fast scan line with a given pixel size
+        for i=1:size(force,2)
+            filteredForce(i,:) = A5_method3feature_DeleteEdgeDataAndOutlierRemoval(force(i,:), pix, fOutlierRemoval);
+            % update dialog box and check if cancel is clicked
+            waitbar(i/size(force,1),wb,sprintf('Processing the Outliers Removal Mode %d with a pixel size %d\n\t Line %.0f Completeted  %2.1f %%',str2double(fOutlierRemoval),pix,i,i/size(force,1)*100));
+            if(exist('wb','var'))
+                %if cancel is clicked, stop and delete dialog
+                if getappdata(wb,'canceling')
+                    delete(wb), break
                 end
-            end           
-           
-            % calc average along fast scan line, ignore zero values
-            force_avg = zeros(1, size(force,1));
-            for i=1:size(force,1)
-                tmp = filteredForce(i,:);
-                force_avg(i) = mean(tmp(tmp~=0));
             end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-            % Detect over the threshold. Remove those with vertical force values too outside from theoritical value
-            Th = 0.4e-8;
-            vertTrace_avg = mean(vertical_Trace,2);
-            vertReTrace_avg = mean(vertical_ReTrace,2);
-            Idx = abs(vertTrace_avg - vertReTrace_avg) < Th;
-            % based on the idx, remove the outliers
-            force_avg_fix = force_avg(Idx);
-            vert_avg_fix = (vertTrace_avg + vertReTrace_avg) / 2;
-            vert_avg_fix = vert_avg_fix(Idx);
-            % remove NaN data
-            force_avg_fix = force_avg_fix(~isnan(force_avg_fix));
-            vert_avg_fix = vert_avg_fix(~isnan(force_avg_fix));
-            
-            % delete previous experimental data, keep curve fitting. Update the latter
-            if exist('xyExp','var')
-                delete(xyExp)
-            end
-
-            hold on
-            xyExp=plot(vert_avg_fix, force_avg_fix, 'x');
-            xlabel('Set Point (N)'); ylabel('Delta Offset (N)');
-            % Linear fitting
-            p = polyfit(vert_avg_fix, force_avg_fix, 1);
-            yfit = polyval(p, vert_avg_fix);
-            % plot curve fitting
-            plot(vert_avg_fix, yfit, 'r-.'); grid on
-            legend('fitted curve','experimental data','Location','northwest','FontSize',15)
-            eqn = sprintf('Linear: y = %0.3g x %0.3g', p(1), p(2));
-            title({'Delta Offset vs Set Point'; eqn},'FontSize',15);
-            hold off
-        
-            %% Store coef data
-            avg_fc(Cnt) = p(1);
-            Cnt = Cnt+1;
+        end           
+       
+        % calc average along fast scan line, ignore zero values
+        force_avg = zeros(1, size(force,1));
+        for i=1:size(force,1)
+            tmp = filteredForce(i,:);
+            force_avg(i) = mean(tmp(tmp~=0));
         end
-        delete(wb)
+
+        % Detect over the threshold. Remove those with vertical force values too outside from theoritical value
+        Th = 0.4e-8;
+        vertTrace_avg = mean(vertical_Trace,2);
+        vertReTrace_avg = mean(vertical_ReTrace,2);
+        Idx = abs(vertTrace_avg - vertReTrace_avg) < Th;
+        % based on the idx, remove the outliers
+        force_avg_fix = force_avg(Idx);
+        vert_avg_fix = (vertTrace_avg + vertReTrace_avg) / 2;
+        vert_avg_fix = vert_avg_fix(Idx);
+        % remove NaN data
+        force_avg_fix = force_avg_fix(~isnan(force_avg_fix));
+        vert_avg_fix = vert_avg_fix(~isnan(force_avg_fix));
+        
+        % delete previous experimental data, keep curve fitting. Update the latter
+        if exist('xyExp','var')
+            delete(xyExp)
+        end
+
+        hold on
+        xyExp=plot(vert_avg_fix, force_avg_fix, 'x');
+        xlabel('Set Point (N)'); ylabel('Delta Offset (N)');
+        % Linear fitting
+        p = polyfit(vert_avg_fix, force_avg_fix, 1);
+        yfit = polyval(p, vert_avg_fix);
+        % plot curve fitting
+        plot(vert_avg_fix, yfit, 'r-.'); grid on
+        legend('fitted curve','experimental data','Location','northwest','FontSize',15)
+        eqn = sprintf('Linear: y = %0.3g x %0.3g', p(1), p(2));
+        title({'Delta Offset vs Set Point'; eqn},'FontSize',15);
+        hold off
+    
+        % Store coef data
+        avg_fc(Cnt) = p(1);
+        Cnt = Cnt+1;
     end
+    delete(wb)
     figure;
     plot(0:pixData(2):pixData(1), avg_fc, 'bx-'); grid on
     xlabel('Pixel size'); ylabel('Glass friction coefficient');
     title({'Result Method 3 (Mask + Outliers Removal';'Click on the plot to select the most suited glass friction coefficient'},'FontSize',16);
-    avg_fc_def=avg_fc(selectRangeGInput(1,1,0:pixData(2):pixData(1),avg_fc));
-    title({'Result Method 3 (Mask + Outliers Removal'},'FontSize',16);
+    idx_x=selectRangeGInput(1,1,0:pixData(2):pixData(1),avg_fc);
+    hold on
+    scatter(pixData(2)*idx_x-pixData(2),avg_fc(idx_x),200,'pentagram','filled', 'MarkerFaceColor', 'red');
+    avg_fc_def=avg_fc(idx_x);
+    title({'Result Method 3 (Mask + Outliers Removal)'},'FontSize',16);
 end

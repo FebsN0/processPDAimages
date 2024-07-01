@@ -36,7 +36,7 @@ function avg_fc=A5_frictionGlassCalc_method1(alphaGlass,dataGlass,secondMonitorM
     % Calc W (half-width loop)
     W = latDefl_trace - Delta;                     
     
-    if ~isempty(secondMonitorMain), f1=figure; objInSecondMonitor(f1,secondMonitorMain,'maximized'); else, figure; end
+    if ~isempty(secondMonitorMain), f1=figure; objInSecondMonitor(secondMonitorMain,f1); else, figure; end
     surf(W,'LineStyle','none'), title('W half-width loop','FontSize',20)
     xlabel(' fast direction - scan line','FontSize',15), zlabel('W [V]','FontSize',15), ylabel('slow direction','FontSize',15)
 
@@ -72,7 +72,7 @@ function avg_fc=A5_frictionGlassCalc_method1(alphaGlass,dataGlass,secondMonitorM
     %plot the fitting curve and the experimental data
     x=linspace(verForce(1),verForce(end),100);
     y=(fitresult.p1*x+fitresult.p2);
-    if ~isempty(secondMonitorMain), f2=figure; objInSecondMonitor(f2,secondMonitorMain,'maximized'); else, figure; end
+    if ~isempty(secondMonitorMain), f2=figure; objInSecondMonitor(secondMonitorMain,f2); else, figure; end
     hold on
     plot(x,y), plot(setpoints,force_avg_singleSetpoint,'k*')
     errorbar(setpoints,force_avg_singleSetpoint,force_std_singleSetpoint, 'k', 'LineStyle', 'none', 'Marker','none','LineWidth', 1.5);

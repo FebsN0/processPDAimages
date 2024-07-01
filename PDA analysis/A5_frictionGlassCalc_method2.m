@@ -29,7 +29,7 @@ function avg_fc=A5_frictionGlassCalc_method2(alpha,Cropped_Images,AFM_height_IO,
     vertical_Trace=rot90(flipud(vertical_Trace));
     vertical_ReTrace=rot90(flipud(vertical_ReTrace));
     % plot lateral (masked force, N) and vertical data (force, N)
-    if ~isempty(secondMonitorMain), f1=figure; objInSecondMonitor(f1,secondMonitorMain,'maximized'); else, figure; end
+    if ~isempty(secondMonitorMain), f1=figure; objInSecondMonitor(secondMonitorMain, f1); else, figure; end
     subplot(121)
     mesh(force)
     xlim tight, ylim tight
@@ -42,8 +42,12 @@ function avg_fc=A5_frictionGlassCalc_method2(alpha,Cropped_Images,AFM_height_IO,
     title('Vertical Deflection (masked)','FontSize',20)
     xlabel(' fast direction - scan line','FontSize',15), ylabel('slow direction','FontSize',15)
    
-    % average force along fast scan line
-    force_avg = mean(force,2);
+    % calc average along fast scan line, ignore zero values
+    force_avg = zeros(1, size(force,1));
+    for i=1:size(force,1)
+        tmp = force(i,:);
+        force_avg(i) = mean(tmp(tmp~=0));
+    end
 
     % Detect over the threshold. Remove those with vertical force values too outside from theoritical value
     Th = 0.4e-8;

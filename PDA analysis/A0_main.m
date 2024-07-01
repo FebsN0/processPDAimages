@@ -1,14 +1,8 @@
 clc, clear, close
 
 [fileName, filePathData] = uigetfile('*.jpk', 'Select a .jpk AFM image');
+secondMonitorMain=objInSecondMonitor;
 
-question= 'Do you want to show the figures into a maximized window in a second monitor? [Y/N]: ';
-if strcmpi(getValidAnswer(question,{'y','n'}),'y')
-    question= 'Is the second monitor a main monitor? [Y/N]: ';
-    secondMonitorMain = getValidAnswer(question,{'y','n'});
-else
-    secondMonitorMain = [];
-end
 clear question
 % open jpk, it returns the AFM file, the details (position of tip, IGain, Pgain, Sn, Kn and
 % calculates alpha, based on the pub), it returns the location of the file.
