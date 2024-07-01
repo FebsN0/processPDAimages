@@ -80,7 +80,7 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_maske
         if(exist('wb','var'))
             %if cancel is clicked, stop
             if getappdata(wb,'canceling')
-               % break
+               break
             end
         end           
         % Mask W to cut the PDA from the baseline fitting. Where there is PDA in corrispondece of the mask, then mask the
