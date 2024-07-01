@@ -85,10 +85,7 @@ end
 clear i idx j unorderedData unorderedData_tmp firstHeight copy
 
 %move the figure in another monitor in a maximized windows if second monitor is allowed
-question= 'Do you want to show the figures into a maximized window in a second monitor? [Y/N]: ';
-possibleAnswers= {'y','n'};
-secondMonitor = getValidAnswer(question,possibleAnswers);
-
+secondMonitorMain = objInSecondMonitor;
 
 %% Part 2 : Plotting Trace Retrace and Height of every data
 %  (if you want still to plot more than 9 single grates, add a new custom color palette for each new grates)
@@ -96,7 +93,7 @@ question='Do you want to see overlapped trace, retrace and height of every provi
 plotEverything = getValidAnswer(question,possibleAnswers);
 
 if strcmpi(plotEverything,'y') && size(orderedData, 1) < 10
-    if strcmpi(secondMonitor,'y'), figure('units','normalized','outerposition',[-2 0 1 1],'WindowState','maximized'); else, figure; end
+    if ~isempty(secondMonitorMain), f1=figure; objInSecondMonitor(secondMonitorMain,f1); else, figure; end
     hold on
     customColorPalette = [
         1 0 0   % red
@@ -212,8 +209,7 @@ else
             % close to zero.
             % To check if this happens, an user-guided selection will follow to
             % find the force adhesion for any force curve
-            if secondMonitor, figure('units','normalized','outerposition',[-2 0 1 1],'WindowState','maximized'); else, figure; end
-            xlabel('Height (m)');
+            if ~isempty(secondMonitorMain), f3=figure; objInSecondMonitor(secondMonitorMain,f3); else, figure; end            xlabel('Height (m)');
             ylabel('Vertical Deflection (N)');
             title('Select two point to create a range of interest in which the force adhesion is extracted','FontSize',16)
             hold on
@@ -291,8 +287,7 @@ clear numberForceCurves text question completed values possibleAnswers forceCurv
 % and flat section.
 referenceImage1 = imread('referencePicLateralDeflectionCalibration_1.png');
 referenceImage2 = imread('referencePicLateralDeflectionCalibration_2.png');
-if secondMonitor, figure('units','normalized','outerposition',[-2 0 1 1],'WindowState','maximized'); else, figure; end
-
+if ~isempty(secondMonitorMain), f2=figure; objInSecondMonitor(secondMonitorMain,f2); else, figure; end
 
 ax1=axes('Position', [0.05, 0.5, 0.47, 0.47]); % subplot 1
 imshow(referenceImage1,'Border','tight');
@@ -569,7 +564,7 @@ end
 
 %% extract final results
 close
-clear firstTheta ans secondMonitor ax MuCoefficient AlphaCoefficient MuFlatCoefficient text question possibleAnswers completed positionRect ax1 ax2 closest_indices data deltaPlot h* i j latDefl_* n nameSlopes referenceImage* x* y*
+clear firstTheta ans secondMonitorMain ax MuCoefficient AlphaCoefficient MuFlatCoefficient text question possibleAnswers completed positionRect ax1 ax2 closest_indices data deltaPlot h* i j latDefl_* n nameSlopes referenceImage* x* y*
 clc
 
       

@@ -1,30 +1,28 @@
-function objInSecondMonitor(h,secondMonitorMain,varargin)
+function res=objInSecondMonitor(varargin)
     %%% INPUT:
     % - object to handle
     % - secondMonitor is main? Y or N
     % varargin (optional) = 'maximized'
     % Get the position and resolution of all monitors
     screens = get(0, 'MonitorPositions');
-    % Check if there is more than one monitor
-    if size(screens, 1) > 1
-        if ~isempty(varargin)
-            if strcmp(varargin{1},'maximized')
-                set(h,'units','normalized','outerposition',[-2 0 1 1],'WindowState','maximized')
+    % first request. Ask if show figures in another monitor
+    if isempty(varargin)
+        % Check if there is more than one monitor
+        if size(screens, 1) > 1
+            question= 'More monitor detected!\nDo you want to show the figures into a maximized window in a second monitor? [Y/N]: ';
+            if strcmpi(getValidAnswer(question,{'y','n'}),'y')
+                question= 'Is the second monitor a main monitor? [Y/N]: ';
+                res = getValidAnswer(question,{'y','n'});
+            else
+                res = [];
             end
-        else
-            % if the second monitor is a main monitor, then put the obj in the first monitor
-            if strcmpi(secondMonitorMain,'y'), z=1; else, z=2; end
-            % Get the position of the second monitor (not main)
-            secondMonitor = screens(z, :);
-            %left bottom width height
-            windowObjPosition = get(h, 'Position');
-            % Calculate the new position for the waitbar on the second monitor
-            newPosition = [(secondMonitor(1)+3*windowObjPosition(3)), secondMonitor(2)+10, windowObjPosition(3), windowObjPosition(4)];
-            % Move the waitbar to the new position
-            set(h, 'Position', newPosition);
         end
-    else
-        disp('Only one monitor detected.');
+    else 
+        % if the second monitor is a main monitor, then put the obj in the first monitor (second row
+        % screen var). varargin{1} is "res" var
+        if strcmpi(varargin{1},'y'), z=1; else, z=2; end
+        % Get the position of the second monitor (not main)
+        secondMonitor = screens(z, :);
+        % Move the figure to the new position
+        set(varargin{2}, 'Position', secondMonitor,'WindowState','maximized');
     end
-end
-
