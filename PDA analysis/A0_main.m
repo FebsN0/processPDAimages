@@ -37,5 +37,9 @@ avg_fc2=A5_frictionGlassCalc_method2(metadata.Alpha,AFM_cropped_Images,AFM_heigh
 % method 3
 avg_fc3=A5_frictionGlassCalc_method3(metadata.Alpha,AFM_cropped_Images,AFM_height_IO,secondMonitorMain);
 
+% previous friction coefficients (determined by separate measurements)
+% TRCDA : 0.2920
+% PCDA  : 0.2626 (2020 July 7)
+
 %% Substitute to the AFM cropped channels the baseline adapted LD
-%[Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_masked(Cropped_Images,alpha,AFM_height_IO,'Low');
+[Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,metadata.Alpha,avg_fc3,'Low');
