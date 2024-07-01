@@ -41,7 +41,7 @@ function LineDataFilt = A5_method3feature_DeleteEdgeDataAndOutlierRemoval(LineDa
                 % if the segment is longer than window, then reset first and last part with size = pix
                 % in order to remove edges in both sides (the tip encounters the edges of a single PDA crystal 
                 % twice: trace and in retrace)
-                if length(Segment)>=pix
+                if ceil(length(Segment)/2) >=pix
                     Segment(1:pix) = 0;                
                     Segment(end-pix+1:end) = 0;
                 else
