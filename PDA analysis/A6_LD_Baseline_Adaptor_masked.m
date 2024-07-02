@@ -4,7 +4,7 @@
 % Check manually the processed image afterwards and compare with the AFM VD
 % image!
 
-function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,alpha,avg_fc,varargin)
+function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,alpha,avg_fc,secondMonitorMain,varargin)
 
     p=inputParser();    %init instance of inputParser
     %Add default parameters. When call the function, use 'argName' as well you use 'LineStyle' in plot! And
@@ -21,15 +21,11 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_maske
     Lateral_Trace   = (AFM_cropped_Images(strcmpi({AFM_cropped_Images.Channel_name},'Lateral Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'Trace')).Cropped_AFM_image);
     Lateral_ReTrace = (AFM_cropped_Images(strcmpi({AFM_cropped_Images.Channel_name},'Lateral Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'ReTrace')).Cropped_AFM_image);
     vertical_Trace  = (AFM_cropped_Images(strcmpi({AFM_cropped_Images.Channel_name},'Vertical Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'Trace')).Cropped_AFM_image);
+    %Fix orientation
+    Lateral_Trace=rot90(flipud(Lateral_Trace));
+    Lateral_ReTrace=rot90(flipud(Lateral_ReTrace));
+    vertical_Trace=rot90(flipud(vertical_Trace));
 
-
-    % convert W into force (in Newton units) using alpha calibration factor and show results.
-    % force=W*alpha;
-    % % flip and rotate to have the start of scan line to left and the low setpoint to bottom)
-    % force=rot90(flipud(force));
-    % vertical_Trace=rot90(flipud(vertical_Trace));
-    % vertical_ReTrace=rot90(flipud(vertical_ReTrace));
-    
     % Calc Delta (offset loop) 
     Delta = (Lateral_Trace + Lateral_ReTrace) / 2;
     % Calc W (half-width loop)
@@ -37,10 +33,7 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_maske
 
     %Subtract the minimum of the image
     W=minus(W,min(min(W)));
-    %Fix orientation
-    W=rot90(flipud(W));
-    vertical_Trace=rot90(flipud(vertical_Trace));
-    %vertical_ReTrace=rot90(flipud(vertical_ReTrace));
+    
     % plot 
     if ~isempty(secondMonitorMain), f1=figure; objInSecondMonitor(secondMonitorMain,f1); else, figure; end
     subplot(131)
@@ -64,14 +57,12 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_maske
     %   - Sum of squares due to error / Degree-of-freedom adjusted coefficient of determination
     %   - Sum of squares due to error
     %   - Degree-of-freedom adjusted coefficient of determination
-    
-    switch p.Results.Accuracy
-        case 'Low'
-            limit=3;
-        case 'Medium'
-            limit=6;
-        case 'High'
-            limit=9;
+    if strcmp(p.Results.Accuracy,'Low')
+        limit=3;
+    elseif strcmp(p.Results.Accuracy,'Medium')
+        limit=6;
+    else
+        limit=9;
     end
     fit_decision=zeros(3,limit);
 

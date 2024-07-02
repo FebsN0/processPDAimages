@@ -34,6 +34,7 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_he
 
     % Calc Delta (offset loop) 
     Delta = (Lateral_Trace_masked + Lateral_ReTrace_masked) / 2;
+    % Calc W (half-width loop)
     W = Lateral_Trace_masked - Delta;      
         
     % convert W into force (in Newton units) using alpha calibration factor and show results.
@@ -141,8 +142,9 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_he
         title({'Delta Offset vs Set Point'; eqn},'FontSize',15);
         hold off
     
-        % since slope higher than 0.7 has no sense, the loop will be stopped.
-        if p(1) > 0.7 || p(1) < 0
+        % since slope higher than 0.95 has no sense, the loop will be stopped. In theory max 1, but it will be
+        % never such value
+        if p(1) > 0.95 || p(1) < 0
             fprintf('\nSlope outside the reasonable range ( 0 < m < 7 ) ==> stopped calculation!\n\n')
             break
         end

@@ -42,4 +42,7 @@ avg_fc3=A5_frictionGlassCalc_method3(metadata.Alpha,AFM_cropped_Images,AFM_heigh
 % PCDA  : 0.2626 (2020 July 7)
 
 %% Substitute to the AFM cropped channels the baseline adapted LD
-[Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,metadata.Alpha,avg_fc3,'Low');
+[Corrected_LD_Trace,AFM_Elab,~]=A6_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,metadata.Alpha,avg_fc3,secondMonitorMain,'Medium');
+
+
+[AFM_cropped_Images_fit,~,~]=LD_Baseline_Adaptor_masked_TRCDA(AFM_cropped_Images,metadata.Alpha,AFM_height_IO,avg_fc3,'Medium');

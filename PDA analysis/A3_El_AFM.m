@@ -100,6 +100,8 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(input,secondMonitorMa
     poly_filt_data=zeros(size(cropped_image,1),size(cropped_image,2));
     for i=1:size(cropped_image,2)
         waitbar(i/N_Cycluse_waitbar,wb,sprintf('Removing Polynomial Baseline ... Completed %2.1f %%',i/N_Cycluse_waitbar*100));
+        % prepareCurveData function clean the data like Removing NaN or Inf, converting nondouble to double, converting complex to 
+        % real and returning data as columns regardless of the input shapes.
         % extract the i-th column of the cropped image ==> fitting on single column
         [xData,yData] = prepareCurveData((1:size(cropped_image,1))',cropped_image(:,i));
         % Linear polynomial curve

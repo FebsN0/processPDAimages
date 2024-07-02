@@ -20,6 +20,7 @@ function avg_fc=A5_frictionGlassCalc_method2(alpha,Cropped_Images,AFM_height_IO,
 
     % Calc Delta (offset loop) 
     Delta = (Lateral_Trace_masked + Lateral_ReTrace_masked) / 2;
+    % Calc W (half-width loop)
     W = Lateral_Trace_masked - Delta;      
         
     % convert W into force (in Newton units) using alpha calibration factor and show results.
