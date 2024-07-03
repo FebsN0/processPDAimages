@@ -1,4 +1,4 @@
-function [AFM_noBk]=A4_El_AFM_masked(Cropped_Images,AFM_height_IO,secondMonitorMain)
+function [AFM_noBk,Cropped_Images_Bk]=A4_El_AFM_masked(Cropped_Images,AFM_height_IO,secondMonitorMain)
 %%
 % The function extracts Images from the experiments.
 % It removes baseline and extracts foreground from the AFM image.
@@ -28,10 +28,15 @@ function [AFM_noBk]=A4_El_AFM_masked(Cropped_Images,AFM_height_IO,secondMonitorM
     p=inputParser();    %init instance of inputParser
     % Add required parameter and also check if it is a struct by a inner function end if the Trace_type are all Trace
     addRequired(p, 'Cropped_Images', @(x) isstruct(x));
+    argName = 'Silent';
+    defaultVal = 'No';
+    addOptional(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     % validate and parse the inputs
     parse(p,Cropped_Images);
     clearvars argName defaultVal
-    
+
+    if(strcmp(p.Results.Silent,'Yes')); SeeMe=0; else, SeeMe=1; end
+
     % added on 20012020: using the 0/1 height image, new fitting by excluding those information
     % which correspond to the PDA crystals. Put value 5 to exclude
     cropped_image=Cropped_Images(1).Cropped_AFM_image; 
@@ -63,11 +68,17 @@ function [AFM_noBk]=A4_El_AFM_masked(Cropped_Images,AFM_height_IO,secondMonitorM
     AFM_noBk=AFM_noBk-min(min(AFM_noBk));
     AFM_noBk_visible_data=AFM_noBk/max(max(AFM_noBk));
     AFM_noBk_visible_data=imadjust(AFM_noBk_visible_data);
-    if ~isempty(secondMonitorMain), f2=figure; objInSecondMonitor(secondMonitorMain,f2); else, figure; end
-    imshow(AFM_noBk_visible_data),colormap parula, title('(Optimized) Usable Partial of Image')
+    if SeeMe
+        if ~isempty(secondMonitorMain), f2=figure; objInSecondMonitor(secondMonitorMain,f2); else, figure; end
+        imshow(AFM_noBk_visible_data),colormap parula, title('(Optimized) Usable Partial of Image')
+    end
     if(exist('wb','var'))
         delete(wb)
     end
+
+    % substitutes to the raw cropped date the Height with no BK
+    Cropped_Images_Bk=Cropped_Images;
+    Cropped_Images_Bk(strcmp({Cropped_Images_Bk.Channel_name},'Height (measured)')).Cropped_AFM_image=AFM_noBk;
 end
     
 

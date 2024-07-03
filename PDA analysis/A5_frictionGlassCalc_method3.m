@@ -53,7 +53,6 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_he
     xlabel(' fast direction - scan line','FontSize',15), ylabel('slow direction','FontSize',15)
     subplot(122)
     imagesc(flip(vertical_Trace.*(~rot90(flipud(AFM_height_IO)))))
-    xlim tight, ylim tight
     title('Vertical Deflection (masked)','FontSize',20)
     xlabel(' fast direction - scan line','FontSize',15), ylabel('slow direction','FontSize',15)
    

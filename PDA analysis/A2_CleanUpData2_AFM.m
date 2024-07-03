@@ -13,7 +13,6 @@ function [Selected_AFM_data]=A2_CleanUpData2_AFM(arg)
     if ~nargin
         error('Missing Input')
     elseif nargin==1
-        Selected_AFM_data=[];
         %check if they are struct with the specific fields
         if isstruct(arg)
            % Check if the struct has exactly the specific fields and 10 rows

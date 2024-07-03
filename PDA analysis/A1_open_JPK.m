@@ -34,6 +34,7 @@ function [varargout]=A1_open_JPK(varargin)
 % if the input file is .jpk ==> retrieve metadata and img information
 % if the input file is .jpk-force ==> not sure what exactly is. 
 
+
 flag_manual_select=1;
 
 valid_extensions={'.jpk';'.jpk-force';'.jpk-force-map'};
@@ -317,7 +318,6 @@ elseif(strcmp(extension,valid_extensions{2,1}))
     % the unzip operation creates: segments, shared-data and header.properties
     unzip(complete_path_to_afm_file,sprintf('%s\\%s',FullDirPath,FileName))
     InfoDir=dir(sprintf('%s\\%s',FullDirPath,FileName));
-    InfoDirSize=size(InfoDir,1);
     
     % every metadata information is in header.properties file inside share-data dir
     index_header=find(strcmp({InfoDir.name},'shared-data')==1);

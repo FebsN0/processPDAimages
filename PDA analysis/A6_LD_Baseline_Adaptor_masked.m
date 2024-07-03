@@ -5,7 +5,7 @@
 % image!
 
 function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,alpha,avg_fc,secondMonitorMain,varargin)
-
+    fprintf('\tSTEP 3 processing ...\n')
     p=inputParser();    %init instance of inputParser
     %Add default parameters. When call the function, use 'argName' as well you use 'LineStyle' in plot! And
     %then the values
@@ -13,7 +13,7 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_maske
     defaultVal = 'Low';
     addOptional(p,argName,defaultVal, @(x) ismember(x,{'Low','Medium','High'}));
     % validate and parse the inputs
-    parse(p,varargin);
+    parse(p,varargin{:});
     clearvars argName defaultVal
 
     % extract data (lateral deflection Trace and Retrace, vertical deflection) and then mask (glass-PDA) elementXelement
@@ -21,39 +21,34 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_maske
     Lateral_Trace   = (AFM_cropped_Images(strcmpi({AFM_cropped_Images.Channel_name},'Lateral Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'Trace')).Cropped_AFM_image);
     Lateral_ReTrace = (AFM_cropped_Images(strcmpi({AFM_cropped_Images.Channel_name},'Lateral Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'ReTrace')).Cropped_AFM_image);
     vertical_Trace  = (AFM_cropped_Images(strcmpi({AFM_cropped_Images.Channel_name},'Vertical Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'Trace')).Cropped_AFM_image);
-    %Fix orientation
-    Lateral_Trace=rot90(flipud(Lateral_Trace));
-    Lateral_ReTrace=rot90(flipud(Lateral_ReTrace));
-    vertical_Trace=rot90(flipud(vertical_Trace));
-
-    % Calc Delta (offset loop) 
-    Delta = (Lateral_Trace + Lateral_ReTrace) / 2;
-    % Calc W (half-width loop)
-    W = Lateral_Trace - Delta;
 
     %Subtract the minimum of the image
-    W=minus(W,min(min(W)));
-    
+    Lateral_Trace_shift= Lateral_Trace - min(min(Lateral_Trace));
+    % Mask W to cut the PDA from the baseline fitting. Where there is PDA in corrispondece of the mask, then mask the
+    % lateral deflection data. Basically, the goal is fitting using the glass which is know to be flat. 
+        
     % plot 
     if ~isempty(secondMonitorMain), f1=figure; objInSecondMonitor(secondMonitorMain,f1); else, figure; end
-    subplot(131)
-    imshow(flip(imadjust(Lateral_Trace/max(max(Lateral_Trace))))), colormap parula, title('Lateral Trace [V]','FontSize',15)
-    subplot(132)
-    imshow(flip(imadjust(Lateral_ReTrace/max(max(Lateral_ReTrace))))), colormap parula, title('Lateral Retrace [V]','FontSize',15)
-    subplot(133)
-    imshow(flip(imadjust(W/max(max(W))))), colormap parula, title('Shifted half-width loop [W]','FontSize',15)
+    subplot(221)
+    imshow((imadjust(Lateral_Trace/max(max(Lateral_Trace))))), colormap parula; colorbar, title({'Lateral Deflection [V]';'(Trace - original)'},'FontSize',15)
+    subplot(222)
+    imshow((imadjust(Lateral_ReTrace/max(max(Lateral_ReTrace))))), colormap parula; colorbar, title({'Lateral Deflection [V]'; '(Retrace - HOVER MODE ON)'},'FontSize',15)
+    subplot(223)
+    imshow((imadjust(vertical_Trace/max(max(vertical_Trace))))), colormap parula; colorbar, title('Vertical Deflection [N]','FontSize',15)
+    subplot(224)
+    imshow((imadjust(Lateral_Trace_shift/max(max(Lateral_Trace_shift))))), colormap parula; colorbar, title({'Lateral Deflection [V]'; '(Trace - shifted)'},'FontSize',15)
+    % apply the PDA mask
+    Lateral_Trace_shift_masked= Lateral_Trace_shift;
+    Lateral_Trace_shift_masked(AFM_height_IO==1)=5;
+
     %show dialog box
-    wb=waitbar(0/size(W,1),sprintf('Removing Polynomial Baseline %.0f of %.0f',0,size(W,1)),...
+    wb=waitbar(0/size(Lateral_Trace_shift_masked,1),sprintf('Removing Polynomial Baseline %.0f of %.0f',0,size(Lateral_Trace_shift_masked,1)),...
         'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
     setappdata(wb,'canceling',0);
     
     % Polynomial baseline fitting (line by line)
     warning ('off','all');
-    fit_decision_final=nan(size(W,1),13);
-    % init var with same size as well as W 
-    Bk_iterative=zeros(size(W,1),size(W,2));
-    N_Cycluse_waitbar=size(W,1);
-    % For each different fitting depending on the accuracy (poly1 to poly9), extract 3 information:
+        % For each different fitting depending on the accuracy (poly1 to poly9), extract 3 information:
     %   - Sum of squares due to error / Degree-of-freedom adjusted coefficient of determination
     %   - Sum of squares due to error
     %   - Degree-of-freedom adjusted coefficient of determination
@@ -65,21 +60,25 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_maske
         limit=9;
     end
     fit_decision=zeros(3,limit);
+    % the fit_decision_final will contain the best fit_decision and the polynomial parameters (if grade = 3
+    % ==> # parameters = 4)
+    fit_decision_final=nan(size(Lateral_Trace_shift_masked,2),3+limit+1);
+    % init var with same size as well as W 
+    Bk_iterative=zeros(size(Lateral_Trace_shift_masked,1),size(Lateral_Trace_shift_masked,2));
+    N_Cycluse_waitbar=size(Lateral_Trace_shift_masked,2);
 
     % perform the fitting fast scan line by fast scan line 
-    for i=1:size(W,1)
+    for i=1:size(Lateral_Trace_shift_masked,2)
         if(exist('wb','var'))
             %if cancel is clicked, stop
             if getappdata(wb,'canceling')
                break
             end
         end           
-        % Mask W to cut the PDA from the baseline fitting. Where there is PDA in corrispondece of the mask, then mask the
-        % lateral deflection data. Basically, the goal is fitting using the glass which is know to be flat. 
-        W(AFM_height_IO==1)=5;
+        
         % extract the single fast scan line
-        flag_signal_y=W(i,:);
-        flag_signal_x=(1:size(flag_signal_y,2));
+        flag_signal_y=Lateral_Trace_shift_masked(:,i);
+        flag_signal_x=(1:size(flag_signal_y,1));
         % prepareCurveData function clean the data like Removing NaN or Inf, converting nondouble to double, converting complex to 
         % real and returning data as columns regardless of the input shapes.
         [xData, yData] = prepareCurveData(flag_signal_x,flag_signal_y);
@@ -103,7 +102,7 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_maske
                 fit_decision(3,z)=gof.adjrsquare;
             end
             
-            %prepare type fitting. Choose the one with the best statistics
+            %prepare type fitting. Choose the one with the best statistics. Ind represent the polynomial grade
             clearvars Ind
             [~,Ind]=min(fit_decision(1,:));
             ft = fittype(sprintf('poly%d',Ind));
@@ -121,14 +120,14 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_maske
         % build the y value using the polynomial coefficients and x value (1 ==> 512)
         % save polynomial coefficients (p1, p2, p3, ...) into fit_decision_final
         commPart =[];
-        x=1:size(W,1);
+        x=1:size(Lateral_Trace_shift_masked,1);
         j=1;
         for n=Ind:-1:0
             commPart = sprintf('%s + %s', commPart,sprintf('fitresult.p%d*(x).^%d',j,n));
             eval(sprintf('fit_decision_final(i,%d)= fitresult.p%d;',j+3,j))
             j=j+1;
         end
-        Bk_iterative(i,:)= eval(commPart);
+        Bk_iterative(:,i)= eval(commPart);
     end
     % processed every fast scan line
     delete(wb)
@@ -136,14 +135,13 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_maske
     % find idx having adjrsquare < 0.95. Averaging using taking adjacent lines.
     to_avg=find(fit_decision_final(:,3)<0.95);
     if(exist('to_avg','var'))
-        for i=1:size(to_avg,1)
-            if(to_avg(i,1)==1)                                                   % if idx = 1  ==> copy second row and paste in first row
-                Bk_iterative(to_avg(i,1),:)=Bk_iterative(to_avg(i,1)+1,:);  
-            elseif(to_avg(i,1)==size(Bk_iterative,1))                            % if idx =512 ==> copy second-last row and paste in last row
-                Bk_iterative(to_avg(i,1),:)=Bk_iterative(to_avg(i,1)-1,:);
-            else                                                                 % of idx between 2 and 511 ==> 
-               Bk_iterative(to_avg(i,1),:)=( ...                                 % take the previous and the next row and average them.
-                   Bk_iterative(to_avg(i,1)-1,:) + Bk_iterative(to_avg(i,1)+1,:) )/2;
+        for i=1:size(to_avg,1)-1
+            if(to_avg(i,1)~=1)
+                Bk_iterative(:,to_avg(i,1))=(Bk_iterative(:,to_avg(i,1)-1)+Bk_iterative(:,to_avg(i,1)+1))/2;
+            elseif(to_avg(i,1)==1)
+                Bk_iterative(:,to_avg(i,1))=Bk_iterative(:,to_avg(i,1)+1);
+            elseif(to_avg(i,1)==size(Bk_iterative,2))
+                Bk_iterative(:,to_avg(i,1))=Bk_iterative(:,to_avg(i,1)-1);
             end
         end
     end
@@ -151,20 +149,27 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_maske
     % Plot the fitted backround:
     if ~isempty(secondMonitorMain), f1=figure; objInSecondMonitor(secondMonitorMain,f1); else, figure; end
     subplot(131)
-    imshow(flip(imadjust(Bk_iterative/max(max(Bk_iterative))))), colormap parula, title('FITTED BACKGROUND (no PDA data)','FontSize',15)
+    imshow((imadjust(Bk_iterative/max(max(Bk_iterative))))), colormap parula
+    c=colorbar; c.Label.String = 'Lateral Deflection channel [V]';
+    title('Fitted Background','FontSize',15)
         
-    % remove the minimum of the image and then the background (friction on glass should be zero afterwards):
-    Lateral_Trace_Shifted_noBK= Lateral_Trace - min(min(Lateral_Trace)) - Bk_iterative;
+    % remove the background from the image (friction on glass should be zero afterwards):
+    Lateral_Trace_shift_noBK= Lateral_Trace_shift - Bk_iterative;
     subplot(132)
-    imshow(flip(imadjust(Lateral_Trace_Shifted_noBK/max(max(Lateral_Trace_Shifted_noBK))))), colormap parula, title('FITTED BACKGROUND (no PDA data)','FontSize',15)
+    imshow((imadjust(Lateral_Trace_shift_noBK/max(max(Lateral_Trace_shift_noBK))))), colormap parula
+    c=colorbar; c.Label.String = 'Lateral Deflection channel [V]';
+    title('Corrected Lateral Trace ','FontSize',15)
+    
     % Friction force = friction coefficient * Normal Force
     Baseline_Friction_Force= vertical_Trace*avg_fc;
     % Friction force = calibration coefficient * Lateral Trace (V)
-    Lateral_Trace_Force= Lateral_Trace_Shifted_noBK*alpha;
+    Lateral_Trace_Force= Lateral_Trace_shift_noBK*alpha;
     % To read the baseline friction, to obtain the processed image:
     Corrected_LD_Trace= Lateral_Trace_Force + Baseline_Friction_Force;
-    subplot(133),
-    imshow(flip(imadjust(Corrected_LD_Trace/max(max(Corrected_LD_Trace))))), colormap parula, title('Lateral Force [N] - FITTED','FontSize',15)
+    subplot(133)
+    imshow(imadjust(Corrected_LD_Trace/max(max(Corrected_LD_Trace)))), colormap parula
+    c=colorbar; c.Label.String = 'Lateral Deflection channel [N]';
+    title('Definitive Lateral Force [N]','FontSize',15)
     
     AFM_Elab=AFM_cropped_Images;
     % save the corrected lateral force into cropped AFM image

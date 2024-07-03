@@ -24,6 +24,7 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(input,secondMonitorMa
 %
 % Last update 18/06/2024
 %
+    fprintf('\tSTEP 3 processing ...\n')
     if(~isempty(varargin))&&(size(varargin,2)==1)
         if(iscell(varargin{1,1}))
             varargin=vertcat(varargin{:});
@@ -39,15 +40,18 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(input,secondMonitorMa
     %then the values
     argName = 'Accuracy';
     defaultVal = 'Low';
-    addOptional(p,argName,defaultVal, @(x) ismember(x,{'Low','Medium','High'}) );
+    addParameter(p, argName, defaultVal,@(x) ismember(x,{'Low','Medium','High'}));
+
     argName = 'AutoElab';
     defaultVal = 'No';
-    addOptional(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}) );
+    addParameter(p, argName, defaultVal,@(x) ismember(x,{'No','Yes'}));
+
+    argName = 'Silent';
+    defaultVal = 'No';
+    addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     % validate and parse the inputs
     parse(p,input,varargin{:});
     clearvars argName defaultVal
-
-  
 
     % Extract the height channel
     raw_data_Or=input(strcmp({input.Channel_name},'Height (measured)')).AFM_image;
@@ -61,12 +65,11 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(input,secondMonitorMa
     imshow(visible_data_rot)
     colormap parula
     title('Whole Image. Select to crop')
-    fprintf('Crop manually the area of interest...\n')
     % Crop AFM image
     % Rect = Size and position of the crop rectangle [xmin ymin width height].
     [~,~,cropped_image,Rect]=imcrop();
     close(f_start)
-    clc
+    
     % Extract the data relative to the cropped area for each channel
     for i=1:size(input,2)
         %rotate and flip because the the crop area reference is already rotated and flipped
@@ -87,9 +90,7 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(input,secondMonitorMa
             'Channel_name', input(i).Channel_name,...
             'Trace_type', input(i).Trace_type, ...
             'Cropped_AFM_image', temp_img(start_x:end_x,start_y:end_y));
-    end
-    
-    
+    end 
     
     wb=waitbar(0/size(cropped_image,1),sprintf('Removing Polynomial Baseline %.0f of %.0f',0,size(cropped_image,1)),...
         'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');

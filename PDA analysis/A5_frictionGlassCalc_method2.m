@@ -32,14 +32,12 @@ function avg_fc=A5_frictionGlassCalc_method2(alpha,Cropped_Images,AFM_height_IO,
     % plot lateral (masked force, N) and vertical data (force, N)
     if ~isempty(secondMonitorMain), f1=figure; objInSecondMonitor(secondMonitorMain, f1); else, figure; end
     subplot(121)
-    mesh(force)
-    xlim tight, ylim tight
+    imagesc(flip(force))
     c= colorbar; c.Label.String = 'Force [N]'; c.FontSize = 15;
     title({'Force in glass regions';'(PDA masked out)'},'FontSize',20)
     xlabel(' fast direction - scan line','FontSize',15), ylabel('slow direction','FontSize',15)
     subplot(122)
-    mesh(vertical_Trace)
-    xlim tight, ylim tight
+    imagesc(flip(vertical_Trace))
     title('Vertical Deflection (masked)','FontSize',20)
     xlabel(' fast direction - scan line','FontSize',15), ylabel('slow direction','FontSize',15)
    

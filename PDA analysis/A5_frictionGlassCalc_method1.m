@@ -25,7 +25,7 @@ function avg_fc=A5_frictionGlassCalc_method1(alphaGlass,dataGlass,secondMonitorM
     latDefl_trace   = dataGlass(strcmpi({dataGlass.Channel_name},'Lateral Deflection') & strcmpi({dataGlass.Trace_type},'Trace')).AFM_image;
     latDefl_retrace = dataGlass(strcmpi({dataGlass.Channel_name},'Lateral Deflection') & strcmpi({dataGlass.Trace_type},'ReTrace')).AFM_image;
     % verDefl expressed in Newton
-    verForce         = dataGlass(strcmpi({dataGlass.Channel_name},'Vertical Deflection') & strcmpi({dataGlass.Trace_type},'Trace')).AFM_image;
+    verForce        = dataGlass(strcmpi({dataGlass.Channel_name},'Vertical Deflection') & strcmpi({dataGlass.Trace_type},'Trace')).AFM_image;
     % obtain the setpoint value. Note: because of little instabilities, round the vertical values to the fixed setpoint 
     % (i.e. 3.091 nN --> 3.000 nN)
     verForce = round(verForce,8);
