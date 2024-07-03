@@ -30,13 +30,21 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_maske
     % plot 
     if ~isempty(secondMonitorMain), f1=figure; objInSecondMonitor(secondMonitorMain,f1); else, figure; end
     subplot(221)
-    imshow((imadjust(Lateral_Trace/max(max(Lateral_Trace))))), colormap parula; colorbar, title({'Lateral Deflection [V]';'(Trace - original)'},'FontSize',15)
+    imshow((imadjust(Lateral_Trace/max(max(Lateral_Trace))))), colormap parula; colorbar,
+    c=colorbar; c.Label.String = 'Lateral Deflection channel [V]';
+    title({'Lateral Deflection';'(Trace - original)'},'FontSize',15)
     subplot(222)
-    imshow((imadjust(Lateral_ReTrace/max(max(Lateral_ReTrace))))), colormap parula; colorbar, title({'Lateral Deflection [V]'; '(Retrace - HOVER MODE ON)'},'FontSize',15)
+    imshow((imadjust(Lateral_ReTrace/max(max(Lateral_ReTrace))))), colormap parula; colorbar,
+    c=colorbar; c.Label.String = 'Lateral Deflection channel [V]';
+    title({'Lateral Deflection [V]'; '(Retrace - HOVER MODE ON)'},'FontSize',15)
     subplot(223)
-    imshow((imadjust(vertical_Trace/max(max(vertical_Trace))))), colormap parula; colorbar, title('Vertical Deflection [N]','FontSize',15)
+    imshow((imadjust(vertical_Trace/max(max(vertical_Trace))))), colormap parula; colorbar,
+    c=colorbar; c.Label.String = 'Verical Deflection channel [N]';
+    title('Vertical Deflection [N]','FontSize',15)
     subplot(224)
-    imshow((imadjust(Lateral_Trace_shift/max(max(Lateral_Trace_shift))))), colormap parula; colorbar, title({'Lateral Deflection [V]'; '(Trace - shifted)'},'FontSize',15)
+    imshow((imadjust(Lateral_Trace_shift/max(max(Lateral_Trace_shift))))), colormap parula; colorbar,
+    c=colorbar; c.Label.String = 'Lateral Deflection channel [V]';
+    title({'Lateral Deflection [V]'; '(Trace - shifted)'},'FontSize',15)
     % apply the PDA mask
     Lateral_Trace_shift_masked= Lateral_Trace_shift;
     Lateral_Trace_shift_masked(AFM_height_IO==1)=5;
