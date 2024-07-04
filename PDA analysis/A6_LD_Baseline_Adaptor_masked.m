@@ -12,9 +12,13 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_maske
     argName = 'Accuracy';
     defaultVal = 'Low';
     addOptional(p,argName,defaultVal, @(x) ismember(x,{'Low','Medium','High'}));
+    argName = 'Silent';
+    defaultVal = 'No';
+    addOptional(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     % validate and parse the inputs
     parse(p,varargin{:});
     clearvars argName defaultVal
+    fprintf('Results of optional input:\n\tAccuracy:\t%s\n\tSilent:\t\t%s\n',p.Results.Accuracy,p.Results.Silent)
 
     % extract data (lateral deflection Trace and Retrace, vertical deflection) and then mask (glass-PDA) elementXelement
     % ONLY in correspondence with the glass!
@@ -54,9 +58,8 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_maske
         'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
     setappdata(wb,'canceling',0);
     
-    % Polynomial baseline fitting (line by line)
     warning ('off','all');
-        % For each different fitting depending on the accuracy (poly1 to poly9), extract 3 information:
+    % For each different fitting depending on the accuracy (poly1 to poly9), extract 3 information:
     %   - Sum of squares due to error / Degree-of-freedom adjusted coefficient of determination
     %   - Sum of squares due to error
     %   - Degree-of-freedom adjusted coefficient of determination
@@ -67,14 +70,14 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_maske
     else
         limit=9;
     end
-    fit_decision=zeros(3,limit);
+    % init var with same size as well as W 
     % the fit_decision_final will contain the best fit_decision and the polynomial parameters (if grade = 3
     % ==> # parameters = 4)
     fit_decision_final=nan(size(Lateral_Trace_shift_masked,2),3+limit+1);
-    % init var with same size as well as W 
     Bk_iterative=zeros(size(Lateral_Trace_shift_masked,1),size(Lateral_Trace_shift_masked,2));
     N_Cycluse_waitbar=size(Lateral_Trace_shift_masked,2);
-
+    % build x array for the fitting
+    x=1:size(Lateral_Trace_shift_masked,1);
     % perform the fitting fast scan line by fast scan line 
     for i=1:size(Lateral_Trace_shift_masked,2)
         if(exist('wb','var'))
@@ -83,7 +86,7 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_maske
                break
             end
         end           
-        
+
         % extract the single fast scan line
         flag_signal_y=Lateral_Trace_shift_masked(:,i);
         flag_signal_x=(1:size(flag_signal_y,1));
@@ -94,7 +97,7 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_maske
         if(size(xData,1)>2)
             opts = fitoptions( 'Method', 'LinearLeastSquares' );
             opts.Robust = 'LAR';
-           
+            fit_decision=zeros(3,limit);
             for z=1:limit
                 % based on the choosen accuracy, run the fitting using different curves to find the best fit
                 % before returning the definitive fitted single fast scan line
@@ -113,6 +116,7 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_maske
             %prepare type fitting. Choose the one with the best statistics. Ind represent the polynomial grade
             clearvars Ind
             [~,Ind]=min(fit_decision(1,:));
+
             ft = fittype(sprintf('poly%d',Ind));
             waitbar(i/N_Cycluse_waitbar,wb,sprintf('Processing %d° Ord Pol fit ... Line %.0f Completeted  %2.1f %%',Ind,i,i/N_Cycluse_waitbar*100));
             % save the fitting decisions
@@ -128,7 +132,6 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_maske
         % build the y value using the polynomial coefficients and x value (1 ==> 512)
         % save polynomial coefficients (p1, p2, p3, ...) into fit_decision_final
         commPart =[];
-        x=1:size(Lateral_Trace_shift_masked,1);
         j=1;
         for n=Ind:-1:0
             commPart = sprintf('%s + %s', commPart,sprintf('fitresult.p%d*(x).^%d',j,n));

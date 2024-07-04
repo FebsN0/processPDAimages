@@ -1,6 +1,23 @@
 clc, clear, close
 
 [fileName, filePathData] = uigetfile('*.jpk', 'Select a .jpk AFM image');
+if isequal(fileName,0)
+    error('No File Selected');
+end
+% save the useful figures into a directory
+newFolder = fullfile(filePathData, 'Results Processing AFM and fluorescence images');
+% check if dir already exists
+if exist(newFolder, 'dir')
+    question= sprintf('Directory already exists and it may already contain results.\nDo you want to overwrite it?');
+    options= {'Yes','No'};
+    if getValidAnswer(question,'',options) == 1
+        rmdir(newFolder, 's');
+        mkdir(newFolder);
+    end
+else
+    mkdir(newFolder);
+end
+
 secondMonitorMain=objInSecondMonitor;
 
 clear question
@@ -21,8 +38,13 @@ clear filtData
 [AFM_H_NoBk,AFM_cropped_Images]=A4_El_AFM_masked(AFM_cropped_Images,AFM_height_IO,secondMonitorMain);
 
 %% to extract the friction coefficient, choose which method use.
-question=sprintf('Which method perform to extract the glass friction coefficient?\n 1) Average fast scan lines containing only glass.\tUse the .jpk image containing only glass\n 2) Masking PDA feature.\tuse the .jpk image containing both PDA and glass (ReTrace Data required - Hover Mode OFF)\n 3) Masking PDA + outlier removal features (ReTrace Data required - Hover Mode OFF)\n selection: \n');
-answer = getValidAnswer(question, {'1','2','3'});
+question=sprintf('Which method perform to extract the glass friction coefficient?');
+options={ ...
+    sprintf('1) Average fast scan lines containing only glass.\nUse the .jpk image containing only glass'), ...
+    sprintf('2) Masking PDA feature.\nUse the .jpk image containing both PDA and glass (ReTrace Data required - Hover Mode OFF)'), ... 
+    sprintf('3) Masking PDA + outlier removal features\n(ReTrace Data required - Hover Mode OFF)')};
+choice = getValidAnswer(question, '', options);
+
 % methods 2 and 3 require the .jpk file with HOVER MODE OFF but in the same condition (same scanned PDA area
 % of when HOVER MODE is ON)
 switch answer
@@ -41,5 +63,25 @@ end
 % PCDA  : 0.2626 (2020 July 7)
 
 %% Substitute to the AFM cropped channels the baseline adapted LD
-
 [Corrected_LD_Trace,AFM_Elab,~]=A6_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,metaData.Alpha,avg_fc,secondMonitorMain,'Accuracy','Low');
+
+%% Open Brightfield image and the TRITIC (Before and After stimulation images)
+
+[fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the BrightField image',filePathData);
+[BF_Mic_Image]=A7_open_ND2(fullfile(filePathData,fileName)); 
+figure,imshow(imadjust(BF_Mic_Image))
+
+[fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the TRITIC Before Stimulation image',filePathData);
+[Tritic_Mic_Image_Before]=A7_open_ND2(fullfile(filePathData,fileName)); 
+figure,imshow(imadjust(Tritic_Mic_Image_Before))
+
+[fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the TRITIC After Stimulation image',filePathData);
+[Tritic_Mic_Image_After]=A7_open_ND2(fullfile(filePathData,fileName)); 
+figure,imshow(imadjust(Tritic_Mic_Image_After))
+
+%% Align the fluorescent images After with the BEFORE stimulation
+Tritic_Mic_Image_After_Registered=A8_limited_registration(Tritic_Mic_Image_After,Tritic_Mic_Image_Before);
+
+% Align the Brightfield to TRITIC Before Stimulation
+BF_Mic_Image_Registered=A8_limited_registration(BF_Mic_Image,Tritic_Mic_Image_Before,'brightfield','moving');
+
