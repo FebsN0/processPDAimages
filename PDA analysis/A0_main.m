@@ -1,9 +1,10 @@
 clc, clear, close
 
-[fileName, filePathData] = uigetfile('*.jpk', 'Select a .jpk AFM image');
-if isequal(fileName,0)
-    error('No File Selected');
-end
+
+% upload .jpk files. If more than one and if from same experiment in which setpoint is changed, then assembly.
+[data,metaData,filePathData]=A1_openANDassembly_JPK;
+
+
 % save the useful figures into a directory
 newFolder = fullfile(filePathData, 'Results Processing AFM and fluorescence images');
 % check if dir already exists
@@ -18,25 +19,19 @@ else
     mkdir(newFolder);
 end
 
+% prepare figure and put in a second monitor if any
 secondMonitorMain=objInSecondMonitor;
-
-clear question
-% open jpk, it returns the AFM file, the details (position of tip, IGain, Pgain, Sn, Kn and
-% calculates alpha, based on the pub), it returns the location of the file.
-[data,metaData]=A1_open_JPK(fullfile(filePathData,fileName));
-
-%% Remove unnecessary channels to elaboration (necessary for memory save)
+% Remove unnecessary channels to elaboration (necessary for memory save)
 filtData=A2_CleanUpData2_AFM(data);
 clear data
-
-%% Extract the (1) height no Bk, which is not used, (2) cropped AFM channels, (3) I/O image of Height and
+% Extract the (1) height no Bk, which is not used, (2) cropped AFM channels, (3) I/O image of Height and
 % (4) info of the cropped area
-[~,AFM_cropped_Images,AFM_height_IO,Rect]=A3_El_AFM(filtData,secondMonitorMain,'Accuracy','High');
+[~,AFM_cropped_Images,AFM_height_IO,Rect]=A3_El_AFM(filtData,secondMonitorMain,newFolder,'Accuracy','High');
 clear filtData
+% Using the AFM_height_IO, fit the background again, yielding a more accurate height image
+[AFM_H_NoBk,AFM_cropped_Images]=A4_El_AFM_masked(AFM_cropped_Images,AFM_height_IO,secondMonitorMain,newFolder);
 
-%% Using the AFM_height_IO, fit the background again, yielding a more accurate height image
-[AFM_H_NoBk,AFM_cropped_Images]=A4_El_AFM_masked(AFM_cropped_Images,AFM_height_IO,secondMonitorMain);
-
+close all
 %% to extract the friction coefficient, choose which method use.
 question=sprintf('Which method perform to extract the glass friction coefficient?');
 options={ ...
@@ -47,21 +42,29 @@ choice = getValidAnswer(question, '', options);
 
 % methods 2 and 3 require the .jpk file with HOVER MODE OFF but in the same condition (same scanned PDA area
 % of when HOVER MODE is ON)
-switch answer
-    case '1'    % method 1 : get the friction glass experiment .jpk file
-        [fileNameFriction, filePathDataFriction] = uigetfile('*.jpk', 'Select the .jpk AFM image to extract glass friction coefficient');
-        [dataGlass,metaDataGlass]=A1_open_JPK(fullfile(filePathDataFriction,fileNameFriction));
-        avg_fc=A5_frictionGlassCalc_method1(metaDataGlass.Alpha,dataGlass,secondMonitorMain);
-    case '2'    % method 2: masking
-        avg_fc=A5_frictionGlassCalc_method2(metaData.Alpha,AFM_cropped_Images,AFM_H_NoBk,secondMonitorMain);
-    case '3'    % method 3: masking + outlier removal method
-        avg_fc=A5_frictionGlassCalc_method3(metaData.Alpha,AFM_cropped_Images,AFM_H_NoBk,secondMonitorMain);
+if choice == 1
+    % method 1 : get the friction glass experiment .jpk file
+    [fileNameFriction, filePathDataFriction] = uigetfile('*.jpk', 'Select the .jpk AFM image to extract glass friction coefficient');
+    [dataGlass,metaDataGlass]=A1_open_JPK(fullfile(filePathDataFriction,fileNameFriction));
+    avg_fc=A5_frictionGlassCalc_method1(metaDataGlass.Alpha,dataGlass,secondMonitorMain,newFolder);
+    %clear fileNameFriction filePathDataFriction dataGlass metaDataGlass
+else
+    % before perform method 2 or 3, upload the data used to calc the glass friction coeffiecient. Basically it the same experiment but with Hover Mode OFF
+    % then clean the data.
+    [dataHoverModeOFF,metaDataHoverModeOFF,~]=A1_openANDassembly_JPK;
+    filtDataHVOFF=A2_CleanUpData2_AFM(dataHoverModeOFF);
+    [~,AFM_cropped_ImagesHVOFF,AFM_height_IOHVOFF,~]=A3_El_AFM(filtDataHVOFF,secondMonitorMain,newFolder,'Accuracy','Low','Silent','Yes');
+    [~,AFM_cropped_ImagesHVOFF_fitted]=A4_El_AFM_masked(AFM_cropped_ImagesHVOFF,AFM_height_IOHVOFF,secondMonitorMain,newFolder,'Silent','Yes');
+    % METHOD 2 : MASKING ONLY
+    % METHOD 3 : MASKING + OUTLIER REMOVAL
+    eval(sprintf('avg_fc=A5_frictionGlassCalc_method%d(metaDataHoverModeOFF.Alpha,AFM_cropped_ImagesHVOFF_fitted,AFM_height_IOHVOFF,secondMonitorMain,newFolder);',choice));
+    %clear dataHoverModeOFF metaDataHoverModeOFF filtDataHVOFF AFM_cropped_ImagesHVOFF AFM_height_IOHVOFF AFM_H_NoBkHVOFF AFM_cropped_ImagesHVOFF_fitted
 end
 
 % previous friction coefficients (determined by separate measurements)
 % TRCDA : 0.2920
 % PCDA  : 0.2626 (2020 July 7)
-
+close all
 %% Substitute to the AFM cropped channels the baseline adapted LD
 [Corrected_LD_Trace,AFM_Elab,~]=A6_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,metaData.Alpha,avg_fc,secondMonitorMain,'Accuracy','Low');
 

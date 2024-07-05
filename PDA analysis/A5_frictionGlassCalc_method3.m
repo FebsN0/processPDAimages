@@ -1,4 +1,4 @@
-function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_height_IO,secondMonitorMain)
+function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_height_IO,secondMonitorMain,newFolder)
 %
 % This function opens the AFM cropped data previously created to calculate the glass friction
 % coefficient. This method is more accurated than the method 2.
@@ -45,17 +45,21 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_he
     vertical_ReTrace=rot90(flipud(vertical_ReTrace));
     % plot lateral (masked force, N) and vertical data (masked force, N)
     % NOTE: vertical data is not directly masked, rather just only for the rapresentation to provide better show
-    if ~isempty(secondMonitorMain), f1=figure; objInSecondMonitor(secondMonitorMain,f1); else, figure; end
+    f1=figure;
+    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
     subplot(121)
     imagesc(flip(force))
     c= colorbar; c.Label.String = 'Force [N]'; c.FontSize = 15;
     title({'Force in glass regions';'(PDA masked out)'},'FontSize',20)
     xlabel(' fast direction - scan line','FontSize',15), ylabel('slow direction','FontSize',15)
+    axis equal, xlim([0 512]), ylim([0 512])
     subplot(122)
     imagesc(flip(vertical_Trace.*(~rot90(flipud(AFM_height_IO)))))
     title('Vertical Deflection (masked)','FontSize',20)
     xlabel(' fast direction - scan line','FontSize',15), ylabel('slow direction','FontSize',15)
-   
+    axis equal, xlim([0 512]), ylim([0 512])
+    saveas(f1,sprintf('%s/resultA5method3_1_ForceInGlassRegionsAndVerticalDeflectionN.tif',newFolder))
+    
 %%%%%%%%%%%------- SETTING PARAMETERS FOR THE EDGE REMOVAL -------%%%%%%%%%%%
     % the user has to choose the number of points
     % in a single fast scan line to consider in order to remove the edge spikes data
@@ -70,12 +74,15 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_he
         end
     end
     % choose the removal modality    
-    question= ['Modality of removal outliers:\n' ...
-                ' 1) Apply outlier removal to each segment after pixel reduction\n'...
-                ' 2) Apply outlier removal to one large connected segment after pixel reduction.\n' ...
-                ' Enter the mode: '];
-    fOutlierRemoval = str2double(getValidAnswer(question,{'1','2'}));
-   
+    question= 'Choose the modality of removal outliers';
+    options={ ...
+    sprintf('1) Apply outlier removal to each segment after pixel reduction'), ...
+    sprintf('2) Apply outlier removal to one large connected segment after pixel reduction.')};
+    
+    fOutlierRemoval = getValidAnswer(question, '', options);
+
+
+                
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % show a dialog box indicating the index of fast scan line along slow direction and which pixel size is processing
     wb=waitbar(0/size(force,1),sprintf(' Processing the Outliers Removal Mode %d (pixel size %d / %d) \n\t Line %.0f Completeted  %2.1f %%',fOutlierRemoval,0,pixData(1),0,0),...
@@ -153,7 +160,8 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_he
         Cnt = Cnt+1;
     end
     delete(wb)
-    if ~isempty(secondMonitorMain), f3=figure; objInSecondMonitor(secondMonitorMain,f3); else, figure; end
+    f3=figure;
+    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
     plot(pixx, avg_fc, 'bx-'); grid on
     xlabel('Pixel size'); ylabel('Glass friction coefficient');
     title({'Result Method 3 (Mask + Outliers Removal';'Click on the plot to select the most suited glass friction coefficient'},'FontSize',16);
@@ -163,4 +171,5 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_he
     avg_fc_def=avg_fc(idx_x);
     resultChoice= sprintf('Selected friction coefficient: %0.3g', avg_fc_def);
     title({' Result Method 3 (Mask + Outliers Removal)'; resultChoice},'FontSize',16);
+    saveas(f3,sprintf('%s/resultA5method3_3_DeltaOffsetVSsetpoint.tif',newFolder))
 end

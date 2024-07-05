@@ -1,4 +1,4 @@
-function [AFM_noBk,Cropped_Images_Bk]=A4_El_AFM_masked(Cropped_Images,AFM_height_IO,secondMonitorMain)
+function [AFM_noBk,Cropped_Images_Bk]=A4_El_AFM_masked(Cropped_Images,AFM_height_IO,secondMonitorMain,filepath,varargin)
 %%
 % The function extracts Images from the experiments.
 % It removes baseline and extracts foreground from the AFM image.
@@ -22,7 +22,7 @@ function [AFM_noBk,Cropped_Images_Bk]=A4_El_AFM_masked(Cropped_Images,AFM_height
 % Author modifications: Altieri F.
 % Last update 18.June.2024
 
-
+    fprintf('\n\t\tSTEP 4 processing ...\n')
     % A tool for handling and validating function inputs.  define expected inputs, set default values, and validate the types
     % and properties of inputs. This helps to make functions more robust and user-friendly.
     p=inputParser();    %init instance of inputParser
@@ -32,8 +32,10 @@ function [AFM_noBk,Cropped_Images_Bk]=A4_El_AFM_masked(Cropped_Images,AFM_height
     defaultVal = 'No';
     addOptional(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     % validate and parse the inputs
-    parse(p,Cropped_Images);
+    parse(p,Cropped_Images,varargin{:});
+    
     clearvars argName defaultVal
+    fprintf('Results of optional input:\n\tSilent:\t\t%s\n',p.Results.Silent)
 
     if(strcmp(p.Results.Silent,'Yes')); SeeMe=0; else, SeeMe=1; end
 
@@ -66,11 +68,12 @@ function [AFM_noBk,Cropped_Images_Bk]=A4_El_AFM_masked(Cropped_Images,AFM_height
   
     AFM_noBk=poly_filt_data;
     AFM_noBk=AFM_noBk-min(min(AFM_noBk));
-    AFM_noBk_visible_data=AFM_noBk/max(max(AFM_noBk));
-    AFM_noBk_visible_data=imadjust(AFM_noBk_visible_data);
     if SeeMe
-        if ~isempty(secondMonitorMain), f2=figure; objInSecondMonitor(secondMonitorMain,f2); else, figure; end
-        imshow(AFM_noBk_visible_data),colormap parula, title('(Optimized) Usable Partial of Image')
+        f1=figure;       
+        imshow(imadjust(AFM_noBk/max(max(AFM_noBk)))),colormap parula, title('(Optimized) Fitted Height (measured) channel', 'FontSize',16)        
+        if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f1); end
+        c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
+        saveas(f1,sprintf('%s/resultA4_1_OptFittedHeightChannel.tif',filepath))
     end
     if(exist('wb','var'))
         delete(wb)

@@ -1,4 +1,4 @@
-function avg_fc=A5_frictionGlassCalc_method1(alphaGlass,dataGlass,secondMonitorMain)
+function avg_fc=A5_frictionGlassCalc_method1(alphaGlass,dataGlass,secondMonitorMain,filepath)
 
 % This function opens an .JPK image file in which the tip scanned the glass in order to retrieve the glass
 % friction coefficient at different setpoints
@@ -37,8 +37,10 @@ function avg_fc=A5_frictionGlassCalc_method1(alphaGlass,dataGlass,secondMonitorM
     W = latDefl_trace - Delta;                     
     
     if ~isempty(secondMonitorMain), f1=figure; objInSecondMonitor(secondMonitorMain,f1); else, figure; end
-    surf(W,'LineStyle','none'), title('W half-width loop','FontSize',20)
-    xlabel(' fast direction - scan line','FontSize',15), zlabel('W [V]','FontSize',15), ylabel('slow direction','FontSize',15)
+    imagesc(W), title('Raw Data of only substrate','FontSize',20)
+    xlabel(' fast direction - scan line','FontSize',15), ylabel('slow direction','FontSize',15)
+    c=colorbar; c.Label.String = 'W half-width loop [V]'; c.Label.FontSize=15;
+    saveas(f1,sprintf('%s/resultA5method1_1_RawDataW.tif',filepath))
 
     % convert W into force (in Newton units) using alpha calibration factor
     force=W*alphaGlass;
@@ -77,11 +79,12 @@ function avg_fc=A5_frictionGlassCalc_method1(alphaGlass,dataGlass,secondMonitorM
     plot(x,y), plot(setpoints,force_avg_singleSetpoint,'k*')
     errorbar(setpoints,force_avg_singleSetpoint,force_std_singleSetpoint, 'k', 'LineStyle', 'none', 'Marker','none','LineWidth', 1.5);
     xlim([0,max(setpoints) * 1.1]);
-    hold off, xlabel('Vertical Deflection [N]','FontSize',15), ylabel('Lateral Deflection [N]','FontSize',15), grid on
+    hold off
+    xlabel('Vertical Deflection [N]','FontSize',15), ylabel('Lateral Deflection [N]','FontSize',15), grid on
     legend('fitted curve','experimental data','Location','northwest','FontSize',15)
     eqn = sprintf('Linear: y = %0.3g x %0.3g', fitresult.p1, fitresult.p2);
     title({'Delta Offset vs Set Point'; eqn},'FontSize',15);
-    
+    saveas(f2,sprintf('%s/resultA5method1_2_DeltaOffsetVSsetpoint.tif',filepath))
     avg_fc=fitresult.p1;
 end
 

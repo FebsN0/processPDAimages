@@ -1,4 +1,4 @@
-function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonitorMain,varargin)
+function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonitorMain,filepath,varargin)
 
 % The function extracts Images from the experiments.
 % It removes baseline and extracts foreground from the AFM image.
@@ -24,7 +24,7 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonito
 %
 % Last update 18/06/2024
 %
-    fprintf('\tSTEP 3 processing ...\n')
+    fprintf('\n\t\tSTEP 3 processing ...\n')
     % A tool for handling and validating function inputs.  define expected inputs, set default values, and validate the types
     % and properties of inputs. This helps to make functions more robust and user-friendly.
     p=inputParser();    %init instance of inputParser
@@ -47,8 +47,13 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonito
     addOptional(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     % validate and parse the inputs
     parse(p,filtData,varargin{:});
+
     clearvars argName defaultVal
     fprintf('Results of optional input:\n\tAccuracy:\t%s\n\tAutoElab:\t%s\n\tSilent:\t\t%s\n',p.Results.Accuracy,p.Results.AutoElab,p.Results.Silent)
+    
+    if(strcmp(p.Results.Silent,'Yes')); SeeMe=0; else, SeeMe=1; end
+
+
     % Extract the height channel
     raw_data_Height=filtData(strcmp({filtData.Channel_name},'Height (measured)')).AFM_image;
     % Orient the image by counterclockwise 180° and flip to coencide with the Microscopy image through rotations
@@ -57,15 +62,20 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonito
     visible_data_rot_Height=raw_data_Height/max(max(raw_data_Height));
     %maps the intensity values in grayscale image I to new values in J
     visible_data_rot_Height=imadjust(visible_data_rot_Height);
-    f_start=figure;
+    
+    f1=figure;
     imshow(visible_data_rot_Height)
-    colormap parula
-    title('Height (measured) channel')
+    colormap parula, title('Original Height (measured) channel'),
+    c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
+    if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f1); end
+    if SeeMe
+        saveas(f1,sprintf('%s/resultA3_1_originalHeightChannel.tif',filepath))
+    end
     [~]=questdlg("Crop the Area","","OK","OK");
     % Crop AFM image
     % Rect = Size and position of the crop rectangle [xmin ymin width height].
     [~,~,cropped_image,Rect]=imcrop();
-    close(f_start)
+    close(f1)
     
     % Extract the data relative to the cropped area for each channel
     for i=1:size(filtData,2)
@@ -87,8 +97,7 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonito
             'Channel_name', filtData(i).Channel_name,...
             'Trace_type', filtData(i).Trace_type, ...
             'Cropped_AFM_image', temp_img(start_x:end_x,start_y:end_y));
-    end 
-    
+    end     
     wb=waitbar(0/size(cropped_image,1),sprintf('Removing Polynomial Baseline %.0f of %.0f',0,size(cropped_image,1)),...
         'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
     setappdata(wb,'canceling',0);
@@ -272,8 +281,11 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonito
     AFM_noBk_visible_data=AFM_noBk/max(max(AFM_noBk));
     AFM_noBk_visible_data=imadjust(AFM_noBk_visible_data);
     
-    if ~isempty(secondMonitorMain), f2=figure; objInSecondMonitor(secondMonitorMain,f2); else, figure; end
-    subplot(121), imshow(AFM_noBk_visible_data),colormap parula, title('Usable Partial of Image')
+    f2=figure;
+    if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f2); end
+    subplot(121), imshow(AFM_noBk_visible_data),colormap parula, title('Fitted Height (measured) channel', 'FontSize',16)
+    c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
+
     satisfied='Manual Selection';
     first_In=1;
     closest_indices=[];
@@ -288,7 +300,7 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonito
             
             imhistfig=figure('visible','on');hold on,plot(Y)
             if any(closest_indices)
-                xline(closest_indices,'r--','LineWidth',2)
+                scatter(closest_indices,Y(closest_indices),40,'r*')
             end
             zoom on; pan on
             % Mostrare una finestra di dialogo per chiedere all'utente di premere "OK" per continuare
@@ -315,21 +327,19 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonito
             delete(h1);
         end
         h1=subplot(122);
-        imshow(seg_dial); title('Baseline and foreground processed'), colormap parula
+        imshow(seg_dial); title('Baseline and foreground processed', 'FontSize',16), colormap parula
+        colorbar('Ticks',[0 1],...
+         'TickLabels',{'Background','Foreground'},'FontSize',13)
 
         if(strcmp(p.Results.AutoElab,'No'))
+            satisfied=questdlg('Keep automatic threshold selection or turn to Manual?', 'Manual Selection', 'Keep Current','Manual Selection','Keep Current');
             if(first_In==1)
-                satisfied=questdlg('Keep automatic threshold selection or turn to Manual?', 'Manual Selection', 'Keep Current','Manual Selection','Keep Current');
                 if(strcmp(satisfied,'Manual Selection'))
                     no_sub_div=1000;
                     [Y,E] = histcounts(AFM_noBk,no_sub_div);
                     first_In=0;
                 end
-            else
-                satisfied=questdlg('Keep current or reselct threshold Manually?', 'Manual Selection', 'Keep Current','Manual Selection','Keep Current');
             end
-        else
-            satisfied='Keep Current';
         end
     end
     
@@ -337,6 +347,9 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonito
     IO_Image=logical(seg_dial);
     if(exist('wb','var'))
         delete (wb)
+    end
+    if SeeMe
+        saveas(f2,sprintf('%s/resultA3_2_fittedHeightChannel_BaselineForeground.tif',filepath))
     end
 end
 
