@@ -10,7 +10,7 @@ function user_choice = getValidAnswer(question, title, options)
         % end
     %end
 
-     % Default dialog box size
+    % Default dialog box size
     base_width = 450; button_height = 40; spacing = 10;
     % Check the longest string in the question and how many rows
     max_question_length = max(cellfun(@length, strsplit(question, '\n')));
@@ -110,20 +110,42 @@ function user_choice = getValidAnswer(question, title, options)
                 'String', options{i}, 'FontSize', FontsizeOptions, 'Callback', @(src, event) buttonCallback(i));
         end
     else
+        % pattern to find in the options (especially those having like (<number>)
+        % ^expression indicate to check at the beginning of the input text
+        pattern = {'^\(\d+\)\s', ...        % (<number>)
+            '^\d+\)\s', ...                 % <number>)
+            '^\s\(\d+\)\s', ...             % <whiteSpace>(<number>)
+            '^\s\d+\)\s'};                  % <whiteSpace><number>)
         spacing = 15;
         % create buttons and texts from the bottom
         button_start_y = spacing;    
         for i = num_lines_options:-1:1
+            % find the pattern           
+            [startIdx,endIdx]=regexp(options{num_lines_options-i+1}, pattern);
+            % in case the options does not contain any pattern, just show 1 or 2 etc.
+            if all(cellfun(@isempty, startIdx))
+                icon= num2str(num_lines_options-i+1);
+                text= options{num_lines_options-i+1};
+            else
+            % in case there is a pattern, take the pattern to show as icon and display the text option
+            % identify the index where pattern start and finish. Then start the number inside the pattern
+                startIdx= startIdx{find(~cellfun(@isempty, startIdx), 1)};
+                endIdx= endIdx{find(~cellfun(@isempty, endIdx), 1)};
+                patternNumber = '\d';
+                [startIdxNum,endIdxNum] = regexp(options{num_lines_options-i+1}(startIdx:endIdx), patternNumber);
+                icon=str2double(options{num_lines_options-i+1}(startIdxNum:endIdxNum));
+                text= options{num_lines_options-i+1}(endIdx+1:end);
+            end
             % Calc button vertical position 
             button_position_y = button_start_y + (button_height+spacing)*(i-1);
             
             % Name button = first char of the given option ( 1) bla bla ==> 1              % cubic button
             uicontrol('Style', 'pushbutton', 'Position', [spacing, button_position_y, button_height, button_height], ...
-                'String', options{num_lines_options-i+1}(1), 'FontSize', FontsizeOptions, 'Callback', @(src, event) buttonCallback(num_lines_options-i+1));
+                'String', icon, 'FontSize', FontsizeOptions, 'Callback', @(src, event) buttonCallback(num_lines_options-i+1));
             
             % insert label of each button with the entire text option
             uicontrol('Style', 'text', 'Position', [70 + spacing, button_position_y, dialog_width - 80 - 2*spacing, button_height], ...
-                'String', options{num_lines_options-i+1}, 'FontSize', 12, 'HorizontalAlignment', 'left');
+                'String', text, 'FontSize', 12, 'HorizontalAlignment', 'left');
         end
     end
     %wait until user make a choice
