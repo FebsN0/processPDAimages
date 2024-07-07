@@ -302,7 +302,7 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonito
                 scatter(closest_indices,Y(closest_indices),40,'r*')
             end
             zoom on; pan on
-            % Mostrare una finestra di dialogo per chiedere all'utente di premere "OK" per continuare
+            % show dialog box before continue
             uiwait(msgbox('Before click to continue the binarization, zoom or pan on the image for a better view',''));
             zoom off; pan off;
 
