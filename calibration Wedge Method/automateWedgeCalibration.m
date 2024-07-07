@@ -1,19 +1,22 @@
 clc, clear, close
 format shortE
 
-%% Part 1 : upload and order the trace, retrace and height cross section .txt files from the JPK software.
+% Part 1 : upload and order the trace, retrace and height cross section .txt files from the JPK software.
 %  IMPORTANT: upload only those files using the same SETPOINT and speed scan rate!
 
 %select the files
 [fileNames, filePathData] = uigetfile('*.cross', 'Select .cross files containing trace, retrace and height information', 'MultiSelect', 'on');
 unorderedData={};
+if isequal(fileNames,0)
+    error('No File Selected');
+end
 
 %In case of only one Height Data
-question= ['Choose one of the possible options to process Height/Trace/Retrace Data:\n' ...
-    ' (0) Use only one Height Data for every Trace/Retrace Data.\n' ...
-    ' (1) Use the Height Data for each Trace\Retrace Data.\n'];
-possibleAnswers= {'0','1'};
-singleHeightData = str2double(getValidAnswer(question,possibleAnswers));
+question=sprintf('Choose one of the possible options to process Height/Trace/Retrace Data');
+options={ ...
+    sprintf('1) Use only one Height Data for every Trace/Retrace Data.'), ...
+    sprintf('2) Use the Height Data for each Trace/Retrace Data.')};
+singleHeightData = getValidAnswer(question, '', options);
 
 % save the uploaded but unordered data due to user-dependent file naming
 % if only one Height Data is selected, take only the first. Save time by
@@ -23,7 +26,7 @@ j=1;
 for i = 1:length(fileNames)
     currentFile = fullfile(filePathData, fileNames{i});
     unorderedData_tmp = importdata(currentFile);
-    if contains(unorderedData_tmp.textdata(2),'Height') && ~singleHeightData
+    if contains(unorderedData_tmp.textdata(2),'Height') && singleHeightData == 1
         if firstHeight==true
             unorderedData{j} = unorderedData_tmp;
             firstHeight=false;
@@ -43,18 +46,24 @@ orderedData = {};
 %   1st col       2nd col         3rd col
 %   TRACE         RETRACE         HEIGHT
 idx=1;
+countHeightData=0;                      % in case there is a number of Height Data different from trace/retrace data
+countTraceLD_Data=0;
+countReTraceLD_Data=0;
 for i = 1:length(unorderedData)
     % search Trace data, then search the relative Retrace data using the
     % same coordinates of the line cross section
     if contains(unorderedData{i}.textdata(2),'Lateral Deflection (Trace)')
         orderedData{idx,1}=unorderedData{i}.data;               % Trace data
+        countTraceLD_Data = countTraceLD_Data + 1;
         for j = 1:length(unorderedData)
             % check that the coordinates are the same
             if strcmpi(unorderedData{i}.textdata{4},unorderedData{j}.textdata{4})
                 if contains(unorderedData{j}.textdata(2),'Lateral Deflection (Retrace)')
                     orderedData{idx,2}=unorderedData{j}.data;   % Retrace data
+                    countReTraceLD_Data = countReTraceLD_Data + 1;
                 elseif contains(unorderedData{j}.textdata(2),'Height')
                     orderedData{idx,3}=unorderedData{j}.data;   % Height data
+                    countHeightData=countHeightData+1;
                 end
             end
         end
@@ -65,21 +74,19 @@ end
 % check missing trace/retrace/height data in the OrderedData var.
 % in case of only one Height Data option, copy the first available one,
 % otherwise, give error.
-copy=false;
-for i=1:size(orderedData,1)
-    for j=1:3
-        if ~any(orderedData{i,j})
-            if j==3 && ~singleHeightData
-                if i==1, copy=true; end
-            else
-                error('\nERROR: The matrix OrderedData(%d,%d) has missing data! Check the coordinates in the .cross-files and re-run the code!\n',i,j)
-            end
-        elseif j==3 && copy
-            orderedData{1,3}=orderedData{i,3};
-            copy=false;
-        end
+if countTraceLD_Data ~= countReTraceLD_Data
+    error('\nERROR: The matrix OrderedData has missing data! Check the coordinates in the .cross-files and re-run the code!\n')
+elseif countTraceLD_Data ~= countHeightData
+    if singleHeightData == 2
+        singleHeightData = 1;
+        uiwait(msgbox(sprintf(['The number of the height data (%d) is different from the number of trace data (%d)\n' ...
+            'Therefore, only one Height Data will be used for each Trace/Retrace Data, although it was stated to use Height data for each Trace data.'], ...
+            countHeightData,countTraceLD_Data),'icon','warn'))
     end
-end    
+    % in case the number of height data is different from the one of trace data, copy only the first available
+    % if the first is empty, copy the first available
+    orderedData{1,3}=orderedData{find(~cellfun(@isempty,orderedData(:,3)),1),3};
+end
 
 %check if the size of each data is correct
 clear i idx j unorderedData unorderedData_tmp firstHeight copy
@@ -87,13 +94,14 @@ clear i idx j unorderedData unorderedData_tmp firstHeight copy
 %move the figure in another monitor in a maximized windows if second monitor is allowed
 secondMonitorMain = objInSecondMonitor;
 
-%% Part 2 : Plotting Trace Retrace and Height of every data
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Part 2 : Plotting Trace Retrace and Height of every data
 %  (if you want still to plot more than 9 single grates, add a new custom color palette for each new grates)
-question='Do you want to see overlapped trace, retrace and height of every provided data? [Y/N]: ';
-plotEverything = getValidAnswer(question,possibleAnswers);
+question='Do you want to see overlapped trace, retrace and height of every provided data?';
+plotEverything = getValidAnswer(question,'',{'Yes','No'});
 
-if strcmpi(plotEverything,'y') && size(orderedData, 1) < 10
-    if ~isempty(secondMonitorMain), f1=figure; objInSecondMonitor(secondMonitorMain,f1); else, figure; end
+if plotEverything == 1 && size(orderedData, 1) < 10
+    f1=figure; 
+    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
     hold on
     customColorPalette = [
         1 0 0   % red
@@ -109,7 +117,7 @@ if strcmpi(plotEverything,'y') && size(orderedData, 1) < 10
     
     %plot trace, retrace and height for each data
     p_heightTraceRetrace=zeros(size(orderedData, 1),3);
-    displayNames=   {'Height';'Trace';'Retrace'};
+    displayNames=   {'Trace';'Retrace';'Height'};
     lineStyles=     {'-';'-.';':'};
     firstHeight=true;
     for i = 1:size(orderedData, 1)
@@ -119,7 +127,7 @@ if strcmpi(plotEverything,'y') && size(orderedData, 1) < 10
             else
                 yyaxis left
             end
-            if ~singleHeightData && j == 3
+            if singleHeightData == 1 && j == 3
                 if firstHeight
                     firstHeight=false;
                 else
@@ -132,7 +140,7 @@ if strcmpi(plotEverything,'y') && size(orderedData, 1) < 10
 
         end
     end
-    yyaxis right,   ylabel('Height [\mum]'),                    ylim([-2E-7 1E-5])
+    yyaxis right,   ylabel('Height [\mum]'),                    ylim([7E-6 1E-5])
     yyaxis left,    ylabel('lateral deflection signal [V]'),    ylim([-7 3])
     xlim tight,     xlabel('offset [\mum]');
     grid on
@@ -142,11 +150,19 @@ if strcmpi(plotEverything,'y') && size(orderedData, 1) < 10
     clear customColorPalette i j x_data y_data p_heightTraceRetrace displayNames lineStyles
 end
 clear question plotEverything possibleAnswers firstHeight
-%% PART 3:
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PART 3:
 
 % Enter the SETPOINT from which the data is obtained. Check on JPK program
 clc
-L = input("Enter the Setpoint value [nN] applied from which the uploaded data (Trace/Retrace/Height) originated: ");
+
+question='Enter the Setpoint value [nN] applied from which the uploaded data (Trace/Retrace/Height) originated';
+while true
+    L = str2double(inputdlg(question,''));
+    if any(isnan(L)), questdlg('Invalid input! Please enter a numeric value','','OK','OK');
+    else, break
+    end
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         % Let's calculate the Adhesion Force
@@ -155,23 +171,24 @@ L = input("Enter the Setpoint value [nN] applied from which the uploaded data (T
 % 1) MANUAL WAY: enter manually the value until finished 
 % 2) IMPORT WAY: import txt data and process them
 
-question= ['\nChoose the Adhesion Force value modality:\n' ...
-    '1) [manual] : Enter manually the single values for each force curve.\n' ...
-    '2) [import] : Import txt data files\n'];
-possibleAnswers= {'manual','import'};   % 1 = manual | 0 = import
-mode1=getValidAnswer(question,possibleAnswers);
+question=sprintf('Choose the Adhesion Force value modality');
+options={ ...
+    sprintf('1) [manual] : Enter manually the single values for each force curve.'), ...
+    sprintf('2) [import] : Import txt data files.')};
+mode1 = getValidAnswer(question, '', options);
 
-if strcmpi(mode1,'manual')
-% manual adhesion force of each force curve
+if mode1 == 1 
+% manual adhesion force of each force curve.
+    question = "Enter the Adhesion Force value [nN]. Digit ''end'' to finish.";    
     values = [];
     while true
-        v = input('Enter the Adhesion Force value [nN]. Digit ''E'' to finish. ','s');
-        if strcmpi(v,'E')
+        v = inputdlg(question,'');
+        if strcmpi(v,'end')
             break;
         else
             v_num = str2double(v);
             if ~isnan(v_num),   values = [values, v_num];
-            else,               disp('Invalid input! Please enter a numeric value or ''E'' to finish. ');
+            else, uiwait(msgbox(sprintf('Invalid input! Please enter a numeric value or ''end'' to finish. '),''));
             end
         end
     end
@@ -184,9 +201,9 @@ else
 % import force curves
     [fileNames, filePathFC] = uigetfile({'*.txt'}, 'Select the force curves .txt files', filePathData, 'MultiSelect', 'on');
     numberForceCurves=length(fileNames);
-    question= 'Is the force curve obtained in acqueous or air condition? [air | aqueous] : ';
-    possibleAnswers= {'aqueous','air'};   % 1 = aqueous | 0 = air
-    mode2=getValidAnswer(question,possibleAnswers);
+    question= sprintf('Is the force curve obtained in acqueous or air condition?\nClick acqueous even if the measurement is done by air if you want to check manually each force curve.');
+    options= {'Aqueous','Air'};   % 1 = aqueous | 0 = air
+    mode2=getValidAnswer(question,'',options);
     % extract and clean from NaN values among any the force curves
     for i = 1:length(fileNames)
         currentFile = fullfile(filePathFC, fileNames{i});
@@ -196,9 +213,8 @@ else
         % Shift toward x axis = 0 using the first value
         shifted_cleaned_data = cleaned_data{:,2}-cleaned_data{1,2};
 
-        % min function can be used without problems (maybe..) to find the
-        % adhesion force
-        if strcmpi(mode2,'air')
+        % min function can be used without problems (maybe..) to find the adhesion force in case of air
+        if mode2 == 2
             values(i)= min(shifted_cleaned_data);
         else
         % aqueous
@@ -209,7 +225,9 @@ else
             % close to zero.
             % To check if this happens, an user-guided selection will follow to
             % find the force adhesion for any force curve
-            if ~isempty(secondMonitorMain), f3=figure; objInSecondMonitor(secondMonitorMain,f3); else, figure; end            xlabel('Height (m)');
+            f3=figure;
+            if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
+            xlabel('Height (m)');
             ylabel('Vertical Deflection (N)');
             title('Select two point to create a range of interest in which the force adhesion is extracted','FontSize',16)
             hold on
@@ -221,19 +239,26 @@ else
             [~,ixMax]=max(force);
             hf1= plot(height(1:ixMax),force(1:ixMax),'b','DisplayName','Trace');
             hf2= plot(height(ixMax+1:end),force(ixMax+1:end),'r','DisplayName','Retrace');
-            legend([hf1,hf2],'Autoupdate','off')
+            legend([hf1,hf2],'Autoupdate','off'), grid on
             % height = x | force = y
             while true
                 if exist('sf_real', 'var') && ishandle(sf_real)
                     delete(sf_real), delete(hp), delete(sf_idx), delete(point_selected)
                 end
+                pan on; zoom on;
+                % show better figure if necessary
+                uiwait(msgbox('Before click to continue, zoom or pan on the image for a better view',''));
+                zoom off; pan off;
+                               
                 closest_indices= selectRangeGInput(2,1,height(ixMax+1:end),force(ixMax+1:end));
                 closest_indices=closest_indices+ixMax;
                 % Plot the points closer to the manually selected points
                 %delete(point_selected)
-                x_selected = height(closest_indices); y_selected = force(closest_indices);
-                sf_idx=scatter(x_selected, y_selected, 200,'pentagram','filled', 'MarkerFaceColor', 'green','DisplayName','Closest selected points');
-     
+                x_selected = height(closest_indices);
+                y_selected = force(closest_indices);
+                hold on
+                sf_idx=plot(x_selected, y_selected,'LineStyle','none','Marker','pentagram','MarkerSize',10,'MarkerFaceColor','green','DisplayName','Closest selected points');
+
                 % Create a patch to highlight the selected x-axis range
                 y_limits = ylim;
                 x_patch = [x_selected(1), x_selected(2), x_selected(2), x_selected(1)];
@@ -243,15 +268,14 @@ else
                 % find the adhesion force and plot
                 [ ~ , ix ] = min([force(min(closest_indices):max(closest_indices))]);
                 ix1=min(closest_indices)+ix-1;
-                sf_real=scatter(height(ix1),force(ix1), 200,'pentagram','filled', 'MarkerFaceColor', 'k','DisplayName','Adhesion Force');       
+                sf_real=plot(height(ix1),force(ix1),'LineStyle','none','MarkerSize',10, 'MarkerFaceColor', 'k','DisplayName','Adhesion Force');       
                 legend([hf1, hf2 ,sf_idx, sf_real])
-                fprintf('Adhesion Force is = %.3f nN\n', abs(force(ix1))*1e9)
-                
-                question= 'Is the Adhesion Force ok? [y/n] ';
-                possibleAnswers= {'y','n'};   % 1 = y | 0 = n
-                completed=getValidAnswer(question,possibleAnswers);
+            
+                question=sprintf('Adhesion Force is = %.3f nN\nIs the value ok?', abs(force(ix1))*1e9);
+                possibleAnswers= {'Yes','No'};   % 1 = y | 0 = n
+                completed=getValidAnswer(question,'',possibleAnswers);
                 close
-                if strcmpi(completed,'y')
+                if completed == 1
                     values(i)=force(ix1);
                     break
                 end
@@ -265,7 +289,7 @@ end
 
 %express Force Adhesion and Setpoint in nN
 clc
-fprintf('\nAdhesion Force (mean+std) on %d force curves = %.3g \x00B1 %.2g nN \n\n',numberForceCurves, F_adhesion,F_adhesion_std)
+uiwait(msgbox(sprintf('\nAdhesion Force (mean+std) on %d force curves = %.3g \x00B1 %.2g nN \n\n',numberForceCurves, F_adhesion,F_adhesion_std)))
 clear numberForceCurves text question completed values possibleAnswers forceCurvecompleted distances currentFile fileNames filePathFC i shifted_cleaned_data cleaned_data nan_rows rawForceCurves mode* j closest_indices force* height* hf* ix* hp pointSelected_all range_selected sf_* x* y*
 
 %% Part 4
@@ -287,7 +311,8 @@ clear numberForceCurves text question completed values possibleAnswers forceCurv
 % and flat section.
 referenceImage1 = imread('referencePicLateralDeflectionCalibration_1.png');
 referenceImage2 = imread('referencePicLateralDeflectionCalibration_2.png');
-if ~isempty(secondMonitorMain), f2=figure; objInSecondMonitor(secondMonitorMain,f2); else, figure; end
+f2=figure;
+if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2); end
 
 ax1=axes('Position', [0.05, 0.5, 0.47, 0.47]); % subplot 1
 imshow(referenceImage1,'Border','tight');
@@ -307,21 +332,31 @@ m=1;
 % enter manually the theta OR
 % use the theta of the first height only OR
 % of all data
-question=['\nChoose one of the following options:\n' ...
-    ' (1) Enter manually the theta angle\n' ...
-    ' (2) Extract theta angle from the first Height data and use it for the rest of the data\n' ...
-    ' (3) Extract theta angle for each Height data\n'];
-possibleAnswers={'1','2','3'};
-processTheta=getValidAnswer(question,possibleAnswers);
-if processTheta == '1'
-    theta = input("Enter the theta angle [°,degree]: ");
+question='Choose one of the following options.';
+options={
+    '(1) Enter manually the theta angle.' ...
+    '(2) Extract theta angle from the first Height data and use it for the rest of the data.' ...
+    '(3) Extract theta angle for each Height data.'};
+processTheta=getValidAnswer(question,'',options);
+
+if processTheta == 1
+    question='Enter the theta angle [°,degree]';
+    while true
+        theta = str2double(inputdlg(question,''));
+        if any(isnan(theta)), questdlg('Invalid input! Please enter a numeric value','','OK','OK');
+        else, break
+        end
+    end
 else
-    if processTheta == '3' && ~singleHeightData
-        processTheta = '2';
-        fprintf('\nThere is only one Height Data ==> switched to (2) automatically\n\n')
+    if processTheta == 3 && singleHeightData == 1
+        uiwait(msgbox(sprintf(['The third option is not permitted because only one height data is processed.\n' ...
+            'Therefore, the second option is automatically selected.'], ...
+            countHeightData,countTraceLD_Data),'icon','warn'))
+        processTheta = 2;
     end
     firstTheta= false;
 end
+
 
 firstHeight=true;
 for i = 1:size(orderedData, 1)
@@ -332,8 +367,8 @@ for i = 1:size(orderedData, 1)
     % j=2 Retrace_x|y
     % j=3 Height_x|y
     for j=1:3
-        if j==3 && ~singleHeightData
-            if firstHeight && ~singleHeightData
+        if j==3 && singleHeightData == 1
+            if firstHeight && singleHeightData == 1
                 firstHeight=false;
             else
                 continue
@@ -357,6 +392,7 @@ for i = 1:size(orderedData, 1)
     
     % plot the Height data
     hold on
+    yyaxis left
     hh=plot(x_data{3}, y_data{3},'k-','DisplayName','Height','LineWidth',2);
     ylabel('Height [\mum]');
     xlabel('offset [\mum]');
@@ -366,19 +402,21 @@ for i = 1:size(orderedData, 1)
     % select manually the points on the plots to calculate the theta.
     % Sometimes the slope may be disaligned, therefore the code asks you if
     % the theta is ok by checking the red slope on the plot
-    if processTheta=='2' || processTheta=='3'
+    if processTheta==2 || processTheta==3
         % OPTION 3: extract the first theta angle. If processTheta=2, then
         % do it only once and break the while loop, otherwise for each 
         % Height data 
-        if firstTheta== false
+        if firstTheta == false
             while true
+                yyaxis left
                 title('Click on the plot to select the coordinates to calculate theta angle','FontSize',16);
-                fprintf('Click on the plot to select the coordinates to calculate theta angle\n')
+                uiwait(msgbox(sprintf('Click on the plot to select the coordinates to calculate theta angle')))
                 % calc theta angle specifing the points manually
                 closest_indices=selectRangeGInput(2,2,x_data{3},y_data{3});
                 % plot the real coordinates from the manually selected points
                 x = x_data{3}(closest_indices); y = y_data{3}(closest_indices);
-                stheta_real=scatter(x, y, 200,'pentagram','filled', 'MarkerFaceColor', 'green','DisplayName','real idx');
+                hold on
+                stheta_real=plot(x, y,'LineStyle','none','Marker','pentagram','MarkerSize',10,'MarkerFaceColor','green','DisplayName','real idx');
                 
                 % calculate theta from real points
                 theta = atand(((y(2)-y(1))/(x(2)-x(1))));
@@ -388,14 +426,13 @@ for i = 1:size(orderedData, 1)
                 line_theta=plot(x_range, y_range,'r--','LineWidth',2,'DisplayName','slope');
                 legend([hh,stheta_real,line_theta])
                 theta_all(i)=abs(theta);
-                fprintf('%s = %.2f\n', char(952), theta_all(i));
-                question= 'Is the calculated theta ok? [Y/N]: ';
-                possibleAnswers= {'y','n'};   % 1 = y | 0 = n
-                completed=getValidAnswer(question,possibleAnswers);
+                question= sprintf('%s = %.2f\nIs the calculated theta ok?',char(952), theta_all(i));
+                possibleAnswers= {'yes','no'};   % 1 = y | 0 = n
+                completed=getValidAnswer(question,'',possibleAnswers);
                 delete(stheta_real), delete(line_theta)
                 clc
-                if strcmpi(completed,'y')
-                    if processTheta=='2' || ~singleHeightData
+                if completed == 1
+                    if processTheta=='2' || singleHeightData == 1
                         firstTheta=true;
                     end
                     break
@@ -441,17 +478,18 @@ for i = 1:size(orderedData, 1)
             closest_indices = [closest_indices, selectRangeGInput(2,1,x_data{ceil(j/3)},y_data{ceil(j/3)})];
             delete(r)
         end
-     
-        st=scatter(x_data{1}(closest_indices(:,1:3)), y_data{1}(closest_indices(:,1:3)), 200,'pentagram','filled', 'MarkerFaceColor', 'magenta','DisplayName','real idx');
-        sr=scatter(x_data{2}(closest_indices(:,4:6)), y_data{2}(closest_indices(:,4:6)),200,'pentagram','filled', 'MarkerFaceColor', 'magenta','DisplayName','real indexes');
+        hold on
+        yyaxis right
+        st=plot(x_data{1}(closest_indices(:,1:3)), y_data{1}(closest_indices(:,1:3)),'LineStyle','none','MarkerSize',10,'Marker','pentagram', 'MarkerFaceColor', 'magenta','DisplayName','real idx');
+        sr=plot(x_data{2}(closest_indices(:,4:6)), y_data{2}(closest_indices(:,4:6)),'LineStyle','none','Marker','pentagram','MarkerSize',10, 'MarkerFaceColor', 'magenta','DisplayName','real indexes');
         legend([ht,hr,hh,st(1)])
 
         
-        question= 'Are real indexes ok? [Y/N]: ';
-        possibleAnswers= {'y','n'};   % 1 = y | 0 = n
-        completed=getValidAnswer(question,possibleAnswers);
+        question= 'Are real indexes ok?';
+        possibleAnswers= {'yes','no'};   % 1 = y | 0 = n
+        completed=getValidAnswer(question,'',possibleAnswers);
         delete(sr), delete(st)
-        if strcmpi(completed,'y')
+        if completed == 1
             break
         end
     end
@@ -536,7 +574,7 @@ for i = 1:size(orderedData, 1)
     % W=abs(W);
     if processTheta=='2'
         theta=theta_all(1);
-    elseif processTheta=='3' && singleHeightData
+    elseif processTheta=='3' && singleHeightData == 2
         theta=theta_all(i);
     end
     
@@ -556,9 +594,7 @@ for i = 1:size(orderedData, 1)
         delta_W_rate(i,(j+1)/2)=(Delta(j)-Delta(2))/W(j);
     end
     
-    question= '\n\nClick any button to continue to the next data...';
-    possibleAnswers= {''};
-    getValidAnswer(question,possibleAnswers);
+    uiwait(msgbox('Click OK button to continue to the next data...'));
     clc
 end
 
@@ -570,7 +606,7 @@ clc
       
 filename = "resultsCalibration"+string(L)+'nN';
 fullfilen=fullfile(filePathData, filename);
-if processTheta=="2" || processTheta == "3"; theta=mean(theta_all); end
+if processTheta==2 || processTheta == 3; theta=mean(theta_all); end
 save(fullfilen,"L","F_adhesion","orderedData","realMuFlatCoefficient","realMuCoefficient","realAlphaCoefficient","theta","delta_W_rate")
 
 fullfilen = fullfilen+".txt";
