@@ -53,7 +53,6 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonito
     
     if(strcmp(p.Results.Silent,'Yes')); SeeMe=0; else, SeeMe=1; end
 
-
     % Extract the height channel
     raw_data_Height=filtData(strcmp({filtData.Channel_name},'Height (measured)')).AFM_image;
     % Orient the image by counterclockwise 180° and flip to coencide with the Microscopy image through rotations
@@ -304,7 +303,7 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonito
             end
             zoom on; pan on
             % Mostrare una finestra di dialogo per chiedere all'utente di premere "OK" per continuare
-            uiwait(msgbox('Zoom / Pan ON. Click OK to continue the binarisation.', ''));
+            uiwait(msgbox('Before click to continue the binarization, zoom or pan on the image for a better view',''));
             zoom off; pan off;
 
             % if(exist('x_sel','var'))

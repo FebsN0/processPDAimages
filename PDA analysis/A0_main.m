@@ -30,14 +30,16 @@ clear data
 clear filtData
 % Using the AFM_height_IO, fit the background again, yielding a more accurate height image
 [AFM_H_NoBk,AFM_cropped_Images]=A4_El_AFM_masked(AFM_cropped_Images,AFM_height_IO,secondMonitorMain,newFolder);
-
 close all
-%% to extract the friction coefficient, choose which method use.
+
+% to extract the friction coefficient, choose which method use.
 question=sprintf('Which method perform to extract the glass friction coefficient?');
 options={ ...
     sprintf('1) Average fast scan lines containing only glass.\nUse the .jpk image containing only glass'), ...
     sprintf('2) Masking PDA feature.\nUse the .jpk image containing both PDA and glass (ReTrace Data required - Hover Mode OFF)'), ... 
-    sprintf('3) Masking PDA + outlier removal features\n(ReTrace Data required - Hover Mode OFF)')};
+    sprintf('3) Masking PDA + outlier removal features\n(ReTrace Data required - Hover Mode OFF)'), ...
+    sprintf('4) Use a previous calculated friction coefficient: TRCDA = 0.2920'), ...
+    sprintf('5) Use a previous calculated friction coefficient: PCDA  = 0.2626')};
 choice = getValidAnswer(question, '', options);
 
 % methods 2 and 3 require the .jpk file with HOVER MODE OFF but in the same condition (same scanned PDA area
@@ -47,8 +49,8 @@ if choice == 1
     [fileNameFriction, filePathDataFriction] = uigetfile('*.jpk', 'Select the .jpk AFM image to extract glass friction coefficient');
     [dataGlass,metaDataGlass]=A1_open_JPK(fullfile(filePathDataFriction,fileNameFriction));
     avg_fc=A5_frictionGlassCalc_method1(metaDataGlass.Alpha,dataGlass,secondMonitorMain,newFolder);
-    %clear fileNameFriction filePathDataFriction dataGlass metaDataGlass
-else
+    clear fileNameFriction filePathDataFriction dataGlass metaDataGlass
+elseif choice == 2 || choice == 3
     % before perform method 2 or 3, upload the data used to calc the glass friction coeffiecient. Basically it the same experiment but with Hover Mode OFF
     % then clean the data.
     [dataHoverModeOFF,metaDataHoverModeOFF,~]=A1_openANDassembly_JPK;
@@ -58,15 +60,18 @@ else
     % METHOD 2 : MASKING ONLY
     % METHOD 3 : MASKING + OUTLIER REMOVAL
     eval(sprintf('avg_fc=A5_frictionGlassCalc_method%d(metaDataHoverModeOFF.Alpha,AFM_cropped_ImagesHVOFF_fitted,AFM_height_IOHVOFF,secondMonitorMain,newFolder);',choice));
-    %clear dataHoverModeOFF metaDataHoverModeOFF filtDataHVOFF AFM_cropped_ImagesHVOFF AFM_height_IOHVOFF AFM_H_NoBkHVOFF AFM_cropped_ImagesHVOFF_fitted
+    clear dataHoverModeOFF metaDataHoverModeOFF filtDataHVOFF AFM_cropped_ImagesHVOFF AFM_height_IOHVOFF AFM_H_NoBkHVOFF AFM_cropped_ImagesHVOFF_fitted
+elseif choice == 4  %TRCDA
+    avg_cf = 0.2920;
+else                %PCDA
+    avg_cf = 0.2626;
 end
-
-% previous friction coefficients (determined by separate measurements)
-% TRCDA : 0.2920
-% PCDA  : 0.2626 (2020 July 7)
 close all
-%% Substitute to the AFM cropped channels the baseline adapted LD
-[Corrected_LD_Trace,AFM_Elab,~]=A6_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,metaData.Alpha,avg_fc,secondMonitorMain,'Accuracy','Low');
+
+% Substitute to the AFM cropped channels the baseline adapted LD
+[Corrected_LD_Trace,AFM_Elab,~]=A6_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,metaData.Alpha,avg_fc,secondMonitorMain,newFolder,'Accuracy','High');
+
+
 
 %% Open Brightfield image and the TRITIC (Before and After stimulation images)
 

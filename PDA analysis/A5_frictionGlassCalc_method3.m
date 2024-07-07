@@ -55,6 +55,7 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_he
     axis equal, xlim([0 512]), ylim([0 512])
     subplot(122)
     imagesc(flip(vertical_Trace.*(~rot90(flipud(AFM_height_IO)))))
+    c= colorbar; c.Label.String = 'Force [N]'; c.FontSize = 15;
     title('Vertical Deflection (masked)','FontSize',20)
     xlabel(' fast direction - scan line','FontSize',15), ylabel('slow direction','FontSize',15)
     axis equal, xlim([0 512]), ylim([0 512])
@@ -63,14 +64,13 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_he
 %%%%%%%%%%%------- SETTING PARAMETERS FOR THE EDGE REMOVAL -------%%%%%%%%%%%
     % the user has to choose the number of points
     % in a single fast scan line to consider in order to remove the edge spikes data
-    pixData=zeros(2,1); i=1;
-    text ={'How many pixels to get remove from both edges of the segment? ' ...
+    pixData=zeros(2,1);
+    question ={'How many pixels to get remove from both edges of the segment? ' ...
         'Enter the step size of pixel loop: '};
     while true
-        v = input(text{i},'s'); v_num = str2double(v);
-        if isnan(v_num), disp('Invalid input! Please enter a numeric value');
-        else, pixData(i) = v_num;
-            if i==2, break, else, i=i+1; end
+        pixData = str2double(inputdlg(question,'SETTING PARAMETERS FOR THE EDGE REMOVAL',[1 90]));
+        if any(isnan(pixData)), questdlg('Invalid input! Please enter a numeric value','','OK','OK');
+        else, break
         end
     end
     % choose the removal modality    
@@ -80,16 +80,14 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_he
     sprintf('2) Apply outlier removal to one large connected segment after pixel reduction.')};
     
     fOutlierRemoval = getValidAnswer(question, '', options);
-
-
                 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % show a dialog box indicating the index of fast scan line along slow direction and which pixel size is processing
     wb=waitbar(0/size(force,1),sprintf(' Processing the Outliers Removal Mode %d (pixel size %d / %d) \n\t Line %.0f Completeted  %2.1f %%',fOutlierRemoval,0,pixData(1),0,0),...
              'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
     setappdata(wb,'canceling',0);
     % open a new figure where plot the fitting curve
-    if ~isempty(secondMonitorMain), f2=figure; objInSecondMonitor(secondMonitorMain,f2); else, figure; end
+    f2=figure;
+    if ~isempty(secondMonitorMain); objInSecondMonitor(secondMonitorMain,f2); end
     xlim([min(min(vertical_Trace))*0.9 max(max(vertical_Trace))*1.1])
     ylim([min(min(force))*0.9 max(max(force))*1.1])
     Cnt=1;
@@ -136,22 +134,22 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_he
         end
 
         hold on
-        xyExp=plot(vert_avg_fix, force_avg_fix, 'x');
+        xyExp=scatter(vert_avg_fix, force_avg_fix, 100,'pentagram','filled', 'MarkerFaceColor', 'green','DisplayName','experimental data');
         xlabel('Set Point (N)'); ylabel('Delta Offset (N)');
         % Linear fitting
         p = polyfit(vert_avg_fix, force_avg_fix, 1);
         yfit = polyval(p, vert_avg_fix);
         % plot curve fitting
-        plot(vert_avg_fix, yfit, 'r-.'); grid on
-        legend('fitted curve','experimental data','Location','northwest','FontSize',15)
-        eqn = sprintf('Linear: y = %0.3g x %0.3g', p(1), p(2));
+        xyFit=plot(vert_avg_fix, yfit, 'r-.','DisplayName','Fitted data'); grid on
+        legend([xyExp(1),xyFit(1)],'Location','northwest','FontSize',15)
+        eqn = sprintf('Last executed Linear fitting: y = %0.3g x %0.3g', p(1), p(2));
         title({'Delta Offset vs Set Point'; eqn},'FontSize',15);
         hold off
     
         % since slope higher than 0.95 has no sense, the loop will be stopped. In theory max 1, but it will be
         % never such value
         if p(1) > 0.95 || p(1) < 0
-            fprintf('\nSlope outside the reasonable range ( 0 < m < 7 ) ==> stopped calculation!\n\n')
+            uiwait(msgbox(sprintf('Slope outside the reasonable range ( 0 < m < 0.95 ) \x2192 stopped calculation!'),''));
             break
         end
         % Store coef data
@@ -159,6 +157,9 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_he
         pixx(Cnt) = pix;
         Cnt = Cnt+1;
     end
+    saveas(f2,sprintf('%s/resultA5method3_2_DeltaOffsetVSsetpoint.tif',newFolder))
+
+
     delete(wb)
     f3=figure;
     if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
@@ -171,5 +172,5 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_he
     avg_fc_def=avg_fc(idx_x);
     resultChoice= sprintf('Selected friction coefficient: %0.3g', avg_fc_def);
     title({' Result Method 3 (Mask + Outliers Removal)'; resultChoice},'FontSize',16);
-    saveas(f3,sprintf('%s/resultA5method3_3_DeltaOffsetVSsetpoint.tif',newFolder))
+    saveas(f3,sprintf('%s/resultA5method3_3_pixelVSfrictionCoeffs.tif',newFolder))
 end
