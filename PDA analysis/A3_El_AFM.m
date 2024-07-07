@@ -66,6 +66,7 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonito
     imshow(visible_data_rot_Height)
     colormap parula, title('Original Height (measured) channel'),
     c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
+    ylabel('fast scan line direction'), xlabel('slow scan line direction')
     if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f1); end
     if SeeMe
         saveas(f1,sprintf('%s/resultA3_1_originalHeightChannel.tif',filepath))
@@ -301,7 +302,7 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonito
             if any(closest_indices)
                 scatter(closest_indices,Y(closest_indices),40,'r*')
             end
-            zoom on; pan on
+            pan on; zoom on;
             % show dialog box before continue
             uiwait(msgbox('Before click to continue the binarization, zoom or pan on the image for a better view',''));
             zoom off; pan off;

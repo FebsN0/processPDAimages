@@ -4,7 +4,6 @@ clc, clear, close
 % upload .jpk files. If more than one and if from same experiment in which setpoint is changed, then assembly.
 [data,metaData,filePathData]=A1_openANDassembly_JPK;
 
-
 % save the useful figures into a directory
 newFolder = fullfile(filePathData, 'Results Processing AFM and fluorescence images');
 % check if dir already exists
@@ -31,7 +30,7 @@ clear filtData
 % Using the AFM_height_IO, fit the background again, yielding a more accurate height image
 [AFM_H_NoBk,AFM_cropped_Images]=A4_El_AFM_masked(AFM_cropped_Images,AFM_height_IO,secondMonitorMain,newFolder);
 close all
-
+%%
 % to extract the friction coefficient, choose which method use.
 question=sprintf('Which method perform to extract the glass friction coefficient?');
 options={ ...
