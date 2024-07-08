@@ -61,9 +61,9 @@ elseif choice == 2 || choice == 3
     eval(sprintf('avg_fc=A5_frictionGlassCalc_method%d(metaDataHoverModeOFF.Alpha,AFM_cropped_ImagesHVOFF_fitted,AFM_height_IOHVOFF,secondMonitorMain,newFolder);',choice));
     clear dataHoverModeOFF metaDataHoverModeOFF filtDataHVOFF AFM_cropped_ImagesHVOFF AFM_height_IOHVOFF AFM_H_NoBkHVOFF AFM_cropped_ImagesHVOFF_fitted
 elseif choice == 4  %TRCDA
-    avg_cf = 0.2920;
+    avg_fc = 0.2920;
 else                %PCDA
-    avg_cf = 0.2626;
+    avg_fc = 0.2626;
 end
 close all
 
@@ -76,19 +76,30 @@ close all
 
 [fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the BrightField image',filePathData);
 [BF_Mic_Image]=A7_open_ND2(fullfile(filePathData,fileName)); 
-figure,imshow(imadjust(BF_Mic_Image))
+f1=figure;
+if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
+imshow(imadjust(BF_Mic_Image))
+saveas(f1,sprintf('%s/image_8step_BrightField.tif',newFolder))
+
 
 [fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the TRITIC Before Stimulation image',filePathData);
 [Tritic_Mic_Image_Before]=A7_open_ND2(fullfile(filePathData,fileName)); 
-figure,imshow(imadjust(Tritic_Mic_Image_Before))
+f2=figure;
+if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2); end
+imshow(imadjust(Tritic_Mic_Image_Before))
+saveas(f2,sprintf('%s/image_8step_TRITIC_Before_Stimulation.tif',newFolder))
 
 [fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the TRITIC After Stimulation image',filePathData);
 [Tritic_Mic_Image_After]=A7_open_ND2(fullfile(filePathData,fileName)); 
-figure,imshow(imadjust(Tritic_Mic_Image_After))
+f3=figure;
+if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
+imshow(imadjust(Tritic_Mic_Image_After))
+saveas(f3,sprintf('%s/image_8step_TRITIC_After_Stimulation.tif',newFolder))
+
 
 %% Align the fluorescent images After with the BEFORE stimulation
-Tritic_Mic_Image_After_Registered=A8_limited_registration(Tritic_Mic_Image_After,Tritic_Mic_Image_Before);
+Tritic_Mic_Image_After_Registered=A8_limited_registration(Tritic_Mic_Image_After,Tritic_Mic_Image_Before,newFolder,secondMonitorMain);
 
 % Align the Brightfield to TRITIC Before Stimulation
-BF_Mic_Image_Registered=A8_limited_registration(BF_Mic_Image,Tritic_Mic_Image_Before,'brightfield','moving');
+BF_Mic_Image_Registered=A8_limited_registration(BF_Mic_Image,Tritic_Mic_Image_Before,newFolder,secondMonitorMain,'Brightfield','Yes','Moving','Yes');
 

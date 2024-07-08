@@ -6,59 +6,44 @@
 
 function [binary_image,Tritic_before,Tritic_after_reg,FurtherDetails]=A8_feature_Mic_to_Binary(image,Tritic_before,Tritic_after_reg,varargin)
 
-if(~isempty(varargin))
-    if(size(varargin,2)==1)
-        if(iscell(varargin{1,1}))
-            varargin=vertcat(varargin{:});
-        end
-    end
-end
     p=inputParser();
     argName = 'Silent';
-    defaultVal = 'Yes';
+    defaultVal = 'No';
     addOptional(p,argName,defaultVal);
     
     parse(p,varargin{:});
-    if(strcmp(p.Results.Silent,'Yes'))
-        SeeMe='off';
-    else
-        SeeMe='on';
-    end
+    if(strcmp(p.Results.Silent,'Yes')), SeeMe='off'; else, SeeMe='on'; end
     
-clearvars argName defaultVal
+    clearvars argName defaultVal
+    Crop_image = getValidAnswer('Would Like to Crop the Image?', '', {'Yes','No'});
 
-if(strcmp(p.Results.Silent,'No'))
-    Crop_image=questdlg('Would Like to Crop the Image?', 'Crop', 'Yes','No','No');
-else
-    Crop_image='No';
-end
-
-if(strcmp(Crop_image,'Yes'))
-    Was_I_Cropped='Yes';
-    figure_image=imshow(imadjust(image));
-    [~,specs]=imcrop(figure_image);
-    close all
-    YBegin=round(specs(1,1));
-    XBegin=round(specs(1,2));
-    YEnd=round(specs(1,1))+round(specs(1,3));
-    XEnd=round(specs(1,2))+round(specs(1,end));
-    if(XEnd>size(image,1))
-        XEnd=size(image,1);
+    if Crop_image == 1
+        Was_I_Cropped='Yes';
+        figure_image=imshow(imadjust(image));
+        title('')
+        [~,specs]=imcrop(figure_image);
+        close all
+        YBegin=round(specs(1,1));
+        XBegin=round(specs(1,2));
+        YEnd=round(specs(1,1))+round(specs(1,3));
+        XEnd=round(specs(1,2))+round(specs(1,end));
+        if(XEnd>size(image,1))
+            XEnd=size(image,1);
+        end
+        if(YEnd>size(image,2))
+            YEnd=size(image,2);
+        end
+        Im_Or=image;
+        image=image(XBegin:XEnd,YBegin:YEnd,:);
+        Tritic_before=Tritic_before(XBegin:XEnd,YBegin:YEnd,:);  %added on 19112019
+        Tritic_after_reg=Tritic_after_reg(XBegin:XEnd,YBegin:YEnd,:);  %added on 19112019
+    else
+        Was_I_Cropped='No';
+        YBegin=nan;
+        XBegin=nan;
+        YEnd=nan;
+        XEnd=nan;
     end
-    if(YEnd>size(image,2))
-        YEnd=size(image,2);
-    end
-    Im_Or=image;
-    image=image(XBegin:XEnd,YBegin:YEnd,:);
-    Tritic_before=Tritic_before(XBegin:XEnd,YBegin:YEnd,:);  %added on 19112019
-    Tritic_after_reg=Tritic_after_reg(XBegin:XEnd,YBegin:YEnd,:);  %added on 19112019
-else
-    Was_I_Cropped='No';
-    YBegin=nan;
-    XBegin=nan;
-    YEnd=nan;
-    XEnd=nan;
-end
 
 
 question='\nThe fluorescence is from PCDA? [Y,N]';
