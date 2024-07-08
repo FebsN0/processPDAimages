@@ -159,7 +159,6 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_he
     end
     saveas(f2,sprintf('%s/resultA5method3_2_DeltaOffsetVSsetpoint.tif',newFolder))
 
-
     delete(wb)
     f3=figure;
     if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
@@ -171,6 +170,6 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_he
     scatter(pixData(2)*idx_x-pixData(2),avg_fc(idx_x),200,'pentagram','filled', 'MarkerFaceColor', 'red');
     avg_fc_def=avg_fc(idx_x);
     resultChoice= sprintf('Selected friction coefficient: %0.3g', avg_fc_def);
-    title({' Result Method 3 (Mask + Outliers Removal)'; resultChoice},'FontSize',16);
+    title({'Result Method 3 (Mask + Outliers Removal\)'; resultChoice},'FontSize',16);
     saveas(f3,sprintf('%s/resultA5method3_3_pixelVSfrictionCoeffs.tif',newFolder))
 end

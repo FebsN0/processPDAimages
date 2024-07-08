@@ -48,7 +48,7 @@ function [dataOrdered,metaDataOrdered,filePathData] = A1_openANDassembly_JPK
         [data,metaData]=A1_open_JPK(fullName);
         allScansImage{i}=data;
         allScansMetadata{i}=metaData;
-        % y slow direction BUT once it is in MATLAB it is the x axis
+        % y slow direction (rows) | x fast direction (columns)
         y_OriginAllScans(i)=allScansMetadata{i}.y_Origin;
         y_scan_lengthAllScans(i)=allScansMetadata{i}.y_scan_length;
         x_scan_lengthAllScans(i)=allScansMetadata{i}.x_scan_length;
@@ -74,7 +74,7 @@ function [dataOrdered,metaDataOrdered,filePathData] = A1_openANDassembly_JPK
     [~,idx]=sort(y_OriginAllScans);
     allScansImageOrdered=allScansImage(idx);
     allScansMetadataOrdered=allScansMetadata(idx);
-    clear allScansMetadata allScansImage metadata data
+    clear allScansMetadata allScansImage metaData data alphaAllScans x_scan_pixelsAllScans x_scan_lengthAllScans
     
     % adjust the metaData, in particular:
     %       y_Origin
@@ -99,7 +99,7 @@ function [dataOrdered,metaDataOrdered,filePathData] = A1_openANDassembly_JPK
         error(sprintf('ERROR: the x lengths and/or x pixels is not the same as well as the y length and/or y pixels!!'))
     end
 
-    clear y_scan_pixelsAllScans y_scan_lengthAllScans y_OriginAllScans
+    clear y_scan_pixelsAllScans y_scan_lengthAllScans y_OriginAllScans ratioLength ratioPixel idx allScansMetadataOrdered
     % copy common data:
     %   Channel_name
     %   Trace_type
@@ -112,9 +112,8 @@ function [dataOrdered,metaDataOrdered,filePathData] = A1_openANDassembly_JPK
         concatenatedData_Raw_afm_image=[];
         concatenatedData_AFM_image=[];
         for j=1:numFiles
-            %dubbio su dim concatenazione
-            concatenatedData_Raw_afm_image  = cat(2,concatenatedData_Raw_afm_image,allScansImageOrdered{j}(i).Raw_afm_image);
-            concatenatedData_AFM_image      = cat(2,concatenatedData_AFM_image,allScansImageOrdered{j}(i).AFM_image);
+            concatenatedData_Raw_afm_image  = cat(1,concatenatedData_Raw_afm_image,allScansImageOrdered{j}(i).Raw_afm_image);
+            concatenatedData_AFM_image      = cat(1,concatenatedData_AFM_image,allScansImageOrdered{j}(i).AFM_image);
         end
         dataOrdered(i).Raw_afm_image= concatenatedData_Raw_afm_image;
         dataOrdered(i).AFM_image=concatenatedData_AFM_image;

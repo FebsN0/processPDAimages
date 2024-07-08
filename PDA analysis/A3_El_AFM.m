@@ -66,7 +66,7 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonito
     imshow(visible_data_rot_Height)
     colormap parula, title('Original Height (measured) channel'),
     c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
-    ylabel('fast scan line direction'), xlabel('slow scan line direction')
+    ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
     if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f1); end
     if SeeMe
         saveas(f1,sprintf('%s/resultA3_1_originalHeightChannel.tif',filepath))
@@ -285,6 +285,7 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonito
     if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f2); end
     subplot(121), imshow(AFM_noBk_visible_data),colormap parula, title('Fitted Height (measured) channel', 'FontSize',16)
     c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
+    ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
 
     satisfied='Manual Selection';
     first_In=1;
