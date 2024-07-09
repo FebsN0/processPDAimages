@@ -25,27 +25,48 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
     defaultVal = 'No';
     addOptional(p, argName, defaultVal,@(x) ismember(x,{'No','Yes'}));
 
+    argName = 'BKsubstraction';
+    defaultVal = 'No';
+    addOptional(p, argName, defaultVal,@(x) ismember(x,{'No','Yes'}));
+
+    argName = 'BorderAnalysis';
+    defaultVal = 'No';
+    addOptional(p, argName, defaultVal,@(x) ismember(x,{'No','Yes'}));
+
     % validate and parse the inputs
     parse(p,moved,fixed,newFolder,secondMonitorMain,varargin{:});
 
     clearvars argName defaultVal
-    fprintf('Results of optional input:\n\tSilent:\t\t\t%s\n\tBrightfield:\t%s\n\tMoving:\t\t\t%s\n',p.Results.Silent,p.Results.Brightfield,p.Results.Moving)
+    fprintf(['Results of optional input:\n\tSilent:\t\t\t\t\t\t%s\n\t' ...
+        'Brightfield:\t\t\t\t%s\n\t' ...
+        'Moving:\t\t\t\t\t\t%s\n\t' ...
+        'Background substraction:\t%s\n\t' ...
+        'Border Analysis:\t\t\t%s\n\n'], ...
+        p.Results.Silent,p.Results.Brightfield,p.Results.Moving,p.Results.BKsubstraction,p.Results.BorderAnalysis)
   
     if((~islogical(moved))&&(~islogical(fixed)))
+        % mix two images
         fused_image=imfuse(imadjust(moved),imadjust(fixed),'falsecolor','Scaling','independent');
     else
         fused_image=imfuse(moved,fixed,'falsecolor','Scaling','independent');
     end
-    
-    uiwait(msgbox('Crop the area of interest containing the stimulated part',''));
+
+    if strcmpi(p.Results.Brightfield,'Yes')
+        textFirstLastFig='BrightField and TRITIC Before Images Overlapped';
+    else
+        textFirstLastFig='TRITIC Before and After Images Overlapped';
+    end
+
     f1=figure;
     if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
     imshow(fused_image)
-    saveas(f1,sprintf('%s/image_8step_1_Entire_TRITIC_BeforeAfter_Overlapped_NOTfixed.tif',newFolder))   
-  
+    title(sprintf('%s Not Aligned',textFirstLastFig)) 
+    saveas(f1,sprintf('%s/image_8step_1_Entire_%s_NotAligned.tif',newFolder,textFirstLastFig))
+
+    uiwait(msgbox('Crop the area of interest containing the stimulated part',''));
     % Size and position of the crop rectangle [xmin ymin width height].
-    [~,specs]=imcrop(fused_image);
-    close all
+    [~,specs]=imcrop();
+
     % find the indexes of the cropped area
     YBegin=round(specs(1,1));
     XBegin=round(specs(1,2));
@@ -61,7 +82,8 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
     reduced_moving=moved(XBegin:XEnd,YBegin:YEnd,:);
     
     flag_brightfield=0;
-    % if no optional argument is given then skip the entire following part
+    % if no optional argument is given then skip the entire following part, otherwise a polynomial fitting is
+    % performed on the moving image
     if strcmpi(p.Results.Brightfield,'Yes')
         flag_brightfield=1;
         if strcmpi(p.Results.Moving,'Yes')
@@ -71,6 +93,10 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
         end
         x_Bk=1:size(image_of_interest,2);
         y_Bk=1:size(image_of_interest,1);
+        % Prepare data inputs for surface fitting, similar to prepareCurveData but 3D. Transform the 2D image
+        % into 3 arrays:
+        % xData = 1 1 .. 1 2 .. etc = each block is long #row length of image
+        % yData = 1 2 .. length(image) 1 2 .. etc
         [xData, yData, zData] = prepareSurfaceData( x_Bk, y_Bk, image_of_interest );
         ft = fittype( 'poly11' );
         [fitresult, ~] = fit( [xData, yData], zData, ft );
@@ -88,9 +114,11 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
         imshow(imadjust(image_of_interest)),title('Original')
         subplot(1,2,2)
         imshow(imadjust(el_image)),title('Bk Removed')
-        saveas(f2,sprintf('%s/image_8step_2_BrightField_TRITIC_Overlapped_NOTfixed.tif',newFolder))   
+        saveas(f2,sprintf('%s/image_8step_2_BackgroundSubstracted.tif',newFolder))   
+        
         awnser=getValidAnswer('Use Backgrownd Subtracted Image?','',{'Yes','No'});
         if awnser == 1
+        %if strcmpi(p.Results.BKsubstraction,'Yes')
             if strcmpi(p.Results.Moving,'Yes')
                 reduced_moving=el_image;
             else
@@ -98,8 +126,12 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
             end
         end
         close all
-        awnser_BA=getValidAnswer('Procede with border Analysis?','Border Analysis',{'Yes','No'});
-        if awnser_BA == 1
+        
+        %awnser_BA=getValidAnswer('Procede with Border Analysis?','Border Analysis',{'Yes','No'});
+        %if awnser_BA == 1
+        % Mic_to_Function creates a binary image, which is required to deterct the edges of an 2-D grayscale
+        % image. Canny method finds edges by looking for local maxima of the gradient of 2-D grayscale image
+        if strcmpi(p.Results.BorderAnalysis,'Yes')
             [IO_OI_moving,~]=A8_feature_Mic_to_Binary(reduced_moving);
             IO_edge_moving=edge(IO_OI_moving,'Canny');
             IO_edge_fixed=edge(reduced_fixed,'Canny');
@@ -111,24 +143,33 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
         [reduced_fixed,~]=Mic_to_Binary(reduced_fixed);
     end
 
+
+
+
+
+
+
+
+
     %%%%%%%%%%%%%%%%%%% section in case no argument is given
     if(islogical(reduced_moving))||(islogical(reduced_fixed))
         f3=figure;
         if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
         imshow(imfuse((reduced_moving),(reduced_fixed)))
-        saveas(f3,sprintf('%s/image_8step_2_Cropped_TRITIC_BeforeAfter_Overlapped_NOTfixed.tif',newFolder))   
+        saveas(f3,sprintf('%s/image_8step_3_Cropped_%s_NotAligned.tif',newFolder,textFirstLastFig))   
         evo_reduced_fixed=reduced_fixed;
         evo_reduced_moving=reduced_moving;
+        close gcf
     else
         sigma=1;
         reduced_fixed_blurred=imgaussfilt(reduced_fixed,sigma);
         reduced_moving_blurred=imgaussfilt(reduced_moving,sigma);
-        imshowpair(imadjust(reduced_moving_blurred), imadjust(reduced_fixed_blurred), 'falsecolor','Scaling','independent')
-        title('Cropped and Overlapped images Not Fixed')
         f3=figure;
         if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
-        saveas(f3,sprintf('%s/image_8step_3_Cropped_TRITIC_BeforeAfter_Overlapped_NOTfixed.tif',newFolder))   
-
+        imshowpair(imadjust(reduced_moving_blurred), imadjust(reduced_fixed_blurred), 'falsecolor','Scaling','independent')
+        title('Cropped and Overlapped images Not Fixed')
+        saveas(f3,sprintf('%s/image_8step_3_Cropped_%s_NotAligned.tif',newFolder,textFirstLastFig))   
+        close gcf
         % choose if run the automatic binarization or not
         question='Do you want to perform manual (for too dimmered images) or automatic selection?';
         answer=getValidAnswer(question,'',{'manual','automatic'});
@@ -150,9 +191,6 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
                 while satisfied==1
                     % reset every time
                     originalData=data{i};
-                    if exist('subpl2','var')
-                        delete(subpl2)
-                    end
                     no_sub_div=2000;
                     [Y,E] = histcounts(data{i},no_sub_div);
                     figure,hold on,plot(Y)
@@ -164,11 +202,17 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
                     % show dialog box before continue
                     uiwait(msgbox('Before click to continue the binarization, zoom or pan on the image for a better view',''));
                     zoom off; pan off;
-                    closest_indices=selectRangeGInput(1,1,1:1000,Y);
-                    close(gcf)
+                    closest_indices=selectRangeGInput(1,1,1:no_sub_div,Y);
+                    % close the histogram
+                    close gcf
+
+                    %close(gcf)
                     % if the value is lower than selected point, then 0, otherwise 1
                     originalData(originalData<E(closest_indices))=0;
                     originalData(originalData>=E(closest_indices))=1;
+                    if exist('subpl2','var')  && ishandle(subpl2)
+                        delete(subpl2)
+                    end
                     subpl2=subplot(122);
                     imshow(originalData)
                     title(sprintf('Result Binarization of %s',text{i}), 'FontSize',16)
@@ -176,6 +220,7 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
                 end
                 %save the result of binarization
                 saveas(eval(sprintf('f4_%d',i)),sprintf('%s/image_8step_4_%s_BinarizationResult.tif',newFolder,text{i}))
+                close gcf
                 data{i}=originalData;
             end
             close all
@@ -197,20 +242,19 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
                 evo_reduced_moving(evo_reduced_moving<Th_r_moving)=0;
             end
         end
-        % show the final result of manual\auto selection
-        imshowpair(imadjust(evo_reduced_moving), imadjust(evo_reduced_fixed), 'falsecolor','Scaling','independent')
     end
-
+    % xcorr2_fft Two-dimensional cross-correlation evaluated with FFT algorithm.
     cross_correlation=xcorr2_fft(evo_reduced_fixed,evo_reduced_moving);
     [~, imax] = max(abs(cross_correlation(:)));
     [ypeak, xpeak] = ind2sub(size(cross_correlation),imax(1));
     corr_offset = [(xpeak-size(evo_reduced_moving,2)) (ypeak-size(evo_reduced_moving,1))];
     rect_offset = [(evo_reduced_fixed(1)-evo_reduced_moving(1)) (evo_reduced_fixed(2)-evo_reduced_moving(2))];
+    % calc the offset which is required to traslate the original image
     offset = corr_offset + rect_offset;
     xoffset = offset(1);
     yoffset = offset(2);
-
     moving_tr=imtranslate(moved,[xoffset,yoffset]);
+    
     f5=figure;
     if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f5); end
     if((~islogical(moved))&&(~islogical(fixed)))
@@ -218,5 +262,6 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
     else
         imshow(imfuse(moving_tr,fixed))
     end
-    saveas(f5,sprintf('%s/image_8step_4_TRITIC_BeforeAfter_Overlapped_FIXED.tif',newFolder))
+    title(sprintf('%s and Aligned',textFirstLastFig))
+    saveas(f5,sprintf('%s/image_8step_5_%s_Aligned.tif',newFolder,textFirstLastFig))
 end

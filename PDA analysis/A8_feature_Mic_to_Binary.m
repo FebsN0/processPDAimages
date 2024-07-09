@@ -46,116 +46,116 @@ function [binary_image,Tritic_before,Tritic_after_reg,FurtherDetails]=A8_feature
     end
 
 
-question='\nThe fluorescence is from PCDA? [Y,N]';
-answer=getValidAnswer(question,{'y','n'});
-if strcmpi(answer,'n')
-    Im_Neg(size(image,1),size(image,2))=0;
-    [a,~]=max(max(image));
-    Im_Neg=plus(Im_Neg,a);
-    Im_Neg=minus(Im_Neg,image);
-    background=imopen(imadjust(Im_Neg),strel('square',50)); %modified to 100 from 50 on 22112019
-    I2=imadjust(Im_Neg)-background;
-    [a,~]=max(max(I2));
-    Im_Pos(size(image,1),size(image,2))=0;
-    Im_Pos=plus(Im_Pos,a);
-    image2=imadjust(minus(Im_Pos,I2)); %modified to image2 on 22112019
-    clearvars Im_Neg a background I2 Im_Pos
-else
-    image2=image; %%%%%%%%%%% nella parte proveniente da Mic_to_Binary_PCDA.m, previous condition is omitted %%%%%%%%%%%
-end
+    question='\nThe fluorescence is from PCDA? [Y,N]';
+    answer=getValidAnswer(question,{'y','n'});
+    if strcmpi(answer,'n')
+        Im_Neg(size(image,1),size(image,2))=0;
+        [a,~]=max(max(image));
+        Im_Neg=plus(Im_Neg,a);
+        Im_Neg=minus(Im_Neg,image);
+        background=imopen(imadjust(Im_Neg),strel('square',50)); %modified to 100 from 50 on 22112019
+        I2=imadjust(Im_Neg)-background;
+        [a,~]=max(max(I2));
+        Im_Pos(size(image,1),size(image,2))=0;
+        Im_Pos=plus(Im_Pos,a);
+        image2=imadjust(minus(Im_Pos,I2)); %modified to image2 on 22112019
+        clearvars Im_Neg a background I2 Im_Pos
+    else
+        image2=image; %%%%%%%%%%% nella parte proveniente da Mic_to_Binary_PCDA.m, previous condition is omitted %%%%%%%%%%%
+    end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-if(~exist('given_flag','var'))
     
-    satisfied='Manual Selection';
-    alredy_done=0;
-    no_sub_div=2000;
-    [Y,E] = histcounts(image2,no_sub_div); %modified to image2 on 22112019
-    
-    while(strcmp(satisfied,'Manual Selection'))
-        if(alredy_done==0)
-            alredy_done=1;
-            diff_Y=diff(Y);
-            [~,b]=max(diff_Y);
-            
-            for i=2:size(diff_Y,2)
-                if(i>b)
-                    if (diff_Y(1,i-1)<0)&&(diff_Y(1,i)>=0)
-                        flag=i;
-                        break
+    if(~exist('given_flag','var'))
+        
+        satisfied='Manual Selection';
+        alredy_done=0;
+        no_sub_div=2000;
+        [Y,E] = histcounts(image2,no_sub_div); %modified to image2 on 22112019
+        
+        while(strcmp(satisfied,'Manual Selection'))
+            if(alredy_done==0)
+                alredy_done=1;
+                diff_Y=diff(Y);
+                [~,b]=max(diff_Y);
+                
+                for i=2:size(diff_Y,2)
+                    if(i>b)
+                        if (diff_Y(1,i-1)<0)&&(diff_Y(1,i)>=0)
+                            flag=i;
+                            break
+                        end
                     end
                 end
-            end
-            
-            if(exist('flag','var'))
-                binary_image=image2; %modified to image2 on 22112019
-                binary_image(binary_image<E(1,flag))=0;
-                binary_image(binary_image>=E(1,flag))=1;
-                binary_image=~binary_image;
+                
+                if(exist('flag','var'))
+                    binary_image=image2; %modified to image2 on 22112019
+                    binary_image(binary_image<E(1,flag))=0;
+                    binary_image(binary_image>=E(1,flag))=1;
+                    binary_image=~binary_image;
+                else
+                    binary_image=~imbinarize(image2,'adaptive'); %modified to image2 on 22112019
+                end
+                
+                figure,imshow(binary_image)
+                satisfied=questdlg('Keep selection or turn to Manual', 'Manual Selection', 'Keep Current','Manual Selection','Keep Current');
             else
-                binary_image=~imbinarize(image2,'adaptive'); %modified to image2 on 22112019
+                close all
+                clearvars binary_image diff_Y flag
+                figure,hold on,plot(Y)
+                if(exist('x_sel','var'))
+                    plot([x_sel x_sel],ylim)
+                    xlim([x_sel-x_sel/2 x_sel+x_sel/2])
+                end
+                
+                [x_sel,~]=ginput(1);
+                close all
+                
+                binary_image=image2; %modified to image2 on 22112019
+                binary_image(binary_image<E(1,round(x_sel)))=0;
+                binary_image(binary_image>=E(1,round(x_sel)))=1;
+                binary_image=~binary_image;
+                
+                figure,imshow(binary_image)
+                satisfied=questdlg('Keep selection or turn to Manual', 'Manual Selection', 'Keep Current','Manual Selection','Keep Current');
+                
             end
-            
-            figure,imshow(binary_image)
-            satisfied=questdlg('Keep selection or turn to Manual', 'Manual Selection', 'Keep Current','Manual Selection','Keep Current');
-        else
-            close all
-            clearvars binary_image diff_Y flag
-            figure,hold on,plot(Y)
-            if(exist('x_sel','var'))
-                plot([x_sel x_sel],ylim)
-                xlim([x_sel-x_sel/2 x_sel+x_sel/2])
-            end
-            
-            [x_sel,~]=ginput(1);
-            close all
-            
-            binary_image=image2; %modified to image2 on 22112019
-            binary_image(binary_image<E(1,round(x_sel)))=0;
-            binary_image(binary_image>=E(1,round(x_sel)))=1;
-            binary_image=~binary_image;
-            
-            figure,imshow(binary_image)
-            satisfied=questdlg('Keep selection or turn to Manual', 'Manual Selection', 'Keep Current','Manual Selection','Keep Current');
-            
         end
-    end
-    
-    if(~strcmp(satisfied,'Keep Current'))
-    if(exist('flag','var'))
-        threshold=E(1,flag);
+        
+        if(~strcmp(satisfied,'Keep Current'))
+        if(exist('flag','var'))
+            threshold=E(1,flag);
+        else
+            threshold=E(1,round(x_sel));
+        end
+        end
+        
     else
-        threshold=E(1,round(x_sel));
-    end
+        binary_image=image2; %modified to image2 on 22112019
+        binary_image(binary_image<given_flag)=0;
+        binary_image(binary_image>=given_flag)=1;
+        binary_image=~binary_image;
     end
     
-else
-    binary_image=image2; %modified to image2 on 22112019
-    binary_image(binary_image<given_flag)=0;
-    binary_image(binary_image>=given_flag)=1;
-    binary_image=~binary_image;
-end
-
-kernel=strel('square',2);
-binary_image=imerode(binary_image,kernel);
-binary_image=imdilate(binary_image,kernel);
-
-if(~exist('threshold','var'))
-    threshold=nan;
-end
-
-FurtherDetails=struct(...
-    'Threshold',...
-    threshold,...
-    'Cropped',...
-    Was_I_Cropped,...
-    'Crop_XBegin',...
-    XBegin,...
-    'Crop_YBegin',...
-    YBegin,...
-    'Crop_XEnd',...
-    XEnd,...
-    'Crop_YEnd',...
-    YEnd);
+    kernel=strel('square',2);
+    binary_image=imerode(binary_image,kernel);
+    binary_image=imdilate(binary_image,kernel);
+    
+    if(~exist('threshold','var'))
+        threshold=nan;
+    end
+    
+    FurtherDetails=struct(...
+        'Threshold',...
+        threshold,...
+        'Cropped',...
+        Was_I_Cropped,...
+        'Crop_XBegin',...
+        XBegin,...
+        'Crop_YBegin',...
+        YBegin,...
+        'Crop_XEnd',...
+        XEnd,...
+        'Crop_YEnd',...
+        YEnd);
 
 end

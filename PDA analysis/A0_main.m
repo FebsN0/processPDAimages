@@ -30,7 +30,7 @@ clear filtData
 % Using the AFM_height_IO, fit the background again, yielding a more accurate height image
 [AFM_H_NoBk,AFM_cropped_Images]=A4_El_AFM_masked(AFM_cropped_Images,AFM_height_IO,secondMonitorMain,newFolder);
 close all
-%%
+
 % to extract the friction coefficient, choose which method use.
 question=sprintf('Which method perform to extract the glass friction coefficient?');
 options={ ...
@@ -70,9 +70,9 @@ close all
 % Substitute to the AFM cropped channels the baseline adapted LD
 [Corrected_LD_Trace,AFM_Elab,~]=A6_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,metaData.Alpha,avg_fc,secondMonitorMain,newFolder,'Accuracy','High');
 
+close all
 
-
-%% Open Brightfield image and the TRITIC (Before and After stimulation images)
+% Open Brightfield image and the TRITIC (Before and After stimulation images)
 
 [fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the BrightField image',filePathData);
 [BF_Mic_Image]=A7_open_ND2(fullfile(filePathData,fileName)); 
@@ -81,13 +81,14 @@ if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
 imshow(imadjust(BF_Mic_Image))
 saveas(f1,sprintf('%s/image_8step_BrightField.tif',newFolder))
 
-
 [fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the TRITIC Before Stimulation image',filePathData);
 [Tritic_Mic_Image_Before]=A7_open_ND2(fullfile(filePathData,fileName)); 
 f2=figure;
 if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2); end
 imshow(imadjust(Tritic_Mic_Image_Before))
 saveas(f2,sprintf('%s/image_8step_TRITIC_Before_Stimulation.tif',newFolder))
+
+close all
 
 [fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the TRITIC After Stimulation image',filePathData);
 [Tritic_Mic_Image_After]=A7_open_ND2(fullfile(filePathData,fileName)); 
@@ -96,10 +97,9 @@ if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
 imshow(imadjust(Tritic_Mic_Image_After))
 saveas(f3,sprintf('%s/image_8step_TRITIC_After_Stimulation.tif',newFolder))
 
-
-%% Align the fluorescent images After with the BEFORE stimulation
+% Align the fluorescent images After with the BEFORE stimulation
 Tritic_Mic_Image_After_Registered=A8_limited_registration(Tritic_Mic_Image_After,Tritic_Mic_Image_Before,newFolder,secondMonitorMain);
 
-% Align the Brightfield to TRITIC Before Stimulation
+%% Align the Brightfield to TRITIC Before Stimulation
 BF_Mic_Image_Registered=A8_limited_registration(BF_Mic_Image,Tritic_Mic_Image_Before,newFolder,secondMonitorMain,'Brightfield','Yes','Moving','Yes');
 

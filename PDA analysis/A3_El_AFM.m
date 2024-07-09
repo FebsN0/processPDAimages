@@ -307,15 +307,8 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonito
             % show dialog box before continue
             uiwait(msgbox('Before click to continue the binarization, zoom or pan on the image for a better view',''));
             zoom off; pan off;
-
-            % if(exist('x_sel','var'))
-            %     plot([x_sel x_sel],ylim)
-            %     xlim([x_sel-x_sel/2 x_sel+x_sel/2])
-            % end
             closest_indices=selectRangeGInput(1,1,1:1000,Y);
             th_segmentation=E(closest_indices);
-            %[x_sel,~]=ginput(1);
-            %th_segmentation=E(1,round(x_sel));
             close(imhistfig)
             seg_AFM=AFM_noBk;
             seg_AFM(seg_AFM<th_segmentation)=0;
