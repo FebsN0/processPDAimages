@@ -100,6 +100,9 @@ saveas(f3,sprintf('%s/image_8step_TRITIC_After_Stimulation.tif',newFolder))
 % Align the fluorescent images After with the BEFORE stimulation
 Tritic_Mic_Image_After_Registered=A8_limited_registration(Tritic_Mic_Image_After,Tritic_Mic_Image_Before,newFolder,secondMonitorMain);
 
-%% Align the Brightfield to TRITIC Before Stimulation
+% Align the Brightfield to TRITIC Before Stimulation
 BF_Mic_Image_Registered=A8_limited_registration(BF_Mic_Image,Tritic_Mic_Image_Before,newFolder,secondMonitorMain,'Brightfield','Yes','Moving','Yes');
 
+%%
+% Align AFM to BF and extract the coordinates for alighnment to be transferred to the other data
+[AFM_IO_Padded,BF_Image_Cut,AFM_cropped_channels_Big,Coordinates_forAllighnment,~]=alignment_AFMMicroscope(BF_Mic_Image_IO,AFM_height_IO,AFM_cropped_channels,'Margin',0,'QuickMatch','No','Silent','No');

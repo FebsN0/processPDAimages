@@ -182,7 +182,7 @@ if(strcmp(aw,'Yes'))
     size_final_row=size(moving,1);
     size_final_col=size(moving,2);
     N_cycles_opt=1;
-    Limit_Cycles=1000; % the number of iteration of alignment, can be modified
+
     StepChanges=0;
     if(strcmp(SeeMe,'Yes'))
         hWait = waitbar(0,'Initializing', ...
@@ -204,10 +204,37 @@ if(strcmp(aw,'Yes'))
     
     cross_correlation=xcorr2_fft(still_reduced,moving);
     [max_c_it_OI,~] = max(abs(cross_correlation(:)));
-%     StepSize=0.001;
-     StepSize=0.005; % the increase in resize, can be modified
-     Rot_par=2; % the extra rotational parameter, can be modified
-     
+    answer=getValidAnswer('Select the Polydiacetylene used in the experiment to prepare the alignment cycle parameters ','',{'TRCDA','DCDA','PCDA','Enter manually the values'});
+    switch answer
+        case 1
+            Limit_Cycles=1000; % the number of iteration of alignment, can be modified
+            StepSize=0.005; % the increase in resize, can be modified
+            Rot_par=2; % the extra rotational parameter, can be modified
+        case 2
+            Limit_Cycles=500; % the number of iteration of alignment, can be modified
+            StepSize=0.0001; % the increase in resize, can be modified
+            Rot_par=50; % the extra rotational parameter, can be modified
+        case 3
+            Limit_Cycles=1000; % the number of iteration of alignment, can be modified
+            StepSize=0.00001; % the increase in resize, can be modified
+            Rot_par=500; % the extra rotational parameter, can be modified
+        case 4
+            cycleParameters=zeros(3,1);
+            question ={'Enter the Limit Cycle:' ...
+                'Enter the step size:'...
+                'Enter the rotational parameter'};
+            valueDefault = {'1000','0.005','2'};
+            while true
+                cycleParameters = str2double(inputdlg(question,'Setting parameters for the alignment',[1 90],valueDefault));
+                if any(isnan(cycleParameters)), questdlg('Invalid input! Please enter a numeric value','','OK','OK');
+                else, break
+                end
+            end
+            Limit_Cycles=cycleParameters(1);
+            StepSize=cycleParameters(2);
+            Rot_par=cycleParameters(3);
+    end
+
     while(N_cycles_opt<=Limit_Cycles)
         if(N_cycles_opt==1)
             moving_iterative_Oversize=imresize(moving,1+StepSize*N_cycles_opt);
