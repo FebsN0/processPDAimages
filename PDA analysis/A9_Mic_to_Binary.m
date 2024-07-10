@@ -4,7 +4,7 @@
 % more contrast)
 
 
-function [binary_image,reduced_Tritic_before,reduced_Tritic_after_aligned,FurtherDetails]=A8_feature_Mic_to_Binary(imageBF,Tritic_before,Tritic_after_aligned,varargin)
+function [binary_image,reduced_Tritic_before,reduced_Tritic_after_aligned,FurtherDetails]=A9_Mic_to_Binary(imageBF,Tritic_before,Tritic_after_aligned,varargin)
 
     p=inputParser();
     %Add default mandatory parameters.
