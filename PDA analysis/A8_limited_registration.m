@@ -6,37 +6,29 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
     % Add required parameters
     addRequired(p, 'moved');
     addRequired(p,'fixed')
-    addRequired(p,'newFolder')
-    addRequired(p,'secondMonitorMain')
     %Add default parameters.
     argName = 'Silent';
     defaultVal = 'No';
-    addOptional(p,argName,defaultVal,@(x) ismember(x,{'Yes','No'}));
-    
+    addOptional(p,argName,defaultVal,@(x) ismember(x,{'Yes','No'})); 
     argName = 'Brightfield';
     defaultVal = 'No';
     addOptional(p, argName, defaultVal,@(x) ismember(x,{'Yes','No'}));
-
     argName = 'AFM';
     defaultVal = 'No';
     addOptional(p, argName, defaultVal,@(x) ismember(x,{'Yes','No'}));
-
     argName = 'Moving';
     defaultVal = 'No';
     addOptional(p, argName, defaultVal,@(x) ismember(x,{'No','Yes'}));
-
     argName = 'BKsubstraction';
     defaultVal = 'No';
     addOptional(p, argName, defaultVal,@(x) ismember(x,{'No','Yes'}));
-
     argName = 'BorderAnalysis';
     defaultVal = 'No';
     addOptional(p, argName, defaultVal,@(x) ismember(x,{'No','Yes'}));
-
     % validate and parse the inputs
-    parse(p,moved,fixed,newFolder,secondMonitorMain,varargin{:});
-
+    parse(p,moved,fixed,varargin{:});
     clearvars argName defaultVal
+
     fprintf(['Results of optional input:\n\tSilent:\t\t\t\t\t\t%s\n\t' ...
         'Brightfield:\t\t\t\t%s\n\t' ...
         'Moving:\t\t\t\t\t\t%s\n\t' ...
@@ -64,22 +56,20 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
     saveas(f1,sprintf('%s/image_8step_1_Entire_%s_NotAligned.tif',newFolder,textFirstLastFig))
 
     uiwait(msgbox('Crop the area of interest containing the stimulated part',''));
+   
     % Size and position of the crop rectangle [xmin ymin width height].
     [~,specs]=imcrop();
-
     % find the indexes of the cropped area
     YBegin=round(specs(1,1));
     XBegin=round(specs(1,2));
     YEnd=round(specs(1,1))+round(specs(1,3));
-    XEnd=round(specs(1,2))+round(specs(1,end));
-    
+    XEnd=round(specs(1,2))+round(specs(1,end)); 
     % in case the cropped area is bigger than image itself
     if(XEnd>size(moved,1)); XEnd=size(moved,1); end
     if(YEnd>size(moved,2)); YEnd=size(moved,2); end
-    
     % extract the cropped image data
-    reduced_fixed=fixed(XBegin:XEnd,YBegin:YEnd,:);
-    reduced_moving=moved(XBegin:XEnd,YBegin:YEnd,:);
+    reduced_fixed=fixed(XBegin:XEnd,YBegin:YEnd);
+    reduced_moving=moved(XBegin:XEnd,YBegin:YEnd);
     
     flag_brightfield=0;
     % if no optional argument is given then skip the entire following part, otherwise a polynomial fitting is
@@ -132,7 +122,7 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
         % Mic_to_Function creates a binary image, which is required to deterct the edges of an 2-D grayscale
         % image. Canny method finds edges by looking for local maxima of the gradient of 2-D grayscale image
         if strcmpi(p.Results.BorderAnalysis,'Yes')
-            [IO_OI_moving,~]=A8_feature_Mic_to_Binary(reduced_moving);
+            [IO_OI_moving,~]=A8_feature_Mic_to_Binary(reduced_moving,'Cropped','Yes');
             IO_edge_moving=edge(IO_OI_moving,'Canny');
             IO_edge_fixed=edge(reduced_fixed,'Canny');
             reduced_moving=IO_edge_moving;
@@ -142,14 +132,6 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
         [reduced_moving,~]=Mic_to_Binary(reduced_moving);
         [reduced_fixed,~]=Mic_to_Binary(reduced_fixed);
     end
-
-
-
-
-
-
-
-
 
     %%%%%%%%%%%%%%%%%%% section in case no argument is given
     if(islogical(reduced_moving))||(islogical(reduced_fixed))

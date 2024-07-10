@@ -4,22 +4,37 @@
 % more contrast)
 
 
-function [binary_image,Tritic_before,Tritic_after_reg,FurtherDetails]=A8_feature_Mic_to_Binary(image,Tritic_before,Tritic_after_reg,varargin)
+function [binary_image,reduced_Tritic_before,reduced_Tritic_after_aligned,FurtherDetails]=A8_feature_Mic_to_Binary(imageBF,Tritic_before,Tritic_after_aligned,varargin)
 
     p=inputParser();
+    %Add default mandatory parameters.
+    addRequired(p, 'imageBF');
+    addRequired(p,'Tritic_before')
+    addRequired(p,'Tritic_after_aligned')
+    %Add default parameters.
     argName = 'Silent';
     defaultVal = 'No';
-    addOptional(p,argName,defaultVal);
-    
-    parse(p,varargin{:});
+    addOptional(p,argName,defaultVal,@(x) ismember(x,{'Yes','No'}));
+    argName = 'Cropped';
+    defaultVal = 'No';
+    addOptional(p,argName,defaultVal,@(x) ismember(x,{'Yes','No'}));
+    parse(p,imageBF,Tritic_before,Tritic_after_aligned,varargin{:});
+    clearvars argName defaultVal
+    fprintf(['Results of optional input:\n\tSilent:\t\t\t\t\t\t%s\n\t' ...
+        'Brightfield:\t%s\n\t' ...
+        'Cropped:\t\t%s\n\n'], ...
+        p.Results.Silent,p.Results.Cropped)
+ 
     if(strcmp(p.Results.Silent,'Yes')), SeeMe='off'; else, SeeMe='on'; end
     
-    clearvars argName defaultVal
-    Crop_image = getValidAnswer('Would Like to Crop the Image?', '', {'Yes','No'});
+    % when this function is called by A8_limited_registration, the images are already cropped.
+    if strcmpi(p.Results.Cropped, 'No')
+        Crop_image = getValidAnswer('The image is not cropped yet, would Like to Crop the Image?', '', {'Yes','No'});
+    end
 
     if Crop_image == 1
-        Was_I_Cropped='Yes';
-        figure_image=imshow(imadjust(image));
+        Crop_image ='Yes';
+        figure_image=imshow(imadjust(imageBF));
         title('')
         [~,specs]=imcrop(figure_image);
         close all
@@ -27,18 +42,13 @@ function [binary_image,Tritic_before,Tritic_after_reg,FurtherDetails]=A8_feature
         XBegin=round(specs(1,2));
         YEnd=round(specs(1,1))+round(specs(1,3));
         XEnd=round(specs(1,2))+round(specs(1,end));
-        if(XEnd>size(image,1))
-            XEnd=size(image,1);
-        end
-        if(YEnd>size(image,2))
-            YEnd=size(image,2);
-        end
-        Im_Or=image;
-        image=image(XBegin:XEnd,YBegin:YEnd,:);
-        Tritic_before=Tritic_before(XBegin:XEnd,YBegin:YEnd,:);  %added on 19112019
-        Tritic_after_reg=Tritic_after_reg(XBegin:XEnd,YBegin:YEnd,:);  %added on 19112019
+        if(XEnd>size(imageBF,1)), XEnd=size(imageBF,1); end
+        if(YEnd>size(imageBF,2)), YEnd=size(imageBF,2); end
+        reduced_imageBF=imageBF(XBegin:XEnd,YBegin:YEnd);
+        reduced_Tritic_before=Tritic_before(XBegin:XEnd,YBegin:YEnd);
+        reduced_Tritic_after_aligned=Tritic_after_aligned(XBegin:XEnd,YBegin:YEnd);
     else
-        Was_I_Cropped='No';
+        Crop_image='No';
         YBegin=nan;
         XBegin=nan;
         YEnd=nan;
@@ -49,19 +59,19 @@ function [binary_image,Tritic_before,Tritic_after_reg,FurtherDetails]=A8_feature
     question='\nThe fluorescence is from PCDA? [Y,N]';
     answer=getValidAnswer(question,{'y','n'});
     if strcmpi(answer,'n')
-        Im_Neg(size(image,1),size(image,2))=0;
-        [a,~]=max(max(image));
+        Im_Neg(size(reduced_imageBF,1),size(reduced_imageBF,2))=0;
+        [a,~]=max(max(reduced_imageBF));
         Im_Neg=plus(Im_Neg,a);
-        Im_Neg=minus(Im_Neg,image);
+        Im_Neg=minus(Im_Neg,reduced_imageBF);
         background=imopen(imadjust(Im_Neg),strel('square',50)); %modified to 100 from 50 on 22112019
         I2=imadjust(Im_Neg)-background;
         [a,~]=max(max(I2));
-        Im_Pos(size(image,1),size(image,2))=0;
+        Im_Pos(size(reduced_imageBF,1),size(reduced_imageBF,2))=0;
         Im_Pos=plus(Im_Pos,a);
         image2=imadjust(minus(Im_Pos,I2)); %modified to image2 on 22112019
         clearvars Im_Neg a background I2 Im_Pos
     else
-        image2=image; %%%%%%%%%%% nella parte proveniente da Mic_to_Binary_PCDA.m, previous condition is omitted %%%%%%%%%%%
+        image2=reduced_imageBF; %%%%%%%%%%% nella parte proveniente da Mic_to_Binary_PCDA.m, previous condition is omitted %%%%%%%%%%%
     end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
@@ -148,7 +158,7 @@ function [binary_image,Tritic_before,Tritic_after_reg,FurtherDetails]=A8_feature
         'Threshold',...
         threshold,...
         'Cropped',...
-        Was_I_Cropped,...
+        Crop_image,...
         'Crop_XBegin',...
         XBegin,...
         'Crop_YBegin',...
