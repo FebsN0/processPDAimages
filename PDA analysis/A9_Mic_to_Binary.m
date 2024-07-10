@@ -4,37 +4,27 @@
 % more contrast)
 
 
-function [binary_image,reduced_Tritic_before,reduced_Tritic_after_aligned,FurtherDetails]=A9_Mic_to_Binary(imageBF,Tritic_before,Tritic_after_aligned,varargin)
+function [binary_image,reduced_Tritic_before,reduced_Tritic_after_aligned,FurtherDetails]=A9_Mic_to_Binary(imageBF_aligned,Tritic_before,Tritic_after_aligned,varargin)
 
     p=inputParser();
     %Add default mandatory parameters.
-    addRequired(p, 'imageBF');
+    addRequired(p, 'imageBF_aligned');
     addRequired(p,'Tritic_before')
     addRequired(p,'Tritic_after_aligned')
     %Add default parameters.
     argName = 'Silent';
     defaultVal = 'No';
     addOptional(p,argName,defaultVal,@(x) ismember(x,{'Yes','No'}));
-    argName = 'Cropped';
-    defaultVal = 'No';
-    addOptional(p,argName,defaultVal,@(x) ismember(x,{'Yes','No'}));
-    parse(p,imageBF,Tritic_before,Tritic_after_aligned,varargin{:});
+
+    parse(p,imageBF_aligned,Tritic_before,Tritic_after_aligned,varargin{:});
     clearvars argName defaultVal
-    fprintf(['Results of optional input:\n\tSilent:\t\t\t\t\t\t%s\n\t' ...
-        'Brightfield:\t%s\n\t' ...
-        'Cropped:\t\t%s\n\n'], ...
-        p.Results.Silent,p.Results.Cropped)
+    fprintf('Results of optional input:\n\tSilent:\t\t\t\t\t\t%s\n\n',p.Results.Silent)
  
     if(strcmp(p.Results.Silent,'Yes')), SeeMe='off'; else, SeeMe='on'; end
     
-    % when this function is called by A8_limited_registration, the images are already cropped.
-    if strcmpi(p.Results.Cropped, 'No')
-        Crop_image = getValidAnswer('The image is not cropped yet, would Like to Crop the Image?', '', {'Yes','No'});
-    end
-
+    Crop_image = getValidAnswer('The image is not cropped yet, would Like to Crop the Image?', '', {'Yes','No'});
     if Crop_image == 1
-        Crop_image ='Yes';
-        figure_image=imshow(imadjust(imageBF));
+        figure_image=imshow(imadjust(imageBF_aligned));
         title('')
         [~,specs]=imcrop(figure_image);
         close all
@@ -42,23 +32,20 @@ function [binary_image,reduced_Tritic_before,reduced_Tritic_after_aligned,Furthe
         XBegin=round(specs(1,2));
         YEnd=round(specs(1,1))+round(specs(1,3));
         XEnd=round(specs(1,2))+round(specs(1,end));
-        if(XEnd>size(imageBF,1)), XEnd=size(imageBF,1); end
-        if(YEnd>size(imageBF,2)), YEnd=size(imageBF,2); end
-        reduced_imageBF=imageBF(XBegin:XEnd,YBegin:YEnd);
+        if(XEnd>size(imageBF_aligned,1)), XEnd=size(imageBF_aligned,1); end
+        if(YEnd>size(imageBF_aligned,2)), YEnd=size(imageBF_aligned,2); end
+        reduced_imageBF=imageBF_aligned(XBegin:XEnd,YBegin:YEnd);
         reduced_Tritic_before=Tritic_before(XBegin:XEnd,YBegin:YEnd);
         reduced_Tritic_after_aligned=Tritic_after_aligned(XBegin:XEnd,YBegin:YEnd);
     else
-        Crop_image='No';
-        YBegin=nan;
-        XBegin=nan;
-        YEnd=nan;
-        XEnd=nan;
-    end
+        reduced_imageBF                 =imageBF_aligned;
+        reduced_Tritic_before           =Tritic_before;
+        reduced_Tritic_after_aligned    =Tritic_after_aligned;
 
 
-    question='\nThe fluorescence is from PCDA? [Y,N]';
-    answer=getValidAnswer(question,{'y','n'});
-    if strcmpi(answer,'n')
+    question='The fluorescence is from PCDA?';
+    answer=getValidAnswer(question,'',{'Yes','No'});
+    if answer == 2
         Im_Neg(size(reduced_imageBF,1),size(reduced_imageBF,2))=0;
         [a,~]=max(max(reduced_imageBF));
         Im_Neg=plus(Im_Neg,a);
@@ -132,11 +119,11 @@ function [binary_image,reduced_Tritic_before,reduced_Tritic_after_aligned,Furthe
         end
         
         if(~strcmp(satisfied,'Keep Current'))
-        if(exist('flag','var'))
-            threshold=E(1,flag);
-        else
-            threshold=E(1,round(x_sel));
-        end
+            if(exist('flag','var'))
+                threshold=E(1,flag);
+            else
+                threshold=E(1,round(x_sel));
+            end
         end
         
     else
@@ -154,18 +141,18 @@ function [binary_image,reduced_Tritic_before,reduced_Tritic_after_aligned,Furthe
         threshold=nan;
     end
     
-    FurtherDetails=struct(...
-        'Threshold',...
-        threshold,...
-        'Cropped',...
-        Crop_image,...
-        'Crop_XBegin',...
-        XBegin,...
-        'Crop_YBegin',...
-        YBegin,...
-        'Crop_XEnd',...
-        XEnd,...
-        'Crop_YEnd',...
-        YEnd);
+    if Crop_image == 1
+        FurtherDetails=struct(...
+            'Threshold',    threshold,...
+            'Cropped',      'Yes',...
+            'Crop_XBegin',  XBegin,...
+            'Crop_YBegin',  YBegin,...
+            'Crop_XEnd',    XEnd,...
+            'Crop_YEnd',    YEnd);
+    else
+        FurtherDetails=struct(...
+            'Threshold',    threshold,...
+            'Cropped',      'No');
+    end
 
 end
