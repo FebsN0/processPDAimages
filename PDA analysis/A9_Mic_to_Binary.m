@@ -41,7 +41,7 @@ function [binary_image,reduced_Tritic_before,reduced_Tritic_after_aligned,Furthe
         reduced_imageBF                 =imageBF_aligned;
         reduced_Tritic_before           =Tritic_before;
         reduced_Tritic_after_aligned    =Tritic_after_aligned;
-
+    end
 
     question='The fluorescence is from PCDA?';
     answer=getValidAnswer(question,'',{'Yes','No'});
