@@ -64,7 +64,7 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonito
     
     f1=figure;
     imshow(visible_data_rot_Height)
-    colormap parula, title('Original Height (measured) channel'),
+    colormap parula, title('Original Height (measured) channel','FontSize',17),
     c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
     ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
     if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f1); end

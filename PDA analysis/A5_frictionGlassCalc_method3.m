@@ -158,17 +158,31 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_he
         Cnt = Cnt+1;
     end
     saveas(f2,sprintf('%s/resultA5method3_2_DeltaOffsetVSsetpoint.tif',newFolder))
-
+    close(f2)
     delete(wb)
     f3=figure;
     if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
     plot(pixx, avg_fc, 'bx-'); grid on
     xlabel('Pixel size'); ylabel('Glass friction coefficient');
-    title({'Result Method 3 (Mask + Outliers Removal';'Click on the plot to select the most suited glass friction coefficient'},'FontSize',16);
-    idx_x=selectRangeGInput(1,1,0:pixData(2):pixData(1),avg_fc);
-    hold on
-    scatter(pixData(2)*idx_x-pixData(2),avg_fc(idx_x),200,'pentagram','filled', 'MarkerFaceColor', 'red');
-    avg_fc_def=avg_fc(idx_x);
+    title('Result Method 3 (Mask + Outliers Removal','FontSize',16);
+    
+    question='Select the method to extrapolate the definitive glass friction';
+    options= {'1) select a specific point','2) average between two selected points'};
+    answer=getValidAnswer(question,'',options);
+    uiwait(msgbox('Click on the plot'));
+
+    if answer == 1   
+        idx_x=selectRangeGInput(1,1,0:pixData(2):pixData(1),avg_fc);
+        hold on
+        scatter(pixData(2)*idx_x-pixData(2),avg_fc(idx_x),200,'pentagram','filled', 'MarkerFaceColor', 'red');
+        avg_fc_def=avg_fc(idx_x);
+    else
+        range_selected=selectRangeGInput(2,1,0:pixData(2):pixData(1),avg_fc);
+        hold on
+        scatter(pixData(2)*range_selected-pixData(2),avg_fc(range_selected),200,'pentagram','filled', 'MarkerFaceColor', 'red');
+        range_selected=sort(range_selected);
+        avg_fc_def=mean(avg_fc(range_selected(1):range_selected(2)));
+    end
     resultChoice= sprintf('Selected friction coefficient: %0.3g', avg_fc_def);
     title({'Result Method 3 (Mask + Outliers Removal\)'; resultChoice},'FontSize',16);
     saveas(f3,sprintf('%s/resultA5method3_3_pixelVSfrictionCoeffs.tif',newFolder))
