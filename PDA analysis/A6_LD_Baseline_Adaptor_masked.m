@@ -93,7 +93,7 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_maske
     Bk_iterative=zeros(size(Lateral_Trace_shift_masked,1),size(Lateral_Trace_shift_masked,2));
     N_Cycluse_waitbar=size(Lateral_Trace_shift_masked,2);
     % build x array for the fitting
-    x=1:size(Lateral_Trace_shift_masked,1);
+    x=1:size(Lateral_Trace_shift_masked,1); %#ok<NASGU> ignore error
     % perform the fitting fast scan line by fast scan line 
     for i=1:size(Lateral_Trace_shift_masked,2)
         if(exist('wb','var'))
@@ -140,8 +140,7 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_maske
             fit_decision_final(i,2)=fit_decision(2,Ind);
             fit_decision_final(i,3)=fit_decision(3,Ind);
             % start the fitting. Ignore the data in corrispondence of PDA.
-            % Although the fitresult seems to be unused, it is actually evaluated with eval function.
-            [fitresult, ~] = fit( xData, yData, ft, 'Exclude', yData > 1 );
+            [fitresult, ~] = fit( xData, yData, ft, 'Exclude', yData > 1 ); %#ok<ASGLU> ignore warning
         else
             error('The extracted fast scan line is too short. Something is wrong');
         end

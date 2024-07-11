@@ -290,6 +290,7 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonito
     satisfied='Manual Selection';
     first_In=1;
     closest_indices=[];
+    no_sub_div=1000;
     % Binarisation of the bg-subtracted image
     while(strcmp(satisfied,'Manual Selection'))
         kernel=strel('square',3); % can be modified
@@ -307,7 +308,7 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonito
             % show dialog box before continue
             uiwait(msgbox('Before click to continue the binarization, zoom or pan on the image for a better view',''));
             zoom off; pan off;
-            closest_indices=selectRangeGInput(1,1,1:1000,Y);
+            closest_indices=selectRangeGInput(1,1,1:no_sub_div,Y);
             th_segmentation=E(closest_indices);
             close(imhistfig)
             seg_AFM=AFM_noBk;
@@ -329,7 +330,6 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonito
             satisfied=questdlg('Keep automatic threshold selection or turn to Manual?', 'Manual Selection', 'Keep Current','Manual Selection','Keep Current');
             if(first_In==1)
                 if(strcmp(satisfied,'Manual Selection'))
-                    no_sub_div=1000;
                     [Y,E] = histcounts(AFM_noBk,no_sub_div);
                     first_In=0;
                 end

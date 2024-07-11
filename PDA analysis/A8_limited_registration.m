@@ -47,7 +47,7 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
     if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
     imshow(fused_image)
     title(sprintf('%s Not Aligned',textFirstLastFig)) 
-    saveas(f1,sprintf('%s/image_8step_1_Entire_%s_NotAligned.tif',newFolder,textFirstLastFig))
+    saveas(f1,sprintf('%s/resultA8_1_Entire_%s_NotAligned.tif',newFolder,textFirstLastFig))
 
     % run the polynomial fitting on the Brightfield image since it is likely to be "tilted"
     flag_brightfield=0;
@@ -87,7 +87,7 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
         imshow(imadjust(image_of_interest)),title('Original Brightfield','FontSize',14)
         subplot(1,2,2)
         imshow(imadjust(el_image)),title('Brightfield with Bk Removed','FontSize',14)
-        saveas(f2_1,sprintf('%s/image_8step_2_1_comparisonOriginalAndBackgroundSubstracted.tif',newFolder))   
+        saveas(f2_1,sprintf('%s/resultA8_2_1_comparisonOriginalAndBackgroundSubstracted.tif',newFolder))   
                 
         awnser=getValidAnswer(sprintf('Use the Backgrownd Subtracted Image?\nIf not, it will be used the original BF data'),'',{'Yes','No'});
         if awnser == 1
@@ -101,7 +101,7 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
             if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2_2); end
             imshowpair(imadjust(moved), imadjust(fixed), 'falsecolor','Scaling','independent')
             title(sprintf('Fitted %s',textFirstLastFig),'FontSize',14)
-            saveas(f2_2,sprintf('%s/image_8step_2_2_Fitted_BrightField.tif',newFolder))
+            saveas(f2_2,sprintf('%s/resultA8_2_2_Fitted_BrightField.tif',newFolder))
             uiwait(msgbox('Click to continue',''));
         end
     end
@@ -127,7 +127,7 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
         f3=figure;
         if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
         imshow(imfuse((reduced_moved),(reduced_fixed)))
-        saveas(f3,sprintf('%s/image_8step_3_Cropped_%s_NotAligned.tif',newFolder,textFirstLastFig))   
+        saveas(f3,sprintf('%s/resultA8_3_Cropped_%s_NotAligned.tif',newFolder,textFirstLastFig))   
         evo_reduced_fixed=reduced_fixed;
         evo_reduced_moved=reduced_moved;
         close gcf
@@ -139,7 +139,7 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
         if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
         imshowpair(imadjust(reduced_moved_blurred), imadjust(reduced_fixed_blurred), 'falsecolor','Scaling','independent')
         title(sprintf('Cropped %s-%s - Not Aligned',textCropped,textFirstLastFig))
-        saveas(f3,sprintf('%s/image_8step_3_Cropped_%s-%s-NotAligned.tif',newFolder,textCropped,textFirstLastFig))   
+        saveas(f3,sprintf('%s/resultA8_3_Cropped_%s-%s-NotAligned.tif',newFolder,textCropped,textFirstLastFig))   
         
         % choose if run the automatic binarization or not
         question='Do you want to perform manual (for too dimmered images) or automatic selection?';
@@ -191,7 +191,7 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
                     satisfied=getValidAnswer('Keep selection or turn again to manual selection?','',{'Continue the manual selection.','Keep current.'});       
                 end
                 %save the result of binarization
-                saveas(eval(sprintf('f4_%d',i)),sprintf('%s/image_8step_4_%s_BinarizationResult.tif',newFolder,text{i}))
+                saveas(eval(sprintf('f4_%d',i)),sprintf('%s/resultA8_4_%s_BinarizationResult.tif',newFolder,text{i}))
                 close gcf
                 data{i}=originalData;
             end
@@ -235,5 +235,5 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
         imshow(imfuse(moving_tr,fixed))
     end
     title(sprintf('Cropped %s-%s - Aligned',textCropped,textFirstLastFig),'FontSize',15)
-    saveas(f5,sprintf('%s/image_8step_5_Cropped_%s-%s-Aligned.tif',newFolder,textCropped,textFirstLastFig))
+    saveas(f5,sprintf('%s/resultA8_5_Cropped_%s-%s-Aligned.tif',newFolder,textCropped,textFirstLastFig))
 end

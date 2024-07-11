@@ -23,6 +23,7 @@ secondMonitorMain=objInSecondMonitor;
 % Remove unnecessary channels to elaboration (necessary for memory save)
 filtData=A2_CleanUpData2_AFM(data);
 clear data
+
 % Extract the (1) height no Bk, which is not used, (2) cropped AFM channels, (3) I/O image of Height and
 % (4) info of the cropped area
 [~,AFM_cropped_Images,AFM_height_IO,Rect]=A3_El_AFM(filtData,secondMonitorMain,newFolder,'Accuracy','High');
@@ -90,14 +91,14 @@ close all
 f1=figure;
 if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
 imshow(imadjust(BF_Mic_Image)), title('BrightField - original','FontSize',20)
-saveas(f1,sprintf('%s/image_8step_BrightField.tif',newFolder))
+saveas(f1,sprintf('%s/resultA8_0_BrightField.tif',newFolder))
 
 [fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the TRITIC Before Stimulation image',filePathData);
 [Tritic_Mic_Image_Before]=A7_open_ND2(fullfile(filePathData,fileName)); 
 f2=figure;
 if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2); end
 imshow(imadjust(Tritic_Mic_Image_Before)), title('TRITIC Before Stimulation','FontSize',20)
-saveas(f2,sprintf('%s/image_8step_TRITIC_Before_Stimulation.tif',newFolder))
+saveas(f2,sprintf('%s/resultA8_0_TRITIC_Before_Stimulation.tif',newFolder))
 
 close all
 
@@ -106,7 +107,7 @@ close all
 f3=figure;
 if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
 imshow(imadjust(Tritic_Mic_Image_After)), title('TRITIC After Stimulation','FontSize',20)
-saveas(f3,sprintf('%s/image_8step_TRITIC_After_Stimulation.tif',newFolder))
+saveas(f3,sprintf('%s/resultA8_0_TRITIC_After_Stimulation.tif',newFolder))
 
 % Align the fluorescent images After with the BEFORE stimulation
 Tritic_Mic_Image_After_aligned=A8_limited_registration(Tritic_Mic_Image_After,Tritic_Mic_Image_Before,newFolder,secondMonitorMain);
@@ -117,9 +118,10 @@ BF_Mic_Image_aligned=A8_limited_registration(BF_Mic_Image,Tritic_Mic_Image_Befor
 uiwait(msgbox('Click to continue',''));
 close all
 clear f1 f2 f3 question options choice fileName Tritic_Mic_Image_After BF_Mic_Image
-%%
-% Produce the binary IO of Brightfield
-[BF_Mic_Image_IO,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,Details_On_BF_Image]=A9_Mic_to_Binary(BF_Mic_Image_aligned,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned); 
 
+% Produce the binary IO of Brightfield
+[BF_Mic_Image_IO,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,Details_On_BF_Image]=A9_Mic_to_Binary(BF_Mic_Image_aligned,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,secondMonitorMain,newFolder); 
+
+%%
 % Align AFM to BF and extract the coordinates for alighnment to be transferred to the other data
-[AFM_IO_Padded,BF_Image_Cut,AFM_cropped_channels_Big,Coordinates_forAllighnment,~]=alignment_AFMMicroscope(BF_Mic_Image_IO,AFM_height_IO,AFM_cropped_channels,'Margin',0,'QuickMatch','No');
+[AFM_IO_Padded,BF_Image_Cut,AFM_cropped_channels_Big,Coordinates_forAllighnment,~]=A10_alignment_AFM_Microscope(BF_Mic_Image_IO,AFM_height_IO,AFM_Elab,'Margin',0,'QuickMatch','No');
