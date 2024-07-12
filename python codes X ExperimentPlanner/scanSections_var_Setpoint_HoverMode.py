@@ -1,6 +1,6 @@
 # Python code for ExperimentPlanner
 # JPK Script
-checkVersion('SPM', 6, 4, 25)
+checkVersion('SPM', 6, 1, 186)
 
 from com.jpk.inst.lib import JPKScript
 from com.jpk.spm.data import AmplitudeSetpointFeedbackSettings
@@ -49,16 +49,22 @@ def enableHoverMode(enable):
 '''
 Define a list of setpoints here in VOLTS scaling. If you have calibrated 
 the sensitivity value, setpoint must be given in METER, 30 nm = 30e-9
+Otherwise, enter the sensitivity and spring constant. Conver the nN into Volts
 '''
-setpointList = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 
+setpointListNewton = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]   # N
+setpointListNanoNewton=[x * 1e-9 for x in setpointListNewton]   # nN
+springConstant= 0.227                                         # N/m
+sensitivity=72.47e-9                                             # nm/V
+setpointListVolts=[x / (springConstant*sensitivity) for x in setpointListNanoNewton]
 
 '''
 setup the base directory for saving data
 this will be extended later in the loop to
 sort HoverMode ON/OFF scans
 '''
-baseDirName=input(f"Enter the path of the folder where save the scanned AFM section .jpk images (example: \"/home/name/.../destination\").")
+
+baseDirName='/home/jpkuser/jpkdata/Fabiano/5_20240712_DEMO3_ExperimentPlannerFirstTime'
 Imaging.setOutputDirectory(baseDirName)
 Imaging.setAutosave(True)
 
@@ -68,7 +74,7 @@ Setup the initial scan size of a single section at the current x,y offset positi
 '''
 scanSizeFast = 50.0e-6     # 50 um
 # if 10 setpoints  ==> 10 slow direction scan sections with a size of 5 um if fast scan line direction is 50 um long
-scanSizeSlow = scanSizeFast / len(setpointList)
+scanSizeSlow = scanSizeFast / len(setpointListVolts)
 
 # extract the origin of scanning
 xOffset = Imaging.getXOffset()
@@ -79,10 +85,19 @@ Scanner.retractPiezo()
 Imaging.setScanSize(scanSizeFast, scanSizeSlow)
 
 '''
-Set the pixel size
+Set other parameters (pixel size, scan line rate)
 '''
+fastPixels=640			# 512 for 8 sections ==> 512+64+64 = 640 pixels
+slowPixels= fastPixels/len(setpointListVolts)
+Imaging.setScanPixels(fastPixels, slowPixels)
+scan_rate=1	# 1 Hz
 
-
+'''
+Save all parameters in a txt file. If already exists it the dir, overwrite
+'''
+#f = open(baseDirName+"/settedParameters.txt", "w")
+#f.write()
+#f.close()
 
 '''
 Start the measurement
@@ -96,12 +111,12 @@ conditionHVmode = [True, False]
 # two for cycles:
 # Cycle 1 HoverMode ON
 # Cycle 2 HoverMode OFF 
-for i in range(2) 
+for i in range(0,2):
     print(textToPrint[i])
     Imaging.setOutputDirectory(baseDirName+textDirectory[i])
     enableHoverMode(conditionHVmode[i])
 
-    for setpoint in setpointList:
+    for setpoint in setpointListVolts:
         # Set setpoint
         setAmplitudeSetpoint(setpoint)    
         Scanner.approachPiezo()
