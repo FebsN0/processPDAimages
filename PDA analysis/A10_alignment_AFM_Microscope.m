@@ -1,5 +1,5 @@
 % to align AFM height IO image to BF IO image, the main alignment
-function [padded_AFM,microscope_cut,AFM_Elab,pos_allighnment,details_it_reg]=A9_alignment_AFM_Microscope(still,moving_Or,varargin)
+function [padded_AFM,microscope_cut,AFM_data,pos_allighnment,details_it_reg]=A10_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_data,varargin)
 
 
 dbstop if error
@@ -9,8 +9,10 @@ warning('off', 'Images:initSize:adjustingMag');
 if(~isempty(varargin))
     for checkVar=1:size(varargin,2)
         if(isstruct(varargin{1,checkVar}))
-            AFM_Elab=varargin{1,checkVar};
-            [AFM_Elab(:).Padded]=deal(zeros(size(still)));
+            AFM_data=varargin{1,checkVar};
+            [AFM_data(:).Padded]=deal(zeros(size(BF_Mic_Image_IO)));
+            
+            
             varargin(:,checkVar)=[];
             break
         end
@@ -24,54 +26,55 @@ end
 
 p=inputParser();
 argName = 'Silent';
-defaultVal = 'Yes';
-addOptional(p,argName,defaultVal);
+defaultVal = 'No';
+addOptional(p,argName,defaultVal,@(x) ismember(x,{'No','Yes'}));
 argName = 'QuickMatch';
 defaultVal = 'Yes';
-addOptional(p,argName,defaultVal);
+addOptional(p,argName,defaultVal,@(x) ismember(x,{'No','Yes'}));
 argName = 'CropStill';
 defaultVal = 'Yes';
-addOptional(p,argName,defaultVal);
+addOptional(p,argName,defaultVal,@(x) ismember(x,{'No','Yes'}));
 argName = 'CropStillOriginal';
 defaultVal = 'No';
-addOptional(p,argName,defaultVal);
+addOptional(p,argName,defaultVal,@(x) ismember(x,{'No','Yes'}));
 argName = 'Margin';
 defaultVal = 25;
-addOptional(p,argName,defaultVal);
+addOptional(p,argName,defaultVal,@(x) isnumeric(x) && (x > 0));
+
 parse(p,varargin{:});
-if(strcmp(p.Results.Silent,'Yes'))
-    SeeMe='off';
-else
-    SeeMe='on';
-end
-if(strcmp(p.Results.QuickMatch,'Yes'))
-    aw='No';
-end
+if(strcmp(p.Results.Silent,'Yes')), SeeMe=false; else, SeeMe=true; end
+if(strcmp(p.Results.QuickMatch,'Yes')), aw='No'; end
+fprintf(['Results of optional input:\n' ...
+    '\tSilent:\t\t\t\t%s\n'      ...
+    '\tQuickMatch:\t\t\t%s\n'  ...
+    '\tCropStill:\t\t\t%s\n' ...
+    '\tCropStillOriginal:\t%s\n' ...
+    '\tMargin:\t\t\t\t%d\n'
+    ],p.Results.Silent,p.Results.QuickMatch,p.Results.CropStill,p.Results.CropStillOriginal,p.Results.Margin)
 
 % Optical microscopy and AFM image resolution can be entered here
 
-if(strcmp(SeeMe,'on'))
+if SeeMe==true
     [settings, ~] = settingsdlg(...
-        'Description'                        , ['Setting the ', ...
-        'parameters that will be used in the elaboration'], ...
+        'Description'                        , 'Setting the parameters that will be used in the elaboration', ...
         'title'                              , 'Image Alighnment options', ...
         'separator'                          , 'Microscopy Parameters', ...
-        {'Image Width (um):';'MW'}           , 157.73, ...
-        {'Image Height (um):';'MH'}          , 237.18, ... %modified to 237.18 from 237.10 on 12022020
-        {'Or Img Size Px Width (Px):';'MicPxW'} , 3264, ...
-        {'Or Img Size Px Height (Px):';'MicPxH'} , 4908, ...
-        'separator'                          , 'AFM Parameters', ...
-        {'Image Width (um):';'AFMW'}         , 50, ...
-        {'Image Height (um):';'AFMH'}        , 100, ...
-        {'Image Pixel Width (Px):';'AFMPxW'} , 512, ...
-        {'Image Pixel Height (Px):';'AFMPxH'} , 1024);
+        {'Image Width (um):';'MW'}               , metaData_BF.ImageWidthPixels*metaData_BF.ImageWidthMeter, ...
+        {'Image Height (um):';'MH'}              , metaData_BF.ImageHeightPixels*metaData_BF.ImageHeightMeter, ... %modified to 237.18 from 237.10 on 12022020
+        {'Or Img Size Px Width (Px):';'MicPxW'}  , metaData_BF.ImageWidthPixels, ...
+        {'Or Img Size Px Height (Px):';'MicPxH'} , metaData_BF.ImageHeightPixels, ...
+        'separator'                           , 'AFM Parameters', ...
+        {'Image Width (um):';'AFMW'}          , metaData_AFM.x_scan_length, ...
+        {'Image Height (um):';'AFMH'}         , metaData_AFM.y_scan_length, ...
+        {'Image Pixel Width (Px):';'AFMPxW'}  , metaData_AFM.x_scan_pixels, ...
+        {'Image Pixel Height (Px):';'AFMPxH'} , metaData_AFM.y_scan_pixels);
 else
-    settings.MW=157.73;
-    settings.MicPxW=3264;
-    settings.AFMW=50;
-    settings.AFMPxW=512;
-    settings.AFMH=100;
-    settings.AFMPxH=1024;
+    settings.MW= metaData_BF.ImageWidthPixels*metaData_BF.ImageWidthMeter;
+    settings.MicPxW= metaData_BF.ImageWidthPixels;
+    settings.AFMW=metaData_AFM.x_scan_length;
+    settings.AFMPxW=metaData_AFM.x_scan_pixels;
+    settings.AFMH=metaData_AFM.y_scan_length;
+    settings.AFMPxH=metaData_AFM.y_scan_pixels;
 end
     
     MRatio=settings.MW/settings.MicPxW;
@@ -79,19 +82,19 @@ end
     AFMRatioHoriz=settings.AFMH/settings.AFMPxH;
     
     if(AFMRatioVertical==AFMRatioHoriz)
-        moving=imresize(moving_Or,AFMRatioVertical/MRatio);
-         if(exist('AFM_Elab','var'))
+        moving=imresize(AFM_height_IO,AFMRatioVertical/MRatio);
+         if(exist('AFM_data','var'))
             fprintf('\n Elaborating AFM images ... \n')
-            for flag_AFM=1:size(AFM_Elab,2)
-                AFM_Elab(flag_AFM).Cropped_AFM_image=imresize(AFM_Elab(flag_AFM).Cropped_AFM_image,AFMRatioVertical/MRatio);
+            for flag_AFM=1:size(AFM_data,2)
+                AFM_data(flag_AFM).Cropped_AFM_image=imresize(AFM_data(flag_AFM).Cropped_AFM_image,AFMRatioVertical/MRatio);
             end
         end
     else
-        moving=imresize(moving_Or,[round(((AFMRatioVertical/MRatio)*size(moving_Or,1)),0) round(((AFMRatioHoriz/MRatio)*size(moving_Or,2)),0)]);
-        if(exist('AFM_Elab','var'))
+        moving=imresize(AFM_height_IO,[round(((AFMRatioVertical/MRatio)*size(AFM_height_IO,1)),0) round(((AFMRatioHoriz/MRatio)*size(AFM_height_IO,2)),0)]);
+        if(exist('AFM_data','var'))
             fprintf('\n Elaborating AFM images ... \n')
-            for flag_AFM=1:size(AFM_Elab,2)
-                AFM_Elab(flag_AFM).Cropped_AFM_image=imresize(AFM_Elab(flag_AFM).Cropped_AFM_image,[round(((AFMRatioVertical/MRatio)*size(moving_Or,1)),0) round(((AFMRatioHoriz/MRatio)*size(moving_Or,2)),0)]);
+            for flag_AFM=1:size(AFM_data,2)
+                AFM_data(flag_AFM).Cropped_AFM_image=imresize(AFM_data(flag_AFM).Cropped_AFM_image,[round(((AFMRatioVertical/MRatio)*size(AFM_height_IO,1)),0) round(((AFMRatioHoriz/MRatio)*size(AFM_height_IO,2)),0)]);
             end
         end
     end
@@ -101,7 +104,7 @@ end
 if(strcmp(p.Results.CropStillOriginal,'Yes'))
     awnser_Crop=questdlg(sprintf('Would you like to crop still image?'),'Crop Still Image','Yes','No','No');
     if(strcmp(awnser_Crop,'Yes'))
-        showComplete_image=figure;imshow(still);
+        showComplete_image=figure;imshow(BF_Mic_Image_IO);
         [~,specs]=imcrop(showComplete_image);
         close all
         YBegin=round(specs(1,1));
@@ -115,8 +118,8 @@ if(strcmp(p.Results.CropStillOriginal,'Yes'))
         if(YEnd>size(moving,2))
             YEnd=size(moving,2);
         end
-        still_OR=still;
-        still=still(XBegin:XEnd,YBegin:YEnd,:);
+        still_OR=BF_Mic_Image_IO;
+        BF_Mic_Image_IO=BF_Mic_Image_IO(XBegin:XEnd,YBegin:YEnd,:);
     else
         YBegin=nan;
         XBegin=nan;
@@ -127,7 +130,7 @@ end
 
 fprintf('\n First Cross Correlataion ... \n')
 before1=clock;
-cross_correlation=xcorr2_fft(still,moving);
+cross_correlation=xcorr2_fft(BF_Mic_Image_IO,moving);
 final_time=etime(clock,before1);
 
 [~, imax] = max(abs(cross_correlation(:)));
@@ -135,7 +138,7 @@ final_time=etime(clock,before1);
 [ypeak, xpeak] = ind2sub(size(cross_correlation),imax(1));
 
 corr_offset = [(xpeak-size(moving,2)) (ypeak-size(moving,1))];
-rect_offset = [(still(1)-moving(1)) (still(2)-moving(2))];
+rect_offset = [(BF_Mic_Image_IO(1)-moving(1)) (BF_Mic_Image_IO(2)-moving(2))];
 
 offset = corr_offset + rect_offset;
 xoffset = offset(1);
@@ -161,10 +164,10 @@ if(xbegin<=0)
     xbegin=1;
 end
 
-padded_AFM=(zeros(size(still)));
+padded_AFM=(zeros(size(BF_Mic_Image_IO)));
 padded_AFM(ybegin:yend,xbegin:xend,:) = moving;
 
-figure('visible',SeeMe),imshowpair(still(:,:,1),padded_AFM,'falsecolor')
+figure('visible',SeeMe),imshowpair(BF_Mic_Image_IO(:,:,1),padded_AFM,'falsecolor')
 
 if(strcmp(p.Results.QuickMatch,'No'))
     if(strcmp(SeeMe,'Yes'))
@@ -193,18 +196,24 @@ if(strcmp(aw,'Yes'))
     end
     
     if(strcmp(p.Results.CropStillOriginal,'Yes'))
-        if(ybegin-p.Results.Margin>=1)&&(xbegin-p.Results.Margin>=1)&&(yend+p.Results.Margin<size(still,2))&&(xend+p.Results.Margin<size(still,2))
-            still_reduced=still(ybegin-p.Results.Margin:yend+p.Results.Margin,xbegin-p.Results.Margin:xend+p.Results.Margin,:);
+        if(ybegin-p.Results.Margin>=1)&&(xbegin-p.Results.Margin>=1)&&(yend+p.Results.Margin<size(BF_Mic_Image_IO,2))&&(xend+p.Results.Margin<size(BF_Mic_Image_IO,2))
+            still_reduced=BF_Mic_Image_IO(ybegin-p.Results.Margin:yend+p.Results.Margin,xbegin-p.Results.Margin:xend+p.Results.Margin,:);
         else
-            still_reduced=still;
+            still_reduced=BF_Mic_Image_IO;
         end
     else
-        still_reduced=still;
+        still_reduced=BF_Mic_Image_IO;
     end
     
     cross_correlation=xcorr2_fft(still_reduced,moving);
     [max_c_it_OI,~] = max(abs(cross_correlation(:)));
-    answer=getValidAnswer('Select the Polydiacetylene used in the experiment to prepare the alignment cycle parameters ','',{'TRCDA','DCDA','PCDA','Enter manually the values'});
+    options= { ...
+        sprintf('TRCDA\n(Limit_Cycles: 1000; StepSize: 0.005 Tot_par: 2)'),...
+        sprintf('DCDA\n(Limit_Cycles: 500; StepSize: 0.0001 Tot_par: 50)'),...
+        sprintf('PCDA\n(Limit_Cycles: 1000; StepSize: 0.00001 Tot_par: 500)'),...
+        'Enter manually the values'};
+    question='Select the Polydiacetylene used in the experiment to prepare the alignment cycle parameters ';
+    answer=getValidAnswer(question,'',options);
     switch answer
         case 1
             Limit_Cycles=1000; % the number of iteration of alignment, can be modified
@@ -235,7 +244,18 @@ if(strcmp(aw,'Yes'))
             Rot_par=cycleParameters(3);
     end
 
+    wb=waitbar(0/Limit_Cycles,'Processing the expanding/reduction/rotation optimization','CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
+    setappdata(wb,'canceling',0);
+  
     while(N_cycles_opt<=Limit_Cycles)
+        if(exist('wb','var'))
+            %if cancel is clicked, stop
+            if getappdata(wb,'canceling')
+               break
+            end
+        end
+        waitbar(N_cycles_opt/Limit_Cycles,wb,'Processing the expanding/reduction/rotation optimization');
+
         if(N_cycles_opt==1)
             moving_iterative_Oversize=imresize(moving,1+StepSize*N_cycles_opt);
             cross_correlation_Oversize=xcorr2_fft(still_reduced,moving_iterative_Oversize);
@@ -287,10 +307,10 @@ if(strcmp(aw,'Yes'))
                 details_it_reg(z,2)=size(moving,1);
                 details_it_reg(z,3)=size(moving,2);
                 fprintf('\n Expansion Scaling Optimization Found ... %f \n',details_it_reg(z,2))
-                if(exist('AFM_Elab','var'))
+                if(exist('AFM_data','var'))
                     fprintf('\n Elaborating AFM images ... \n')
-                    for flag_AFM=1:size(AFM_Elab,2)
-                        AFM_Elab(flag_AFM).Cropped_AFM_image=imresize(AFM_Elab(flag_AFM).Cropped_AFM_image,1+StepSize*N_cycles_opt);
+                    for flag_AFM=1:size(AFM_data,2)
+                        AFM_data(flag_AFM).Cropped_AFM_image=imresize(AFM_data(flag_AFM).Cropped_AFM_image,1+StepSize*N_cycles_opt);
                     end
                 end
             elseif(b==2)
@@ -301,10 +321,10 @@ if(strcmp(aw,'Yes'))
                 details_it_reg(z,2)=size(moving,1);
                 details_it_reg(z,3)=size(moving,2);
                 fprintf('\n Contraction Scaling Optimization Found ... %f \n',details_it_reg(z,2))
-                if(exist('AFM_Elab','var'))
+                if(exist('AFM_data','var'))
                     fprintf('\n Elaborating AFM images ... \n')
-                    for flag_AFM=1:size(AFM_Elab,2)
-                        AFM_Elab(flag_AFM).Cropped_AFM_image=imresize(AFM_Elab(flag_AFM).Cropped_AFM_image,1-StepSize*N_cycles_opt);
+                    for flag_AFM=1:size(AFM_data,2)
+                        AFM_data(flag_AFM).Cropped_AFM_image=imresize(AFM_data(flag_AFM).Cropped_AFM_image,1-StepSize*N_cycles_opt);
                     end
                 end
             elseif(b==3)
@@ -315,10 +335,10 @@ if(strcmp(aw,'Yes'))
                 details_it_reg(z,2)=StepSize*N_cycles_opt*Rot_par;
                 details_it_reg(z,3)=nan;
                 fprintf('\n Clock Wise Rotation Scaling Optimization Found ... %f \n',details_it_reg(z,2))
-                if(exist('AFM_Elab','var'))
+                if(exist('AFM_data','var'))
                     fprintf('\n Elaborating AFM images ... \n')
-                    for flag_AFM=1:size(AFM_Elab,2)
-                        AFM_Elab(flag_AFM).Cropped_AFM_image=imrotate(AFM_Elab(flag_AFM).Cropped_AFM_image,StepSize*N_cycles_opt*Rot_par,'bilinear','loose');
+                    for flag_AFM=1:size(AFM_data,2)
+                        AFM_data(flag_AFM).Cropped_AFM_image=imrotate(AFM_data(flag_AFM).Cropped_AFM_image,StepSize*N_cycles_opt*Rot_par,'bilinear','loose');
                     end
                 end
             else
@@ -329,10 +349,10 @@ if(strcmp(aw,'Yes'))
                 details_it_reg(z,2)=-StepSize*N_cycles_opt*Rot_par;
                 details_it_reg(z,3)=nan;
                 fprintf('\n Counter Clock Wise Rotation Scaling Optimization Found ... %f \n',details_it_reg(z,2))
-                if(exist('AFM_Elab','var'))
+                if(exist('AFM_data','var'))
                     fprintf('\n Elaborating AFM images ... \n')
-                    for flag_AFM=1:size(AFM_Elab,2)
-                       AFM_Elab(flag_AFM).Cropped_AFM_image=imrotate(AFM_Elab(flag_AFM).Cropped_AFM_image,-StepSize*N_cycles_opt*Rot_par,'bilinear','loose');
+                    for flag_AFM=1:size(AFM_data,2)
+                       AFM_data(flag_AFM).Cropped_AFM_image=imrotate(AFM_data(flag_AFM).Cropped_AFM_image,-StepSize*N_cycles_opt*Rot_par,'bilinear','loose');
                     end
                 end
             end
@@ -398,10 +418,10 @@ else
 end
 
 
-if(exist('AFM_Elab','var'))
+if(exist('AFM_data','var'))
     fprintf('\n Final elaboration of AFM images ... \n')
-    for flag_size=1:size(AFM_Elab,2)
-         AFM_Elab(flag_size).Padded(ybegin:size(AFM_Elab(flag_size).Cropped_AFM_image,1)+ybegin-1,xbegin:size(AFM_Elab(flag_size).Cropped_AFM_image,2)+xbegin-1)=AFM_Elab(flag_size).Cropped_AFM_image;
+    for flag_size=1:size(AFM_data,2)
+         AFM_data(flag_size).Padded(ybegin:size(AFM_data(flag_size).Cropped_AFM_image,1)+ybegin-1,xbegin:size(AFM_data(flag_size).Cropped_AFM_image,2)+xbegin-1)=AFM_data(flag_size).Cropped_AFM_image;
     end
 end
 
@@ -439,15 +459,15 @@ if(strcmp(p.Results.CropStill,'Yes'))
         c=1;
         warning_Flag=1;
     end
-    if ~(yend+p.Results.Margin<size(still,1))
-        b=size(still,1);
+    if ~(yend+p.Results.Margin<size(BF_Mic_Image_IO,1))
+        b=size(BF_Mic_Image_IO,1);
         warning_Flag=1;
     end
-    if ~(xend+p.Results.Margin<size(still,2))
-        d=size(still,2);
+    if ~(xend+p.Results.Margin<size(BF_Mic_Image_IO,2))
+        d=size(BF_Mic_Image_IO,2);
         warning_Flag=1;
     end
-    microscope_cut=still(a:b,c:d);
+    microscope_cut=BF_Mic_Image_IO(a:b,c:d);
     if(warning_Flag==1)
         warndlg('Was not able to assign Cut Microscope image ... ')
     end
