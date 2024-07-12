@@ -1,0 +1,8 @@
+# ignore ALL .log files
+*.log
+*.asv
+
+# ignore ALL files in ANY directory named temp
+temp/
+PDA\ analysis/Function\ descriptions/
+PDA\ analysis/others/
