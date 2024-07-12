@@ -146,7 +146,8 @@ function [binary_image,reduced_Tritic_before,reduced_Tritic_after_aligned,Furthe
     text=sprintf('Definitive Binarized BrightField (Morphological Opening - kernel: square 2 pixels)');
     title(text,'FontSize',14)
     saveas(f2,sprintf('%s/resultA9_2_DefinitiveBinarizedBrightField.tif',newFolder))
-  
+    saveas(f2,sprintf('%s/resultA9_2_DefinitiveBinarizedBrightField.fig',newFolder))
+
     if Crop_image == 1
         FurtherDetails=struct(...
             'Threshold',    threshold,...
