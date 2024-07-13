@@ -46,7 +46,7 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
     f1=figure;
     if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
     imshow(fused_image)
-    title(sprintf('%s Not Aligned',textFirstLastFig)) 
+    title(sprintf('%s Not Aligned',textFirstLastFig),'FontSize',14) 
     saveas(f1,sprintf('%s/resultA8_1_Entire_%s_NotAligned.tif',newFolder,textFirstLastFig))
 
     % run the polynomial fitting on the Brightfield image since it is likely to be "tilted"

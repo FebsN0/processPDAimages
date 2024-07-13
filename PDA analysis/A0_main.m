@@ -2,7 +2,7 @@ clc, clear, close
 
 
 % upload .jpk files. If more than one and if from same experiment in which setpoint is changed, then assembly.
-[data,metaData,filePathData]=A1_openANDassembly_JPK;
+[data,metaData_AFM,filePathData]=A1_openANDassembly_JPK;
 
 % save the useful figures into a directory
 newFolder = fullfile(filePathData, 'Results Processing AFM and fluorescence images');
@@ -80,14 +80,14 @@ end
 close all
 
 % Substitute to the AFM cropped channels the baseline adapted LD
-[Corrected_LD_Trace,AFM_Elab,~]=A6_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,metaData.Alpha,avg_fc,secondMonitorMain,newFolder,'Accuracy','High');
+[Corrected_LD_Trace,AFM_Elab,~]=A6_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,metaData_AFM.Alpha,avg_fc,secondMonitorMain,newFolder,'Accuracy','High');
 
 close all
 
 % Open Brightfield image and the TRITIC (Before and After stimulation images)
 
 [fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the BrightField image',filePathData);
-[BF_Mic_Image]=A7_open_ND2(fullfile(filePathData,fileName)); 
+[BF_Mic_Image,~,metaData_BF]=A7_open_ND2(fullfile(filePathData,fileName)); 
 f1=figure;
 if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
 imshow(imadjust(BF_Mic_Image)), title('BrightField - original','FontSize',20)
@@ -124,4 +124,4 @@ clear f1 f2 f3 question options choice fileName Tritic_Mic_Image_After BF_Mic_Im
 
 %%
 % Align AFM to BF and extract the coordinates for alighnment to be transferred to the other data
-[AFM_IO_Padded,BF_Image_Cut,AFM_cropped_channels_Big,Coordinates_forAllighnment,~]=A10_alignment_AFM_Microscope(BF_Mic_Image_IO,AFM_height_IO,AFM_Elab,'Margin',0,'QuickMatch','No');
+[AFM_IO_Padded,BF_Image_Cut,AFM_cropped_channels_Big,Coordinates_forAllighnment,~]=A10_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,Details_On_BF_Image.Cropped,AFM_height_IO,metaData_AFM,AFM_Elab,newFolder,'Margin',0);
