@@ -124,4 +124,4 @@ clear f1 f2 f3 question options choice fileName Tritic_Mic_Image_After BF_Mic_Im
 
 %%
 % Align AFM to BF and extract the coordinates for alighnment to be transferred to the other data
-[AFM_IO_Padded,BF_Image_Cut,AFM_cropped_channels_Big,Coordinates_forAllighnment,~]=A10_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,Details_On_BF_Image.Cropped,AFM_height_IO,metaData_AFM,AFM_Elab,newFolder,'Margin',0);
+[AFM_IO_Padded,BF_Image_Cut,AFM_cropped_channels_Big,Coordinates_forAllighnment,~]=A10_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,Details_On_BF_Image.Cropped,AFM_height_IO,metaData_AFM,AFM_Elab,newFolder,secondMonitorMain,'Margin',0);
