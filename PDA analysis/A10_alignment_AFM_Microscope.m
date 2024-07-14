@@ -1,5 +1,5 @@
 % to align AFM height IO image to BF IO image, the main alignment
-function [padded_AFM,microscope_cut,AFM_Elab,pos_allignment,details_it_reg]=A10_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,BFcropped,AFM_height_IO,metaData_AFM,AFM_Elab,newFolder,secondMonitorMain,varargin)
+function [AFM_padded,microscope_cut,AFM_Elab,pos_allignment,details_it_reg]=A10_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,BFcropped,AFM_height_IO,metaData_AFM,AFM_Elab,newFolder,secondMonitorMain,varargin)
     fprintf('\n\t\tSTEP 10 processing ...\n')
     dbstop if error
     warning('off', 'Images:initSize:adjustingMag');
@@ -16,9 +16,6 @@ function [padded_AFM,microscope_cut,AFM_Elab,pos_allignment,details_it_reg]=A10_
     argName = 'Silent';
     defaultVal = 'No';
     addParameter(p,argName,defaultVal,@(x) ismember(x,{'No','Yes'}));
-    argName = 'CropStill';
-    defaultVal = 'Yes';
-    addParameter(p,argName,defaultVal,@(x) ismember(x,{'No','Yes'}));    
     argName = 'Margin';
     defaultVal = 25;
     addParameter(p,argName,defaultVal,@(x) isnumeric(x) && (x >= 0));
@@ -28,9 +25,8 @@ function [padded_AFM,microscope_cut,AFM_Elab,pos_allignment,details_it_reg]=A10_
     if(strcmp(p.Results.Silent,'Yes')), SeeMe=false; else, SeeMe=true; end
     fprintf(['Results of optional input:\n' ...
         '\tSilent:\t\t\t\t%s\n'      ...
-        '\tCropStill:\t\t\t%s\n' ...
         '\tMargin:\t\t\t\t%d\n'
-        ],p.Results.Silent,p.Results.CropStill,p.Results.Margin)
+        ],p.Results.Silent,p.Results.Margin)
     
     % Add a new column-Field to the AFM data struct with zero elements matrix and same BF image size
     [AFM_Elab(:).Padded]=deal(zeros(size(BF_Mic_Image_IO)));
@@ -75,10 +71,6 @@ function [padded_AFM,microscope_cut,AFM_Elab,pos_allignment,details_it_reg]=A10_
     scaleAFM2BF_H=  AFMRatioHorizontal/BFRatioHorizontal;
     scaleAFM2BF_V=  AFMRatioVertical/BFRatioVertical;
     
-    text=sprintf('Scaling the AFM channels based on BF pixel size (%d of %d channels)',0,size(AFM_Elab,2));
-    wb=waitbar(0/size(AFM_Elab,2),text,'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
-    setappdata(wb,'canceling',0);      
-
     if(AFMRatioVertical==AFMRatioHorizontal)
         % if the x and y pixel sizes are the same
         scale = scaleAFM2BF_H;              % scalar value
@@ -89,11 +81,6 @@ function [padded_AFM,microscope_cut,AFM_Elab,pos_allignment,details_it_reg]=A10_
         
     moving=imresize(AFM_height_IO,scale);
     for flag_AFM=1:size(AFM_Elab,2)
-        if getappdata(wb,'canceling')
-           break
-        end
-        text=sprintf('Scaling the AFM channels based on BF pixel size (%d of %d channels)',flag_AFM,size(AFM_Elab,2));
-        waitbar(flag_AFM/size(AFM_Elab,2),wb,text);
         % scale the AFM channels. It doesnt mean that the matrix size of AFM and BF images will be the same
         AFM_Elab(flag_AFM).Cropped_AFM_image=imresize(AFM_Elab(flag_AFM).Cropped_AFM_image,scale);
     end
@@ -104,8 +91,8 @@ function [padded_AFM,microscope_cut,AFM_Elab,pos_allignment,details_it_reg]=A10_
         answer=getValidAnswer(question,'',{'Yes','No'});
         if answer==1
             f1=figure;
-            if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
             imshow(BF_Mic_Image_IO); title('BrightField 0/1 image','FontSize',14)
+            if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
             uiwait(msgbox('Crop the area of interest containing the stimulated part',''));
             [~,specs]=imcrop();
             close(f1)
@@ -115,14 +102,17 @@ function [padded_AFM,microscope_cut,AFM_Elab,pos_allignment,details_it_reg]=A10_
             XEnd=round(specs(2))+round(specs(end));  
             if(XEnd>size(BF_Mic_Image_IO,1)), XEnd=size(BF_Mic_Image_IO,1); end
             if(YEnd>size(BF_Mic_Image_IO,2)), YEnd=size(BF_Mic_Image_IO,2); end
-            BF_Mic_Image_IO=BF_Mic_Image_IO(XBegin:XEnd,YBegin:YEnd);
+            BF_Mic_Image_IO_cropped=BF_Mic_Image_IO(XBegin:XEnd,YBegin:YEnd);
+        else
+            BF_Mic_Image_IO_cropped=BF_Mic_Image_IO;
         end
     end
+    wb=waitbar(0,'First Cross Correlation','CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
+    setappdata(wb,'canceling',0);      
 
-    waitbar(0/1,wb,'First Cross Correlation');
     % calc the time required to run a cross-correlation
     before1=datetime('now');
-    cross_correlation=xcorr2_fft(BF_Mic_Image_IO,moving);
+    cross_correlation=xcorr2_fft(BF_Mic_Image_IO_cropped,moving);
     final_time=minus(datetime('now'),before1);
     waitbar(1/1,wb,'Completed First Cross Correlation');
 
@@ -143,42 +133,53 @@ function [padded_AFM,microscope_cut,AFM_Elab,pos_allignment,details_it_reg]=A10_
     yend   = ybegin+size(moving,1)-1;
     % create a zero-element matrix with the same cropped BF sizes and place the AFM image based at those idxs (i.e.
     % offset) which represent the most aligned position
-    padded_AFM=(zeros(size(BF_Mic_Image_IO)));
-    padded_AFM(ybegin:yend,xbegin:xend) = moving;
+    AFM_padded=(zeros(size(BF_Mic_Image_IO_cropped)));
+    AFM_padded(ybegin:yend,xbegin:xend) = moving;
     % show the first cross correlation
     f2=figure;
+    imshowpair(BF_Mic_Image_IO_cropped,AFM_padded,'falsecolor')
     if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2); end
-    imshowpair(BF_Mic_Image_IO(:,:),padded_AFM,'falsecolor')
     title('Cropped Brightfield and resized AFM images - First cross-correlation','FontSize',14)
     saveas(f2,sprintf('%s/resultA10_1_BF_AFM_firstCrossCorrelation.tif',newFolder))
 
     question=sprintf('Maximize the cross-correlation between the BF and AFM images?\n(I.e. Run a cycle of series of operations: Iterative, auto-expansion and compression).');
     answer=getValidAnswer(question,'',{'Yes','No'});
     rotation_deg=0;
-
+    close(f2)
     if answer==1
-        waitbar(0,wb,'Initializing Iterative Cross Correlation');
-        % check whether the BF image, in case it was already cropped before this function, is still OK
-        if(strcmp(BFcropped,'Yes'))
+        waitbar(0,wb,'Initializing Iterative Cross Correlation')
+        % obtain the BF image slightly bigger than AFM image to improve the alignment
+        question=sprintf('Do you want to obtain a BF image slightly larger than the AFM image by a defined margin (%d pixels)?',p.Results.Margin);
+        answer=getValidAnswer(question,'',{'Yes','No'});
+        if answer == 1
+            % if the AFM image is properly inside the BF image. Adjust the borders
             if(ybegin-p.Results.Margin>=1) && (xbegin-p.Results.Margin>=1) && ...
-                (yend+p.Results.Margin<size(BF_Mic_Image_IO,2)) && ...
+                (yend+p.Results.Margin<size(BF_Mic_Image_IO,1)) && ...
                 (xend+p.Results.Margin<size(BF_Mic_Image_IO,2))
-                reduced_BF_IO=BF_Mic_Image_IO(ybegin-p.Results.Margin:yend+p.Results.Margin,xbegin-p.Results.Margin:xend+p.Results.Margin,:);
-                % run a second cross-correlation between the already cropped BF image and AFM image
-                cross_correlation=xcorr2_fft(reduced_BF_IO,moving);
+                % extract from BF image the area+margin into a new BF image
+                BF_IO_reduced=BF_Mic_Image_IO_cropped(ybegin-p.Results.Margin:yend+p.Results.Margin,xbegin-p.Results.Margin:xend+p.Results.Margin);
+                % init again the AFM image with the same size as well as the reduced BF
+                AFM_padded=(zeros(size(BF_IO_reduced)));
+                % the AFM image is distant from the BF image's borders by only margin
+                AFM_padded(p.Results.Margin+1:size(moving,2)+p.Results.Margin,p.Results.Margin+1:size(moving,1)+p.Results.Margin) = moving;
+                f3=figure;
+                imshowpair(BF_IO_reduced,AFM_padded,'falsecolor')
+                if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
+                title('Reduced (by margin) Brightfield and resized AFM images - First cross-correlation','FontSize',14)
+                saveas(f3,sprintf('%s/resultA10_3_reducedBF_AFM_firstCrossCorrelation.tif',newFolder))
+                % run a second cross-correlation between the already cropped BF image and AFM image to update
+                % the score of cross correlation
+                before1=datetime('now');
+                cross_correlation=xcorr2_fft(BF_IO_reduced,moving);
+                final_time=minus(datetime('now'),before1);              
                 [max_c_it_OI,~] = max(abs(cross_correlation(:)));
             else
-                reduced_BF_IO=BF_Mic_Image_IO;
+                BF_IO_reduced=BF_Mic_Image_IO_cropped;
             end
         else
-            reduced_BF_IO=BF_Mic_Image_IO;
+            BF_IO_reduced=BF_Mic_Image_IO_cropped;
         end
-        
-        
-        %%%%%%%%%%%%%%%%%%%%%%
-%%% FIX THE REQUIRED AMOUNT OF TIME %% not sure how much is. Before was 100/20
-        %%%%%%%%%%%%%%%%%%%%%%
-        
+           
         options= { ...
             sprintf('TRCDA - Maximum time required: %3.2f min\n(Limit_Cycles: 1000; StepSize: 0.005 Tot_par: 2).',seconds(final_time)*1000/60),...
             sprintf('DCDA - Maximum time required: %3.2f min\n(Limit_Cycles: 500; StepSize: 0.0001 Tot_par: 50)',seconds(final_time)*500/60),...
@@ -231,6 +232,15 @@ function [padded_AFM,microscope_cut,AFM_Elab,pos_allignment,details_it_reg]=A10_
         details_it_reg = zeros(Limit_Cycles,3);
         before2=datetime('now');
         moving_OPT=moving;
+        % init plot where show trend of max correlation value
+        close all
+        f2max=figure;
+        maxC_original=max_c_it_OI;
+        h = animatedline('Marker','o');
+        addpoints(h,0,1)
+        xlabel('number cycles'), ylabel('Normalized max cross correlation value over first value')
+        %h_plot = plot(nan, nan, 'bo-'); % Inizializzare la linea con un plot vuoto
+
         while(N_cycles_opt<=Limit_Cycles)
             if(exist('wb','var'))
                 %if cancel is clicked, stop
@@ -241,20 +251,24 @@ function [padded_AFM,microscope_cut,AFM_Elab,pos_allignment,details_it_reg]=A10_
             waitbar(N_cycles_opt/Limit_Cycles,wb,sprintf('Processing the EXP/RED/ROT optimization. Cycle %d / %d',N_cycles_opt,Limit_Cycles));
     
             % increase
-            moving_iterative_Oversize=imresize(moving_OPT,1+StepSize*N_cycles_opt);
-            cross_correlation_Oversize=xcorr2_fft(reduced_BF_IO,moving_iterative_Oversize);
+            %moving_iterative_Oversize=imresize(moving_OPT,1+StepSize*N_cycles_opt);
+            moving_iterative_Oversize=imresize(moving_OPT,1+StepSize);
+            cross_correlation_Oversize=xcorr2_fft(BF_IO_reduced,moving_iterative_Oversize);
             [max_c_iterative(1),imax(1)] = max(abs(cross_correlation_Oversize(:)));
             % decrease
-            moving_iterative_Undersize=imresize(moving_OPT,1-StepSize*N_cycles_opt);
-            cross_correlation_Undersize=xcorr2_fft(reduced_BF_IO,moving_iterative_Undersize);
+            %moving_iterative_Undersize=imresize(moving_OPT,1-StepSize*N_cycles_opt);
+            moving_iterative_Undersize=imresize(moving_OPT,1-StepSize);
+            cross_correlation_Undersize=xcorr2_fft(BF_IO_reduced,moving_iterative_Undersize);
             [max_c_iterative(2),imax(2)] = max(abs(cross_correlation_Undersize(:)));
-            % rotation clockwise
-            moving_iterative_PosRot=imrotate(moving_OPT,StepSize*N_cycles_opt*Rot_par,'nearest','loose');
-            cross_correlation_PosRot=xcorr2_fft(reduced_BF_IO,moving_iterative_PosRot);
-            [max_c_iterative(3),imax(3)] = max(abs(cross_correlation_PosRot(:)));          
             % rotation counter-clockwise
-            moving_iterative_NegRot=imrotate(moving_OPT,-StepSize*N_cycles_opt*Rot_par,'nearest','loose');
-            cross_correlation_NegRot=xcorr2_fft(reduced_BF_IO,moving_iterative_NegRot);
+            %moving_iterative_PosRot=imrotate(moving_OPT,StepSize*N_cycles_opt*Rot_par,'nearest','loose');
+            moving_iterative_PosRot=imrotate(moving_OPT,StepSize*Rot_par,'nearest','loose');
+            cross_correlation_PosRot=xcorr2_fft(BF_IO_reduced,moving_iterative_PosRot);
+            [max_c_iterative(3),imax(3)] = max(abs(cross_correlation_PosRot(:)));          
+            % rotation clockwise
+            %moving_iterative_NegRot=imrotate(moving_OPT,-StepSize*N_cycles_opt*Rot_par,'nearest','loose');
+            moving_iterative_NegRot=imrotate(moving_OPT,-StepSize*Rot_par,'nearest','loose');
+            cross_correlation_NegRot=xcorr2_fft(BF_IO_reduced,moving_iterative_NegRot);
             [max_c_iterative(4),imax(4)] = max(abs(cross_correlation_NegRot(:)));
 
             % if the max value of the new cross-correlation is better than the previous saved one, then
@@ -275,7 +289,8 @@ function [padded_AFM,microscope_cut,AFM_Elab,pos_allignment,details_it_reg]=A10_
                         details_it_reg(z,3)=size(moving_OPT,2);
                         fprintf('\n Expansion Scaling Optimization Found. The new dimension is %dx%d \n',details_it_reg(z,2), details_it_reg(z,3))
                         for flag_AFM=1:size(AFM_Elab,2)
-                            AFM_Elab(flag_AFM).Cropped_AFM_image=imresize(AFM_Elab(flag_AFM).Cropped_AFM_image,1+StepSize*N_cycles_opt);
+                            %AFM_Elab(flag_AFM).Cropped_AFM_image=imresize(AFM_Elab(flag_AFM).Cropped_AFM_image,1+StepSize*N_cycles_opt);                            
+                            AFM_Elab(flag_AFM).Cropped_AFM_image=imresize(AFM_Elab(flag_AFM).Cropped_AFM_image,1+StepSize);
                         end
                     case 2
                         moving_OPT=moving_iterative_Undersize;
@@ -285,37 +300,51 @@ function [padded_AFM,microscope_cut,AFM_Elab,pos_allignment,details_it_reg]=A10_
                         details_it_reg(z,3)=size(moving_OPT,2);
                         fprintf('\n Contraction Scaling Optimization Found. The new dimension is %dx%d \n',details_it_reg(z,2), details_it_reg(z,3))
                         for flag_AFM=1:size(AFM_Elab,2)
-                            AFM_Elab(flag_AFM).Cropped_AFM_image=imresize(AFM_Elab(flag_AFM).Cropped_AFM_image,1-StepSize*N_cycles_opt);
+                            %AFM_Elab(flag_AFM).Cropped_AFM_image=imresize(AFM_Elab(flag_AFM).Cropped_AFM_image,1-StepSize*N_cycles_opt);
+                            AFM_Elab(flag_AFM).Cropped_AFM_image=imresize(AFM_Elab(flag_AFM).Cropped_AFM_image,1-StepSize);
                         end
                     case 3
                         moving_OPT=moving_iterative_PosRot;
-                        rotation_deg = rotation_deg + StepSize*N_cycles_opt*Rot_par;
+                        %rotation_deg = rotation_deg + StepSize*N_cycles_opt*Rot_par;
+                        rotation_deg = rotation_deg + StepSize*Rot_par;
                         size_OI=size(cross_correlation_PosRot);
                         details_it_reg(z,1)=0;
-                        details_it_reg(z,2)=StepSize*N_cycles_opt*Rot_par;
+                        %details_it_reg(z,2)=StepSize*N_cycles_opt*Rot_par;
+                        details_it_reg(z,2)=StepSize*Rot_par;
                         details_it_reg(z,3)=nan;
-                        fprintf('\n Clock Wise Rotation Scaling Optimization Found. The rotation is %f \n',details_it_reg(z,2))
+                        fprintf('\n Counter ClockWise Rotation Scaling Optimization Found. The total rotation from original is %f \n',rotation_deg)
                         for flag_AFM=1:size(AFM_Elab,2)
-                            AFM_Elab(flag_AFM).Cropped_AFM_image=imrotate(AFM_Elab(flag_AFM).Cropped_AFM_image,StepSize*N_cycles_opt*Rot_par,'bilinear','loose');
+                            %AFM_Elab(flag_AFM).Cropped_AFM_image=imrotate(AFM_Elab(flag_AFM).Cropped_AFM_image,StepSize*N_cycles_opt*Rot_par,'bilinear','loose');
+                            AFM_Elab(flag_AFM).Cropped_AFM_image=imrotate(AFM_Elab(flag_AFM).Cropped_AFM_image,StepSize*Rot_par,'bilinear','loose');
                         end
                     case 4
                         moving_OPT=moving_iterative_NegRot;
+                        %rotation_deg = rotation_deg - StepSize*N_cycles_opt*Rot_par;
                         rotation_deg = rotation_deg - StepSize*N_cycles_opt*Rot_par;
                         size_OI=size(cross_correlation_NegRot);
                         details_it_reg(z,1)=0;
-                        details_it_reg(z,2)=-StepSize*N_cycles_opt*Rot_par;
+                        %details_it_reg(z,2)=-StepSize*N_cycles_opt*Rot_par;
+                        details_it_reg(z,2)=-StepSize*Rot_par;
                         details_it_reg(z,3)=nan;
-                        fprintf('\n Counter Clock Wise Rotation Scaling Optimization Found. The rotation is %f \n',details_it_reg(z,2))
+                        fprintf('\n ClockWise Rotation Scaling Optimization Found. The total rotation from original is %f \n',rotation_deg)
                         for flag_AFM=1:size(AFM_Elab,2)
-                           AFM_Elab(flag_AFM).Cropped_AFM_image=imrotate(AFM_Elab(flag_AFM).Cropped_AFM_image,-StepSize*N_cycles_opt*Rot_par,'bilinear','loose');
+                           %AFM_Elab(flag_AFM).Cropped_AFM_image=imrotate(AFM_Elab(flag_AFM).Cropped_AFM_image,-StepSize*N_cycles_opt*Rot_par,'bilinear','loose');
+                           AFM_Elab(flag_AFM).Cropped_AFM_image=imrotate(AFM_Elab(flag_AFM).Cropped_AFM_image,-StepSize*Rot_par,'bilinear','loose');
                         end
                 end
+                
+                figure(f2max)
+                new_x = N_cycles_opt; new_y = max_c_it_OI/maxC_original;
+                addpoints(h,new_x, new_y)
+                drawnow
+                
                 if(exist('h_it','var'))
                     close(h_it)
                 end
-
+                
+              
                 % if the new AFM image sizes are still smaller than those of BF image, shift the new image
-                if(size(moving_OPT)<size(reduced_BF_IO))
+                if(size(moving_OPT)<size(BF_IO_reduced))
                     [ypeak, xpeak] = ind2sub(size_OI,imax_OI(1));
                     corr_offset = [(xpeak-size(moving_OPT,2)) (ypeak-size(moving_OPT,1))];
                     xoffset = corr_offset(1);
@@ -326,11 +355,11 @@ function [padded_AFM,microscope_cut,AFM_Elab,pos_allignment,details_it_reg]=A10_
                     if(yoffset>0), ybegin = round(yoffset); else, ybegin = 1; end
                     yend   = ybegin+size(moving_OPT,1)-1;
                 % save the new image
-                    padded_AFM=(zeros(size(reduced_BF_IO)));
-                    padded_AFM(ybegin:yend,xbegin:xend) = moving_OPT;
+                    AFM_padded=(zeros(size(BF_IO_reduced)));
+                    AFM_padded(ybegin:yend,xbegin:xend) = moving_OPT;
                 end
                 h_it=figure('visible',SeeMe);
-                imshowpair(reduced_BF_IO,padded_AFM,'falsecolor');
+                imshowpair(BF_IO_reduced,AFM_padded,'falsecolor');
 
                 N_cycles_opt=N_cycles_opt+1;
             else
@@ -352,7 +381,7 @@ function [padded_AFM,microscope_cut,AFM_Elab,pos_allignment,details_it_reg]=A10_
         moving_final=moving_OPT;
         % calc the calculates the time taken for the entire process
         final_time2=minus(datetime('now'),before2);
-        waitbar(1/1,wb,sprintf('Completed the EXP/RED/ROT optimization. Performed %d Cycles in %3.2f min',N_cycles_opt,seconds(final_time2)));
+        waitbar(1/1,wb,sprintf('Completed the EXP/RED/ROT optimization. Performed %d Cycles in %3.2f min',N_cycles_opt,seconds(final_time2)/60));
         uiwait(msgbox('Process Completed. Click to continue',''));
 
     % in case the user believe that the first cross correlation is ok
