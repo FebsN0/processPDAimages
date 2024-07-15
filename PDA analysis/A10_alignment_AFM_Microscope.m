@@ -127,7 +127,7 @@ function [AFM_padded,BF_IO_reduced,AFM_Elab,pos_allignment,details_it_reg]=A10_a
         question='Is the AFM image is correctly aligned with the BF? If not, you might selected wrong cropping area or should crop if not cropped.\nClick "No" to run a new crop.';
         satisfied=getValidAnswer(sprintf(question),'',{'Yes','No'});
         if satisfied == 1
-            saveas(f2,sprintf('%s/resultA10_1_BF_AFMresize_firstCrossCorrelation.tif',newFolder))
+            saveas(f2,sprintf('%s/resultA10_1_BFcropped_AFMresize_firstCrossCorrelation.tif',newFolder))
         end
         close(f2)
     end
@@ -162,7 +162,9 @@ function [AFM_padded,BF_IO_reduced,AFM_Elab,pos_allignment,details_it_reg]=A10_a
     else
         BF_IO_reduced=BF_IO_cropped;
     end
-    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% OPTIMIZATION %%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     question='Maximizing the cross-correlation between the BF and AFM images.'; ...
     options={ ...
         sprintf('(1) Automatic method\n Iterative process of expansion, reduction and rotation.'); ...
@@ -170,7 +172,6 @@ function [AFM_padded,BF_IO_reduced,AFM_Elab,pos_allignment,details_it_reg]=A10_a
         '(3) Stop here the process. The fist cross-correlatin is okay.'};
     answer=getValidAnswer(question,'',options);
     close gcf
-
     % in case the user believe that the first cross correlation is ok
     if answer == 3
         details_it_reg(1)=1;
@@ -179,7 +180,13 @@ function [AFM_padded,BF_IO_reduced,AFM_Elab,pos_allignment,details_it_reg]=A10_a
         moving_final=moving;
     elseif answer==2
     % manual approach
-        image_manipulation_gui(BF_IO_reduced,AFM_padded,max_c_it_OI)
+        [moving_final,details_it_reg,coordinates,rotation_deg]=A10_feature_manualAlignmentGUI(BF_IO_reduced,AFM_padded,max_c_it_OI,secondMonitorMain,newFolder);
+        xbegin=coordinates(1); xend=coordinates(2); ybegin=coordinates(3); yend=coordinates(4);
+        f4=figure('visible','off');
+        imshowpair(BF_IO_reduced,moving_final,'falsecolor');
+        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f4); end
+        title('Reduced (by margin) Brightfield and resized AFM images - End Manual Approach','FontSize',14)
+        saveas(f4,sprintf('%s/resultA10_4_BFreduced_AFMopt_EndManualApproach.tif',newFolder))
     else
     % automatic approach
         rotation_deg=0;    
@@ -370,27 +377,26 @@ function [AFM_padded,BF_IO_reduced,AFM_Elab,pos_allignment,details_it_reg]=A10_a
         figure(h_it)
         if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,h_it); end
         title('Reduced (by margin) Brightfield and resized AFM images - End Iterative Process','FontSize',14)
-        saveas(h_it,sprintf('%s/resultA10_4_reducedBF_AFM_EndIterativeProcess.tif',newFolder))
+        saveas(h_it,sprintf('%s/resultA10_3_reducedBF_AFM_EndIterativeProcess.tif',newFolder))
         figure(f2max)
         if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2max); end
         title('Trend Cross-correlation score (max value among the four different image editing)','FontSize',14)
-        saveas(h_it,sprintf('%s/resultA10_4_reducedBF_AFM_EndIterativeProcess.tif',newFolder))
+        saveas(h_it,sprintf('%s/resultA10_4_TrendCross-correlationScore_EndIterativeProcess.tif',newFolder))
         
         uiwait(msgbox(sprintf('Performed %d Cycles in %3.2f min',N_cycles_opt,seconds(final_time2)/60)))
         close all     
-    end
 
-    for flag_size=1:size(AFM_Elab,2)
-        if getappdata(wb,'canceling')
-           break
+        for flag_size=1:size(AFM_Elab,2)
+            AFM_Elab(flag_size).AFM_Padded(ybegin:size(AFM_Elab(flag_size).Cropped_AFM_image,1)+ybegin-1,xbegin:size(AFM_Elab(flag_size).Cropped_AFM_image,2)+xbegin-1)=AFM_Elab(flag_size).Cropped_AFM_image;
         end
-        text=sprintf('Apply the final modification to any AFM channel (%d of %d channels)',flag_AFM,size(AFM_Elab,2));
-        waitbar(flag_AFM/size(AFM_Elab,2),wb,text);
-        AFM_Elab(flag_size).Padded(ybegin:size(AFM_Elab(flag_size).Cropped_AFM_image,1)+ybegin-1,xbegin:size(AFM_Elab(flag_size).Cropped_AFM_image,2)+xbegin-1)=AFM_Elab(flag_size).Cropped_AFM_image;
     end
 
-    % save all the information
-    pos_allignment=struct(...
+    
+
+    if answerReducedBF == 1, answer= true; else, answer = false; end
+        % save all the information
+    
+        pos_allignment=struct(...
         'YBegin',...
         ybegin,...
         'YEnd',...
@@ -406,6 +412,8 @@ function [AFM_padded,BF_IO_reduced,AFM_Elab,pos_allignment,details_it_reg]=A10_a
         'Rotation',...
         rotation_deg,...
         'MarginOfBFReduced',...
+        answer, ...
+        'AmountMargin',...
         p.Results.Margin);
 
     if(exist('wb','var'))
