@@ -95,9 +95,21 @@ scan_rate=1	# 1 Hz
 '''
 Save all parameters in a txt file. If already exists it the dir, overwrite
 '''
-#f = open(baseDirName+"/settedParameters.txt", "w")
-#f.write()
-#f.close()
+text = """
+( setpoint [N] / springConstant [N/m] / sensitivity [nm/V] )
+setpoint [nN]\t\t\t= {}
+setpoint [V]\t\t\t= {}
+scanSizeFast [m]\t\t= {:.3g}
+scanSizeSlow [m]\t\t= {:.3g}
+xOffset origin\t\t\t= {}
+yOffset origin\t\t\t= {}
+Fast scan line pixels\t\t= {}
+Slow scan line pixels\t\t= {}
+scan Rate [Hz]\t\t\t= {}
+""".format(setpointListNewton, [round(x,3) for x in setpointListVolts], scanSizeFast, scanSizeSlow, xOffset, yOffset, fastPixels, slowPixels, scan_rate)
+
+with open(baseDirName+'/variables.txt', 'w') as file:
+    file.write(text)
 
 '''
 Start the measurement
