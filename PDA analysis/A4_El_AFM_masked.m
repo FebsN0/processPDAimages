@@ -20,7 +20,10 @@ function [AFM_noBk,Cropped_Images_Bk]=A4_El_AFM_masked(Cropped_Images,AFM_height
 %
 %
 % Author modifications: Altieri F.
-% Last update 18.June.2024
+% Last update 15.July.2024
+    % in case of code error, the waitbar won't be removed. So the following command force its closure
+    allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
+    delete(allWaitBars)
 
     fprintf('\n\t\tSTEP 4 processing ...\n')
     % A tool for handling and validating function inputs.  define expected inputs, set default values, and validate the types

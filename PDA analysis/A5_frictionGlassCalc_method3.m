@@ -23,6 +23,9 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_he
 %               1: Apply outlier removal to each segment after pixel reduction.
 %               2: Apply outlier removal to one large connected segment after pixel reduction.
 
+    % in case of code error, the waitbar won't be removed. So the following command force its closure
+    allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
+    delete(allWaitBars)
 
 
     % extract data (lateral deflection Trace and Retrace, vertical deflection) and then mask (glass-PDA) elementXelement

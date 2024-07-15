@@ -2,6 +2,10 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
 % Function to align optical images to each other (TRITC after and BF to TRITC before)
 % if BF is given, it must be the first input
 
+    % in case of code error, the waitbar won't be removed. So the following command force its closure
+    allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
+    delete(allWaitBars)
+
     fprintf('\n\t\tSTEP 8 processing ...\n')
     p=inputParser();    %init instance of inputParser
     % Add required parameters

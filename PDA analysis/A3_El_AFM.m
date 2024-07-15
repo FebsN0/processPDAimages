@@ -24,6 +24,10 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonito
 %
 % Last update 18/06/2024
 %
+    % in case of code error, the waitbar won't be removed. So the following command force its closure
+    allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
+    delete(allWaitBars)
+    
     fprintf('\n\t\tSTEP 3 processing ...\n')
     % A tool for handling and validating function inputs.  define expected inputs, set default values, and validate the types
     % and properties of inputs. This helps to make functions more robust and user-friendly.
