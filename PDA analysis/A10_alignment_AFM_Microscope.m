@@ -90,7 +90,8 @@ function [AFM_padded,BF_IO_reduced,AFM_Elab,pos_allignment,details_it_reg]=A10_a
         
     AFM_IO_resized=imresize(AFM_height_IO,scale);
     for flag_AFM=1:size(AFM_Elab,2)
-        % scale the AFM channels. It doesnt mean that the matrix size of AFM and BF images will be the same
+        % scale the AFM channels. It doesnt mean that the matrix size of AFM and BF images will be the same.
+        % Indipendent from BF processing
         AFM_Elab(flag_AFM).Cropped_AFM_image=imresize(AFM_Elab(flag_AFM).Cropped_AFM_image,scale);
     end
     clear BFRatioHorizontal BFRatioVertical AFMRatioHorizontal AFMRatioVertical scaleAFM2BF_H scaleAFM2BF_V scale
@@ -142,7 +143,6 @@ function [AFM_padded,BF_IO_reduced,AFM_Elab,pos_allignment,details_it_reg]=A10_a
     % save the coordinates of AFM resized in the 2D space of BF (cropped)
     xbegin = rect(1); xend = rect(2);
     ybegin = rect(3); yend = rect(4);
-    disp(rect)
     % fix the size of BF image based on the Margin
     question=sprintf('Do you want to obtain a BF image slightly larger than the AFM image by a defined margin (%d pixels)?',p.Results.Margin);
     answerReducedBF=getValidAnswer(question,'',{'Yes','No'});
@@ -256,6 +256,7 @@ function [AFM_padded,BF_IO_reduced,AFM_Elab,pos_allignment,details_it_reg]=A10_a
             waitbar(N_cycles_opt/Limit_Cycles,wb,sprintf('Processing the EXP/RED/ROT optimization. Cycle %d / %d',N_cycles_opt,Limit_Cycles));
             % init
             moving_iterative=cell(1,4); max_c_iterative=zeros(1,4); imax_iterative=zeros(1,4); sz_iterative=zeros(4,2);
+            textFprintf={'Expansion','Reduction','Counter ClockWise Rotation','ClockWise Rotation'};
             % 1: Oversize - 2 : Undersize - 3 : PosRot - 4 : NegRot
             moving_iterative{1} = imresize(moving_OPT,size(moving_OPT)+StepSizeMatrix);
             moving_iterative{2} = imresize(moving_OPT,size(moving_OPT)-StepSizeMatrix);
@@ -279,66 +280,44 @@ function [AFM_padded,BF_IO_reduced,AFM_Elab,pos_allignment,details_it_reg]=A10_a
                 size_OI = sz_iterative(b,:);
                 % save the best moving AFM image
                 moving_OPT= moving_iterative{b};
+                fprintf('\n %s Scaling Optimization Found.\n\tMatrix Size: %dx%d\n\tTotal rotation:%0.2f°\n\n', textFprintf{b}, size(moving_OPT),rotation_deg)
+                % adjust the AFM data (FIELD Cropped_AFM_image) (Lateral deflection, etc etc) every step based
+                % on the OPT process. NOTE: Indipendent from BF processing
                 switch b
-                    case 1 || 2
+                    case 1 || 2   
+                        if b == 1, StepSizeMatrix=abs(StepSizeMatrix); else, StepSizeMatrix=-abs(StepSizeMatrix); end
+                        for flag_AFM=1:size(AFM_Elab,2)
+                            AFM_Elab(flag_AFM).Cropped_AFM_image=imresize(AFM_Elab(flag_AFM).Cropped_AFM_image,size(AFM_Elab(flag_AFM).Cropped_AFM_image)+StepSizeMatrix);
+                        end
+                        % keep track
                         details_it_reg(z,1)=1;
                         details_it_reg(z,2)=StepSizeMatrix;
-                        if b == 1
-                            fprintf('\n Expansion/Reduction Scaling Optimization Found. The new dimension is %dx%d \n', size(moving_OPT))
-                            for flag_AFM=1:size(AFM_Elab,2)
-                                AFM_Elab(flag_AFM).Cropped_AFM_image=imresize(AFM_Elab(flag_AFM).Cropped_AFM_image,size(AFM_Elab(flag_AFM).Cropped_AFM_image)+StepSizeMatrix);
-                            end
-                        else
-                            fprintf('\n Contraction Scaling Optimization Found. The new dimension is %dx%d \n', size(moving_OPT))
-                            for flag_AFM=1:size(AFM_Elab,2)
-                                AFM_Elab(flag_AFM).Cropped_AFM_image=imresize(AFM_Elab(flag_AFM).Cropped_AFM_image,size(AFM_Elab(flag_AFM).Cropped_AFM_image)-StepSizeMatrix);                        
-                            end
-                        end
                     case 3 || 4
-                        details_it_reg(z,1)=0;
-                        if b == 3
-                            details_it_reg(z,2)=Rot_par;
-                            fprintf('\n Counter ClockWise Rotation Scaling Optimization Found. The total rotation from original is %f \n',rotation_deg)
-                            for flag_AFM=1:size(AFM_Elab,2)
-                                AFM_Elab(flag_AFM).Cropped_AFM_image=imrotate(AFM_Elab(flag_AFM).Cropped_AFM_image,Rot_par,'bilinear','loose');
-                            end
-                        else
-                            details_it_reg(z,2)=-Rot_par;
-                            fprintf('\n ClockWise Rotation Scaling Optimization Found. The total rotation from original is %f \n',rotation_deg)
-                            for flag_AFM=1:size(AFM_Elab,2)
-                               AFM_Elab(flag_AFM).Cropped_AFM_image=imrotate(AFM_Elab(flag_AFM).Cropped_AFM_image,-Rot_par,'bilinear','loose');
-                            end
+                        if b == 3, Rot_par=abs(Rot_par); else, Rot_par=-abs(Rot_par); end
+                        for flag_AFM=1:size(AFM_Elab,2)
+                            AFM_Elab(flag_AFM).Cropped_AFM_image=imrotate(AFM_Elab(flag_AFM).Cropped_AFM_image,Rot_par,'bilinear','loose');
                         end
+                        % keep track
+                        details_it_reg(z,1)=0;
+                        details_it_reg(z,2)=Rot_par;
                 end
-                
+                % update the score
                 figure(f2max)
-                new_x = N_cycles_opt; new_y = max_c_it_OI/maxC_original;
-                addpoints(h,new_x, new_y)
+                score = max_c_it_OI_prev/maxC_original;
+                addpoints(h,N_cycles_opt, score)
                 drawnow
                 
-                    
-               
-                % if the new AFM image sizes are still smaller than those of BF image, shift the new image
-                if(size(moving_OPT)<size(BF_IO_reduced))
-                    [ypeak, xpeak] = ind2sub(size_OI,imax_OI(1));
-                    corr_offset = [(xpeak-size(moving_OPT,2)) (ypeak-size(moving_OPT,1))];
-                    xoffset = corr_offset(1);
-                    yoffset = corr_offset(2);
-
-                    if(xoffset>0), xbegin = round(xoffset); else, xbegin = 1; end
-                    xend   = xbegin+size(moving_OPT,2)-1;
-                    if(yoffset>0), ybegin = round(yoffset); else, ybegin = 1; end
-                    yend   = ybegin+size(moving_OPT,1)-1;
-                % save the new image
-                    AFM_padded=(zeros(size(BF_IO_reduced)));
-                    AFM_padded(ybegin:yend,xbegin:xend) = moving_OPT;
-                end
+                % adjust the AFM image
+                [~,~,~,~,rect,AFM_padded] = A10_feature_crossCorrelationAlignmentAFM(BF_IO_reduced,moving_OPT,'runFFT',false,'idxCCMax',imax_OI,'sizeCCMax',size_OI);
+                xbegin = rect(1); xend = rect(2);
+                ybegin = rect(3); yend = rect(4);   
+        
                 figure(h_it);
                 if exist('pairAFM_BF','var')
                     delete(pairAFM_BF)
                 end
                 pairAFM_BF=imshowpair(BF_IO_reduced,AFM_padded,'falsecolor');
-
+                % update the cycle
                 N_cycles_opt=N_cycles_opt+1;
             else
                 % if there are no updates, a maximum local is likely to be found, therefore reduce StepSizeMatrix and rotaion degree.
@@ -374,12 +353,12 @@ function [AFM_padded,BF_IO_reduced,AFM_Elab,pos_allignment,details_it_reg]=A10_a
         uiwait(msgbox(sprintf('Performed %d Cycles in %3.2f min',N_cycles_opt,seconds(final_time2)/60)))
         close all     
 
+        % place the the AFM data in the same space of BF image (no data modification)
         for flag_size=1:size(AFM_Elab,2)
             AFM_Elab(flag_size).AFM_Padded(ybegin:size(AFM_Elab(flag_size).Cropped_AFM_image,1)+ybegin-1,xbegin:size(AFM_Elab(flag_size).Cropped_AFM_image,2)+xbegin-1)=AFM_Elab(flag_size).Cropped_AFM_image;
         end
     end
-
-    
+   
 
     if answerReducedBF == 1, answer= 'True'; else, answer = 'False'; end
         % save all the information

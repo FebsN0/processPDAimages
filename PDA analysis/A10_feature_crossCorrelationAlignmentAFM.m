@@ -21,16 +21,12 @@ function varargout = A10_feature_crossCorrelationAlignmentAFM(BF_IO,AFM_IO,varar
     argName = 'idxCCMax';
     defaultVal = [];
     addParameter(p,argName,defaultVal);
+    argName = 'sizeCCMax';
+    defaultVal = [];
+    addParameter(p,argName,defaultVal);
 
     parse(p,BF_IO,AFM_IO,varargin{:});
     
-
-    % fprintf(['Results of optional input:\n' ...
-    %     '\trunFFT:\t\t\t\t%s\n'      ...
-    %     '\trunAlignAFM:\t\t\t%s\n'
-    %     ],string(p.Results.runFFT),string(p.Results.runAlignAFM))
-    % 
-
     if p.Results.runFFT
         % calc the time required to run a cross-correlation
         before=datetime('now');
@@ -40,23 +36,25 @@ function varargout = A10_feature_crossCorrelationAlignmentAFM(BF_IO,AFM_IO,varar
         % correlated (i.e. almost aligned).
         % cross_correlation(:) becomes a single array with any element, therefore find the idx x max value in 1D array
         [max_c_it_OI, imax] = max(abs(cross_correlation(:)));       
+        size_OI=size(cross_correlation);
         % output
         varargout{1}= max_c_it_OI;
         varargout{2}= imax;
-        varargout{3}= size(cross_correlation);
+        varargout{3}= size_OI;
         varargout{4}= final_time;
     end
 
     if p.Results.runAlignAFM
         % case in which imax is brought from the extern, for example when runAlignAFM is true
         % whereas runFFT is false
-        if ~isempty(p.Results.idxCCMax) && ~p.Results.runFFT
-            imax=p.Results.idxCCMax;
-        elseif ~p.Results.runFFT && isempty(p.Results.idxCCMax)
+        if ~isempty(p.Results.idxCCMax) && ~isempty(p.Results.sizeCCMax) && ~p.Results.runFFT
+            imax=p.Results.idxCCMax; size_OI=p.Results.sizeCCMax;
+        elseif ~p.Results.runFFT && isempty(p.Results.idxCCMax) && isempty(p.Results.sizeCCMax)
             error('Operation non permitted. Check better the input')
         end
+
         % convert the idx of 1D array into idx of 2D matrix
-        [ypeak, xpeak] = ind2sub(size(cross_correlation),imax);    
+        [ypeak, xpeak] = ind2sub(size_OI,imax);    
         % The idx's point of view is from BF_Mic_Image_IO ==> therefore the AFM image has to moved
         corr_offset = [(xpeak-size(AFM_IO,2)) (ypeak-size(AFM_IO,1))];
 
@@ -74,7 +72,6 @@ function varargout = A10_feature_crossCorrelationAlignmentAFM(BF_IO,AFM_IO,varar
         AFM_padded=(zeros(size(BF_IO)));
         AFM_padded(ybegin:yend,xbegin:xend) = AFM_IO;
         % save the output
-        varargout{2}= imax;
         varargout{5}= [xbegin, xend, ybegin, yend];
         varargout{6}=AFM_padded;
     end
