@@ -9,7 +9,9 @@ function varargout=A10_feature_manualAlignmentGUI(BF_IO,AFM_padded,max_c_it_OI,s
                              'Units', 'normalized', 'Position', [0.4, 0.25, 0.2, 0.05]);
     % init another counter for all the operation. Required to save all operation done in order to modify the
     % AFM data
-    details_it_reg =[]; 
+    details_it_reg =[];
+    % init the var where save the new coordinates of alignment
+    rect=[];
 
     % init the trend plot
     maxC_original=max_c_it_OI;
@@ -24,8 +26,6 @@ function varargout=A10_feature_manualAlignmentGUI(BF_IO,AFM_padded,max_c_it_OI,s
     rotation_deg=0;
     hRotText = uicontrol('Parent', hFig, 'Style', 'text', 'String', 'Rotation: 0°', ...
                              'Units', 'normalized', 'Position', [0.4, 0.20, 0.2, 0.05]);
-    
-    coordinates=[]; varargoutCC=cell(2,1);
     % Load two images
     fixedImg1 = BF_IO;
     modifiedImg2 = AFM_padded;
@@ -36,6 +36,7 @@ function varargout=A10_feature_manualAlignmentGUI(BF_IO,AFM_padded,max_c_it_OI,s
     title(hAx, 'BrightField (green) and AFM (purple) Images');
 
     % Create input fields and buttons for operations
+    % button to resize (increase and decrease)
     uicontrol('Parent', hFig, 'Style', 'text', 'String', sprintf('Scale factor\n[rows cols]'), ...
               'Units', 'normalized', 'Position', [0.15, 0.2, 0.1, 0.05]);
     hResizeFactor = uicontrol('Parent', hFig, 'Style', 'edit', 'String', '1', ...
@@ -72,10 +73,9 @@ function varargout=A10_feature_manualAlignmentGUI(BF_IO,AFM_padded,max_c_it_OI,s
         modifiedImg2 = imresize(modifiedImg2, size(modifiedImg2)+scale);
         % save the operation
         details_it_reg(counter,1)=1;
-        details_it_reg(counter,2)=size(modifiedImg2,1);
-        details_it_reg(counter,3)=size(modifiedImg2,2);
+        details_it_reg(counter,2)=scale;
         % run CC
-        [modifiedImg2,coordinates]=exeSingleCrossCorr(counter,modifiedImg2);
+        exeSingleCrossCorr();
         counter=counter+1;
         update_display();
     end
@@ -90,9 +90,8 @@ function varargout=A10_feature_manualAlignmentGUI(BF_IO,AFM_padded,max_c_it_OI,s
         % save the operation
         details_it_reg(counter,1)=0;
         details_it_reg(counter,2)=angle;
-        details_it_reg(counter,3)=nan;
         % get CC
-        [modifiedImg2,coordinates]=exeSingleCrossCorr(counter,modifiedImg2);
+        exeSingleCrossCorr();
         counter=counter+1;
         update_display();
     end
@@ -103,8 +102,8 @@ function varargout=A10_feature_manualAlignmentGUI(BF_IO,AFM_padded,max_c_it_OI,s
     end
 
     % run a cross correlation (xcorr2_fft) and alignment
-    function [modifiedImg2,coordinates]=exeSingleCrossCorr(counter,modifiedImg2)
-        [max_c_it_OI,~,~,~,xbegin,xend,ybegin,yend,modifiedImg2] = A10_feature_crossCorrelationAlignmentAFM(fixedImg1,modifiedImg2);
+    function exeSingleCrossCorr()
+        [max_c_it_OI,~,~,~,rect,modifiedImg2] = A10_feature_crossCorrelationAlignmentAFM(fixedImg1,modifiedImg2);
         figure(f2max)
         % update the counter and the score
         score = max_c_it_OI/maxC_original;
@@ -113,7 +112,6 @@ function varargout=A10_feature_manualAlignmentGUI(BF_IO,AFM_padded,max_c_it_OI,s
         set(hScoreCCText, 'String', ['Score (normalized): ' num2str(score)]);
         addpoints(h,counter, score)
         drawnow
-        coordinates=[xbegin,xend,ybegin,yend];
     end
     
     % in case something goes wrong, restart
@@ -147,6 +145,6 @@ function varargout=A10_feature_manualAlignmentGUI(BF_IO,AFM_padded,max_c_it_OI,s
     uiwait(msgbox('Click to continue when the manual method is terminated',''));
     varargout{1}= modifiedImg2;
     varargout{2}= details_it_reg;
-    varargout{3}= coordinates;
+    varargout{3}= rect;
     varargout{4}= rotation_deg;
 end

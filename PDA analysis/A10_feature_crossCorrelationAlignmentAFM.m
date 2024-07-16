@@ -64,6 +64,7 @@ function varargout = A10_feature_crossCorrelationAlignmentAFM(BF_IO,AFM_IO,varar
         yoffset = corr_offset(2);                    % idx from the top of BF matrix
         % In the worst case scenario, the top and left edges of the AFM image coincide with those of the BF image.
         % It is very unlikely that the AFM image goes outside the BF image because of experimental design.
+        % save the coordinates of AFM in the 2D space of BF
         if(xoffset>0), xbegin = round(xoffset); else, xbegin = 1; end
         xend   = xbegin+size(AFM_IO,2)-1;
         if(yoffset>0), ybegin = round(yoffset); else, ybegin = 1; end
@@ -74,10 +75,7 @@ function varargout = A10_feature_crossCorrelationAlignmentAFM(BF_IO,AFM_IO,varar
         AFM_padded(ybegin:yend,xbegin:xend) = AFM_IO;
         % save the output
         varargout{2}= imax;
-        varargout{5}= xbegin;
-        varargout{6}= xend;
-        varargout{7}= ybegin;
-        varargout{8}= yend;
-        varargout{9}=AFM_padded;
+        varargout{5}= [xbegin, xend, ybegin, yend];
+        varargout{6}=AFM_padded;
     end
 end
