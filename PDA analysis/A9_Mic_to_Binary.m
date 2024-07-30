@@ -161,5 +161,6 @@ function [binary_image,reduced_Tritic_before,reduced_Tritic_after_aligned,Furthe
             'Threshold',    threshold,...
             'Cropped',      'No');
     end
-
+    uiwait(msgbox('Click to continue',''));
+    close all
 end
