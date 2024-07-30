@@ -1,12 +1,20 @@
 % to align AFM height IO image to BF IO image, the main alignment
-function [AFM_padded,BF_IO_reduced,AFM_Elab,pos_allignment,details_it_reg]=A10_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,BFcropped,AFM_height_IO,metaData_AFM,AFM_Elab,newFolder,secondMonitorMain,varargin)
-    
-    % details_it_reg : contains all the iterative (both manual or automatic) steps performed to process the
-    %                  AFM image. Three possibilities for each row
-    %                       1) 1 : increase | scale (positive)
-    %                       2) 1 : decrease | scale (negative)
-    %                       3) 0 : rotation | degree rotation | nan
-
+function [AFM_IO_padded,BF_IO_reduced,AFM_Elab,pos_allignment,details_it_reg]=A10_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,BFcropped,AFM_height_IO,metaData_AFM,AFM_Elab,newFolder,secondMonitorMain,varargin)
+    % OUTPUT DETAILS
+    %   - AFM_IO_padded :   AFM height 0/1 data ALIGNED with BF 0/1 data BUT the image is slighly bigger (in
+    %                       case of margin or only crop) which values, outside AFM height is only 0. Briefly,
+    %                       it is the moving data
+    %   - BF_IO_reduced :   same size as the previous output data, it is the fixed data used for alignment
+    %   - AFM_Elab      :   the AFM data with any channels. Post elaboration of the original AFM_Elab used as input.
+    %                       the updates consist in:
+    %                               1) Cropped_AFM_image field  (update): the original data is aligned (rotation and resize)
+    %                               2) AFM_Padded field         (new): it is the same of before, but in the space of BF original image (BF_Mic_Image_IO input variable)
+    %   - pos_allignment
+    %   - details_it_reg:   contains all the iterative (both manual or automatic) steps performed to process the AFM image. Two possibilities for each row
+    %                       1) 1 : resize | scale (positive or negative)
+    %                       2) 0 : rotation | degree rotation
+    %
+    % INPUT DETAILS
 
     fprintf('\n\t\tSTEP 10 processing ...\n')
     % in case of code error, the waitbar won't be removed. So the following command force its closure
@@ -95,48 +103,51 @@ function [AFM_padded,BF_IO_reduced,AFM_Elab,pos_allignment,details_it_reg]=A10_a
         AFM_Elab(flag_AFM).Cropped_AFM_image=imresize(AFM_Elab(flag_AFM).Cropped_AFM_image,scale);
     end
     clear BFRatioHorizontal BFRatioVertical AFMRatioHorizontal AFMRatioVertical scaleAFM2BF_H scaleAFM2BF_V scale
+    
+    % if not already cropped, ask if crop the BF IO image
+    if strcmp(BFcropped,'No')
+        question='Original BrightField image not cropped yet. Crop? The smaller the crop, the easier the alignment will be.';
+        answerCrop=getValidAnswer(question,'',{'Yes','No'});
+    else
+        answerCrop=2;
+    end
 
-    satisfied=2;
-    while satisfied ~= 1
-        % if not already cropped, ask if crop the BF IO image
-        if strcmp(BFcropped,'No')
-            question='Original BrightField image not cropped yet. Crop? The smaller the crop, the easier the alignment will be.';
-            answer=getValidAnswer(question,'',{'Yes','No'});
+    while true
+        if answerCrop == 1
             % crop the right area containing the AFM image, if not, restart
-            if answer==1
-                f1=figure;
-                imshow(BF_Mic_Image_IO); title('BrightField 0/1 image','FontSize',14)
-                if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
-                uiwait(msgbox('Crop the area of interest containing the stimulated part',''));
-                [~,specs]=imcrop();
-                close(f1)
-                % extract the cropped area
-                YBegin=round(specs(1));
-                XBegin=round(specs(2));
-                YEnd=round(specs(1))+round(specs(3));
-                XEnd=round(specs(2))+round(specs(end));  
-                if(XEnd>size(BF_Mic_Image_IO,1)), XEnd=size(BF_Mic_Image_IO,1); end
-                if(YEnd>size(BF_Mic_Image_IO,2)), YEnd=size(BF_Mic_Image_IO,2); end
-                BF_IO_cropped=BF_Mic_Image_IO(XBegin:XEnd,YBegin:YEnd);
-                clear YBegin XBegin YEnd XEnd
-            % if not cropped
-            else
-                BF_IO_cropped=BF_Mic_Image_IO;
-            end
+            f1=figure;
+            imshow(BF_Mic_Image_IO); title('BrightField 0/1 image','FontSize',14)
+            if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
+            uiwait(msgbox('Crop the area of interest containing the stimulated part',''));
+            [~,specs]=imcrop();
+            close(f1)
+            % extract the cropped area
+            YBegin=round(specs(1));
+            XBegin=round(specs(2));
+            YEnd=round(specs(1))+round(specs(3));
+            XEnd=round(specs(2))+round(specs(end));  
+            if(XEnd>size(BF_Mic_Image_IO,1)), XEnd=size(BF_Mic_Image_IO,1); end
+            if(YEnd>size(BF_Mic_Image_IO,2)), YEnd=size(BF_Mic_Image_IO,2); end
+            BF_IO_cropped=BF_Mic_Image_IO(XBegin:XEnd,YBegin:YEnd);
+            clear YBegin XBegin YEnd XEnd
         else
+            % in case already cropped
             BF_IO_cropped=BF_Mic_Image_IO;
         end
 
         % run cross correlation and alignment between BF and resized AFM
-        [max_c_it_OI,~,~,final_time,rect,AFM_padded] = A10_feature_crossCorrelationAlignmentAFM(BF_IO_cropped,AFM_IO_resized);
+        [max_c_it_OI,~,~,final_time,rect,AFM_IO_padded] = A10_feature_crossCorrelationAlignmentAFM(BF_IO_cropped,AFM_IO_resized);
         f2=figure;
-        imshowpair(BF_IO_cropped,AFM_padded,'falsecolor')
+        imshowpair(BF_IO_cropped,AFM_IO_padded,'falsecolor')
         if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2); end
-        title('Brightfield and resized AFM images - First cross-correlation','FontSize',14)
-        question='Is the AFM image is correctly aligned with the BF? If not, you might selected wrong cropping area or should crop if not cropped.\nClick "No" to run a new crop.';
-        satisfied=getValidAnswer(sprintf(question),'',{'Yes','No'});
-        if satisfied == 1
+        title('Brightfield and resized AFM images - Post First cross-correlation','FontSize',14)
+        question='Is the AFM image correctly aligned with the BF? If not, you might selected wrong cropping area or should crop if not cropped.\nClick "No" to run a new crop.';
+        answer = getValidAnswer(sprintf(question),'',{'Yes','No'});
+        if answer == 1
             saveas(f2,sprintf('%s/resultA10_1_BFcropped_AFMresize_firstCrossCorrelation.tif',newFolder))
+            break
+        else
+            answerCrop=1;
         end
         close(f2)
     end
@@ -146,26 +157,28 @@ function [AFM_padded,BF_IO_reduced,AFM_Elab,pos_allignment,details_it_reg]=A10_a
     % fix the size of BF image based on the Margin
     question=sprintf('Do you want to obtain a BF image slightly larger than the AFM image by a defined margin (%d pixels)?',p.Results.Margin);
     answerReducedBF=getValidAnswer(question,'',{'Yes','No'});
+    close all
     % if the AFM image is properly inside the BF image. Adjust the borders
+    % the new coordinates represent the new space of BF reduced
     if answerReducedBF == 1
         % FIX LEFT BORDER: if the BF border is very close and less than margin, then "modify" the margin to the extreme BF border
         if (xbegin-p.Results.Margin>=1), tmp_xbegin=xbegin-p.Results.Margin; else, tmp_xbegin=1; end
         % FIX RIGHT BORDER
-        if (xend-p.Results.Margin>=1), tmp_xend=xend+p.Results.Margin; else, tmp_xbegin=size(tmpIO,2); end
+        if (xend-p.Results.Margin>=1), tmp_xend=xend+p.Results.Margin; else, tmp_xend=size(tmpIO,2); end
         % FIX BOTTOM BORDER
         if (ybegin-p.Results.Margin>=1), tmp_ybegin=ybegin-p.Results.Margin; else, tmp_ybegin=1; end
         % FIX TOP BORDER
-        if (ybegin-p.Results.Margin>=1), tmp_yend=yend+p.Results.Margin; else, tmp_yend=size(tmpIO,1); end
+        if (yend-p.Results.Margin>=1), tmp_yend=yend+p.Results.Margin; else, tmp_yend=size(tmpIO,1); end
         
         % extract the BF with reduced border depending on the margin
         BF_IO_reduced=BF_IO_cropped(tmp_ybegin:tmp_yend,tmp_xbegin:tmp_xend);
-        AFM_padded=(zeros(size(BF_IO_reduced)));
-        AFM_padded( ...
+        AFM_IO_padded=(zeros(size(BF_IO_reduced)));
+        AFM_IO_padded( ...
             p.Results.Margin+1:yend-ybegin+p.Results.Margin+1, ...
             p.Results.Margin+1:xend-xbegin+p.Results.Margin+1) = AFM_IO_resized;
         % note: rect is not valid anymore, since there is a new BF image
         f3=figure;
-        imshowpair(BF_IO_reduced,AFM_padded,'falsecolor')
+        imshowpair(BF_IO_reduced,AFM_IO_padded,'falsecolor')
         clear tmpIO
         if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
         title('Reduced (by margin) Brightfield and resized AFM images - First cross-correlation','FontSize',14)
@@ -173,9 +186,9 @@ function [AFM_padded,BF_IO_reduced,AFM_Elab,pos_allignment,details_it_reg]=A10_a
     else
         BF_IO_reduced=BF_IO_cropped;
     end
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% OPTIMIZATION %%%%%%%%%%%%%%%%%%%%%%%%%     
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% OPTIMIZATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%     
+                                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
     %%% NOTE: although the AFM and BF images have same sizes, the true content of AFM is smaller and coincides
     %%% with the AFM_IO_resized
@@ -185,34 +198,50 @@ function [AFM_padded,BF_IO_reduced,AFM_Elab,pos_allignment,details_it_reg]=A10_a
         sprintf('(1) Automatic method\n Iterative process of expansion, reduction and rotation.'); ...
         sprintf('(2) Manual method\n Choose which operation (expansion, reduction and rotation) run.'); ...
         '(3) Stop here the process. The fist cross-correlatin is okay.'};
-    answer=getValidAnswer(question,'',options);
+    answerMethod=getValidAnswer(question,'',options);
     close gcf
     % in case the user believe that the first cross correlation is ok
-    if answer == 3
+    if answerMethod == 3
         details_it_reg=nan;
         moving_final=AFM_IO_resized;
-    elseif answer==2
+    elseif answerMethod==2
     % manual approach
-        [moving_final,details_it_reg,rect,rotation_deg]=A10_feature_manualAlignmentGUI(BF_IO_reduced,AFM_padded,max_c_it_OI,secondMonitorMain,newFolder);
+        [moving_final,details_it_reg,rect,rotation_deg_tot]=A10_feature_manualAlignmentGUI(BF_IO_reduced,AFM_IO_padded,max_c_it_OI,secondMonitorMain,newFolder); % forse va AFM_IO_resized e non AFM_IO_padded
         xbegin=rect(1); xend=rect(2); ybegin=rect(3); yend=rect(4);
         f4=figure('visible','off');
         imshowpair(BF_IO_reduced,moving_final,'falsecolor');
         if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f4); end
         title('Reduced (by margin) Brightfield and resized AFM images - End Manual Approach','FontSize',14)
         saveas(f4,sprintf('%s/resultA10_4_BFreduced_AFMopt_EndManualApproach.tif',newFolder))
+        % process the AFM channel data using the details_it_reg
+        for i=1:size(details_it_reg,1)
+            % process rotation
+            if details_it_reg(i,1)==0
+                for flag_AFM=1:size(AFM_Elab,2)
+                    AFM_Elab(flag_AFM).Cropped_AFM_image=imrotate(AFM_Elab(flag_AFM).Cropped_AFM_image,details_it_reg(i,2),'bilinear','loose');
+                end
+                fprintf('rotation. new size: %dx%d\n',size(AFM_Elab(1).Cropped_AFM_image))
+            else
+            % process resize
+                for flag_AFM=1:size(AFM_Elab,2)
+                    AFM_Elab(flag_AFM).Cropped_AFM_image=imresize(AFM_Elab(flag_AFM).Cropped_AFM_image,size(AFM_Elab(flag_AFM).Cropped_AFM_image)+details_it_reg(i,2));
+                end
+                fprintf('resize. new size: %dx%d\n',size(AFM_Elab(1).Cropped_AFM_image))
+            end
+        end
     else
     % automatic approach
-        rotation_deg=0;    
+        rotation_deg_tot=0;    
         wb=waitbar(0,'Initializing Iterative Cross Correlation','CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
         setappdata(wb,'canceling',0);    
         % setting the parameters
         cycleParameters=zeros(3,1);
-        question ={'Enter the number of iterations:' ...
+        question ={sprintf('Enter the number of iterations (100 times is estimated to last %3.2f s):',seconds(final_time)*100) ...
             'Enter the step in pixel to increase/decrease during the resize:'...
             'Enter the step in degree° to rotate clock-wise/counter clock-wise:'};
         valueDefault = {'100','1','1'};
         while true
-            cycleParameters = str2double(inputdlg(question,'Setting parameters for the alignment',[1 70],valueDefault));
+            cycleParameters = str2double(inputdlg(question,'Setting parameters for the alignment',[1 80],valueDefault));
             if any(isnan(cycleParameters)), questdlg('Invalid input! Please enter a numeric value','','OK','OK');
             else, break
             end
@@ -239,12 +268,12 @@ function [AFM_padded,BF_IO_reduced,AFM_Elab,pos_allignment,details_it_reg]=A10_a
         % init plot where show overlapping of AFM-BF and trend of max correlation value
         close all
         h_it=figure('visible',SeeMe);
-        f2max=figure;
+        f2max=figure; grid on
         max_c_it_OI_prev=max_c_it_OI;
         maxC_original = max_c_it_OI;
         h = animatedline('Marker','o');
         addpoints(h,0,1)
-        xlabel('Cross-correlation scor','FontSize',12), ylabel('# cycles','FontSize',12)        
+        ylabel('Cross-correlation scor','FontSize',12), xlabel('# cycles','FontSize',12)        
 
         while(N_cycles_opt<=Limit_Cycles)
             if(exist('wb','var'))
@@ -280,11 +309,10 @@ function [AFM_padded,BF_IO_reduced,AFM_Elab,pos_allignment,details_it_reg]=A10_a
                 size_OI = sz_iterative(b,:);
                 % save the best moving AFM image
                 moving_OPT= moving_iterative{b};
-                fprintf('\n %s Scaling Optimization Found.\n\tMatrix Size: %dx%d\n\tTotal rotation:%0.2f°\n\n', textFprintf{b}, size(moving_OPT),rotation_deg)
-                % adjust the AFM data (FIELD Cropped_AFM_image) (Lateral deflection, etc etc) every step based
+                % adjust any AFM data channels into FIELD Cropped_AFM_image (Lateral deflection, etc etc) every step based
                 % on the OPT process. NOTE: Indipendent from BF processing
                 switch b
-                    case 1 || 2   
+                    case {1,2} 
                         if b == 1, StepSizeMatrix=abs(StepSizeMatrix); else, StepSizeMatrix=-abs(StepSizeMatrix); end
                         for flag_AFM=1:size(AFM_Elab,2)
                             AFM_Elab(flag_AFM).Cropped_AFM_image=imresize(AFM_Elab(flag_AFM).Cropped_AFM_image,size(AFM_Elab(flag_AFM).Cropped_AFM_image)+StepSizeMatrix);
@@ -292,7 +320,7 @@ function [AFM_padded,BF_IO_reduced,AFM_Elab,pos_allignment,details_it_reg]=A10_a
                         % keep track
                         details_it_reg(z,1)=1;
                         details_it_reg(z,2)=StepSizeMatrix;
-                    case 3 || 4
+                    case {3,4}
                         if b == 3, Rot_par=abs(Rot_par); else, Rot_par=-abs(Rot_par); end
                         for flag_AFM=1:size(AFM_Elab,2)
                             AFM_Elab(flag_AFM).Cropped_AFM_image=imrotate(AFM_Elab(flag_AFM).Cropped_AFM_image,Rot_par,'bilinear','loose');
@@ -300,23 +328,26 @@ function [AFM_padded,BF_IO_reduced,AFM_Elab,pos_allignment,details_it_reg]=A10_a
                         % keep track
                         details_it_reg(z,1)=0;
                         details_it_reg(z,2)=Rot_par;
+                        rotation_deg_tot=rotation_deg_tot+Rot_par;
                 end
+                fprintf('\n %s Scaling Optimization Found.\n\tMatrix Size: %dx%d\n\tTotal rotation:%0.2f°\n\n', textFprintf{b}, size(moving_OPT),rotation_deg_tot)
+
                 % update the score
                 figure(f2max)
                 score = max_c_it_OI_prev/maxC_original;
                 addpoints(h,N_cycles_opt, score)
                 drawnow
                 
-                % adjust the AFM image
-                [~,~,~,~,rect,AFM_padded] = A10_feature_crossCorrelationAlignmentAFM(BF_IO_reduced,moving_OPT,'runFFT',false,'idxCCMax',imax_OI,'sizeCCMax',size_OI);
+                % adjust the AFM height 0/1 image, dont run FFT, just alignment section
+                [~,~,~,~,rect,AFM_IO_padded] = A10_feature_crossCorrelationAlignmentAFM(BF_IO_reduced,moving_OPT,'runFFT',false,'idxCCMax',imax_OI,'sizeCCMax',size_OI);
                 xbegin = rect(1); xend = rect(2);
                 ybegin = rect(3); yend = rect(4);   
-        
+                disp(rect)
                 figure(h_it);
                 if exist('pairAFM_BF','var')
                     delete(pairAFM_BF)
                 end
-                pairAFM_BF=imshowpair(BF_IO_reduced,AFM_padded,'falsecolor');
+                pairAFM_BF=imshowpair(BF_IO_reduced,AFM_IO_padded,'falsecolor');
                 % update the cycle
                 N_cycles_opt=N_cycles_opt+1;
             else
@@ -348,12 +379,13 @@ function [AFM_padded,BF_IO_reduced,AFM_Elab,pos_allignment,details_it_reg]=A10_a
         figure(f2max)
         if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2max); end
         title('Trend Cross-correlation score (max value among the four different image editing)','FontSize',14)
-        saveas(h_it,sprintf('%s/resultA10_4_TrendCross-correlationScore_EndIterativeProcess.tif',newFolder))
+        saveas(f2max,sprintf('%s/resultA10_4_TrendCross-correlationScore_EndIterativeProcess.tif',newFolder))
         
-        uiwait(msgbox(sprintf('Performed %d Cycles in %3.2f min',N_cycles_opt,seconds(final_time2)/60)))
+        uiwait(msgbox(sprintf('Performed %d Cycles in %3.2f min',N_cycles_opt,minutes(final_time2))))
         close all     
-
-        % place the the AFM data in the same space of BF image (no data modification)
+    end
+    % if the method is manual or automatic, place the the AFM data in the same space of BF image (no data modification)
+    if answerMethod == 1 || answerMethod == 2
         for flag_size=1:size(AFM_Elab,2)
             AFM_Elab(flag_size).AFM_Padded(ybegin:size(AFM_Elab(flag_size).Cropped_AFM_image,1)+ybegin-1,xbegin:size(AFM_Elab(flag_size).Cropped_AFM_image,2)+xbegin-1)=AFM_Elab(flag_size).Cropped_AFM_image;
         end
@@ -376,8 +408,8 @@ function [AFM_padded,BF_IO_reduced,AFM_Elab,pos_allignment,details_it_reg]=A10_a
         size(moving_final,1),...
         'FinalAdjPixelRow',...
         size(moving_final,2),...
-        'Rotation',...
-        rotation_deg,...
+        'TotalRotation',...
+        rotation_deg_tot,...
         'MarginOfBFReduced',...
         answer, ...
         'AmountMargin',...
