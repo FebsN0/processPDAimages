@@ -1,4 +1,4 @@
-function varargout=A10_feature_manualAlignmentGUI(BF_IO,AFM_padded,max_c_it_OI,secondMonitorMain,newFolder)
+function varargout=A10_feature_manualAlignmentGUI(BF_IO,AFM_IO,AFM_IO_padded_original,max_c_it_OI,secondMonitorMain,newFolder)
     % Create the main figure  
     hFig = figure('Name', 'Image Manipulation GUI', 'NumberTitle', 'off', ...
                   'Position', [100, 100, 900, 700], 'MenuBar', 'none', ...
@@ -28,11 +28,14 @@ function varargout=A10_feature_manualAlignmentGUI(BF_IO,AFM_padded,max_c_it_OI,s
                              'Units', 'normalized', 'Position', [0.4, 0.20, 0.2, 0.05]);
     % Load two images
     fixedImg1 = BF_IO;
-    modifiedImg2 = AFM_padded;
-    
+    modifiedImg2 = AFM_IO;
+    AFM_IO_padded=AFM_IO_padded_original;
+      
     % Display the combined image
     hAx = axes('Parent', hFig, 'Units', 'normalized', 'Position', [0.05, 0.3, 0.9, 0.65]);
-    imshow(imfuse(fixedImg1, modifiedImg2, 'falsecolor'), 'Parent', hAx);
+    
+   
+    pairAFM_BF=imshowpair(fixedImg1,AFM_IO_padded,'falsecolor', 'Parent', hAx);
     title(hAx, 'BrightField (green) and AFM (purple) Images');
 
     % Create input fields and buttons for operations
@@ -83,7 +86,7 @@ function varargout=A10_feature_manualAlignmentGUI(BF_IO,AFM_padded,max_c_it_OI,s
 
     % rotate operations (rotate by a defined angle)
     function apply_rotate(angle)
-        modifiedImg2 = imrotate(modifiedImg2, angle,'bicubic','crop');
+        modifiedImg2 = imrotate(modifiedImg2, angle,'bilinear','loose');
         % update the total rotation
         rotation_deg=rotation_deg+angle;
         set(hRotText, 'String', ['Rotation: ' num2str(rotation_deg) '°']);
@@ -98,12 +101,15 @@ function varargout=A10_feature_manualAlignmentGUI(BF_IO,AFM_padded,max_c_it_OI,s
 
     % update the AFM and BF images after each operation
     function update_display()
-        imshow(imfuse(fixedImg1, modifiedImg2, 'falsecolor'), 'Parent', hAx);
+        if exist('pairAFM_BF','var')
+            delete(pairAFM_BF)
+        end
+        pairAFM_BF=imshowpair(fixedImg1,AFM_IO_padded,'falsecolor', 'Parent', hAx);
     end
 
     % run a cross correlation (xcorr2_fft) and alignment
     function exeSingleCrossCorr()
-        [max_c_it_OI,~,~,~,rect,modifiedImg2] = A10_feature_crossCorrelationAlignmentAFM(fixedImg1,modifiedImg2);
+        [max_c_it_OI,~,~,~,rect,AFM_IO_padded] = A10_feature_crossCorrelationAlignmentAFM(fixedImg1,modifiedImg2);
         figure(f2max)
         % update the counter and the score
         score = max_c_it_OI/maxC_original;
@@ -123,7 +129,8 @@ function varargout=A10_feature_manualAlignmentGUI(BF_IO,AFM_padded,max_c_it_OI,s
         score=1;                    set(hScoreCCText, 'String', ['Score (normalized): ' num2str(score)]);
         % original images
         fixedImg1 = BF_IO;
-        modifiedImg2 = AFM_padded;
+        modifiedImg2 = AFM_IO;
+        AFM_IO_padded=AFM_IO_padded_original;
         update_display();
         % restart figures
         close(f2max)
@@ -144,7 +151,8 @@ function varargout=A10_feature_manualAlignmentGUI(BF_IO,AFM_padded,max_c_it_OI,s
 
     uiwait(msgbox('Click to continue when the manual method is terminated',''));
     varargout{1}= modifiedImg2;
-    varargout{2}= details_it_reg;
-    varargout{3}= rect;
-    varargout{4}= rotation_deg;
+    varargout{2}= AFM_IO_padded;
+    varargout{3}= details_it_reg;
+    varargout{4}= rect;
+    varargout{5}= rotation_deg;
 end

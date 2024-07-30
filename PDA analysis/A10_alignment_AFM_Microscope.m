@@ -206,10 +206,10 @@ function [AFM_IO_padded,BF_IO_reduced,AFM_Elab,pos_allignment,details_it_reg]=A1
         moving_final=AFM_IO_resized;
     elseif answerMethod==2
     % manual approach
-        [moving_final,details_it_reg,rect,rotation_deg_tot]=A10_feature_manualAlignmentGUI(BF_IO_reduced,AFM_IO_padded,max_c_it_OI,secondMonitorMain,newFolder); % forse va AFM_IO_resized e non AFM_IO_padded
+        [moving_final,AFM_IO_padded,details_it_reg,rect,rotation_deg_tot]=A10_feature_manualAlignmentGUI(BF_IO_reduced,AFM_IO_resized,AFM_IO_padded,max_c_it_OI,secondMonitorMain,newFolder); % forse va AFM_IO_resized e non AFM_IO_padded
         xbegin=rect(1); xend=rect(2); ybegin=rect(3); yend=rect(4);
         f4=figure('visible','off');
-        imshowpair(BF_IO_reduced,moving_final,'falsecolor');
+        imshowpair(BF_IO_reduced,AFM_IO_padded,'falsecolor');
         if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f4); end
         title('Reduced (by margin) Brightfield and resized AFM images - End Manual Approach','FontSize',14)
         saveas(f4,sprintf('%s/resultA10_4_BFreduced_AFMopt_EndManualApproach.tif',newFolder))
@@ -220,13 +220,11 @@ function [AFM_IO_padded,BF_IO_reduced,AFM_Elab,pos_allignment,details_it_reg]=A1
                 for flag_AFM=1:size(AFM_Elab,2)
                     AFM_Elab(flag_AFM).Cropped_AFM_image=imrotate(AFM_Elab(flag_AFM).Cropped_AFM_image,details_it_reg(i,2),'bilinear','loose');
                 end
-                fprintf('rotation. new size: %dx%d\n',size(AFM_Elab(1).Cropped_AFM_image))
             else
             % process resize
                 for flag_AFM=1:size(AFM_Elab,2)
                     AFM_Elab(flag_AFM).Cropped_AFM_image=imresize(AFM_Elab(flag_AFM).Cropped_AFM_image,size(AFM_Elab(flag_AFM).Cropped_AFM_image)+details_it_reg(i,2));
                 end
-                fprintf('resize. new size: %dx%d\n',size(AFM_Elab(1).Cropped_AFM_image))
             end
         end
     else
@@ -342,7 +340,6 @@ function [AFM_IO_padded,BF_IO_reduced,AFM_Elab,pos_allignment,details_it_reg]=A1
                 [~,~,~,~,rect,AFM_IO_padded] = A10_feature_crossCorrelationAlignmentAFM(BF_IO_reduced,moving_OPT,'runFFT',false,'idxCCMax',imax_OI,'sizeCCMax',size_OI);
                 xbegin = rect(1); xend = rect(2);
                 ybegin = rect(3); yend = rect(4);   
-                disp(rect)
                 figure(h_it);
                 if exist('pairAFM_BF','var')
                     delete(pairAFM_BF)

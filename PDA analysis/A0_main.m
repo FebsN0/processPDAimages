@@ -122,6 +122,7 @@ clear f1 f2 f3 question options choice fileName Tritic_Mic_Image_After BF_Mic_Im
 % Produce the binary IO of Brightfield
 [BF_Mic_Image_IO,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,Details_On_BF_Image]=A9_Mic_to_Binary(BF_Mic_Image_aligned,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,secondMonitorMain,newFolder); 
 
-%%
 % Align AFM to BF and extract the coordinates for alighnment to be transferred to the other data
-[AFM_IO_Padded,BF_Image_Cut,AFM_cropped_channels_Big,Coordinates_forAllighnment,details_it_reg]=A10_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,Details_On_BF_Image.Cropped,AFM_height_IO,metaData_AFM,AFM_Elab,newFolder,secondMonitorMain,'Margin',50);
+[AFM_IO_Padded,BF_Image_postAFMalign,AFM_channels_postBFalign,Coordinates_forAllighnment,details_it_reg]=A10_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,Details_On_BF_Image.Cropped,AFM_height_IO,metaData_AFM,AFM_Elab,newFolder,secondMonitorMain,'Margin',70);
+
+%%

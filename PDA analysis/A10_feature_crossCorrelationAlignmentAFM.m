@@ -67,6 +67,7 @@ function varargout = A10_feature_crossCorrelationAlignmentAFM(BF_IO,AFM_IO,varar
         xend   = xbegin+size(AFM_IO,2)-1;
         if(yoffset>0), ybegin = round(yoffset); else, ybegin = 1; end
         yend   = ybegin+size(AFM_IO,1)-1;
+
         % create a zero-element matrix with the same cropped BF sizes and place the AFM image based at those idxs (i.e.
         % offset) which represent the most aligned position
         AFM_padded=(zeros(size(BF_IO)));
