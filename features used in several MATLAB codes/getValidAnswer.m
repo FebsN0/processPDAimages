@@ -17,7 +17,7 @@ function user_choice = getValidAnswer(question, title, options)
     num_lines_question = length(strsplit(question, '\n'));
     
         % if options is just Yes and No, then simple dialog box
-    if length(options) == 2 && any(strcmpi(options, 'yes')) && any(strcmpi(options, 'no'))
+    if length(options) == 2 && any(strcmpi(options, 'yes') | strcmpi(options, 'y')) && any(strcmpi(options, 'no') | strcmpi(options, 'n'))
         flagYesNo=1;
         max_option_length = 3;
         num_lines_options = 1;
@@ -104,10 +104,11 @@ function user_choice = getValidAnswer(question, title, options)
     if flagYesNo
         % fixed in y, moving in x
         button_start_y = 15;
+        opts = {'Yes','No'};
         for i=1:2
          % Name button = first char of the given option ( 1) bla bla ==> 1, Yes ==> Y
             uicontrol('Style', 'pushbutton', 'Position', [dialog_width/3*i-10, button_start_y, 50, 30], ...
-                'String', options{i}, 'FontSize', FontsizeOptions, 'Callback', @(src, event) buttonCallback(i));
+                'String', opts{i}, 'FontSize', FontsizeOptions, 'Callback', @(src, event) buttonCallback(i));
         end
     else
         % pattern to find in the options (especially those having like (<number>)
