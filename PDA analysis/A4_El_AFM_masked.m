@@ -1,4 +1,4 @@
-function [AFM_noBk,Cropped_Images_Bk]=A4_El_AFM_masked(Cropped_Images,AFM_height_IO,secondMonitorMain,filepath,varargin)
+function Cropped_Images_Bk=A4_El_AFM_masked(Cropped_Images,AFM_height_IO,secondMonitorMain,filepath,varargin)
 %%
 % The function extracts Images from the experiments.
 % It removes baseline and extracts foreground from the AFM image.

@@ -411,6 +411,8 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment,det
     'AmountMargin', applied, ...
     'MethodOptimization', answerMethod, ...
     'TotalRotation', rotation_deg_tot);
+    uiwait(msgbox('Click to continue')
+    close all
 end
 
 
