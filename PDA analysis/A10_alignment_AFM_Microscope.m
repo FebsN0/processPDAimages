@@ -263,7 +263,7 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment,det
         maxC_original = max_c_it_OI;
         h = animatedline('Marker','o');
         addpoints(h,0,1)
-        ylabel('Cross-correlation scor','FontSize',12), xlabel('# cycles','FontSize',12)        
+        ylabel('Cross-correlation score (%)','FontSize',12), xlabel('# cycles','FontSize',12)        
 
         while(N_cycles_opt<=Limit_Cycles)
             if(exist('wb','var'))
