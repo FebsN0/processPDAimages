@@ -232,6 +232,10 @@ function [varargout]=A1_open_JPK(varargin)
                 % coefficients to fix the z values
                 typpe_of_ch=file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32897)).Value;
                 
+                if strcmp(Channel_Name,'Lateral Deflection')
+                    fprintf('\n\n\t type data %s \n\n',typpe_of_ch)
+                end
+                
                 if(strcmp(typpe_of_ch,'nominal')||(strcmp(typpe_of_ch,'voltsamplitude')))
                     m_ID=33028;
                     off_ID=33029;

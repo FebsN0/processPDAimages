@@ -4,7 +4,7 @@
 % Check manually the processed image afterwards and compare with the AFM VD
 % image!
 
-function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,alpha,avg_fc,secondMonitorMain,newFolder,varargin)
+function [Corrected_LD_Trace,AFM_Elab,Bk_iterative,setpoints]=A6_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,alpha,avg_fc,secondMonitorMain,newFolder,varargin)
     % in case of code error, the waitbar won't be removed. So the following command force its closure
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)
@@ -31,6 +31,10 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_maske
     Lateral_Trace   = (AFM_cropped_Images(strcmpi({AFM_cropped_Images.Channel_name},'Lateral Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'Trace')).Cropped_AFM_image);
     Lateral_ReTrace = (AFM_cropped_Images(strcmpi({AFM_cropped_Images.Channel_name},'Lateral Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'ReTrace')).Cropped_AFM_image);
     vertical_Trace  = (AFM_cropped_Images(strcmpi({AFM_cropped_Images.Channel_name},'Vertical Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'Trace')).Cropped_AFM_image);
+
+    % find the setpoint values used in the experiments
+    vertical_Trace=round(vertical_Trace,8);
+    setpoints=unique(vertical_Trace);
 
     %Subtract the minimum of the image
     Lateral_Trace_shift= Lateral_Trace - min(min(Lateral_Trace));
@@ -68,7 +72,9 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_maske
         title({'Lateral Deflection [V]'; '(Trace - shifted)'},'FontSize',18)
         xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
         saveas(f2,sprintf('%s/resultA6_2_VerticalDeflection_.tif',newFolder))
+
     end
+
     % apply the PDA mask
     Lateral_Trace_shift_masked= Lateral_Trace_shift;
     Lateral_Trace_shift_masked(AFM_height_IO==1)=5;

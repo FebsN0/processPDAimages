@@ -7,6 +7,8 @@ function [dataOrdered,metaDataOrdered,filePathData] = A1_openANDassembly_JPK
     %%%     setpoint)   ==> 50x10 um2 and 1024x256 pixels !!
     %%% 2) total area: 40x40 um2 and 512x512 pixels and if 8 sections are performed (each with a different
     %%%     setpoint)   ==> 40x10 um2 and 512x64 pixels !!
+    allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
+    delete(allWaitBars)
 
     [fileName, filePathData] = uigetfile('*.jpk', 'Select a .jpk AFM image','MultiSelect', 'on');
     if isequal(fileName,0)
@@ -96,7 +98,7 @@ function [dataOrdered,metaDataOrdered,filePathData] = A1_openANDassembly_JPK
     ratioLength=metaDataOrdered.x_scan_length\metaDataOrdered.y_scan_length;
     ratioPixel=metaDataOrdered.y_scan_pixels\metaDataOrdered.x_scan_pixels;
     if ratioLength ~= 1 || ratioPixel ~= 1
-        error(sprintf('ERROR: the x lengths and/or x pixels is not the same as well as the y length and/or y pixels!!'))
+        warning('ratioLength: %. x lengths and/or x pixels is not the same as well as the y length and/or y pixels!!')
     end
 
     clear y_scan_pixelsAllScans y_scan_lengthAllScans y_OriginAllScans ratioLength ratioPixel idx allScansMetadataOrdered
