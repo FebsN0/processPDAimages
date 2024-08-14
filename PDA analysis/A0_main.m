@@ -1,4 +1,4 @@
-clc, clear, close
+clc, clear, close all
 
 
 % upload .jpk files. If more than one and if from same experiment in which setpoint is changed, then assembly.
@@ -21,16 +21,17 @@ end
 % prepare figure and put in a second monitor if any
 secondMonitorMain=objInSecondMonitor;
 % Remove unnecessary channels to elaboration (necessary for memory save)
-filtData=A2_CleanUpData2_AFM(data);
+filtData=A2_CleanUpData2_AFM(data,secondMonitorMain,newFolder);
 clear data
 
 % Extract the (1) height no Bk, which is not used, (2) cropped AFM channels, (3) I/O image of Height and
 % (4) info of the cropped area
-[~,AFM_cropped_Images,AFM_height_IO,Rect]=A3_El_AFM(filtData,secondMonitorMain,newFolder,'Accuracy','High');
+[~,AFM_cropped_Images,AFM_height_IO,~]=A3_El_AFM(filtData,secondMonitorMain,newFolder,'Accuracy','High');
 clear filtData
 % Using the AFM_height_IO, fit the background again, yielding a more accurate height image
-[AFM_H_NoBk,AFM_cropped_Images]=A4_El_AFM_masked(AFM_cropped_Images,AFM_height_IO,secondMonitorMain,newFolder);
+AFM_cropped_Images=A4_El_AFM_masked(AFM_cropped_Images,AFM_height_IO,secondMonitorMain,newFolder);
 close all
+
 
 % to extract the friction coefficient, choose which method use.
 question=sprintf('Which method perform to extract the glass friction coefficient?');
@@ -55,10 +56,10 @@ switch choice
     case {2, 3}
         % before perform method 2 or 3, upload the data used to calc the glass friction coeffiecient. Basically it the same experiment but with Hover Mode OFF
         % then clean the data.
-        [dataHoverModeOFF,metaDataHoverModeOFF,~]=A1_openANDassembly_JPK;
+        [dataHoverModeOFF,metaDataHoverModeOFF,~]=A1_openANDassembly_JPK; %#ok<ASGLU>
         filtDataHVOFF=A2_CleanUpData2_AFM(dataHoverModeOFF);
         [~,AFM_cropped_ImagesHVOFF,AFM_height_IOHVOFF,~]=A3_El_AFM(filtDataHVOFF,secondMonitorMain,newFolder,'Accuracy','Low','Silent','Yes');
-        [~,AFM_cropped_ImagesHVOFF_fitted]=A4_El_AFM_masked(AFM_cropped_ImagesHVOFF,AFM_height_IOHVOFF,secondMonitorMain,newFolder,'Silent','Yes');
+        [~,AFM_cropped_ImagesHVOFF_fitted]=A4_El_AFM_masked(AFM_cropped_ImagesHVOFF,AFM_height_IOHVOFF,secondMonitorMain,newFolder,'Silent','Yes'); %#ok<ASGLU>
         % METHOD 2 : MASKING ONLY
         % METHOD 3 : MASKING + OUTLIER REMOVAL
         eval(sprintf('avg_fc=A5_frictionGlassCalc_method%d(metaDataHoverModeOFF.Alpha,AFM_cropped_ImagesHVOFF_fitted,AFM_height_IOHVOFF,secondMonitorMain,newFolder);',choice));
@@ -80,8 +81,8 @@ end
 close all
 
 % Substitute to the AFM cropped channels the baseline adapted LD
-[~,AFM_Elab,~]=A6_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,metaData_AFM.Alpha,avg_fc,secondMonitorMain,newFolder,'Accuracy','High');
-
+[~,AFM_Elab,~,setpoints]=A6_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,metaData_AFM.Alpha,avg_fc,secondMonitorMain,newFolder,'Accuracy','High');
+%clear AFM_cropped_Images
 close all
 
 % Open Brightfield image and the TRITIC (Before and After stimulation images)
@@ -120,9 +121,12 @@ close all
 clear f1 f2 f3 question options choice fileName Tritic_Mic_Image_After BF_Mic_Image
 
 % Produce the binary IO of Brightfield
-[BF_Mic_Image_IO,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,Details_On_BF_Image]=A9_Mic_to_Binary(BF_Mic_Image_aligned,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,secondMonitorMain,newFolder); 
+[BF_Mic_Image_IO,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,~]=A9_Mic_to_Binary(BF_Mic_Image_aligned,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,secondMonitorMain,newFolder); 
+clear BF_Mic_Image_aligned
 
 % Align AFM to BF and extract the coordinates for alighnment to be transferred to the other data
-[AFM_IO_Padded,BF_Image_postAFMalign,AFM_channels_postBFalign,Coordinates_forAllighnment,details_it_reg]=A10_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,Details_On_BF_Image.Cropped,AFM_height_IO,metaData_AFM,AFM_Elab,newFolder,secondMonitorMain,'Margin',70);
+[AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_data_optAlignment,results_AFM_BF_aligment]=A10_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_Elab,newFolder,secondMonitorMain,'Margin',70);
+clear AFM_height_IO %AFM_Elab
 
-%%
+[~] = A11_correlation_AFM_BF(Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,AFM_IO_padded_sizeBF,AFM_data_optAlignment,setpoints);
+
