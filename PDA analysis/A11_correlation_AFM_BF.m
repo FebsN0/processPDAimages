@@ -176,16 +176,16 @@ function varargout = A11_correlation_AFM_BF(BF_Before,BF_After,AFM_IO_Padded,AFM
     %[BC_Height_Border_Vs_Delta2ADJ_Border]=A11_feature_CDiB(AFM_Height_Border(:),TRITIC_Border_Delta(:),'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Feature height (nm)','FigTitle','Height Vs Fluorescence increase (borders)');
     %[BC_Height_Inner_Vs_Delta2ADJ_Inner]=A11_feature_CDiB(AFM_Height_Inner(:),TRITIC_Inner_Delta(:),'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Feature height (nm)','FigTitle','Height Vs Fluorescence increase (inner regions)');
     
-    [BC_LD_masked_Vs_Delta2ADJ]=A11_feature_CDiB(AFM_data(idx_LD).Padded_masked(:),Delta_ADJ(:),'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Lateral Force (only PDA) (nN)','FigTitle','LD (PDA) Vs Fluorescence increase');
-    [BC_LD_Vs_Delta2ADJ]=A11_feature_CDiB(AFM_data(idx_LD).AFM_Padded(:),Delta_ADJ(:),'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Lateral Force (nN)','FigTitle','LD Vs Fluorescence increase');
+    [~]=A11_feature_CDiB(AFM_data(idx_LD).Padded_masked(:),Delta_ADJ(:),'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Lateral Force (only PDA) (nN)','FigTitle','LD (PDA) Vs Fluorescence increase');
+    [~]=A11_feature_CDiB(AFM_data(idx_LD).AFM_Padded(:),Delta_ADJ(:),'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Lateral Force (nN)','FigTitle','LD Vs Fluorescence increase');
     %[BC_LD_Vs_Delta2ADJ_Border]=A11_feature_CDiB(AFM_LD_Border(:),TRITIC_Border_Delta(:),'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Lateral Force (nN)','FigTitle','LD Vs Fluorescence increase (borders)');
     %[BC_LD_Vs_Delta2ADJ_Inner]=A11_feature_CDiB(AFM_LD_Inner(:),TRITIC_Inner_Delta(:),'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Lateral Force (nN)','FigTitle','LD Vs Fluorescence increase (inner regions)');
     
-    [BC_VD_Vs_LD]=A11_feature_CDiB(AFM_data(idx_VD).Padded_masked(:),AFM_data(idx_LD).AFM_Padded(:),'setpoints',setpoints,'xpar',1e9,'ypar',1e9,'YAyL','Lateral Force (nN)','XAxL','Vertical Force (nN)','FigTitle','LD Vs VD');
+    [~]=A11_feature_CDiB(AFM_data(idx_VD).Padded_masked(:),AFM_data(idx_LD).AFM_Padded(:),'setpoints',setpoints,'xpar',1e9,'ypar',1e9,'YAyL','Lateral Force (nN)','XAxL','Vertical Force (nN)','FigTitle','LD Vs VD');
     %[BC_VD_Vs_LD_Border]=A11_feature_CDiB(AFM_VD_Border(:),AFM_LD_Border(:),'setpoints',setpoints,'xpar',1e9,'ypar',1e9,'YAyL','Lateral Force (nN)','XAxL','Vertical Force (nN)','FigTitle','LD Vs VD Border');
     %[BC_VD_Vs_LD_Inner]=A11_feature_CDiB(AFM_VD_Inner(:),AFM_LD_Inner(:),'setpoints',setpoints,'xpar',1e9,'ypar',1e9,'YAyL','Lateral Force (nN)','XAxL','Vertical Force (nN)','FigTitle','LD Vs VD Inner');
     
-    [BC_VD_Vs_Delta2ADJ]=A11_feature_CDiB(AFM_data(idx_VD).AFM_Padded(:),Delta_ADJ(:),'setpoints',setpoints,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Vertical Force (nN)','FigTitle','VD Vs Fluorescence increase'); % added on 10.12.2019
+    [~]=A11_feature_CDiB(AFM_data(idx_VD).AFM_Padded(:),Delta_ADJ(:),'setpoints',setpoints,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Vertical Force (nN)','FigTitle','VD Vs Fluorescence increase'); % added on 10.12.2019
     %[BC_VD_Vs_Delta2ADJ_Border]=A11_feature_CDiB(AFM_VD_Border(:),TRITIC_Border_Delta(:),'setpoints',setpoints,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Vertical Force (nN)','FigTitle','VD Vs Fluorescence increase (borders)');
     %[BC_VD_Vs_Delta2ADJ_Inner]=A11_feature_CDiB(AFM_VD_Inner(:),TRITIC_Inner_Delta(:),'setpoints',setpoints,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Vertical Force (nN)','FigTitle','VD Vs Fluorescence increase (inner regions)');
 

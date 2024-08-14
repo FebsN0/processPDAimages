@@ -11,29 +11,17 @@ function [outputme] = A11_feature_CDiB(X_Data,Y_Data,varargin)
     end
     
     p=inputParser();
-    
     argName = 'setpoints';      defaultVal = [];                                        addOptional(p,argName,defaultVal);
-    
     argName = 'NumberOfBins';   defaultVal = 100;                                       addOptional(p,argName,defaultVal);
-    
     argName = 'xpar';           defaultVal = 2e9;                                       addOptional(p,argName,defaultVal);
-    
     argName = 'ypar';           defaultVal = 2e9;                                       addOptional(p,argName,defaultVal);
-    
     argName = 'YAyL';           defaultVal = 'Relative Intensity Increase (A.U.)';      addOptional(p,argName,defaultVal);
-    
     argName = 'XAxL';           defaultVal = 'Force (N)';                               addOptional(p,argName,defaultVal);
-    
     argName = 'FigTitle';       defaultVal = '';                                        addOptional(p,argName,defaultVal);
-    
     argName = 'Xlimit';         defaultVal = ([]);                                      addOptional(p,argName,defaultVal);
-    
     argName = 'Ylimit';         defaultVal = ([]);                                      addOptional(p,argName,defaultVal);
-    
     argName = 'MType';          defaultVal = 'o';                                       addOptional(p,argName,defaultVal);
-    
     argName = 'MCoulor';        defaultVal = 'k';                                       addOptional(p,argName,defaultVal);
-    
     parse(p,varargin{:});
     
     DataOI(:,1)=X_Data;
