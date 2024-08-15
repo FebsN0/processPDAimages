@@ -228,8 +228,9 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
         cycleParameters=zeros(3,1);
         question ={sprintf('Enter the number of iterations (100 times is estimated to last %3.2f s):',seconds(final_time)*100) ...
             'Enter the step in pixel to increase/decrease during the resize:'...
-            'Enter the step in degree° to rotate clock-wise/counter clock-wise:'};
-        valueDefault = {'100','1','1'};
+            'Enter the step in degree° to rotate clock-wise/counter clock-wise:'...
+            'How many attempts to halves the steps in case local maximum is not found?'};
+        valueDefault = {'100','4','4','4'};
         while true
             cycleParameters = str2double(inputdlg(question,'Setting parameters for the alignment',[1 80],valueDefault));
             if any(isnan(cycleParameters)), questdlg('Invalid input! Please enter a numeric value','','OK','OK');
@@ -239,12 +240,7 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
         Limit_Cycles=cycleParameters(1);
         StepSizeMatrix=cycleParameters(2);
         Rot_par=cycleParameters(3);
-        while true
-            maxAttempts = str2double(inputdlg('How many attempts should be made when a local maximum is found for which the step halves (both resize and rotation)?','',[1 50],{'3'}));
-            if any(isnan(maxAttempts)), questdlg('Invalid input! Please enter a numeric value','','OK','OK');
-            else, break
-            end
-        end
+        maxAttempts=cycleParameters(4);
         
         % init vars. Everytime the cross-correlation is better than the previous, increase z
         N_cycles_opt=1; z=0;

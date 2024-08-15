@@ -18,8 +18,10 @@ function [binary_image,reduced_Tritic_before,reduced_Tritic_after_aligned,Furthe
     % decide if crop the image
     Crop_image = getValidAnswer('The image is not cropped yet, would Like to Crop the Image?', '', {'Yes','No'});
     if Crop_image == 1
+        ftmp=figure;
         figure_image=imshow(imadjust(imageBF_aligned));
         title('BrightField image post alignment')
+        if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,ftmp); end
         [~,specs]=imcrop(figure_image);
         close all
         % take the coordinate of the cropped area
@@ -141,12 +143,11 @@ function [binary_image,reduced_Tritic_before,reduced_Tritic_after_aligned,Furthe
     binary_image=imerode(binary_image,kernel);
     binary_image=imdilate(binary_image,kernel);
     f2=figure;
-    if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f2); end
     imshow(binary_image)
     text=sprintf('Definitive Binarized BrightField (Morphological Opening - kernel: square 2 pixels)');
     title(text,'FontSize',14)
+    if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f2); end
     saveas(f2,sprintf('%s/resultA9_2_DefinitiveBinarizedBrightField.tif',newFolder))
-    saveas(f2,sprintf('%s/resultA9_2_DefinitiveBinarizedBrightField.fig',newFolder))
 
     if Crop_image == 1
         FurtherDetails=struct(...

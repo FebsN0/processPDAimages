@@ -35,9 +35,11 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
     % title and name figures based on what input and more are given
     if strcmpi(p.Results.Brightfield,'Yes')
         textFirstLastFig='BrightField and TRITIC Before Images Overlapped';
+        textResultName=2;
         textCropped = 'Fitted';
     else
         textFirstLastFig='TRITIC Before and After Images Overlapped';
+        textResultName=1;
         textCropped = '';
     end
     % show the overlapped original images
@@ -48,10 +50,10 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
         fused_image=imfuse(moved,fixed,'falsecolor','Scaling','independent');
     end
     f1=figure;
-    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
     imshow(fused_image)
-    title(sprintf('%s Not Aligned',textFirstLastFig),'FontSize',14) 
-    saveas(f1,sprintf('%s/resultA8_1_Entire_%s_NotAligned.tif',newFolder,textFirstLastFig))
+    title(sprintf('%s Not Aligned',textFirstLastFig),'FontSize',14)
+    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
+    saveas(f1,sprintf('%s/resultA8_%d_1_Entire_%s_NotAligned.tif',newFolder,textResultName,textFirstLastFig))
 
     % run the polynomial fitting on the Brightfield image since it is likely to be "tilted"
     flag_brightfield=0;
@@ -86,12 +88,12 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
         end
         % show the comparison between original and fitted BrightField
         f2_1=figure;
-        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2_1); end
         subplot(1,2,1)
         imshow(imadjust(image_of_interest)),title('Original Brightfield','FontSize',14)
         subplot(1,2,2)
         imshow(imadjust(el_image)),title('Brightfield with Bk Removed','FontSize',14)
-        saveas(f2_1,sprintf('%s/resultA8_2_1_comparisonOriginalAndBackgroundSubstracted.tif',newFolder))   
+        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2_1); end
+        saveas(f2_1,sprintf('%s/resultA8_%d_2_1_comparisonOriginalAndBackgroundSubstracted.tif',newFolder,textResultName))   
                 
         awnser=getValidAnswer(sprintf('Use the Backgrownd Subtracted Image?\nIf not, it will be used the original BF data'),'',{'Yes','No'});
         if awnser == 1
@@ -100,12 +102,13 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
             else
                 fixed=el_image;
             end
+            close(f1)
             close gcf
             f2_2=figure;
-            if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2_2); end
-            imshowpair(imadjust(moved), imadjust(fixed), 'falsecolor','Scaling','independent')
+            imshowpair(imadjust(moved), imadjust(fixed), 'falsecolor','Scaling','independent');
             title(sprintf('Fitted %s',textFirstLastFig),'FontSize',14)
-            saveas(f2_2,sprintf('%s/resultA8_2_2_Fitted_BrightField.tif',newFolder))
+            if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2_2); end
+            saveas(f2_2,sprintf('%s/resultA8_%d_2_2_Fitted_BrightField.tif',newFolder,textResultName))
             uiwait(msgbox('Click to continue',''));
         end
     end
@@ -124,14 +127,14 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
     % extract the cropped image data
     reduced_fixed=fixed(XBegin:XEnd,YBegin:YEnd);
     reduced_moved=moved(XBegin:XEnd,YBegin:YEnd);
-    close all
+    close gcf
     
     %%%%%%%%%%%%%%%%%%% skip to this following section in case no argument
     if(islogical(reduced_moved))||(islogical(reduced_fixed))
         f3=figure;
-        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
         imshow(imfuse((reduced_moved),(reduced_fixed)))
-        saveas(f3,sprintf('%s/resultA8_3_Cropped_%s_NotAligned.tif',newFolder,textFirstLastFig))   
+        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
+        saveas(f3,sprintf('%s/resultA8_%d_3_Cropped_%s_NotAligned.tif',newFolder,textResultName,textFirstLastFig))   
         evo_reduced_fixed=reduced_fixed;
         evo_reduced_moved=reduced_moved;
         close gcf
@@ -143,7 +146,7 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
         if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
         imshowpair(imadjust(reduced_moved_blurred), imadjust(reduced_fixed_blurred), 'falsecolor','Scaling','independent')
         title(sprintf('Cropped %s-%s - Not Aligned',textCropped,textFirstLastFig))
-        saveas(f3,sprintf('%s/resultA8_3_Cropped_%s-%s-NotAligned.tif',newFolder,textCropped,textFirstLastFig))   
+        saveas(f3,sprintf('%s/resultA8_%d_3_Cropped_%s-%s-NotAligned.tif',newFolder,textResultName,textCropped,textFirstLastFig))   
         
         % choose if run the automatic binarization or not
         question='Do you want to perform manual (for too dimmered images) or automatic selection?';
@@ -161,15 +164,16 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
                 closest_indices=[];
                 satisfied=1;
                 eval(sprintf('f4_%d=figure;',i));
-                if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,eval(sprintf('f4_%d',i))); end
                 subplot(121), imshow(imadjust(data{i}))
+                if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,eval(sprintf('f4_%d',i))); end
                 title(sprintf('Original %s',text{i}), 'FontSize',16)
                 while satisfied==1
                     % reset every time
                     originalData=data{i};
                     no_sub_div=2000;
                     [Y,E] = histcounts(data{i},no_sub_div);
-                    figure,hold on,plot(Y)
+                    f4=figure; hold on
+                    plot(Y)
                     if any(closest_indices)
                         scatter(closest_indices,Y(closest_indices),40,'r*')
                     end
@@ -195,7 +199,8 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
                     satisfied=getValidAnswer('Keep selection or turn again to manual selection?','',{'Continue the manual selection.','Keep current.'});       
                 end
                 %save the result of binarization
-                saveas(eval(sprintf('f4_%d',i)),sprintf('%s/resultA8_4_%s_BinarizationResult.tif',newFolder,text{i}))
+                if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f4); end
+                saveas(eval(sprintf('f4_%d',i)),sprintf('%s/resultA8_%d_4_%s_BinarizationResult.tif',newFolder,textResultName,text{i}))
                 close gcf
                 data{i}=originalData;
             end
@@ -231,13 +236,14 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
     yoffset = offset(2);
     moving_tr=imtranslate(moved,[xoffset,yoffset]);
     
+   
     f5=figure;
-    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f5); end
     if((~islogical(moved))&&(~islogical(fixed)))
         imshow(imfuse(imadjust(moving_tr),imadjust(fixed)))
     else
         imshow(imfuse(moving_tr,fixed))
     end
     title(sprintf('Cropped %s-%s - Aligned',textCropped,textFirstLastFig),'FontSize',15)
-    saveas(f5,sprintf('%s/resultA8_5_Cropped_%s-%s-Aligned.tif',newFolder,textCropped,textFirstLastFig))
+    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f5); end
+    saveas(f5,sprintf('%s/resultA8_%d_5_Cropped_%s-%s-Aligned.tif',newFolder,textResultName,textCropped,textFirstLastFig))
 end

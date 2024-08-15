@@ -9,17 +9,12 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative,setpoints]=A6_LD_Baseline_Ada
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)
 
-    fprintf('\n\tSTEP 6 processing ...\n\n')
+    fprintf('\n\t\tSTEP 6 processing ...\n\n')
     p=inputParser();    %init instance of inputParser
     %Add default parameters. When call the function, use 'argName' as well you use 'LineStyle' in plot! And
     %then the values
-    argName = 'Accuracy';
-    defaultVal = 'Low';
-    addOptional(p,argName,defaultVal, @(x) ismember(x,{'Low','Medium','High'}));
-    argName = 'Silent';
-    defaultVal = 'No';
-    addOptional(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
-    % validate and parse the inputs
+    argName = 'Accuracy';   defaultVal = 'Low';     addOptional(p,argName,defaultVal, @(x) ismember(x,{'Low','Medium','High'}));
+    argName = 'Silent';     defaultVal = 'Yes';      addOptional(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     parse(p,varargin{:});
     clearvars argName defaultVal
     fprintf('Results of optional input:\n\tAccuracy:\t%s\n\tSilent:\t\t%s\n',p.Results.Accuracy,p.Results.Silent)
@@ -32,51 +27,59 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative,setpoints]=A6_LD_Baseline_Ada
     Lateral_ReTrace = (AFM_cropped_Images(strcmpi({AFM_cropped_Images.Channel_name},'Lateral Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'ReTrace')).Cropped_AFM_image);
     vertical_Trace  = (AFM_cropped_Images(strcmpi({AFM_cropped_Images.Channel_name},'Vertical Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'Trace')).Cropped_AFM_image);
 
+
     % find the setpoint values used in the experiments
     vertical_Trace=round(vertical_Trace,8);
     setpoints=unique(vertical_Trace);
 
+    if getValidAnswer('Was the HOVER MODE ON?','',{'y','n'})==2
+    % substract lateral deflection trace from retrace if HOVER MODE UNACTIVATED,
+        Lateral_Trace_clean =Lateral_Trace - Lateral_ReTrace;
+    else
+        Lateral_Trace_clean =Lateral_Trace;
+    end
     %Subtract the minimum of the image
-    Lateral_Trace_shift= Lateral_Trace - min(min(Lateral_Trace));
+    Lateral_Trace_clean_shift= Lateral_Trace_clean - min(min(Lateral_Trace_clean));
     % Mask W to cut the PDA from the baseline fitting. Where there is PDA in corrispondece of the mask, then mask the
     % lateral deflection data. Basically, the goal is fitting using the glass which is know to be flat. 
     if SeeMe    
         % plot 
         f1=figure;
-        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
         subplot(121)
         imshow((imadjust(Lateral_Trace/max(max(Lateral_Trace))))), colormap parula; colorbar,
-        c=colorbar; c.Label.String = 'Lateral Deflection channel [V]'; c.FontSize = 15;
-        title({'Lateral Deflection';'(Trace - original)'},'FontSize',18)
+        c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize = 15;
+        title('Raw Lateral Deflection [V] - Trace','FontSize',18)
         xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
         axis equal, xlim([0 512]), ylim([0 512])
-        
         subplot(122)
-        imshow((imadjust(Lateral_ReTrace/max(max(Lateral_ReTrace))))), colormap parula; colorbar,
-        c=colorbar; c.Label.String = 'Lateral Deflection channel [V]'; c.FontSize = 15;
-        title({'Lateral Deflection [V]'; '(Retrace - HOVER MODE ON)'},'FontSize',18)
-        xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
-        axis equal, xlim([0 512]), ylim([0 512])
-        saveas(f1,sprintf('%s/resultA6_1_LateralDeflection_TraceRetrace.tif',newFolder))
-    
-        f2=figure;
-        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2); end
-        subplot(121)
         imshow((imadjust(vertical_Trace/max(max(vertical_Trace))))), colormap parula; colorbar,
-        c=colorbar; c.Label.String = 'Verical Deflection channel [N]'; c.FontSize = 15;
+        c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize = 15;
         xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
         title('Vertical Deflection [N]','FontSize',18)
-        subplot(122)
-        imshow((imadjust(Lateral_Trace_shift/max(max(Lateral_Trace_shift))))), colormap parula; colorbar,
-        c=colorbar; c.Label.String = 'Lateral Deflection channel [V]'; c.FontSize = 15;
-        title({'Lateral Deflection [V]'; '(Trace - shifted)'},'FontSize',18)
+        axis equal, xlim([0 512]), ylim([0 512])
+        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
+        saveas(f1,sprintf('%s/resultA6_1_RawLateralDeflection_TraceRetrace.tif',newFolder))
+    
+        f2=figure;
+        subplot(121)
+        imshow((imadjust(Lateral_ReTrace/max(max(Lateral_ReTrace))))), colormap parula; colorbar,
+        c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize = 15;
+        title({'Raw Lateral Deflection - Retrace'; '(HOVER MODE ON)'},'FontSize',18)
         xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
+        axis equal, xlim([0 512]), ylim([0 512])
+        subplot(122)
+        imshow((imadjust(Lateral_Trace_clean_shift/max(max(Lateral_Trace_clean_shift))))), colormap parula; colorbar,
+        c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize = 15;
+        title({'Lateral Deflection - Trace [V]'; '(shifted toward minimum)'},'FontSize',18)
+        xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
+        axis equal, xlim([0 512]), ylim([0 512])
+        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2); end
         saveas(f2,sprintf('%s/resultA6_2_VerticalDeflection_.tif',newFolder))
 
     end
 
     % apply the PDA mask
-    Lateral_Trace_shift_masked= Lateral_Trace_shift;
+    Lateral_Trace_shift_masked= Lateral_Trace_clean_shift;
     Lateral_Trace_shift_masked(AFM_height_IO==1)=5;
 
     %show dialog box
@@ -181,7 +184,7 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative,setpoints]=A6_LD_Baseline_Ada
             end
         end
     end
-    Lateral_Trace_shift_noBK= Lateral_Trace_shift - Bk_iterative;
+    Lateral_Trace_shift_noBK= Lateral_Trace_clean_shift - Bk_iterative;
     % Friction force = friction coefficient * Normal Force
     Baseline_Friction_Force= vertical_Trace*avg_fc;
     % Friction force = calibration coefficient * Lateral Trace (V)
@@ -190,30 +193,30 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative,setpoints]=A6_LD_Baseline_Ada
     Corrected_LD_Trace= Lateral_Trace_Force + Baseline_Friction_Force;
     
     % Plot the fitted backround:
-    if SeeMe
-        f3=figure;
-        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
-        subplot(121)
-        imshow((imadjust(Bk_iterative/max(max(Bk_iterative))))), colormap parula
-        c=colorbar; c.Label.String = 'Lateral Deflection channel [V]'; c.FontSize =15;
-        title('Fitted Background','FontSize',15)
-        xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
-        % remove the background from the image (friction on glass should be zero afterwards):
-        subplot(122)
-        imshow((imadjust(Lateral_Trace_shift_noBK/max(max(Lateral_Trace_shift_noBK))))), colormap parula
-        c=colorbar; c.Label.String = 'Lateral Deflection channel [V]'; c.FontSize =15;
-        xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
-        title('Corrected Lateral Trace ','FontSize',15)
-        saveas(f3,sprintf('%s/resultA6_3_ResultsFittingOnLateralDeflections.tif',newFolder))
- 
-        f4=figure;
-        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f4); end
-        imshow(imadjust(Corrected_LD_Trace/max(max(Corrected_LD_Trace)))), colormap parula
-        c=colorbar; c.Label.String = 'Lateral Deflection channel [N]'; c.FontSize =15;
-        title('Definitive Lateral Force [N]','FontSize',15)
-        xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)   
-        saveas(f4,sprintf('%s/resultA6_4_ResultsDefinitiveLateralDeflectionsNewton.tif',newFolder))
-    end
+    f3=figure;
+    
+    subplot(121)
+    imshow((imadjust(Bk_iterative/max(max(Bk_iterative))))), colormap parula
+    c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize =15;
+    title('Fitted Background','FontSize',15)
+    xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
+    % remove the background from the image (friction on glass should be zero afterwards):
+    subplot(122)
+    imshow((imadjust(Lateral_Trace_shift_noBK/max(max(Lateral_Trace_shift_noBK))))), colormap parula
+    c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize =15;
+    xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
+    title('Fitted Lateral Deflection channel [V] - Trace ','FontSize',15)
+    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
+    saveas(f3,sprintf('%s/resultA6_3_ResultsFittingOnLateralDeflections.tif',newFolder))
+    f4=figure;
+    
+    imshow(imadjust(Corrected_LD_Trace/max(max(Corrected_LD_Trace)))), colormap parula
+    c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize =15;
+    title('Fitted and corrected Lateral Force [N]','FontSize',17)
+    xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
+    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f4); end
+    saveas(f4,sprintf('%s/resultA6_4_ResultsDefinitiveLateralDeflectionsNewton.tif',newFolder))
+        
     AFM_Elab=AFM_cropped_Images;
     % save the corrected lateral force into cropped AFM image
     AFM_Elab(strcmpi({AFM_cropped_Images.Channel_name},'Lateral Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'Trace')).Cropped_AFM_image=Corrected_LD_Trace;

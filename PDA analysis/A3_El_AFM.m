@@ -286,8 +286,8 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonito
     AFM_noBk_visible_data=imadjust(AFM_noBk_visible_data);
     
     f2=figure;
-    if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f2); end
     subplot(121), imshow(AFM_noBk_visible_data),colormap parula, title('Fitted Height (measured) channel', 'FontSize',16)
+    if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f2); end
     c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
     ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
 
