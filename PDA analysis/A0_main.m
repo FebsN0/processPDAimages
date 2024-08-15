@@ -24,9 +24,24 @@ secondMonitorMain=objInSecondMonitor;
 filtData=A2_CleanUpData2_AFM(data,secondMonitorMain,newFolder);
 clear data
 
-% Extract the (1) height no Bk, which is not used, (2) cropped AFM channels, (3) I/O image of Height and
-% (4) info of the cropped area
-[~,AFM_cropped_Images,AFM_height_IO,~]=A3_El_AFM(filtData,secondMonitorMain,newFolder,'Accuracy','High');
+% Extract the (1) height no Bk, which is not used, (2) cropped AFM channels, (3) I/O image of Height and (4) info of the cropped area
+while true
+    answer=getValidAnswer('Fitting AFM lateral channel data: which accuracy use?','',{'Low','Medium','High'});
+    switch answer
+        case 1
+            accuracy= 'Low';
+        case 2
+            accuracy= 'Medium';
+        case 3
+            accuracy= 'High';
+    end
+    [~,AFM_cropped_Images,AFM_height_IO,~]=A3_El_AFM(filtData,secondMonitorMain,newFolder,'Accuracy',accuracy);
+    if getValidAnswer('Satisfied of the fitting?','',{'y','n'}) == 1
+        break
+    end
+end
+
+
 clear filtData
 % Using the AFM_height_IO, fit the background again, yielding a more accurate height image
 AFM_cropped_Images=A4_El_AFM_masked(AFM_cropped_Images,AFM_height_IO,secondMonitorMain,newFolder);
@@ -81,44 +96,59 @@ end
 close all
 
 % Substitute to the AFM cropped channels the baseline adapted LD
-[~,AFM_Elab,~,setpoints]=A6_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,metaData_AFM.Alpha,avg_fc,secondMonitorMain,newFolder,'Accuracy','High');
-%clear AFM_cropped_Images
+while true
+    answer=getValidAnswer('Fitting AFM lateral channel data: which accuracy use?','',{'Low','Medium','High'});
+    switch answer
+        case 1
+            accuracy= 'Low';
+        case 2
+            accuracy= 'Medium';
+        case 3
+            accuracy= 'High';
+    end
+    [~,AFM_Elab,~,setpoints]=A6_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,metaData_AFM.Alpha,avg_fc,secondMonitorMain,newFolder,'Accuracy',accuracy);
+    if getValidAnswer('Satisfied of the fitting?','',{'y','n'}) == 1
+        break
+    end
+end
+
+clear AFM_cropped_Images
 close all
 
-% Open Brightfield image and the TRITIC (Before and After stimulation images)
 
+% Open Brightfield image and the TRITIC (Before and After stimulation images)
 [fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the BrightField image',filePathData);
 [BF_Mic_Image,~,metaData_BF]=A7_open_ND2(fullfile(filePathData,fileName)); 
 f1=figure;
+imshow(imadjust(BF_Mic_Image)), title('BrightField - original','FontSize',17)
 if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
-imshow(imadjust(BF_Mic_Image)), title('BrightField - original','FontSize',20)
 saveas(f1,sprintf('%s/resultA8_0_BrightField.tif',newFolder))
 
 [fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the TRITIC Before Stimulation image',filePathData);
 [Tritic_Mic_Image_Before]=A7_open_ND2(fullfile(filePathData,fileName)); 
 f2=figure;
+imshow(imadjust(Tritic_Mic_Image_Before)), title('TRITIC Before Stimulation','FontSize',17)
 if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2); end
-imshow(imadjust(Tritic_Mic_Image_Before)), title('TRITIC Before Stimulation','FontSize',20)
 saveas(f2,sprintf('%s/resultA8_0_TRITIC_Before_Stimulation.tif',newFolder))
-
-close all
 
 [fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the TRITIC After Stimulation image',filePathData);
 [Tritic_Mic_Image_After]=A7_open_ND2(fullfile(filePathData,fileName)); 
 f3=figure;
+imshow(imadjust(Tritic_Mic_Image_After)), title('TRITIC After Stimulation','FontSize',17)
 if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
-imshow(imadjust(Tritic_Mic_Image_After)), title('TRITIC After Stimulation','FontSize',20)
 saveas(f3,sprintf('%s/resultA8_0_TRITIC_After_Stimulation.tif',newFolder))
+
+close all
 
 % Align the fluorescent images After with the BEFORE stimulation
 Tritic_Mic_Image_After_aligned=A8_limited_registration(Tritic_Mic_Image_After,Tritic_Mic_Image_Before,newFolder,secondMonitorMain);
-
 % Align the Brightfield to TRITIC Before Stimulation
 BF_Mic_Image_aligned=A8_limited_registration(BF_Mic_Image,Tritic_Mic_Image_Before,newFolder,secondMonitorMain,'Brightfield','Yes','Moving','Yes');
 
 uiwait(msgbox('Click to continue',''));
-close all
+close gcf
 clear f1 f2 f3 question options choice fileName Tritic_Mic_Image_After BF_Mic_Image
+
 
 % Produce the binary IO of Brightfield
 [BF_Mic_Image_IO,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,~]=A9_Mic_to_Binary(BF_Mic_Image_aligned,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,secondMonitorMain,newFolder); 
@@ -126,7 +156,8 @@ clear BF_Mic_Image_aligned
 
 % Align AFM to BF and extract the coordinates for alighnment to be transferred to the other data
 [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_data_optAlignment,results_AFM_BF_aligment]=A10_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_Elab,newFolder,secondMonitorMain,'Margin',70);
-clear AFM_height_IO %AFM_Elab
+clear AFM_height_IO AFM_Elab
 
-[~] = A11_correlation_AFM_BF(Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,AFM_IO_padded_sizeBF,AFM_data_optAlignment,setpoints);
+% correlation FLUORESCENCE AND AFM DATA
+A11_correlation_AFM_BF(Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,AFM_IO_padded_sizeBF,AFM_data_optAlignment,setpoints,secondMonitorMain,newFolder);
 
