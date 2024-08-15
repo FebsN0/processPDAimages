@@ -51,7 +51,7 @@ function A11_correlation_AFM_BF(BF_Before,BF_After,AFM_IO_Padded,AFM_data,setpoi
     AFM_Height_Inner(AFM_IO_Borders_Grow==1)=nan;
     AFM_Height_Inner(AFM_Height_Inner<=0)=nan;
     
-    plotSave2(SeeMe,AFM_Height_Border*1e6,AFM_Height_Inner*1e6,'AFM Height Border','AFM Height Inner','height [um]','resultA11_3_BorderAndInner_AFM_Height.tif',secondMonitorMain,newFolder)
+    plotSave2(SeeMe,AFM_Height_Border*1e6,AFM_Height_Inner*1e6,'AFM Height Border','AFM Height Inner',sprintf('height (\x03bcm)'),'resultA11_3_BorderAndInner_AFM_Height.tif',secondMonitorMain,newFolder)
 
     % Elaboration of LD to extract inner and border regions
     AFM_LD_Border=AFM_data(idx_LD).AFM_Padded;
@@ -115,12 +115,12 @@ function A11_correlation_AFM_BF(BF_Before,BF_After,AFM_IO_Padded,AFM_data,setpoi
     close all
     save data
     % 7 - HEIGHT VS LATERAL FORCE
-    [~]=A11_feature_CDiB(AFM_data(idx_H).Padded_masked(:),AFM_data(idx_LD).AFM_Padded(:),secondMonitorMain,newFolder,'xpar',1e9,'ypar',1e9,'YAyL','Lateral Force (nN)','XAxL','Feature height (nm)','FigTitle','LD Vs Height','NumFig',1);
+    [~]=A11_feature_CDiB(AFM_data(idx_H).Padded_masked(:),AFM_data(idx_LD).AFM_Padded(:),secondMonitorMain,newFolder,'xpar',1e6,'ypar',1e9,'YAyL','Lateral Force (nN)','XAxL',sprintf('Feature height (\x03bcm)'),'FigTitle','LD Vs Height','NumFig',1);
     %[BC_H_Vs_LD_Border]=A11_feature_CDiB(AFM_Height_Border(:),AFM_LD_Border(:),secondMonitorMain,newFolder,'xpar',1e9,'ypar',1e9,'YAyL','Lateral Force (nN)','XAxL','Feature height (nm)','FigTitle','LD Vs Height Border','NumFig',1);
     %[BC_H_Vs_LD_Inner]=A11_feature_CDiB(AFM_Height_Inner(:),AFM_LD_Inner(:),secondMonitorMain,newFolder,'xpar',1e9,'ypar',1e9,'YAyL','Lateral Force (nN)','XAxL','Feature height (nm)','FigTitle','LD Vs Height Inner','NumFig',1);
     
     % 8 - HEIGHT VS FLUORESCENCE INCREASE
-    [~]=A11_feature_CDiB(AFM_data(idx_H).Padded_masked(:),Delta_ADJ(:),secondMonitorMain,newFolder,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Feature height (nm)','FigTitle','Height Vs Fluorescence increase','NumFig',2);
+    [~]=A11_feature_CDiB(AFM_data(idx_H).Padded_masked(:),Delta_ADJ(:),secondMonitorMain,newFolder,'xpar',1e9,'ypar',1e6,'YAyL','Absolute fluorescence increase (A.U.)','XAxL',sprintf('Feature height (\x03bcm)'),'FigTitle','Height Vs Fluorescence increase','NumFig',2);
     %[BC_Height_Border_Vs_Delta2ADJ_Border]=A11_feature_CDiB(AFM_Height_Border(:),TRITIC_Border_Delta(:),secondMonitorMain,newFolder,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Feature height (nm)','FigTitle','Height Vs Fluorescence increase (borders)','NumFig',2);
     %[BC_Height_Inner_Vs_Delta2ADJ_Inner]=A11_feature_CDiB(AFM_Height_Inner(:),TRITIC_Inner_Delta(:),secondMonitorMain,newFolder,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Feature height (nm)','FigTitle','Height Vs Fluorescence increase (inner regions)','NumFig',2);
     
@@ -136,7 +136,7 @@ function A11_correlation_AFM_BF(BF_Before,BF_After,AFM_IO_Padded,AFM_data,setpoi
     %[BC_VD_Vs_LD_Inner]=A11_feature_CDiB(AFM_VD_Inner(:),AFM_LD_Inner(:),secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'ypar',1e9,'YAyL','Lateral Force (nN)','XAxL','Vertical Force (nN)','FigTitle','LD Vs VD Inner','NumFig',4);
     
     % VERTICAL FORCE VS FLUORESCENCE INCREASE
-    [~]=A11_feature_CDiB(AFM_data(idx_VD).AFM_Padded(:),Delta_ADJ(:),secondMonitorMain,newFolder,'NumberOfBins',5000,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Vertical Force (nN)','FigTitle','VD Vs Fluorescence increase','NumFig',5); 
+    [~]=A11_feature_CDiB(AFM_data(idx_VD).AFM_Padded(:),Delta_ADJ(:),secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Vertical Force (nN)','FigTitle','VD Vs Fluorescence increase','NumFig',5); 
     %[BC_VD_Vs_Delta2ADJ_Border]=A11_feature_CDiB(AFM_VD_Border(:),TRITIC_Border_Delta(:),secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Vertical Force (nN)','FigTitle','VD Vs Fluorescence increase (borders)','NumFig',5);
     %[BC_VD_Vs_Delta2ADJ_Inner]=A11_feature_CDiB(AFM_VD_Inner(:),TRITIC_Inner_Delta(:),secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Vertical Force (nN)','FigTitle','VD Vs Fluorescence increase (inner regions)','NumFig',5);
 end
