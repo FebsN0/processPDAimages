@@ -1,6 +1,6 @@
 % Function to collect data into bins
 
-function [outputme] = A11_feature_CDiB(X_Data,Y_Data,varargin)
+function [outputme] = A11_feature_CDiB(X_Data,Y_Data,secondMonitorMain,newFolder,varargin)
 
     if(~isempty(varargin))
         if(size(varargin,2)==1)
@@ -22,6 +22,8 @@ function [outputme] = A11_feature_CDiB(X_Data,Y_Data,varargin)
     argName = 'Ylimit';         defaultVal = ([]);                                      addOptional(p,argName,defaultVal);
     argName = 'MType';          defaultVal = 'o';                                       addOptional(p,argName,defaultVal);
     argName = 'MCoulor';        defaultVal = 'k';                                       addOptional(p,argName,defaultVal);
+    argName = 'NumFig';         defaultVal = '';                                        addOptional(p,argName,defaultVal);
+
     parse(p,varargin{:});
     
     DataOI(:,1)=X_Data;
@@ -82,7 +84,7 @@ function [outputme] = A11_feature_CDiB(X_Data,Y_Data,varargin)
         stde_VDH_B(i)=outputme(i).STDBin*p.Results.ypar;
     end
      
-    figure,hold on
+    ftmp=figure; hold on
     try
         errorbar(x_VDH_B,y_VDH_B,stde_VDH_B,'MarkerFaceColor',sprintf('%c',p.Results.MCoulor),'MarkerEdgeColor',sprintf('%c',p.Results.MCoulor),'Marker',sprintf('%c',p.Results.MType));
     catch
@@ -100,6 +102,8 @@ function [outputme] = A11_feature_CDiB(X_Data,Y_Data,varargin)
     if (~isempty(p.Results.FigTitle))
         title(p.Results.FigTitle);
     end
-
+    
+    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,ftmp); end
+    saveas(ftmp,sprintf('%s/resultA11_end_%d_%s.fig',newFolder,p.Results.NumFig,p.Results.FigTitle))
 
 end
