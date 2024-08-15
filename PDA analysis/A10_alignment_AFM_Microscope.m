@@ -340,7 +340,7 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
                 Rot_par=Rot_par/2;
                 N_cycles_opt=N_cycles_opt+1;
                 attemptChanges=attemptChanges+1;
-                fprintf('\n\n A local maximum may have been found. Halved parameters. Attempt %d of %d\n',attemptChanges,maxAttempts)
+                fprintf('\n\n A local maximum may have been found. Halved parameters. Attempt %d of %d\n\t\tStepSizeMatrix: %.2f\n\t\tRot_par: %.2f\n',attemptChanges,maxAttempts,StepSizeMatrix,Rot_par)
                 if(attemptChanges==maxAttempts)
                     break
                 end
