@@ -230,19 +230,15 @@ function [varargout]=A1_open_JPK(varargin)
                 
                 % in order to take the z values matrix of each image, take the
                 % coefficients to fix the z values
-                typpe_of_ch=file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32897)).Value;
-                
-                if strcmp(Channel_Name,'Lateral Deflection')
-                    fprintf('\n\n\t type data %s \n\n',typpe_of_ch)
-                end
-                
-                if(strcmp(typpe_of_ch,'nominal')||(strcmp(typpe_of_ch,'voltsamplitude')))
+                type_of_ch=file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32897)).Value;
+                               
+                if(strcmp(type_of_ch,'nominal')||(strcmp(type_of_ch,'voltsamplitude')))
                     m_ID=33028;
                     off_ID=33029;
-                elseif ((strcmp(typpe_of_ch,'force'))||(strcmp(typpe_of_ch,'calibrated'))||(strcmp(typpe_of_ch,'distanceamplitude')))
+                elseif ((strcmp(type_of_ch,'force'))||(strcmp(type_of_ch,'calibrated'))||(strcmp(type_of_ch,'distanceamplitude')))
                     m_ID=33076;
                     off_ID=33077;
-                elseif(strcmp(typpe_of_ch,'volts'))
+                elseif(strcmp(type_of_ch,'volts'))
                     typpe_of_ch_det=file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32848)).Value;
                     if(strcmp(typpe_of_ch_det,'capacitiveSensorXPosition'))||(strcmp(typpe_of_ch_det,'servoDacY'))||(strcmp(typpe_of_ch_det,'servoDacX'))||(strcmp(typpe_of_ch_det,'capacitiveSensorYPosition'))
                         m_ID=33028;
@@ -273,6 +269,8 @@ function [varargout]=A1_open_JPK(varargin)
                 Image(i-1)=struct(...
                     'Channel_name',...
                     Channel_Name,...
+                    'Signal_type',...
+                    type_of_ch,...
                     'Trace_type',...
                     trace_type_flag,...
                     'Raw_afm_image',...

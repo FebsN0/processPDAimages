@@ -48,6 +48,36 @@ function [dataOrdered,metaDataOrdered,filePathData] = A1_openANDassembly_JPK
         % open jpk, it returns the AFM file, the details (position of tip, IGain, Pgain, Sn, Kn and
         % calculates alpha, based on the pub), it returns the location of the file.
         [data,metaData]=A1_open_JPK(fullName);
+        
+        % if the vertical deflection is expressed in volts, then convert into force
+        for j=1:length(data)
+            if strcmp(data(j).Channel_name,'Vertical Deflection') && strcmp(data(j).Signal_type,'volts')
+                
+                raw_data_VD_volt=data(j).AFM_image;
+                % imagesc(raw_data_VD_volt), colormap parula, title('Raw data Vertical Deflection volt','FontSize',17), colorbar
+                raw_data_VD_force = raw_data_VD_volt*metaData.Vertical_kn*metaData.Vertical_Sn;     % F (N) = V (V) * Sn (m/V) * Kn (N/m)
+                % figure
+                % imagesc(raw_data_VD_force), colormap parula, title('Raw data Vertical Deflection force','FontSize',17), colorbar
+                % raw_data_VD_nanoforce = raw_data_VD_force*1e9;
+                % figure
+                % imagesc(raw_data_VD_nanoforce), colormap parula, title('Raw data Vertical Deflection nanoforce','FontSize',17), colorbar
+                data(j).AFM_image = raw_data_VD_force;
+                data(j).Signal_type = 'force';
+            end
+        end
+        
+
+
+
+       
+        
+        
+        
+       
+
+
+
+        
         allScansImage{i}=data;
         allScansMetadata{i}=metaData;
         % y slow direction (rows) | x fast direction (columns)
