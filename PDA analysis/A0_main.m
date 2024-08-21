@@ -1,53 +1,15 @@
 clc, clear, close all
 
-
-% upload .jpk files. If more than one and if from same experiment in which setpoint is changed, then assembly.
-[data,metaData_AFM,filePathData]=A1_openANDassembly_JPK;
-
-% save the useful figures into a directory
-newFolder = fullfile(filePathData, 'Results Processing AFM and fluorescence images');
-% check if dir already exists
-if exist(newFolder, 'dir')
-    question= sprintf('Directory already exists and it may already contain results.\nDo you want to overwrite it?');
-    options= {'Yes','No'};
-    if getValidAnswer(question,'',options) == 1
-        rmdir(newFolder, 's');
-        mkdir(newFolder);
-    end
-else
-    mkdir(newFolder);
-end
-
-% prepare figure and put in a second monitor if any
 secondMonitorMain=objInSecondMonitor;
-% Remove unnecessary channels to elaboration (necessary for memory save)
-filtData=A2_CleanUpData2_AFM(data,secondMonitorMain,newFolder);
-clear data
-
-% Extract the (1) height no Bk, which is not used, (2) cropped AFM channels, (3) I/O image of Height and (4) info of the cropped area
-while true
-    answer=getValidAnswer('Fitting AFM lateral channel data: which accuracy use?','',{'Low','Medium','High'});
-    switch answer
-        case 1
-            accuracy= 'Low';
-        case 2
-            accuracy= 'Medium';
-        case 3
-            accuracy= 'High';
-    end
-    [~,AFM_cropped_Images,AFM_height_IO,~]=A3_El_AFM(filtData,secondMonitorMain,newFolder,'Accuracy',accuracy);
-    if getValidAnswer('Satisfied of the fitting?','',{'y','n'}) == 1
-        break
-    end
-end
+% upload .jpk files. If more than one and if from same experiment in which setpoint is changed, then assembly.
+[AFM_FittedMasked,AFM_height_IO,metaData_AFM,filePathData,newFolder]=A1_openANDassembly_JPK(secondMonitorMain);
 
 
-clear filtData
-% Using the AFM_height_IO, fit the background again, yielding a more accurate height image
-AFM_cropped_Images=A4_El_AFM_masked(AFM_cropped_Images,AFM_height_IO,secondMonitorMain,newFolder);
-close all
 
 
+
+
+%%
 % to extract the friction coefficient, choose which method use.
 question=sprintf('Which method perform to extract the glass friction coefficient?');
 options={ ...
@@ -106,13 +68,13 @@ while true
         case 3
             accuracy= 'High';
     end
-    [~,AFM_Elab,~,setpoints]=A6_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,metaData_AFM.Alpha,avg_fc,secondMonitorMain,newFolder,'Accuracy',accuracy);
+    [~,AFM_Elab,~,setpoints]=A6_LD_Baseline_Adaptor_masked(AFM_FittedMasked,AFM_height_IO,metaData_AFM.Alpha,avg_fc,secondMonitorMain,newFolder,'Accuracy',accuracy);
     if getValidAnswer('Satisfied of the fitting?','',{'y','n'}) == 1
         break
     end
 end
 
-clear AFM_cropped_Images
+clear AFM_FittedMasked
 close all
 
 

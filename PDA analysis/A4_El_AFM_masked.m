@@ -25,7 +25,6 @@ function Cropped_Images_Bk=A4_El_AFM_masked(Cropped_Images,AFM_height_IO,secondM
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)
 
-    fprintf('\n\t\tSTEP 4 processing ...\n')
     % A tool for handling and validating function inputs.  define expected inputs, set default values, and validate the types
     % and properties of inputs. This helps to make functions more robust and user-friendly.
     p=inputParser();    %init instance of inputParser
@@ -36,15 +35,13 @@ function Cropped_Images_Bk=A4_El_AFM_masked(Cropped_Images,AFM_height_IO,secondM
     addOptional(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     % validate and parse the inputs
     parse(p,Cropped_Images,varargin{:});
-    
     clearvars argName defaultVal
-    fprintf('Results of optional input:\n\tSilent:\t\t%s\n',p.Results.Silent)
 
     if(strcmp(p.Results.Silent,'Yes')); SeeMe=0; else, SeeMe=1; end
 
     % added on 20012020: using the 0/1 height image, new fitting by excluding those information
     % which correspond to the PDA crystals. Put value 5 to exclude
-    cropped_image=Cropped_Images(1).Cropped_AFM_image; 
+    cropped_image=Cropped_Images(1).AFM_image; 
     cropped_image_glass=cropped_image;
     cropped_image_glass(AFM_height_IO==1)=5;
     
@@ -86,9 +83,14 @@ function Cropped_Images_Bk=A4_El_AFM_masked(Cropped_Images,AFM_height_IO,secondM
         delete(wb)
     end
 
+    if SeeMe
+        uiwait(msgbox('Click to continue'))
+    end
+    close all
+
     % substitutes to the raw cropped date the Height with no BK
     Cropped_Images_Bk=Cropped_Images;
-    Cropped_Images_Bk(strcmp({Cropped_Images_Bk.Channel_name},'Height (measured)')).Cropped_AFM_image=AFM_noBk;
+    Cropped_Images_Bk(strcmp({Cropped_Images_Bk.Channel_name},'Height (measured)')).AFM_image=AFM_noBk;
 end
     
 

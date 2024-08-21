@@ -1,4 +1,4 @@
-function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonitorMain,filepath,varargin)
+function [Cropped_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain,filepath,varargin)
 
 % The function extracts Images from the experiments.
 % It removes baseline and extracts foreground from the AFM image.
@@ -28,80 +28,102 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonito
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)
     
-    fprintf('\n\t\tSTEP 3 processing ...\n')
     % A tool for handling and validating function inputs.  define expected inputs, set default values, and validate the types
     % and properties of inputs. This helps to make functions more robust and user-friendly.
     p=inputParser();    %init instance of inputParser
     % Add required parameter and also check if it is a struct by a inner function end if the Trace_type are
     % all Trace
-    addRequired(p, 'input', @(x) isstruct(x));
-    addRequired(p,'secondMonitorMain')
+    addRequired(p, 'filtData', @(x) isstruct(x));
     %Add default parameters. When call the function, use 'argName' as well you use 'LineStyle' in plot! And
     %then the values
-    argName = 'Accuracy';
-    defaultVal = 'Low';
-    addOptional(p, argName, defaultVal,@(x) ismember(x,{'Low','Medium','High'}));
+    
+    argName = 'fitOrder';
+    defaultVal = '';
+    addParameter(p,argName,defaultVal, @(x) ismember(x,{'Low','Medium','High'}));
 
     argName = 'AutoElab';
     defaultVal = 'No';
-    addOptional(p, argName, defaultVal,@(x) ismember(x,{'No','Yes'}));
+    addParameter(p, argName, defaultVal,@(x) ismember(x,{'No','Yes'}));
 
     argName = 'Silent';
-    defaultVal = 'No';
-    addOptional(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+    defaultVal = 'Yes';
+    addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+
     % validate and parse the inputs
     parse(p,filtData,varargin{:});
 
     clearvars argName defaultVal
-    fprintf('Results of optional input:\n\tAccuracy:\t%s\n\tAutoElab:\t%s\n\tSilent:\t\t%s\n',p.Results.Accuracy,p.Results.AutoElab,p.Results.Silent)
     
+    % if this is seconf time that the A3 is called, like for the second AFM section, keep the accuracy of
+    % first section
+    if p.Results.fitOrder ~= ""
+        flagAccuracy = true;
+        accuracy=p.Results.fitOrder;
+    else
+        flagAccuracy = false;
+    end
+
     if(strcmp(p.Results.Silent,'Yes')); SeeMe=0; else, SeeMe=1; end
 
     % Extract the height channel
     raw_data_Height=filtData(strcmp({filtData.Channel_name},'Height (measured)')).AFM_image;
     % Orient the image by counterclockwise 180° and flip to coencide with the Microscopy image through rotations
+    
     raw_data_Height=flip(rot90(raw_data_Height),2);
+    %raw_data_Height=rot90(raw_data_Height);
+
+
     % Normalize using the 2D max value
     visible_data_rot_Height=raw_data_Height/max(max(raw_data_Height));
     %maps the intensity values in grayscale image I to new values in J
     visible_data_rot_Height=imadjust(visible_data_rot_Height);
     
-    f1=figure;
-    imshow(visible_data_rot_Height)
-    colormap parula, title('Original Height (measured) channel','FontSize',17),
-    c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
-    ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
-    if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f1); end
     if SeeMe
-        saveas(f1,sprintf('%s/resultA3_1_originalHeightChannel.tif',filepath))
+        f1=figure;
+        imshow(visible_data_rot_Height)
+        colormap parula, title('Original Height (measured) channel','FontSize',17),
+        c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
+        ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
+        if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f1); end
     end
-    [~]=questdlg("Crop the Area","","OK","OK");
-    % Crop AFM image
-    % Rect = Size and position of the crop rectangle [xmin ymin width height].
-    [~,~,cropped_image,Rect]=imcrop();
-    close(f1)
+
+    % [~]=questdlg("Crop the Area","","OK","OK");
+    % % Crop AFM image
+    % % Rect = Size and position of the crop rectangle [xmin ymin width height].
+    % [~,~,cropped_image,Rect]=imcrop();
+    % close(f1)
+    % 
+    % % Extract the data relative to the cropped area for each channel
+    % for i=1:size(filtData,2)
+    %     %rotate and flip because the the crop area reference is already rotated and flipped
+    %     temp_img=flip(rot90(filtData(i).AFM_image),2);
+    %     size_Max_r=size(temp_img,1);
+    %     size_Max_c=size(temp_img,2);
+    %     end_y=round(Rect(1,1))+round(Rect(1,3));
+    %     if(end_y>size_Max_c)
+    %         end_y=size_Max_c;
+    %     end
+    %     start_y=round(Rect(1,1));
+    %     end_x=round(Rect(1,2))+round(Rect(1,4));
+    %     if(end_x>size_Max_r)
+    %         end_x=size_Max_r;
+    %     end  
+    %     start_x=round(Rect(1,2));
+    %     Cropped_Images(i)=struct(...
+    %         'Channel_name', filtData(i).Channel_name,...
+    %         'Trace_type', filtData(i).Trace_type, ...
+    %         'Cropped_AFM_image', temp_img(start_x:end_x,start_y:end_y));
+    % end
     
-    % Extract the data relative to the cropped area for each channel
+    cropped_image=visible_data_rot_Height;
     for i=1:size(filtData,2)
-        %rotate and flip because the the crop area reference is already rotated and flipped
         temp_img=flip(rot90(filtData(i).AFM_image),2);
-        size_Max_r=size(temp_img,1);
-        size_Max_c=size(temp_img,2);
-        end_y=round(Rect(1,1))+round(Rect(1,3));
-        if(end_y>size_Max_c)
-            end_y=size_Max_c;
-        end
-        start_y=round(Rect(1,1));
-        end_x=round(Rect(1,2))+round(Rect(1,4));
-        if(end_x>size_Max_r)
-            end_x=size_Max_r;
-        end  
-        start_x=round(Rect(1,2));
         Cropped_Images(i)=struct(...
-            'Channel_name', filtData(i).Channel_name,...
-            'Trace_type', filtData(i).Trace_type, ...
-            'Cropped_AFM_image', temp_img(start_x:end_x,start_y:end_y));
-    end     
+                'Channel_name', filtData(i).Channel_name,...
+                'Trace_type', filtData(i).Trace_type, ...
+                'AFM_image', temp_img);
+    end
+
     wb=waitbar(0/size(cropped_image,1),sprintf('Removing Polynomial Baseline %.0f of %.0f',0,size(cropped_image,1)),...
         'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
     setappdata(wb,'canceling',0);
@@ -181,113 +203,149 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonito
     %   - Sum of squares due to error / Degree-of-freedom adjusted coefficient of determination
     %   - Sum of squares due to error
     %   - Degree-of-freedom adjusted coefficient of determination
-    if strcmp(p.Results.Accuracy,'Low')
-        limit=3;
-    elseif strcmp(p.Results.Accuracy,'Medium')
-        limit=6;
-    else
-        limit=9;
-    end
-    %init vars
-    % the fit_decision_final will contain the best fit_decision and the polynomial parameters (if grade = 3
-    % ==> # parameters = 4)
-    fit_decision_final=nan(size(filt_data_no_Bk,2),3+limit+1);
-    Bk_iterative=zeros(size(filt_data_no_Bk,1),size(filt_data_no_Bk,2));
-    N_Cycluse_waitbar=size(filt_data_no_Bk,2);
-    % build array abscissas for the fitting
-    x=1:size(filt_data_no_Bk,1);
-
-    % Polynomial baseline fitting (line by line) - Linear least squares fitting to the results
-    for i=1:size(filt_data_no_Bk,2)
-        if(exist('wb','var'))
-            %if cancel is clicked, stop
-            if getappdata(wb,'canceling')
-               break
-            end
+    
+    
+    % Extract the (1) height no Bk, which is not used, (2) cropped AFM channels, (3) I/O image of Height and (4) info of the cropped area
+    while true
+        if ~flagAccuracy
+            answer=getValidAnswer('Fitting AFM Height channel data: which fitting order range use?','',{'Low (1-3)','Medium (1-6)','High (1-9)'});
+            switch answer
+                case 1
+                    accuracy= 'Low';
+                case 2
+                    accuracy= 'Medium';
+                case 3
+                    accuracy= 'High';
+            end      
         end
-        flag_signal_y=filt_data_no_Bk(:,i);
-        flag_signal_x=(1:size(flag_signal_y,1))';
-        flag_signal_y(flag_signal_y>=median(filt_data_no_Bk(:,i)))=nan;
-        flag_signal_x(flag_signal_y>=median(filt_data_no_Bk(:,i)))=nan;
-        [pos_outliner]=isoutlier(flag_signal_y);
         
-        while(any(pos_outliner))
-            flag_signal_y(pos_outliner==1)=nan;
-            flag_signal_x(pos_outliner==1)=nan;
-            [pos_outliner]=isoutlier(flag_signal_y,'gesd');
-        end
-        [xData, yData] = prepareCurveData(flag_signal_x,flag_signal_y);
-        
-        if(size(xData,1)>2)
-            opts = fitoptions( 'Method', 'LinearLeastSquares' );
-            opts.Robust = 'LAR';
-            fit_decision=NaN(3,limit);
-            
-            for z=1:limit
-                % based on the choosen accuracy, run the fitting using different curves to find the best fit
-                % before returning the definitive fitted single fast scan line
-                ft = fittype(sprintf('poly%d',z));
-                % returns goodness-of-fit statistics in the structure gof. Exclude data corresponding to PDA,
-                % which is previously converted to 5 
-                [~, gof] = fit( xData, yData, ft,opts);
-                if(gof.adjrsquare<0)
-                    gof.adjrsquare=0.001;
-                end
-                fit_decision(1,z)=abs(gof.sse)/gof.adjrsquare;
-                fit_decision(2,z)=gof.sse;
-                fit_decision(3,z)=gof.adjrsquare;
-            end
-
-            clearvars Ind
-            [~,Ind]=min(fit_decision(2,:));
-            
-            ft = fittype(sprintf('poly%d',Ind));
-            waitbar(i/N_Cycluse_waitbar,wb,sprintf('Processing %d° Ord Pol fit ... Line %.0f Completeted  %2.1f %%',Ind,i,i/N_Cycluse_waitbar*100));
-          
-            % save the fitting decisions
-            fit_decision_final(i,1)=Ind;
-            fit_decision_final(i,2)=fit_decision(2,Ind);
-            fit_decision_final(i,3)=fit_decision(3,Ind);
-            % start the fitting.
-            % Although the fitresult seems to be unused, it is actually evaluated with eval function.
-            [fitresult, ~] = fit( xData, yData, ft, opts ); % gof was suppressed
+        if strcmp(accuracy,'Low')
+            limit=3;
+        elseif strcmp(accuracy,'Medium')
+            limit=6;
         else
-            error('The extracted fast scan line is too short. Something is wrong');
+            limit=9;
         end
-        % build the y value using the polynomial coefficients and x value (1 ==> 512)
-        % save polynomial coefficients (p1, p2, p3, ...) into fit_decision_final
-        commPart =[];
-        j=1;
-        for n=Ind:-1:0
-            commPart = sprintf('%s + %s', commPart,sprintf('fitresult.p%d*(x).^%d',j,n));
-            eval(sprintf('fit_decision_final(i,%d)= fitresult.p%d;',j+3,j))
-            j=j+1;
-        end
-        Bk_iterative(:,i)= eval(commPart);
-    end
-    delete(wb)
+
+        %init vars
+        % the fit_decision_final will contain the best fit_decision and the polynomial parameters (if grade = 3
+        % ==> # parameters = 4)
+        fit_decision_final=nan(size(filt_data_no_Bk,2),3+limit+1);
+        Bk_iterative=zeros(size(filt_data_no_Bk,1),size(filt_data_no_Bk,2));
+        N_Cycluse_waitbar=size(filt_data_no_Bk,2);
+        % build array abscissas for the fitting
+        x=1:size(filt_data_no_Bk,1); %#ok<NASGU>
+        clear Ind fitresult
+        
+        % Polynomial baseline fitting (line by line) - Linear least squares fitting to the results
+        for i=1:size(filt_data_no_Bk,2)
+            if(exist('wb','var'))
+                %if cancel is clicked, stop
+                if getappdata(wb,'canceling')
+                   break
+                end
+            end
+            flag_signal_y=filt_data_no_Bk(:,i);
+            flag_signal_x=(1:size(flag_signal_y,1))';
+            flag_signal_y(flag_signal_y>=median(filt_data_no_Bk(:,i)))=nan;
+            flag_signal_x(flag_signal_y>=median(filt_data_no_Bk(:,i)))=nan;
+            [pos_outliner]=isoutlier(flag_signal_y);
+            
+            while(any(pos_outliner))
+                flag_signal_y(pos_outliner==1)=nan;
+                flag_signal_x(pos_outliner==1)=nan;
+                [pos_outliner]=isoutlier(flag_signal_y,'gesd');
+            end
+            [xData, yData] = prepareCurveData(flag_signal_x,flag_signal_y);
+            
+            if(size(xData,1)>2)
+                opts = fitoptions( 'Method', 'LinearLeastSquares' );
+                opts.Robust = 'LAR';
+                fit_decision=NaN(3,limit);
+                
+                for z=1:limit
+                    % based on the choosen accuracy, run the fitting using different curves to find the best fit
+                    % before returning the definitive fitted single fast scan line
+                    ft = fittype(sprintf('poly%d',z));
+                    % returns goodness-of-fit statistics in the structure gof. Exclude data corresponding to PDA,
+                    % which is previously converted to 5 
+                    [~, gof] = fit( xData, yData, ft,opts);
+                    if(gof.adjrsquare<0)
+                        gof.adjrsquare=0.001;
+                    end
+                    fit_decision(1,z)=abs(gof.sse)/gof.adjrsquare;
+                    fit_decision(2,z)=gof.sse;
+                    fit_decision(3,z)=gof.adjrsquare;
+                end
     
-    to_avg=find(fit_decision_final(:,3)<0.95);
-    if(exist('to_avg','var'))
-        for i=1:size(to_avg,1)-1
-            if(to_avg(i,1)~=1)
-                Bk_iterative(:,to_avg(i,1))=(Bk_iterative(:,to_avg(i,1)-1)+Bk_iterative(:,to_avg(i,1)+1))/2;
-            elseif(to_avg(i,1)==1)
-                Bk_iterative(:,to_avg(i,1))=Bk_iterative(:,to_avg(i,1)+1);
-            elseif(to_avg(i,1)==size(Bk_iterative,2))
-                Bk_iterative(:,to_avg(i,1))=Bk_iterative(:,to_avg(i,1)-1);
+                
+                [~,Ind]=min(fit_decision(2,:));
+                
+                ft = fittype(sprintf('poly%d',Ind));
+                waitbar(i/N_Cycluse_waitbar,wb,sprintf('Processing %d° Ord Pol fit ... Line %.0f Completeted  %2.1f %%',Ind,i,i/N_Cycluse_waitbar*100));
+              
+                % save the fitting decisions
+                fit_decision_final(i,1)=Ind;
+                fit_decision_final(i,2)=fit_decision(2,Ind);
+                fit_decision_final(i,3)=fit_decision(3,Ind);
+                % start the fitting.
+                % Although the fitresult seems to be unused, it is actually evaluated with eval function.
+                [fitresult, ~] = fit( xData, yData, ft, opts ); %#ok<ASGLU> % gof was suppressed
+            else
+                error('The extracted fast scan line is too short. Something is wrong');
+            end
+            % build the y value using the polynomial coefficients and x value (1 ==> 512)
+            % save polynomial coefficients (p1, p2, p3, ...) into fit_decision_final
+            commPart =[];
+            j=1;
+            for n=Ind:-1:0
+                commPart = sprintf('%s + %s', commPart,sprintf('fitresult.p%d*(x).^%d',j,n));
+                eval(sprintf('fit_decision_final(i,%d)= fitresult.p%d;',j+3,j))
+                j=j+1;
+            end
+            Bk_iterative(:,i)= eval(commPart);
+        end
+                
+        to_avg=find(fit_decision_final(:,3)<0.95);
+        if(exist('to_avg','var'))
+            for i=1:size(to_avg,1)-1
+                if(to_avg(i,1)~=1)
+                    Bk_iterative(:,to_avg(i,1))=(Bk_iterative(:,to_avg(i,1)-1)+Bk_iterative(:,to_avg(i,1)+1))/2;
+                elseif(to_avg(i,1)==1)
+                    Bk_iterative(:,to_avg(i,1))=Bk_iterative(:,to_avg(i,1)+1);
+                elseif(to_avg(i,1)==size(Bk_iterative,2))
+                    Bk_iterative(:,to_avg(i,1))=Bk_iterative(:,to_avg(i,1)-1);
+                end
             end
         end
+       
+        AFM_noBk=minus(filt_data_no_Bk,Bk_iterative);
+        AFM_noBk=AFM_noBk-min(min(AFM_noBk));
+        AFM_noBk_visible_data=AFM_noBk/max(max(AFM_noBk));
+        AFM_noBk_visible_data=imadjust(AFM_noBk_visible_data);
+        
+        f2=figure;
+        imshow(AFM_noBk_visible_data),colormap parula, title('Fitted Height (measured) channel', 'FontSize',16)
+        if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f2); end
+        c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
+        ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
+        
+        if flagAccuracy
+            close all
+            break
+        end
+
+        if getValidAnswer('Satisfied of the fitting?','',{'y','n'}) == 1
+            close all
+            break
+        end
     end
-   
-    AFM_noBk=minus(filt_data_no_Bk,Bk_iterative);
-    AFM_noBk=AFM_noBk-min(min(AFM_noBk));
-    AFM_noBk_visible_data=AFM_noBk/max(max(AFM_noBk));
-    AFM_noBk_visible_data=imadjust(AFM_noBk_visible_data);
     
-    f2=figure;
+
+
+    f3=figure;
     subplot(121), imshow(AFM_noBk_visible_data),colormap parula, title('Fitted Height (measured) channel', 'FontSize',16)
-    if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f2); end
+    if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f3); end
     c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
     ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
 
@@ -341,14 +399,14 @@ function [AFM_noBk,Cropped_Images,IO_Image,Rect]=A3_El_AFM(filtData,secondMonito
         end
     end
     
+    saveas(f3,sprintf('%s/resultA3_1_fittedHeightChannel_BaselineForeground.tif',filepath))
     % converts any nonzero element of the yellow/blue image into a logical image.
     IO_Image=logical(seg_dial);
     if(exist('wb','var'))
         delete (wb)
     end
-    if SeeMe
-        saveas(f2,sprintf('%s/resultA3_2_fittedHeightChannel_BaselineForeground.tif',filepath))
-    end
+    uiwait(msgbox('Click to continue'))
+    close all
 end
 
 

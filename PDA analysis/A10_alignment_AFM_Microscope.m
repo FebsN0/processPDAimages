@@ -7,7 +7,7 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
     %   - BF_IO_choice :   same size as the previous output data, it is the fixed data used for alignment
     %   - AFM_Elab      :   the AFM data with any channels. Post elaboration of the original AFM_Elab used as input.
     %                       the updates consist in:
-    %                               1) Cropped_AFM_image field  (update): the original data is aligned (rotation and resize)
+    %                               1) AFM_image field  (update): the original data is aligned (rotation and resize)
     %                               2) AFM_Padded field         (new): it is the same of before, but in the space of BF original image (BF_Mic_Image_IO input variable)
     %   - pos_allignment
     %   - details_it_reg:   contains all the iterative (both manual or automatic) steps performed to process the AFM image. Two possibilities for each row
@@ -99,7 +99,7 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
     for flag_AFM=1:size(AFM_Elab,2)
         % scale the AFM channels. It doesnt mean that the matrix size of AFM and BF images will be the same.
         % Indipendent from BF processing
-        AFM_Elab(flag_AFM).Cropped_AFM_image=imresize(AFM_Elab(flag_AFM).Cropped_AFM_image,scale);
+        AFM_Elab(flag_AFM).AFM_image=imresize(AFM_Elab(flag_AFM).AFM_image,scale);
     end
     clear BFRatioHorizontal BFRatioVertical AFMRatioHorizontal AFMRatioVertical scaleAFM2BF_H scaleAFM2BF_V scale
     
@@ -207,12 +207,12 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
             % process rotation
             if details_it_reg(i,1)==0
                 for flag_AFM=1:size(AFM_Elab,2)
-                    AFM_Elab(flag_AFM).Cropped_AFM_image=imrotate(AFM_Elab(flag_AFM).Cropped_AFM_image,details_it_reg(i,2),'bilinear','loose');
+                    AFM_Elab(flag_AFM).AFM_image=imrotate(AFM_Elab(flag_AFM).AFM_image,details_it_reg(i,2),'bilinear','loose');
                 end
             else
             % process resize
                 for flag_AFM=1:size(AFM_Elab,2)
-                    AFM_Elab(flag_AFM).Cropped_AFM_image=imresize(AFM_Elab(flag_AFM).Cropped_AFM_image,size(AFM_Elab(flag_AFM).Cropped_AFM_image)+details_it_reg(i,2));
+                    AFM_Elab(flag_AFM).AFM_image=imresize(AFM_Elab(flag_AFM).AFM_image,size(AFM_Elab(flag_AFM).AFM_image)+details_it_reg(i,2));
                 end
             end
         end
@@ -295,13 +295,13 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
                 size_OI = sz_iterative(b,:);
                 % save the best moving AFM image
                 moving_OPT= moving_iterative{b};
-                % adjust any AFM data channels into FIELD Cropped_AFM_image (Lateral deflection, etc etc) every step based
+                % adjust any AFM data channels into FIELD AFM_image (Lateral deflection, etc etc) every step based
                 % on the OPT process. NOTE: Indipendent from BF processing
                 switch b
                     case {1,2} 
                         if b == 1, StepSizeMatrix=abs(StepSizeMatrix); else, StepSizeMatrix=-abs(StepSizeMatrix); end
                         for flag_AFM=1:size(AFM_Elab,2)
-                            AFM_Elab(flag_AFM).Cropped_AFM_image=imresize(AFM_Elab(flag_AFM).Cropped_AFM_image,size(AFM_Elab(flag_AFM).Cropped_AFM_image)+StepSizeMatrix);
+                            AFM_Elab(flag_AFM).AFM_image=imresize(AFM_Elab(flag_AFM).AFM_image,size(AFM_Elab(flag_AFM).AFM_image)+StepSizeMatrix);
                         end
                         % keep track
                         details_it_reg(z,1)=1;
@@ -309,7 +309,7 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
                     case {3,4}
                         if b == 3, Rot_par=abs(Rot_par); else, Rot_par=-abs(Rot_par); end
                         for flag_AFM=1:size(AFM_Elab,2)
-                            AFM_Elab(flag_AFM).Cropped_AFM_image=imrotate(AFM_Elab(flag_AFM).Cropped_AFM_image,Rot_par,'bilinear','loose');
+                            AFM_Elab(flag_AFM).AFM_image=imrotate(AFM_Elab(flag_AFM).AFM_image,Rot_par,'bilinear','loose');
                         end
                         % keep track
                         details_it_reg(z,1)=0;
@@ -392,7 +392,7 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
     for flag_size=1:size(AFM_Elab,2)
         AFM_Elab(flag_size).AFM_Padded( coordinatesFromBForiginal(3):coordinatesFromBForiginal(4), ...
                                         coordinatesFromBForiginal(1):coordinatesFromBForiginal(2)) ...
-                        = AFM_Elab(flag_size).Cropped_AFM_image;
+                        = AFM_Elab(flag_size).AFM_image;
     end
    
 

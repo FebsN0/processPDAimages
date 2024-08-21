@@ -46,70 +46,36 @@ function [Selected_AFM_data]=A2_CleanUpData2_AFM(data,secondMonitorMain,newFolde
         raw_data_VD_trace=  Selected_AFM_data(strcmp({Selected_AFM_data.Channel_name},'Vertical Deflection') & strcmp({Selected_AFM_data.Trace_type},'Trace')).AFM_image;
         raw_data_VD_retrace=Selected_AFM_data(strcmp({Selected_AFM_data.Channel_name},'Vertical Deflection') & strcmp({Selected_AFM_data.Trace_type},'ReTrace')).AFM_image;
         
-        if SeeMe
-            f1=figure('Visible','on');
-        else
-            f1=figure('Visible','off');
-        end
-        imagesc(raw_data_Height*1e6)
-        colormap parula, title('Raw data Height (measured) channel','FontSize',17),
-        c = colorbar; c.Label.String = sprintf('height (\x03bcm)'); c.Label.FontSize=15;
-        ylabel('slow scan line direction','FontSize',12), xlabel('fast scan line direction','FontSize',12)
-        axis equal, xlim([0 512]), ylim([0 512])
-        if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f1); end
-        saveas(f1,sprintf('%s/resultA2_1_RawHeightChannel.tif',newFolder))
-        
-        if SeeMe
-            f2=figure('Visible','on');
-        else
-            f2=figure('Visible','off');
-        end
-        imagesc(raw_data_LD_trace)
-        colormap parula, title('Raw data Lateral Deflection Trace channel','FontSize',17),
-        c = colorbar; c.Label.String = 'Voltage [V]'; c.Label.FontSize=15;
-        ylabel('slow scan line direction','FontSize',12), xlabel('fast scan line direction','FontSize',12)
-        axis equal, xlim([0 512]), ylim([0 512])
-        if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f2); end
-        saveas(f2,sprintf('%s/resultA2_2_RawLDChannel_trace.tif',newFolder))
 
-        if SeeMe
-            f3=figure('Visible','on');
-        else
-            f3=figure('Visible','off');
-        end
-        imagesc(raw_data_LD_retrace)
-        colormap parula, title('Raw data Lateral Deflection Retrace channel','FontSize',17),
-        c = colorbar; c.Label.String = 'Voltage [V]'; c.Label.FontSize=15;
-        ylabel('slow scan line direction','FontSize',12), xlabel('fast scan line direction','FontSize',12)
-        axis equal, xlim([0 512]), ylim([0 512])
-        if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f3); end
-        saveas(f3,sprintf('%s/resultA2_3_RawLDChannel_retrace.tif',newFolder))
+        data=raw_data_Height*1e6;
+        titleData='Raw data Height (measured) channel';
+        labelBar=sprintf('height (\x03bcm)');
+        nameFig=sprintf('%s/resultA2_1_RawHeightChannel.tif',newFolder);
+        showData(secondMonitorMain,SeeMe,1,data,titleData,labelBar,nameFig)
 
-        if SeeMe
-            f4=figure('Visible','on');
-        else
-            f4=figure('Visible','off');
-        end
-        imagesc(raw_data_VD_trace*1e9)
-        colormap parula, title('Raw data Vertical Deflection trace channel','FontSize',17),
-        c = colorbar; c.Label.String = 'Force [nN]'; c.Label.FontSize=15;
-        ylabel('slow scan line direction','FontSize',12), xlabel('fast scan line direction','FontSize',12)
-        axis equal, xlim([0 512]), ylim([0 512])
-        if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f4); end
-        saveas(f4,sprintf('%s/resultA2_4_RawVDChannel_trace.tif',newFolder))
+        data=raw_data_LD_trace;
+        titleData='Raw data Lateral Deflection Trace channel';
+        labelBar='Voltage [V]';
+        nameFig=sprintf('%s/resultA2_2_RawLDChannel_trace.tif',newFolder);
+        showData(secondMonitorMain,SeeMe,2,data,titleData,labelBar,nameFig)
 
-        if SeeMe
-            f5=figure('Visible','on');
-        else
-            f5=figure('Visible','off');
-        end
-        imagesc(raw_data_VD_retrace*1e9)
-        colormap parula, title('Raw data Vertical Deflection retrace channel','FontSize',17),
-        c = colorbar; c.Label.String = 'Force [nN]'; c.Label.FontSize=15;
-        ylabel('slow scan line direction','FontSize',12), xlabel('fast scan line direction','FontSize',12)
-        axis equal, xlim([0 512]), ylim([0 512])
-        if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f5); end
-        saveas(f5,sprintf('%s/resultA2_5_RawVDChannel_retrace.tif',newFolder))
+        data=raw_data_LD_retrace;
+        titleData='Raw data Lateral Deflection Retrace channel';
+        nameFig=sprintf('%s/resultA2_3_RawLDChannel_retrace.tif',newFolder);
+        showData(secondMonitorMain,SeeMe,3,data,titleData,labelBar,nameFig)
+
+        data=raw_data_VD_trace*1e9;
+        titleData='Raw data Vertical Deflection trace channel';
+        labelBar='Force [nN]';
+        nameFig=sprintf('%s/resultA2_4_RawVDChannel_trace.tif',newFolder);
+        showData(secondMonitorMain,SeeMe,4,data,titleData,labelBar,nameFig)
+ 
+
+        data=raw_data_VD_retrace*1e9;
+        titleData='Raw data Vertical Deflection retrace channel';
+        nameFig=sprintf('%s/resultA2_5_RawVDChannel_retrace.tif',newFolder);
+        showData(secondMonitorMain,SeeMe,5,data,titleData,labelBar,nameFig)
+
     else
        error('Invalid Input!');
     end

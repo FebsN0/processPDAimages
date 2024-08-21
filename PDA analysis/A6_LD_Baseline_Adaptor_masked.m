@@ -23,9 +23,9 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative,setpoints]=A6_LD_Baseline_Ada
 
     % extract data (lateral deflection Trace and Retrace, vertical deflection) and then mask (glass-PDA) elementXelement
     % ONLY in correspondence with the glass!
-    Lateral_Trace   = (AFM_cropped_Images(strcmpi({AFM_cropped_Images.Channel_name},'Lateral Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'Trace')).Cropped_AFM_image);
-    Lateral_ReTrace = (AFM_cropped_Images(strcmpi({AFM_cropped_Images.Channel_name},'Lateral Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'ReTrace')).Cropped_AFM_image);
-    vertical_Trace  = (AFM_cropped_Images(strcmpi({AFM_cropped_Images.Channel_name},'Vertical Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'Trace')).Cropped_AFM_image);
+    Lateral_Trace   = (AFM_cropped_Images(strcmpi({AFM_cropped_Images.Channel_name},'Lateral Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'Trace')).AFM_image);
+    Lateral_ReTrace = (AFM_cropped_Images(strcmpi({AFM_cropped_Images.Channel_name},'Lateral Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'ReTrace')).AFM_image);
+    vertical_Trace  = (AFM_cropped_Images(strcmpi({AFM_cropped_Images.Channel_name},'Vertical Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'Trace')).AFM_image);
 
 
     % find the setpoint values used in the experiments
@@ -219,5 +219,5 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative,setpoints]=A6_LD_Baseline_Ada
         
     AFM_Elab=AFM_cropped_Images;
     % save the corrected lateral force into cropped AFM image
-    AFM_Elab(strcmpi({AFM_cropped_Images.Channel_name},'Lateral Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'Trace')).Cropped_AFM_image=Corrected_LD_Trace;
+    AFM_Elab(strcmpi({AFM_cropped_Images.Channel_name},'Lateral Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'Trace')).AFM_image=Corrected_LD_Trace;
 end
