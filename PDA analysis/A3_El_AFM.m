@@ -36,22 +36,12 @@ function [Cropped_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain
     addRequired(p, 'filtData', @(x) isstruct(x));
     %Add default parameters. When call the function, use 'argName' as well you use 'LineStyle' in plot! And
     %then the values
-    
-    argName = 'fitOrder';
-    defaultVal = '';
-    addParameter(p,argName,defaultVal, @(x) ismember(x,{'Low','Medium','High'}));
-
-    argName = 'AutoElab';
-    defaultVal = 'No';
-    addParameter(p, argName, defaultVal,@(x) ismember(x,{'No','Yes'}));
-
-    argName = 'Silent';
-    defaultVal = 'Yes';
-    addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
-
+    argName = 'fitOrder';   defaultVal = '';        addParameter(p,argName,defaultVal, @(x) ismember(x,{'','Low','Medium','High'}));
+    argName = 'AutoElab';   defaultVal = 'No';      addParameter(p, argName, defaultVal,@(x) ismember(x,{'No','Yes'}));
+    argName = 'Silent';     defaultVal = 'Yes';     addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+    argName = 'SaveFig';    defaultVal = 'Yes';     addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     % validate and parse the inputs
     parse(p,filtData,varargin{:});
-
     clearvars argName defaultVal
     
     % if this is seconf time that the A3 is called, like for the second AFM section, keep the accuracy of
@@ -63,8 +53,9 @@ function [Cropped_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain
         flagAccuracy = false;
     end
 
-    if(strcmp(p.Results.Silent,'Yes')); SeeMe=0; else, SeeMe=1; end
-
+    if(strcmp(p.Results.Silent,'Yes'));  SeeMe=0; else, SeeMe=1; end
+    if(strcmp(p.Results.SaveFig,'Yes')); SavFg=1; else, SavFg=0; end
+    
     % Extract the height channel
     raw_data_Height=filtData(strcmp({filtData.Channel_name},'Height (measured)')).AFM_image;
     % Orient the image by counterclockwise 180° and flip to coencide with the Microscopy image through rotations
@@ -398,15 +389,15 @@ function [Cropped_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain
             end
         end
     end
+    if SavFg
+        saveas(f3,sprintf('%s/resultA3_1_fittedHeightChannel_BaselineForeground.tif',filepath))
+    end
     
-    saveas(f3,sprintf('%s/resultA3_1_fittedHeightChannel_BaselineForeground.tif',filepath))
     % converts any nonzero element of the yellow/blue image into a logical image.
     IO_Image=logical(seg_dial);
     if(exist('wb','var'))
         delete (wb)
     end
-    uiwait(msgbox('Click to continue'))
-    close all
 end
 
 

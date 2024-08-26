@@ -2,22 +2,18 @@ clc, clear, close all
 
 secondMonitorMain=objInSecondMonitor;
 % upload .jpk files. If more than one and if from same experiment in which setpoint is changed, then assembly.
-[AFM_FittedMasked,AFM_height_IO,metaData_AFM,filePathData,newFolder]=A1_openANDassembly_JPK(secondMonitorMain);
+[AFM_FittedMasked,AFM_height_IO,metaData_AFM,filePathData,newFolder]=A1_openANDassembly_JPK(secondMonitorMain,'Silent','Yes');
 
 
 
-
-
-
-%%
 % to extract the friction coefficient, choose which method use.
-question=sprintf('Which method perform to extract the glass friction coefficient?');
+question=sprintf('Which method perform to extract the background friction coefficient?');
 options={ ...
-    sprintf('1) Average fast scan lines containing only glass.\nUse the .jpk image containing only glass'), ...
-    sprintf('2) Masking PDA feature.\nUse the .jpk image containing both PDA and glass (ReTrace Data required - Hover Mode OFF)'), ... 
-    sprintf('3) Masking PDA + outlier removal features\n(ReTrace Data required - Hover Mode OFF)'), ...
-    sprintf('4) Use a previous calculated friction coefficient: TRCDA = 0.2920'), ...
-    sprintf('5) Use a previous calculated friction coefficient: PCDA  = 0.2626'), ...
+    sprintf('1) Average fast scan lines containing only background.\nUse the .jpk image containing only background'), ...
+    sprintf('2) Masking PDA feature. Use the .jpk image containing both PDA and background\n(ReTrace Data required - Hover Mode OFF)'), ... 
+    sprintf('3) Masking PDA + outlier removal features. Use the .jpk image containing both PDA and background\n(ReTrace Data required - Hover Mode OFF)'), ...
+    sprintf('4) Use a previous calculated friction coefficient: (only) TRCDA= 0.2920'), ...
+    sprintf('5) Use a previous calculated friction coefficient: (only) PCDA  = 0.2626'), ...
     sprintf('6) Enter manually a value')};
 choice = getValidAnswer(question, '', options);
 
@@ -120,6 +116,8 @@ clear BF_Mic_Image_aligned
 [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_data_optAlignment,results_AFM_BF_aligment]=A10_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_Elab,newFolder,secondMonitorMain,'Margin',70);
 clear AFM_height_IO AFM_Elab
 
+%%
 % correlation FLUORESCENCE AND AFM DATA
 A11_correlation_AFM_BF(Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,AFM_IO_padded_sizeBF,AFM_data_optAlignment,setpoints,secondMonitorMain,newFolder);
 
+save data

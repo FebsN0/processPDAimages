@@ -14,7 +14,7 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative,setpoints]=A6_LD_Baseline_Ada
     %Add default parameters. When call the function, use 'argName' as well you use 'LineStyle' in plot! And
     %then the values
     argName = 'Accuracy';   defaultVal = 'Low';     addOptional(p,argName,defaultVal, @(x) ismember(x,{'Low','Medium','High'}));
-    argName = 'Silent';     defaultVal = 'Yes';      addOptional(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+    argName = 'Silent';     defaultVal = 'Yes';     addOptional(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     parse(p,varargin{:});
     clearvars argName defaultVal
     fprintf('Results of optional input:\n\tAccuracy:\t%s\n\tSilent:\t\t%s\n',p.Results.Accuracy,p.Results.Silent)

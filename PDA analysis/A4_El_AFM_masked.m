@@ -30,14 +30,15 @@ function Cropped_Images_Bk=A4_El_AFM_masked(Cropped_Images,AFM_height_IO,secondM
     p=inputParser();    %init instance of inputParser
     % Add required parameter and also check if it is a struct by a inner function end if the Trace_type are all Trace
     addRequired(p, 'Cropped_Images', @(x) isstruct(x));
-    argName = 'Silent';
-    defaultVal = 'No';
-    addOptional(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+    argName = 'Silent';     defaultVal = 'No';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+    argName = 'SaveFig';    defaultVal = 'Yes';     addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+    
     % validate and parse the inputs
     parse(p,Cropped_Images,varargin{:});
     clearvars argName defaultVal
 
     if(strcmp(p.Results.Silent,'Yes')); SeeMe=0; else, SeeMe=1; end
+    if(strcmp(p.Results.SaveFig,'Yes')); SavFg=1; else, SavFg=0; end
 
     % added on 20012020: using the 0/1 height image, new fitting by excluding those information
     % which correspond to the PDA crystals. Put value 5 to exclude
@@ -68,16 +69,19 @@ function Cropped_Images_Bk=A4_El_AFM_masked(Cropped_Images,AFM_height_IO,secondM
   
     AFM_noBk=poly_filt_data;
     AFM_noBk=AFM_noBk-min(min(AFM_noBk));
-    if SeeMe
-        f1=figure('Visible','on');
-    else
-        f1=figure('Visible','off');
+    if SavFg
+        if SeeMe
+            f1=figure('Visible','on');
+        else
+            f1=figure('Visible','off');
+        end
+
+        imshow(imadjust(AFM_noBk/max(max(AFM_noBk)))),colormap parula, title('(Optimized) Fitted Height (measured) channel', 'FontSize',16)        
+        if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f1); end
+        c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
+        ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
+        saveas(f1,sprintf('%s/resultA4_0_OptFittedHeightChannel.tif',filepath))
     end
-    imshow(imadjust(AFM_noBk/max(max(AFM_noBk)))),colormap parula, title('(Optimized) Fitted Height (measured) channel', 'FontSize',16)        
-    if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f1); end
-    c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
-    ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
-    saveas(f1,sprintf('%s/resultA4_1_OptFittedHeightChannel.tif',filepath))
     
     if(exist('wb','var'))
         delete(wb)

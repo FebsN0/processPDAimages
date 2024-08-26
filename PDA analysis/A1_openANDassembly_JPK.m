@@ -1,4 +1,4 @@
-function [dataOrdered,concatenated_AFM_Height_IO,metaDataOrdered,filePathData,newFolder] = A1_openANDassembly_JPK(secondMonitorMain,varargin)
+function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     %%%% the funtion open .jpk files. If there are more files than one, then assembly togheter before process
     %%%% them
     %%%% IMPORTANT NOTE: the sum area of any section must be a square
@@ -11,16 +11,14 @@ function [dataOrdered,concatenated_AFM_Height_IO,metaDataOrdered,filePathData,ne
     delete(allWaitBars)
     
     %init instance of inputParser
-    p=inputParser();    
-    argName = 'Silent';
-    defaultVal = 'Yes';
-    addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+
+    p=inputParser();
+    argName = 'Silent';         defaultVal = 'Yes';     addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     % validate and parse the inputs
     parse(p,varargin{:});
-    if(strcmp(p.Results.Silent,'Yes')); SeeMe=0; else, SeeMe=1; end
+    silent=p.Results.Silent;
 
-
-
+    % select the files
     [fileName, filePathData] = uigetfile('*.jpk', 'Select a .jpk AFM image','MultiSelect', 'on');
     if isequal(fileName,0)
         error('No File Selected');
@@ -32,9 +30,8 @@ function [dataOrdered,concatenated_AFM_Height_IO,metaDataOrdered,filePathData,ne
         end
     end
 
-
-
-    % save the useful figures into a directory
+    % save the useful figures into a directory. Not in the case of sections to save time.
+    % in case of sections, only the assembled version will be saved
     newFolder = fullfile(filePathData, 'Results Processing AFM and fluorescence images');
     % check if dir already exists
     if exist(newFolder, 'dir')
@@ -44,6 +41,7 @@ function [dataOrdered,concatenated_AFM_Height_IO,metaDataOrdered,filePathData,ne
             rmdir(newFolder, 's');
             mkdir(newFolder);
         else
+            % create new directory with different name
             nameFolder = inputdlg('Enter the name new folder','',[1 80]);
             newFolder = fullfile(filePathData,nameFolder{1});
             mkdir(newFolder);
@@ -54,25 +52,32 @@ function [dataOrdered,concatenated_AFM_Height_IO,metaDataOrdered,filePathData,ne
     end
 
 
-
+    flag_processSignleSections=false;
     if numFiles > 1
         question= sprintf('More .jpk files are uploaded. Are they from the same experiment which only setpoint is changed?');
         options= {'Yes','No'};
         if getValidAnswer(question,'',options) ~= 1
             error('Restart again and select only one .jpk file if the more uploaded .jpk are from different experiment')
         end
-        flagAFMSections=true;
+        question= sprintf('Process single sections before assembling?');
+        options= {'Yes','No'};
+        if getValidAnswer(question,'',options) == 1
+            flag_processSignleSections=true;
+        end
+        imgTyp = 'Assembled';
     else
         %if only one file, the var is not a cell
         fullName=fullfile(filePathData,fileName);
-        newSubFolder=newFolder;
-        flagAFMSections=false;
+        imgTyp = 'Entire';
     end
 
     clear question options
     % init variables
-    allScansImage=cell(1,numFiles);
-    allScans_AFM_HeightIO=cell(1,numFiles);
+    allScansImageSTART=cell(1,numFiles);
+    if flag_processSignleSections
+        allScansImageEND=cell(1,numFiles);
+        allScans_AFM_HeightIO=cell(1,numFiles);
+    end
     allScansMetadata=cell(1,numFiles);
     y_OriginAllScans=zeros(1,numFiles);
     y_scan_lengthAllScans=zeros(1,numFiles);
@@ -82,13 +87,12 @@ function [dataOrdered,concatenated_AFM_Height_IO,metaDataOrdered,filePathData,ne
     alphaAllScans=zeros(1,numFiles);
     % EXTRACT ALL DATA
     for i=1:numFiles
-        fprintf('Processing file of the section %d\n',i)
-        if flagAFMSections
+        if numFiles>1
+            fprintf('Processing the file %d over %d\n',i,numFiles)
             fullName=fullfile(filePathData,fileName{i});
-            %save each section image in different subfolder, otherwise, overwritting
-            newSubFolder=sprintf('%s\\section_%d',newFolder,i);
-            mkdir(newSubFolder)
         end
+        if i==1, accuracy=''; end
+       
         % open jpk, it returns the AFM file, the details (position of tip, IGain, Pgain, Sn, Kn and
         % calculates alpha, based on the pub), it returns the location of the file.
         [data,metaData]=A1_open_JPK(fullName);
@@ -108,42 +112,39 @@ function [dataOrdered,concatenated_AFM_Height_IO,metaDataOrdered,filePathData,ne
                 data(j).AFM_image = raw_data_VD_force;
                 data(j).Signal_type = 'force';
             end
-        end
+        end      
         
-        % Remove unnecessary channels to elaboration (necessary for memory save)
-        filtData=A2_CleanUpData2_AFM(data,secondMonitorMain,newSubFolder);
-        clear data
-        
-        if exist('accuracy','var') % after first AFM section, keep the same accuracy
-            [AFM_HeightFitted,AFM_height_IO,accuracy]=A3_El_AFM(filtData,secondMonitorMain,newSubFolder,'fitOrder',accuracy);
-        else
-            [AFM_HeightFitted,AFM_height_IO,accuracy]=A3_El_AFM(filtData,secondMonitorMain,newSubFolder);
-        end
+        % remove not useful information prior the process. Not show the figures. Later
+        saveFig='No';
+        filtData=A2_CleanUpData2_AFM(data,secondMonitorMain,newFolder,'SaveFig',saveFig);
 
-        clear filtData
-        % Using the AFM_height_IO, fit the background again, yielding a more accurate height image
-        AFM_HeightFittedMasked=A4_El_AFM_masked(AFM_HeightFitted,AFM_height_IO,secondMonitorMain,newSubFolder,'Silent','Yes');
-        clear AFM_HeightFitted
-        
-        allScansImage{i}=AFM_HeightFittedMasked;
-        allScans_AFM_HeightIO{i}=AFM_height_IO;
+                % save the sections before and after the processing
+        allScansImageSTART{i}=filtData;
         allScansMetadata{i}=metaData;
+
+        % in case the process of single section, dont save and show the single figures not save the post processed data of each section
+        if flag_processSignleSections
+            [AFM_HeightFittedMasked,AFM_height_IO,accuracy]=processData(filtData,secondMonitorMain,newFolder,accuracy,'Yes','No');
+            allScansImageEND{i}=AFM_HeightFittedMasked;
+            allScans_AFM_HeightIO{i}=AFM_height_IO;
+        end
+        clear AFM_height_IO AFM_HeightFittedMasked
         % y slow direction (rows) | x fast direction (columns)
+        % save alpha, x_lengt and x_pixels to check errors later
+        % if different x_length ==> no sense! slow fast scan lines should be equally long
+        % if different x_pixels ==> as before, but also matrix error concatenation!
+        % if different alpha    ==> it means that different vertical calibrations are performed,
+        %                           which it is done % when a new experiment is started, but not
+        %                           when different sections from the single experiment are done  
+        alphaAllScans(i)=allScansMetadata{i}.Alpha;     
         y_OriginAllScans(i)=allScansMetadata{i}.y_Origin;
         y_scan_lengthAllScans(i)=allScansMetadata{i}.y_scan_length;
         x_scan_lengthAllScans(i)=allScansMetadata{i}.x_scan_length;
         y_scan_pixelsAllScans(i)=allScansMetadata{i}.y_scan_pixels;
-        x_scan_pixelsAllScans(i)=allScansMetadata{i}.x_scan_pixels;
-        % save x_length, x_pixels and alpha to check errors
-        % if different x_length ==> no sense! slow fast scan lines should be equally long
-        % if different x_pixels ==> as before, but also matrix error concatenation!
-        % if different alpha ==> it means that different vertical calibrations are performed, which it is done
-        % when a new experiment is started, but not when different sections from the single experiment are
-        % done    
-        alphaAllScans(i)=allScansMetadata{i}.Alpha;        
+        x_scan_pixelsAllScans(i)=allScansMetadata{i}.x_scan_pixels;  
     end
 
-    % quick error check: each section is geometrically the same in term of length and pixels!
+    % error check: each section must be geometrically the same in term of length and pixels!
     if  ~all(alphaAllScans == alphaAllScans(1)) || ...
         ~all(y_scan_lengthAllScans == y_scan_lengthAllScans(1)) || ...
         ~all(x_scan_lengthAllScans == x_scan_lengthAllScans(1)) || ...
@@ -153,10 +154,20 @@ function [dataOrdered,concatenated_AFM_Height_IO,metaDataOrdered,filePathData,ne
     end
     % check the offset information and properly sort
     [~,idx]=sort(y_OriginAllScans);
-    allScansImageOrdered=allScansImage(idx);
-    allScans_AFM_HeightIO_ordered=allScans_AFM_HeightIO(idx);
+    allScansImageOrderedSTART=allScansImageSTART(idx);
     allScansMetadataOrdered=allScansMetadata(idx);
-    clear allScansMetadata allScansImage metaData data alphaAllScans x_scan_pixelsAllScans x_scan_lengthAllScans
+    % copy common data fields by copying just the first row (The data will be overwritten):
+    %   Channel_name
+    %   Trace_type
+    %   AFM data
+    dataOrderedSTART=allScansImageOrderedSTART{1};
+    if flag_processSignleSections
+        allScansImageOrderedEND=allScansImageEND(idx);
+        allScans_AFM_HeightIO_ordered=allScans_AFM_HeightIO(idx);
+        dataOrderedEND=allScansImageOrderedEND{1};
+    end
+ 
+    clear allScansMetadata allScansImageSTART allScansImageEND metaData data alphaAllScans x_scan_pixelsAllScans x_scan_lengthAllScans
     
     % adjust the metaData, in particular:
     %       y_Origin
@@ -174,73 +185,87 @@ function [dataOrdered,concatenated_AFM_Height_IO,metaDataOrdered,filePathData,ne
     metaDataOrdered.y_scan_length= sum(y_scan_lengthAllScans);
     metaDataOrdered.y_scan_pixels= sum(y_scan_pixelsAllScans);
 
-    % Further checks: the total scan area must be a square in term of um and pixels
+    % Further checks: the total scan area should be a square in term of um and pixels
     ratioLength=metaDataOrdered.x_scan_length\metaDataOrdered.y_scan_length;
     ratioPixel=metaDataOrdered.y_scan_pixels\metaDataOrdered.x_scan_pixels;
     if ratioLength ~= 1 || ratioPixel ~= 1
         warning('ratioLength: %. x lengths and/or x pixels is not the same as well as the y length and/or y pixels!!')
     end
+    clear y_scan_pixelsAllScans y_scan_lengthAllScans y_OriginAllScans ratioLength ratioPixel idx allScansMetadataOrdered j i
 
-    clear y_scan_pixelsAllScans y_scan_lengthAllScans y_OriginAllScans ratioLength ratioPixel idx allScansMetadataOrdered
-    % copy common data fields:
-    %   Channel_name
-    %   Trace_type
-    %   AFM data
-    dataOrdered=allScansImageOrdered{1};
-    %init vars
+    if flag_processSignleSections
+        concatenated_AFM_Height_IO = [];
+    end
     % ASSEMBLY BY CONCATENATION
-    concatenated_AFM_Height_IO = [];
-    for i=1:size(dataOrdered,2)
-        concatenatedData_AFM_image=[];
+    for i=1:size(dataOrderedSTART,2)
+        % assembly the pre processed single sections
+        concatenatedData_Raw_afm_image=[];
+        concatenatedData_AFM_image_START=[];
+        % assembly the post processed single sections
+        if flag_processSignleSections
+            concatenatedData_AFM_image_END=[];
+        end
+
         for j=numFiles:-1:1
-            concatenatedData_AFM_image      = cat(2,concatenatedData_AFM_image,allScansImageOrdered{j}(i).AFM_image);
-            if i==1
-                concatenated_AFM_Height_IO  = cat(2,concatenated_AFM_Height_IO,allScans_AFM_HeightIO_ordered{j});
+            dataRAW=flip(allScansImageOrderedSTART{j}(i).Raw_afm_image);
+            concatenatedData_Raw_afm_image      = cat(1,concatenatedData_Raw_afm_image,dataRAW);
+            dataIMAGE=flip(allScansImageOrderedSTART{j}(i).AFM_image);
+            concatenatedData_AFM_image_START    = cat(1,concatenatedData_AFM_image_START,dataIMAGE);
+            if flag_processSignleSections
+                dataPOST=flip(rot90(allScansImageOrderedEND{j}(i).AFM_image));
+                concatenatedData_AFM_image_END  = cat(1,concatenatedData_AFM_image_END,dataPOST);
+                % no need to process iteratively in case of AFM Height IO image
+                if i==1
+                    dataIO=flip(rot90(allScans_AFM_HeightIO_ordered{j}));
+                    concatenated_AFM_Height_IO  = cat(1,concatenated_AFM_Height_IO,dataIO);
+                end
             end
         end
-        dataOrdered(i).AFM_image=concatenatedData_AFM_image;
+
+        dataOrderedSTART(i).Raw_afm_image= flip(concatenatedData_Raw_afm_image);
+        dataOrderedSTART(i).AFM_image=flip(concatenatedData_AFM_image_START);
+        if flag_processSignleSections
+            dataOrderedEND(i).AFM_image   = flip(rot90(concatenatedData_AFM_image_END,-1));
+        end
     end
     
-    % show the concatenated images
-    if flagAFMSections
+    % show and save figures post assembly  
+    saveFig='Yes';
+    A2_CleanUpData2_AFM(dataOrderedSTART,secondMonitorMain,newFolder,'imageType',imgTyp,'phaseProcess','Raw','Silent',silent,'SaveFig',saveFig,'Normalization','Yes');
+    
+    % show and save figures post assembly postProcessing
+    if flag_processSignleSections
+        A2_CleanUpData2_AFM(dataOrderedEND,secondMonitorMain,newFolder,'imageType',imgTyp,'phaseProcess','PostProcessed','Silent',silent,'SaveFig',saveFig,'Normalization','Yes');
+        AFM_HeightFittedMasked=dataOrderedEND;
+        AFM_height_IO=rot90(concatenated_AFM_Height_IO,-1);
         
-        data_Height=    dataOrdered(strcmp({dataOrdered.Channel_name},'Height (measured)')).AFM_image;
-        data_LD_trace=  dataOrdered(strcmp({dataOrdered.Channel_name},'Lateral Deflection') & strcmp({dataOrdered.Trace_type},'Trace')).AFM_image;
-        data_LD_retrace=dataOrdered(strcmp({dataOrdered.Channel_name},'Lateral Deflection') & strcmp({dataOrdered.Trace_type},'ReTrace')).AFM_image;
-        data_VD_trace=  dataOrdered(strcmp({dataOrdered.Channel_name},'Vertical Deflection') & strcmp({dataOrdered.Trace_type},'Trace')).AFM_image;
-        data_VD_retrace=dataOrdered(strcmp({dataOrdered.Channel_name},'Vertical Deflection') & strcmp({dataOrdered.Trace_type},'ReTrace')).AFM_image;
-
-        titleData='Assembled Opt Fitted and masked Height channel';
-        labelBar=sprintf('height (\x03bcm)');
-        nameFig=sprintf('%s/resultA4_2_Assembled_OptFittedMasked_HeightChannel.tif',newFolder);
-        showData(secondMonitorMain,true,1,data_Height*1e6,titleData,labelBar,nameFig)
-    
-        titleData='Assembled Height IO';
-        labelBar='';
-        nameFig=sprintf('%s/resultA4_3_Assembled_HeightIO.tif',newFolder);
-        showData(secondMonitorMain,true,2,concatenated_AFM_Height_IO,titleData,labelBar,nameFig)
-
-        titleData='Assembled Raw Lateral Deflection Trace channel';
-        labelBar='Voltage [V]';
-        nameFig=sprintf('%s/resultA4_4_Assembled_RawLDChannel_trace.tif',newFolder);
-        showData(secondMonitorMain,true,3,data_LD_trace,titleData,labelBar,nameFig)
-    
-        titleData='Assembled Raw Lateral Deflection ReTrace channel';
-        nameFig=sprintf('%s/resultA4_5_Assembled_RawLDChannel_Retrace.tif',newFolder);
-        showData(secondMonitorMain,true,4,data_LD_retrace,titleData,labelBar,nameFig)
-
-        titleData='Assembled Raw data Vertical Deflection trace channel';
-        labelBar='Force [nN]';
-        nameFig=sprintf('%s/resultA4_6_Assembled_RawVDChannel_trace.tif',newFolder);
-        showData(secondMonitorMain,true,5,data_VD_trace*1e9,titleData,labelBar,nameFig)
- 
-        titleData='Assembled Raw data Vertical Deflection retrace channel';
-        nameFig=sprintf('%s/resultA4_7_Assembled_RawVDChannel_retrace.tif',newFolder);
-        showData(secondMonitorMain,true,6,data_VD_retrace*1e9,titleData,labelBar,nameFig)
-
-        uiwait(msgbox('Click to continue'))
-        close all
+        if strcmp(silent,'No')
+            f1=figure('Visible','on');
+        else
+            f1=figure('Visible','off');
+        end
+        imshow(AFM_height_IO); title('Baseline and foreground processed', 'FontSize',16), colormap parula
+        colorbar('Ticks',[0 1],'TickLabels',{'Background','Foreground'},'FontSize',13)
+        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
+        saveas(f1,sprintf('%s/resultA3_1_fittedHeightChannel_BaselineForeground_Assembled.tif',newFolder))
+    else       
+        [AFM_HeightFittedMasked,AFM_height_IO,~]=processData(dataOrderedSTART,secondMonitorMain,newFolder,accuracy,silent,saveFig);
+        A2_CleanUpData2_AFM(AFM_HeightFittedMasked,secondMonitorMain,newFolder,'imageType',imgTyp,'phaseProcess','PostProcessed','Silent',silent,'SaveFig',saveFig,'Normalization','Yes');
     end
+
+    varargout{1}=AFM_HeightFittedMasked;
+    varargout{2}=AFM_height_IO;
+    varargout{3}=metaDataOrdered;
+    varargout{4}=filePathData;
+    varargout{5}=newFolder;
+
+    uiwait(msgbox('Click to continue'))
+    close all
 end
 
 
+function [AFM_HeightFittedMasked,AFM_height_IO,accuracy]=processData(data,secondMonitorMain,newFolder,accuracy,silent,saveFig)
+    [AFM_HeightFitted,AFM_height_IO,accuracy]=A3_El_AFM(data,secondMonitorMain,newFolder,'fitOrder',accuracy,'Silent',silent,'SaveFig',saveFig);
+    % Using the AFM_height_IO, fit the background again, yielding a more accurate height image
+    AFM_HeightFittedMasked=A4_El_AFM_masked(AFM_HeightFitted,AFM_height_IO,secondMonitorMain,newFolder,'Silent',silent,'SaveFig',saveFig);
+end
