@@ -2,10 +2,9 @@ clc, clear, close all
 
 secondMonitorMain=objInSecondMonitor;
 % upload .jpk files. If more than one and if from same experiment in which setpoint is changed, then assembly.
-[AFM_FittedMasked,AFM_height_IO,metaData_AFM,filePathData,newFolder]=A1_openANDassembly_JPK(secondMonitorMain,'Silent','Yes');
+[AFM_FittedMasked,AFM_height_IO,metaData_AFM,filePathData,newFolder,setpoints]=A1_openANDassembly_JPK(secondMonitorMain,'Silent','Yes','Normalization','No');
 
-
-
+%%
 % to extract the friction coefficient, choose which method use.
 question=sprintf('Which method perform to extract the background friction coefficient?');
 options={ ...
@@ -28,11 +27,8 @@ switch choice
         clear fileNameFriction filePathDataFriction dataGlass metaDataGlass
     case {2, 3}
         % before perform method 2 or 3, upload the data used to calc the glass friction coeffiecient. Basically it the same experiment but with Hover Mode OFF
-        % then clean the data.
-        [dataHoverModeOFF,metaDataHoverModeOFF,~]=A1_openANDassembly_JPK; %#ok<ASGLU>
-        filtDataHVOFF=A2_CleanUpData2_AFM(dataHoverModeOFF);
-        [~,AFM_cropped_ImagesHVOFF,AFM_height_IOHVOFF,~]=A3_El_AFM(filtDataHVOFF,secondMonitorMain,newFolder,'Accuracy','Low','Silent','Yes');
-        [~,AFM_cropped_ImagesHVOFF_fitted]=A4_El_AFM_masked(AFM_cropped_ImagesHVOFF,AFM_height_IOHVOFF,secondMonitorMain,newFolder,'Silent','Yes'); %#ok<ASGLU>
+        % then clean the data.      
+        [AFM_cropped_ImagesHVOFF_fitted,AFM_height_IOHVOFF,metaDataHoverModeOFF,~,~]=A1_openANDassembly_JPK(secondMonitorMain,'saveFig','No'); %#ok<ASGLU>
         % METHOD 2 : MASKING ONLY
         % METHOD 3 : MASKING + OUTLIER REMOVAL
         eval(sprintf('avg_fc=A5_frictionGlassCalc_method%d(metaDataHoverModeOFF.Alpha,AFM_cropped_ImagesHVOFF_fitted,AFM_height_IOHVOFF,secondMonitorMain,newFolder);',choice));
@@ -52,6 +48,7 @@ switch choice
         end
 end
 close all
+
 
 % Substitute to the AFM cropped channels the baseline adapted LD
 while true
@@ -116,8 +113,10 @@ clear BF_Mic_Image_aligned
 [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_data_optAlignment,results_AFM_BF_aligment]=A10_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_Elab,newFolder,secondMonitorMain,'Margin',70);
 clear AFM_height_IO AFM_Elab
 
-%%
+
 % correlation FLUORESCENCE AND AFM DATA
 A11_correlation_AFM_BF(Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,AFM_IO_padded_sizeBF,AFM_data_optAlignment,setpoints,secondMonitorMain,newFolder);
 
-save data
+
+
+save(sprintf('%s/%s/data.mat',filePathData,newFolder))

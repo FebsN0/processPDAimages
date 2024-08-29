@@ -126,6 +126,9 @@ function A11_correlation_AFM_BF(BF_Before,BF_After,AFM_IO_Padded,AFM_data,setpoi
     
     % 9 - LATERAL DEFLECTION VS FLUORESCENCE INCREASE
     [~]=A11_feature_CDiB(AFM_data(idx_LD).Padded_masked(:),Delta_ADJ(:),secondMonitorMain,newFolder,'NumberOfBins',5000,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Lateral Force (only PDA) (nN)','FigTitle','LD (PDA) Vs Fluorescence increase','NumFig',3);
+    %A11_feature_fittingResults(AFM_data(idx_LD).Padded_masked(:),Delta_ADJ(:),secondMonitorMain,newFolder)
+    %LDmasked_VS_delta
+    
     [~]=A11_feature_CDiB(AFM_data(idx_LD).AFM_Padded(:),Delta_ADJ(:),secondMonitorMain,newFolder,'NumberOfBins',5000,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Lateral Force (nN)','FigTitle','LD Vs Fluorescence increase','NumFig',3);
     %[BC_LD_Vs_Delta2ADJ_Border]=A11_feature_CDiB(AFM_LD_Border(:),TRITIC_Border_Delta(:),secondMonitorMain,newFolder,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Lateral Force (nN)','FigTitle','LD Vs Fluorescence increase (borders)','NumFig',3);
     %[BC_LD_Vs_Delta2ADJ_Inner]=A11_feature_CDiB(AFM_LD_Inner(:),TRITIC_Inner_Delta(:),secondMonitorMain,newFolder,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Lateral Force (nN)','FigTitle','LD Vs Fluorescence increase (inner regions)','NumFig',3);

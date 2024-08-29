@@ -105,5 +105,6 @@ function [outputme] = A11_feature_CDiB(X_Data,Y_Data,secondMonitorMain,newFolder
     
     if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,ftmp); end
     saveas(ftmp,sprintf('%s/resultA11_end_%d_%s.fig',newFolder,p.Results.NumFig,p.Results.FigTitle))
+    saveas(ftmp,sprintf('%s/resultA11_end_%d_%s.tiff',newFolder,p.Results.NumFig,p.Results.FigTitle))
 
 end

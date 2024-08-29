@@ -1,4 +1,4 @@
-function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_height_IO,secondMonitorMain,newFolder)
+function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_Images,AFM_height_IO,secondMonitorMain,newFolder)
 %
 % This function opens the AFM cropped data previously created to calculate the glass friction
 % coefficient. This method is more accurated than the method 2.
@@ -30,10 +30,10 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_cropped_Images,AFM_he
 
     % extract data (lateral deflection Trace and Retrace, vertical deflection) and then mask (glass-PDA) elementXelement
     % ONLY in correspondence with the glass!
-    Lateral_Trace_masked    = (AFM_cropped_Images(strcmpi({AFM_cropped_Images.Channel_name},'Lateral Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'Trace')).Cropped_AFM_image).*(~AFM_height_IO);
-    Lateral_ReTrace_masked  = (AFM_cropped_Images(strcmpi({AFM_cropped_Images.Channel_name},'Lateral Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'ReTrace')).Cropped_AFM_image).*(~AFM_height_IO);
-    vertical_Trace   = (AFM_cropped_Images(strcmpi({AFM_cropped_Images.Channel_name},'Vertical Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'Trace')).Cropped_AFM_image);
-    vertical_ReTrace = (AFM_cropped_Images(strcmpi({AFM_cropped_Images.Channel_name},'Vertical Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'ReTrace')).Cropped_AFM_image);
+    Lateral_Trace_masked    = (AFM_Images(strcmpi({AFM_Images.Channel_name},'Lateral Deflection') & strcmpi({AFM_Images.Trace_type},'Trace')).AFM_image).*(~AFM_height_IO);
+    Lateral_ReTrace_masked  = (AFM_Images(strcmpi({AFM_Images.Channel_name},'Lateral Deflection') & strcmpi({AFM_Images.Trace_type},'ReTrace')).AFM_image).*(~AFM_height_IO);
+    vertical_Trace   = (AFM_Images(strcmpi({AFM_Images.Channel_name},'Vertical Deflection') & strcmpi({AFM_Images.Trace_type},'Trace')).AFM_image);
+    vertical_ReTrace = (AFM_Images(strcmpi({AFM_Images.Channel_name},'Vertical Deflection') & strcmpi({AFM_Images.Trace_type},'ReTrace')).AFM_image);
 
     % Calc Delta (offset loop) 
     Delta = (Lateral_Trace_masked + Lateral_ReTrace_masked) / 2;

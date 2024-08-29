@@ -28,7 +28,7 @@ function [Selected_AFM_data]=A2_CleanUpData2_AFM(data,secondMonitorMain,newFolde
         phaseProc=p.Results.phaseProcess;
         if(strcmp(phaseProc,'Raw'));  step=2; else, step=4; end
         imageTyp=p.Results.imageType;
-        if(strcmp(p.Results.Normalization,'Yes')); norm=1; else norm=0; end
+        if(strcmp(p.Results.Normalization,'Yes')); norm=1; else, norm=0; end
        
         % Check if the data struct has exactly the specific fields and 5 rows (removed not useful data)
         fieldNames=fieldnames(data);

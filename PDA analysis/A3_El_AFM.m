@@ -10,11 +10,13 @@ function [Cropped_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain
 %               B) AutoElab: No (default)   | other                 ==> keep the first result. Not recommended
 %                                                                       when low accuracy is used
 %
-% The function uses a series a total of three parts. One simple polinomial
-% background removal, the second a buttorworth filter backgrownd algorithm
-% and a final iterative backgrownd removal, in which R^2 and RMS residuals
-% are used to calculate the final backgrownd contained in the image. It can
-% also output a binary image if further binary elaboration is required.
+% The function uses a series a total of three parts to remove the baseline from the Height Image.
+%   1) first order linear polinomial curve fitting for correct the height imahe by this baseline 
+%   2) buttorworth filter backgrownd algorithm
+%   3) Poly11: linear polynomial surface is fitted to results of Poly1 fitting, the fitted surface is subtracted from
+%      the results of Poly1 fitting (poly_filt_data), yielding filt_data_no_Bk_visible_data
+%   4) iterative backgrownd removal, in which R^2 and RMS residuals are used to calculate the final backgrownd
+% The output is binary image of the height (background + foreground)
 %
 % Author: Dr. R.D.Ortuso, Levente Juhasz
 % University of Geneva, Switzerland.
@@ -22,7 +24,7 @@ function [Cropped_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain
 % Author modifications: Altieri F.
 % University of Tokyo
 %
-% Last update 18/06/2024
+% Last update 27/08/2024
 %
     % in case of code error, the waitbar won't be removed. So the following command force its closure
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
@@ -59,10 +61,7 @@ function [Cropped_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain
     % Extract the height channel
     raw_data_Height=filtData(strcmp({filtData.Channel_name},'Height (measured)')).AFM_image;
     % Orient the image by counterclockwise 180° and flip to coencide with the Microscopy image through rotations
-    
     raw_data_Height=flip(rot90(raw_data_Height),2);
-    %raw_data_Height=rot90(raw_data_Height);
-
 
     % Normalize using the 2D max value
     visible_data_rot_Height=raw_data_Height/max(max(raw_data_Height));
@@ -78,33 +77,9 @@ function [Cropped_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain
         if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f1); end
     end
 
-    % [~]=questdlg("Crop the Area","","OK","OK");
-    % % Crop AFM image
-    % % Rect = Size and position of the crop rectangle [xmin ymin width height].
-    % [~,~,cropped_image,Rect]=imcrop();
-    % close(f1)
-    % 
-    % % Extract the data relative to the cropped area for each channel
-    % for i=1:size(filtData,2)
-    %     %rotate and flip because the the crop area reference is already rotated and flipped
-    %     temp_img=flip(rot90(filtData(i).AFM_image),2);
-    %     size_Max_r=size(temp_img,1);
-    %     size_Max_c=size(temp_img,2);
-    %     end_y=round(Rect(1,1))+round(Rect(1,3));
-    %     if(end_y>size_Max_c)
-    %         end_y=size_Max_c;
-    %     end
-    %     start_y=round(Rect(1,1));
-    %     end_x=round(Rect(1,2))+round(Rect(1,4));
-    %     if(end_x>size_Max_r)
-    %         end_x=size_Max_r;
-    %     end  
-    %     start_x=round(Rect(1,2));
-    %     Cropped_Images(i)=struct(...
-    %         'Channel_name', filtData(i).Channel_name,...
-    %         'Trace_type', filtData(i).Trace_type, ...
-    %         'Cropped_AFM_image', temp_img(start_x:end_x,start_y:end_y));
-    % end
+    % THE IDEA OF CROPPING CAN BE USED TO REMOVE MANUALLY THE ARTIFACTS IN THE HEIGHT, WHICH CAN BE IGNORED IN
+    % ALL THE DATA, INCLUDING THE FLUORESCENCE
+    % Cropped_Images=A3_feature_removeArtifacts(visible_data_rot_Height)
     
     cropped_image=visible_data_rot_Height;
     for i=1:size(filtData,2)
@@ -123,6 +98,12 @@ function [Cropped_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain
     % Polynomial baseline fitting (line by line)
     poly_filt_data=zeros(size(cropped_image,1),size(cropped_image,2));
     for i=1:size(cropped_image,2)
+        if(exist('wb','var'))
+            %if cancel is clicked, stop
+            if getappdata(wb,'canceling')
+               error('Process cancelled')
+            end
+        end
         waitbar(i/N_Cycluse_waitbar,wb,sprintf('Removing Polynomial Baseline ... Completed %2.1f %%',i/N_Cycluse_waitbar*100));
         % prepareCurveData function clean the data like Removing NaN or Inf, converting nondouble to double, converting complex to 
         % real and returning data as columns regardless of the input shapes.
@@ -231,9 +212,8 @@ function [Cropped_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain
         % Polynomial baseline fitting (line by line) - Linear least squares fitting to the results
         for i=1:size(filt_data_no_Bk,2)
             if(exist('wb','var'))
-                %if cancel is clicked, stop
                 if getappdata(wb,'canceling')
-                   break
+                   error('Process cancelled')
                 end
             end
             flag_signal_y=filt_data_no_Bk(:,i);
@@ -358,7 +338,7 @@ function [Cropped_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain
                 scatter(closest_indices,Y(closest_indices),40,'r*')
             end
             pan on; zoom on;
-            % show dialog box before continue
+            % show dialog box before continue. Select the thresholding
             uiwait(msgbox('Before click to continue the binarization, zoom or pan on the image for a better view',''));
             zoom off; pan off;
             closest_indices=selectRangeGInput(1,1,1:no_sub_div,Y);
@@ -367,8 +347,7 @@ function [Cropped_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain
             seg_AFM=AFM_noBk;
             seg_AFM(seg_AFM<th_segmentation)=0;
             seg_AFM(seg_AFM>=th_segmentation)=1;
-        end
-       
+        end       
         seg_dial=imerode(seg_AFM,kernel);
         seg_dial=imdilate(seg_dial,kernel);
         if exist('h1', 'var') && ishandle(h1)
@@ -389,8 +368,12 @@ function [Cropped_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain
             end
         end
     end
+    close all
+    
+    imshow(seg_dial); title('Baseline and foreground processed', 'FontSize',16), colormap parula
+    colorbar('Ticks',[0 1],'TickLabels',{'Background','Foreground'},'FontSize',13)
     if SavFg
-        saveas(f3,sprintf('%s/resultA3_1_fittedHeightChannel_BaselineForeground.tif',filepath))
+        saveas(f3,sprintf('%s/resultA3_1_BaselineForeground.tif',filepath))
     end
     
     % converts any nonzero element of the yellow/blue image into a logical image.

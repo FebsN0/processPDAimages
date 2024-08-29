@@ -68,7 +68,7 @@ function LineDataFilt = A5_method3feature_DeleteEdgeDataAndOutlierRemoval(LineDa
         else
             i=i+1;
             % the element is zero, so if it is the last element, break the while loop 
-            if i==512, break, end
+            if i==length(LineData), break, end
         end
     end
     
