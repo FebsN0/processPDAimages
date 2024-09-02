@@ -1,4 +1,4 @@
-function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_Images,AFM_height_IO,secondMonitorMain,newFolder)
+function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_Images,AFM_height_IO,setpoints,secondMonitorMain,newFolder)
 %
 % This function opens the AFM cropped data previously created to calculate the glass friction
 % coefficient. This method is more accurated than the method 2.
@@ -55,13 +55,13 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_Images,AFM_height_IO,
     c= colorbar; c.Label.String = 'Force [N]'; c.FontSize = 15;
     title({'Force in glass regions';'(PDA masked out)'},'FontSize',20)
     xlabel(' fast direction - scan line','FontSize',15), ylabel('slow direction','FontSize',15)
-    axis equal, xlim([0 512]), ylim([0 512])
+    axis equal, xlim([0 size(force,2)]), ylim([0 size(force,1)])
     subplot(122)
     imagesc(flip(vertical_Trace.*(~rot90(flipud(AFM_height_IO)))))
     c= colorbar; c.Label.String = 'Force [N]'; c.FontSize = 15;
     title('Vertical Deflection (masked)','FontSize',20)
     xlabel(' fast direction - scan line','FontSize',15), ylabel('slow direction','FontSize',15)
-    axis equal, xlim([0 512]), ylim([0 512])
+    axis equal, xlim([0 size(force,2)]), ylim([0 size(force,1)])
     saveas(f1,sprintf('%s/resultA5method3_1_ForceInGlassRegionsAndVerticalDeflectionN.tif',newFolder))
     
 %%%%%%%%%%%------- SETTING PARAMETERS FOR THE EDGE REMOVAL -------%%%%%%%%%%%
@@ -99,7 +99,7 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_Images,AFM_height_IO,
         filteredForce = zeros(size(force));
                              
         % process the single fast scan line with a given pixel size
-        for i=1:size(force,2)
+        for i=1:size(force,1)
             filteredForce(i,:) = A5_method3feature_DeleteEdgeDataAndOutlierRemoval(force(i,:), pix, fOutlierRemoval);
             % update dialog box and check if cancel is clicked
             if(exist('wb','var'))
@@ -130,7 +130,8 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_Images,AFM_height_IO,
         % remove NaN data
         force_avg_fix = force_avg_fix(~isnan(force_avg_fix));
         vert_avg_fix = vert_avg_fix(~isnan(force_avg_fix));
-        
+        setpointFitting=unique(round(vert_avg_fix,8));
+
         % delete previous experimental data, keep curve fitting. Update the latter
         if exist('xyExp','var')
             delete(xyExp)
@@ -148,17 +149,22 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_Images,AFM_height_IO,
         eqn = sprintf('Last executed Linear fitting: y = %0.3g x %0.3g', p(1), p(2));
         title({'Delta Offset vs Set Point'; eqn},'FontSize',15);
         hold off
-    
-        % since slope higher than 0.95 has no sense, the loop will be stopped. In theory max 1, but it will be
-        % never such value
-        if p(1) > 0.95 || p(1) < 0
-            uiwait(msgbox(sprintf('Slope outside the reasonable range ( 0 < m < 0.95 ) \x2192 stopped calculation!'),''));
-            break
-        end
+        
         % Store coef data
         avg_fc(Cnt) = p(1);
         pixx(Cnt) = pix;
         Cnt = Cnt+1;
+        
+        % since slope higher than 0.95 has no sense, the loop will be stopped. In theory max 1, but it will be
+        % never such value
+        if p(1) > 0.95 %%|| p(1) < 0
+            uiwait(msgbox(sprintf('Slope outside the reasonable range ( 0 < m < 0.95 ) \x2192 stopped calculation!'),''));
+            break
+        elseif length(setpointFitting) ~= length(setpoints)
+            uiwait(msgbox(sprintf('Missing data in the fitting \x2192 stopped calculation!'),''));
+            break
+        end
+        
     end
     saveas(f2,sprintf('%s/resultA5method3_2_DeltaOffsetVSsetpoint.tif',newFolder))
     close(f2)
@@ -179,14 +185,16 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_Images,AFM_height_IO,
         hold on
         scatter(pixData(2)*idx_x-pixData(2),avg_fc(idx_x),200,'pentagram','filled', 'MarkerFaceColor', 'red');
         avg_fc_def=avg_fc(idx_x);
+        text='Selected';
     else
         range_selected=selectRangeGInput(2,1,0:pixData(2):pixData(1),avg_fc);
         hold on
         scatter(pixData(2)*range_selected-pixData(2),avg_fc(range_selected),200,'pentagram','filled', 'MarkerFaceColor', 'red');
         range_selected=sort(range_selected);
         avg_fc_def=mean(avg_fc(range_selected(1):range_selected(2)));
+        text='Averaged';
     end
-    resultChoice= sprintf('Selected friction coefficient: %0.3g', avg_fc_def);
-    title({'Result Method 3 (Mask + Outliers Removal\)'; resultChoice},'FontSize',16);
+    resultChoice= sprintf('%s friction coefficient: %0.3g',text,avg_fc_def);
+    title({'Result Method 3 (Mask + Outliers Removal)'; resultChoice},'FontSize',16);
     saveas(f3,sprintf('%s/resultA5method3_3_pixelVSfrictionCoeffs.tif',newFolder))
 end

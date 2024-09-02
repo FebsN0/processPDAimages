@@ -69,17 +69,18 @@ function Cropped_Images_Bk=A4_El_AFM_masked(Cropped_Images,AFM_height_IO,secondM
   
     AFM_noBk=poly_filt_data;
     AFM_noBk=AFM_noBk-min(min(AFM_noBk));
-    if SavFg
-        if SeeMe
-            f1=figure('Visible','on');
-        else
-            f1=figure('Visible','off');
-        end
+    
+    if SeeMe
+        f1=figure('Visible','on');
+    else
+        f1=figure('Visible','off');
+    end
+    imshow(imadjust(AFM_noBk/max(max(AFM_noBk)))),colormap parula, title('(Optimized) Fitted Height (measured) channel', 'FontSize',16)        
+    if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f1); end
+    c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
+    ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
 
-        imshow(imadjust(AFM_noBk/max(max(AFM_noBk)))),colormap parula, title('(Optimized) Fitted Height (measured) channel', 'FontSize',16)        
-        if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f1); end
-        c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
-        ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
+    if SavFg       
         saveas(f1,sprintf('%s/resultA4_0_OptFittedHeightChannel.tif',filepath))
     end
     

@@ -370,10 +370,18 @@ function [Cropped_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain
     end
     close all
     
+    if SeeMe
+        f4=figure('Visible','on');
+    else
+        f4=figure('Visible','off');
+    end
+
     imshow(seg_dial); title('Baseline and foreground processed', 'FontSize',16), colormap parula
     colorbar('Ticks',[0 1],'TickLabels',{'Background','Foreground'},'FontSize',13)
+    if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f4); end
+    
     if SavFg
-        saveas(f3,sprintf('%s/resultA3_1_BaselineForeground.tif',filepath))
+        saveas(f4,sprintf('%s\\resultA3_1_BaselineForeground.tif',filepath))
     end
     
     % converts any nonzero element of the yellow/blue image into a logical image.

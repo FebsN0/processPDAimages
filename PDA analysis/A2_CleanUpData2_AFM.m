@@ -68,28 +68,29 @@ function [Selected_AFM_data]=A2_CleanUpData2_AFM(data,secondMonitorMain,newFolde
             nameFig=sprintf('%s/resultA%d_1_%s_HeightChannel_%s.tif',newFolder,step,phaseProc,imageTyp);
             labelBar=sprintf('height (\x03bcm)');
             showData(secondMonitorMain,SeeMe,1,data,norm,titleData,labelBar,nameFig)
-    
-            data=data_LD_trace;
-            titleData=sprintf('%s - Lateral Deflection Trace channel (%s)',phaseProc,imageTyp);
-            nameFig=sprintf('%s/resultA%d_2_%s_LDChannel_trace_%s.tif',newFolder,step,phaseProc,imageTyp);
-            labelBar='Voltage [V]';
-            showData(secondMonitorMain,SeeMe,2,data,norm,titleData,labelBar,nameFig)
-    
-            data=data_LD_retrace;
-            titleData=sprintf('%s - Lateral Deflection Retrace channel (%s)',phaseProc,imageTyp);
-            nameFig=sprintf('%s/resultA%d_3_%s_LDChannel_retrace_%s.tif',newFolder,step,phaseProc,imageTyp);
-            showData(secondMonitorMain,SeeMe,3,data,norm,titleData,labelBar,nameFig)
-    
-            data=data_VD_trace*1e9;
-            titleData=sprintf('%s - Vertical Deflection trace channel (%s)',phaseProc,imageTyp);
-            nameFig=sprintf('%s/resultA%d_4_%s_VDChannel_trace_%s.tif',newFolder,step,phaseProc,imageTyp);
-            labelBar='Force [nN]';
-            showData(secondMonitorMain,SeeMe,4,data,norm,titleData,labelBar,nameFig)
-     
-    
-            data=data_VD_retrace*1e9;
-            titleData=sprintf('%s - Vertical Deflection retrace channel (%s)',phaseProc,imageTyp);
-            nameFig=sprintf('%s/resultA%d_5_%s_VDChannel_retrace_%s.tif',newFolder,step,phaseProc,imageTyp);
-            showData(secondMonitorMain,SeeMe,5,data,norm,titleData,labelBar,nameFig)
+            % no need to plot and save the others channels since they have not changed
+            if step == 2
+                data=data_LD_trace;
+                titleData=sprintf('%s - Lateral Deflection Trace channel (%s)',phaseProc,imageTyp);
+                nameFig=sprintf('%s/resultA%d_2_%s_LDChannel_trace_%s.tif',newFolder,step,phaseProc,imageTyp);
+                labelBar='Voltage [V]';
+                showData(secondMonitorMain,SeeMe,2,data,norm,titleData,labelBar,nameFig)
+        
+                data=data_LD_retrace;
+                titleData=sprintf('%s - Lateral Deflection Retrace channel (%s)',phaseProc,imageTyp);
+                nameFig=sprintf('%s/resultA%d_3_%s_LDChannel_retrace_%s.tif',newFolder,step,phaseProc,imageTyp);
+                showData(secondMonitorMain,SeeMe,3,data,norm,titleData,labelBar,nameFig)
+        
+                data=data_VD_trace*1e9;
+                titleData=sprintf('%s - Vertical Deflection trace channel (%s)',phaseProc,imageTyp);
+                nameFig=sprintf('%s/resultA%d_4_%s_VDChannel_trace_%s.tif',newFolder,step,phaseProc,imageTyp);
+                labelBar='Force [nN]';
+                showData(secondMonitorMain,SeeMe,4,data,norm,titleData,labelBar,nameFig)
+                 
+                data=data_VD_retrace*1e9;
+                titleData=sprintf('%s - Vertical Deflection retrace channel (%s)',phaseProc,imageTyp);
+                nameFig=sprintf('%s/resultA%d_5_%s_VDChannel_retrace_%s.tif',newFolder,step,phaseProc,imageTyp);
+                showData(secondMonitorMain,SeeMe,5,data,norm,titleData,labelBar,nameFig)
+            end
         end
 end

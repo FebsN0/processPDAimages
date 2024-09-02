@@ -16,12 +16,11 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
     %
     % INPUT DETAILS
 
-    fprintf('\n\t\tSTEP 10 processing ...\n')
     % in case of code error, the waitbar won't be removed. So the following command force its closure
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)
 
-    p=inputParser();    %init instance of inputParser
+    p=inputParser();
     % Add required parameters
     addRequired(p, 'BF_Mic_Image_IO');
     addRequired(p,'metaData_BF')
@@ -29,21 +28,13 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
     addRequired(p,'metaData_AFM')
     addRequired(p,'AFM_Elab') 
     
-    argName = 'Silent';
-    defaultVal = 'No';
-    addParameter(p,argName,defaultVal,@(x) ismember(x,{'No','Yes'}));
-    argName = 'Margin';
-    defaultVal = 25;
-    addParameter(p,argName,defaultVal,@(x) isnumeric(x) && (x >= 0));
-    
+    argName = 'Silent';     defaultVal = 'No';  addParameter(p,argName,defaultVal,@(x) ismember(x,{'No','Yes'}));
+    argName = 'Margin';     defaultVal = 25;    addParameter(p,argName,defaultVal,@(x) isnumeric(x) && (x >= 0));
     parse(p,BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_Elab,varargin{:});
-
-    if(strcmp(p.Results.Silent,'Yes')), SeeMe=false; else, SeeMe=true; end
-    fprintf(['Results of optional input:\n' ...
-        '\tSilent:\t\t\t\t%s\n'      ...
-        '\tMargin:\t\t\t\t%d\n'
-        ],p.Results.Silent,p.Results.Margin)
     
+    if(strcmp(p.Results.Silent,'Yes')), SeeMe=false; else, SeeMe=true; end
+  
+
     % Add a new column-Field to the AFM data struct with zero elements matrix and same BF image size
     [AFM_Elab(:).AFM_Padded]=deal(zeros(size(BF_Mic_Image_IO)));
     % x and y lengths of AFM image are in meters ==> convert to um 
@@ -253,7 +244,12 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
         moving_OPT=AFM_IO_resized;
         % init plot where show overlapping of AFM-BF and trend of max correlation value
         close all
-        h_it=figure('visible',SeeMe);
+        if SeeMe
+            h_it=figure('visible','on');
+        else
+            h_it=figure('visible','off');
+        end
+
         f2max=figure; grid on
         max_c_it_OI_prev=max_c_it_OI;
         maxC_original = max_c_it_OI;
@@ -273,8 +269,8 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
             moving_iterative=cell(1,4); max_c_iterative=zeros(1,4); imax_iterative=zeros(1,4); sz_iterative=zeros(4,2);
             textFprintf={'Expansion','Reduction','Counter ClockWise Rotation','ClockWise Rotation'};
             % 1: Oversize - 2 : Undersize - 3 : PosRot - 4 : NegRot
-            moving_iterative{1} = imresize(moving_OPT,size(moving_OPT)+StepSizeMatrix);
-            moving_iterative{2} = imresize(moving_OPT,size(moving_OPT)-StepSizeMatrix);
+            moving_iterative{1} = imresize(moving_OPT,size(moving_OPT)+abs(StepSizeMatrix));
+            moving_iterative{2} = imresize(moving_OPT,size(moving_OPT)-abs(StepSizeMatrix));
             moving_iterative{3} = imrotate(moving_OPT,Rot_par,'nearest','loose');
             moving_iterative{4} = imrotate(moving_OPT,-Rot_par,'nearest','loose');
             for i=1:4
@@ -316,7 +312,7 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
                         details_it_reg(z,2)=Rot_par;
                         rotation_deg_tot=rotation_deg_tot+Rot_par;
                 end
-                fprintf('\n %s Scaling Optimization Found.\n\tMatrix Size: %dx%d\n\tTotal rotation:%0.2f°\n\n', textFprintf{b}, size(moving_OPT),rotation_deg_tot)
+                fprintf('\n %s Scaling Optimization Found.\n\tMatrix Size: %dx%d\n\tTotal rotation:%0.2f°\n', textFprintf{b}, size(moving_OPT),rotation_deg_tot)
 
                 % update the score
                 figure(f2max)
@@ -340,7 +336,7 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
                 Rot_par=Rot_par/2;
                 N_cycles_opt=N_cycles_opt+1;
                 attemptChanges=attemptChanges+1;
-                fprintf('\n\n A local maximum may have been found. Halved parameters. Attempt %d of %d\n\t\tStepSizeMatrix: %.2f\n\t\tRot_par: %.2f\n',attemptChanges,maxAttempts,StepSizeMatrix,Rot_par)
+                fprintf('\nA local maximum may have been found. Halved parameters. Attempt %d of %d\n\t\tStepSizeMatrix: %.2f\n\t\tRot_par: %.2f\n',attemptChanges,maxAttempts,StepSizeMatrix,Rot_par)
                 if(attemptChanges==maxAttempts)
                     break
                 end

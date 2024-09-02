@@ -1,25 +1,26 @@
-% Function to process and subtract the AFM LD images, this updated function
+% Function to process and subtract the background from the AFM LD images, this updated function
 % uses the AFM IO image as a mask to select the background, thus a more
 % precise fitting is possible.
 % Check manually the processed image afterwards and compare with the AFM VD
 % image!
 
-function [Corrected_LD_Trace,AFM_Elab,Bk_iterative,setpoints]=A6_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,alpha,avg_fc,secondMonitorMain,newFolder,varargin)
+function [AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,alpha,avg_fc,secondMonitorMain,newFolder,varargin)
     % in case of code error, the waitbar won't be removed. So the following command force its closure
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)
 
-    fprintf('\n\t\tSTEP 6 processing ...\n\n')
     p=inputParser();    %init instance of inputParser
     %Add default parameters. When call the function, use 'argName' as well you use 'LineStyle' in plot! And
     %then the values
     argName = 'Accuracy';   defaultVal = 'Low';     addOptional(p,argName,defaultVal, @(x) ismember(x,{'Low','Medium','High'}));
     argName = 'Silent';     defaultVal = 'Yes';     addOptional(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+    argName = 'SaveFig';    defaultVal = 'Yes';     addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+
     parse(p,varargin{:});
     clearvars argName defaultVal
-    fprintf('Results of optional input:\n\tAccuracy:\t%s\n\tSilent:\t\t%s\n',p.Results.Accuracy,p.Results.Silent)
 
     if(strcmp(p.Results.Silent,'Yes')); SeeMe=0; else, SeeMe=1; end
+    if(strcmp(p.Results.SaveFig,'Yes')); SavFg=1; else, SavFg=0; end
 
     % extract data (lateral deflection Trace and Retrace, vertical deflection) and then mask (glass-PDA) elementXelement
     % ONLY in correspondence with the glass!
@@ -27,10 +28,6 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative,setpoints]=A6_LD_Baseline_Ada
     Lateral_ReTrace = (AFM_cropped_Images(strcmpi({AFM_cropped_Images.Channel_name},'Lateral Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'ReTrace')).AFM_image);
     vertical_Trace  = (AFM_cropped_Images(strcmpi({AFM_cropped_Images.Channel_name},'Vertical Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'Trace')).AFM_image);
 
-
-    % find the setpoint values used in the experiments
-    vertical_Trace=round(vertical_Trace,8);
-    setpoints=unique(vertical_Trace);
 
     if getValidAnswer('Was the HOVER MODE ON?','',{'y','n'})==2
     % substract lateral deflection trace from retrace if HOVER MODE UNACTIVATED,
@@ -42,41 +39,31 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative,setpoints]=A6_LD_Baseline_Ada
     Lateral_Trace_clean_shift= Lateral_Trace_clean - min(min(Lateral_Trace_clean));
     % Mask W to cut the PDA from the baseline fitting. Where there is PDA in corrispondece of the mask, then mask the
     % lateral deflection data. Basically, the goal is fitting using the glass which is know to be flat. 
-    if SeeMe    
-        % plot 
-        f1=figure;
-        subplot(121)
-        imshow((imadjust(Lateral_Trace/max(max(Lateral_Trace))))), colormap parula; colorbar,
-        c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize = 15;
-        title('Raw Lateral Deflection [V] - Trace','FontSize',18)
-        xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
-        axis equal, xlim([0 512]), ylim([0 512])
-        subplot(122)
-        imshow((imadjust(vertical_Trace/max(max(vertical_Trace))))), colormap parula; colorbar,
-        c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize = 15;
-        xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
-        title('Vertical Deflection [N]','FontSize',18)
-        axis equal, xlim([0 512]), ylim([0 512])
-        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
-        saveas(f1,sprintf('%s/resultA6_1_RawLateralDeflection_TraceRetrace.tif',newFolder))
-    
-        f2=figure;
-        subplot(121)
-        imshow((imadjust(Lateral_ReTrace/max(max(Lateral_ReTrace))))), colormap parula; colorbar,
-        c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize = 15;
-        title({'Raw Lateral Deflection - Retrace'; '(HOVER MODE ON)'},'FontSize',18)
-        xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
-        axis equal, xlim([0 512]), ylim([0 512])
-        subplot(122)
-        imshow((imadjust(Lateral_Trace_clean_shift/max(max(Lateral_Trace_clean_shift))))), colormap parula; colorbar,
-        c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize = 15;
-        title({'Lateral Deflection - Trace [V]'; '(shifted toward minimum)'},'FontSize',18)
-        xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
-        axis equal, xlim([0 512]), ylim([0 512])
-        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2); end
-        saveas(f2,sprintf('%s/resultA6_2_VerticalDeflection_.tif',newFolder))
-
+    if SeeMe
+        f1=figure('Visible','on');
+    else
+        f1=figure('Visible','off');
     end
+           
+    subplot(121)
+    imshow((imadjust(Lateral_Trace/max(max(Lateral_Trace))))), colormap parula; colorbar,
+    c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize = 15;
+    title('Raw Lateral Deflection [V] - Trace','FontSize',18)
+    xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
+    axis equal, xlim([0 512]), ylim([0 512])
+    subplot(122)
+    imshow((imadjust(Lateral_Trace_clean_shift/max(max(Lateral_Trace_clean_shift))))), colormap parula; colorbar,
+    c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize = 15;
+    title({'Lateral Deflection - Trace [V]'; '(shifted toward minimum)'},'FontSize',18)
+    xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
+    axis equal, xlim([0 512]), ylim([0 512])
+    
+    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
+    if SavFg
+        saveas(f1,sprintf('%s/resultA6_1_RawAndShiftedLateralDeflection.tif',newFolder))
+    end
+
+
 
     % apply the PDA mask
     Lateral_Trace_shift_masked= Lateral_Trace_clean_shift;
@@ -112,62 +99,70 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative,setpoints]=A6_LD_Baseline_Ada
         if(exist('wb','var'))
             %if cancel is clicked, stop
             if getappdata(wb,'canceling')
-               break
+               error('Process cancelled')
             end
         end           
 
         % extract the single fast scan line
         flag_signal_y=Lateral_Trace_shift_masked(:,i);
         flag_signal_x=(1:size(flag_signal_y,1));
+
         % prepareCurveData function clean the data like Removing NaN or Inf, converting nondouble to double, converting complex to 
         % real and returning data as columns regardless of the input shapes.
         [xData, yData] = prepareCurveData(flag_signal_x,flag_signal_y);
-    
-        if(size(xData,1)>2)
-            opts = fitoptions( 'Method', 'LinearLeastSquares' );
-            opts.Robust = 'LAR';
-            fit_decision=zeros(3,limit);
-            for z=1:limit
-                % based on the choosen accuracy, run the fitting using different curves to find the best fit
-                % before returning the definitive fitted single fast scan line
-                ft = fittype(sprintf('poly%d',z));
-                % returns goodness-of-fit statistics in the structure gof. Exclude data corresponding to PDA,
-                % which is previously converted to 5 
-                [~, gof] = fit( xData, yData, ft,'Exclude', yData > 1 );
-                if(gof.adjrsquare<0)
-                    gof.adjrsquare=0.001;
-                end
-                fit_decision(1,z)=abs(gof.sse)/gof.adjrsquare;
-                fit_decision(2,z)=gof.sse;
-                fit_decision(3,z)=gof.adjrsquare;
-            end
-            
-            %prepare type fitting. Choose the one with the best statistics. Ind represent the polynomial grade
-            clearvars Ind
-            [~,Ind]=min(fit_decision(1,:));
+        
+        %PDA=excludedata(xData, yData,'range',[-1 1]);
+        % if sum(PDA ~= 1) < 5
+        %     continue
+        % else
 
-            ft = fittype(sprintf('poly%d',Ind));
-            waitbar(i/N_Cycluse_waitbar,wb,sprintf('Processing %d° Ord Pol fit ... Line %.0f Completeted  %2.1f %%',Ind,i,i/N_Cycluse_waitbar*100));
-            % save the fitting decisions
-            fit_decision_final(i,1)=Ind;
-            fit_decision_final(i,2)=fit_decision(2,Ind);
-            fit_decision_final(i,3)=fit_decision(3,Ind);
-            % start the fitting. Ignore the data in corrispondence of PDA.
-            [fitresult, ~] = fit( xData, yData, ft, 'Exclude', yData > 1 ); %#ok<ASGLU> ignore warning
-        else
-            error('The extracted fast scan line is too short. Something is wrong');
+            if(size(xData,1)>2)
+                opts = fitoptions( 'Method', 'LinearLeastSquares' );
+                opts.Robust = 'LAR';
+                fit_decision=zeros(3,limit);
+                for z=1:limit
+                    % based on the choosen accuracy, run the fitting using different curves to find the best fit
+                    % before returning the definitive fitted single fast scan line
+                    ft = fittype(sprintf('poly%d',z));
+                    % returns goodness-of-fit statistics in the structure gof. Exclude data corresponding to PDA,
+                    % which is previously converted to 5       
+                        [~, gof] = fit(xData, yData, ft,'Exclude', yData >= 5 ); % MODIFICATO. prima era 1 e dava problemi
+                        if(gof.adjrsquare<0)
+                            gof.adjrsquare=0.001;
+                        end
+                        fit_decision(1,z)=abs(gof.sse)/gof.adjrsquare;
+                        fit_decision(2,z)=gof.sse;
+                        fit_decision(3,z)=gof.adjrsquare;
+                end
+                
+                %prepare type fitting. Choose the one with the best statistics. Ind represent the polynomial grade
+                clearvars Ind
+                [~,Ind]=min(fit_decision(1,:));
+    
+                ft = fittype(sprintf('poly%d',Ind));
+                waitbar(i/N_Cycluse_waitbar,wb,sprintf('Processing %d° Ord Pol fit ... Line %.0f Completeted  %2.1f %%',Ind,i,i/N_Cycluse_waitbar*100));
+                % save the fitting decisions
+                fit_decision_final(i,1)=Ind;
+                fit_decision_final(i,2)=fit_decision(2,Ind);
+                fit_decision_final(i,3)=fit_decision(3,Ind);
+                % start the fitting. Ignore the data in corrispondence of PDA.
+                [fitresult, ~] = fit( xData, yData, ft, 'Exclude', yData >= 5 ); %#ok<ASGLU> ignore warning
+            else
+                error('The extracted fast scan line is too short. Something is wrong');
+            end
+        
+            % build the y value using the polynomial coefficients and x value (1 ==> 512)
+            % save polynomial coefficients (p1, p2, p3, ...) into fit_decision_final
+            commPart =[];
+            j=1;
+            for n=Ind:-1:0
+                commPart = sprintf('%s + %s', commPart,sprintf('fitresult.p%d*(x).^%d',j,n));
+                eval(sprintf('fit_decision_final(i,%d)= fitresult.p%d;',j+3,j))
+                j=j+1;
+            end
+            Bk_iterative(:,i)= eval(commPart);
         end
-        % build the y value using the polynomial coefficients and x value (1 ==> 512)
-        % save polynomial coefficients (p1, p2, p3, ...) into fit_decision_final
-        commPart =[];
-        j=1;
-        for n=Ind:-1:0
-            commPart = sprintf('%s + %s', commPart,sprintf('fitresult.p%d*(x).^%d',j,n));
-            eval(sprintf('fit_decision_final(i,%d)= fitresult.p%d;',j+3,j))
-            j=j+1;
-        end
-        Bk_iterative(:,i)= eval(commPart);
-    end
+    %end
     % processed every fast scan line
     delete(wb)
 
@@ -193,8 +188,12 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative,setpoints]=A6_LD_Baseline_Ada
     Corrected_LD_Trace= Lateral_Trace_Force + Baseline_Friction_Force;
     
     % Plot the fitted backround:
-    f3=figure;
-    
+    if SeeMe
+        f2=figure('Visible','on');       
+    else
+        f2=figure('Visible','off');      
+    end
+   
     subplot(121)
     imshow((imadjust(Bk_iterative/max(max(Bk_iterative))))), colormap parula
     c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize =15;
@@ -206,18 +205,29 @@ function [Corrected_LD_Trace,AFM_Elab,Bk_iterative,setpoints]=A6_LD_Baseline_Ada
     c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize =15;
     xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
     title('Fitted Lateral Deflection channel [V] - Trace ','FontSize',15)
-    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
-    saveas(f3,sprintf('%s/resultA6_3_ResultsFittingOnLateralDeflections.tif',newFolder))
-    f4=figure;
-    
+    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2); end
+    if SavFg
+        saveas(f2,sprintf('%s/resultA6_2_ResultsFittingOnLateralDeflections.tif',newFolder))
+    end
+    if SeeMe
+        f3=figure('Visible','on');
+    else
+        f3=figure('Visible','off');
+    end
     imshow(imadjust(Corrected_LD_Trace/max(max(Corrected_LD_Trace)))), colormap parula
     c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize =15;
     title('Fitted and corrected Lateral Force [N]','FontSize',17)
     xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
-    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f4); end
-    saveas(f4,sprintf('%s/resultA6_4_ResultsDefinitiveLateralDeflectionsNewton.tif',newFolder))
-        
+    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
+    if SavFg
+        saveas(f3,sprintf('%s/resultA6_3_ResultsDefinitiveLateralDeflectionsNewton.tif',newFolder))
+    end
+
     AFM_Elab=AFM_cropped_Images;
     % save the corrected lateral force into cropped AFM image
     AFM_Elab(strcmpi({AFM_cropped_Images.Channel_name},'Lateral Deflection') & strcmpi({AFM_cropped_Images.Trace_type},'Trace')).AFM_image=Corrected_LD_Trace;
+
+    if SeeMe
+        uiwait(msgbox('Click to continue'))
+    end
 end

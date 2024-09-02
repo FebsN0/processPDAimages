@@ -6,7 +6,6 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)
 
-    fprintf('\n\t\tSTEP 8 processing ...\n')
     p=inputParser();    %init instance of inputParser
     % Add required parameters
     addRequired(p, 'moved');
@@ -28,10 +27,6 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
 
     %if(strcmp(p.Results.Silent,'Yes')), SeeMe='off'; else, SeeMe='on'; end
 
-    fprintf(['Results of optional input:\n\tSilent:\t\t\t\t\t\t%s\n\t' ...
-        'Brightfield:\t\t\t\t%s\n\t' ...
-        'Moving:\t\t\t\t\t\t%s\n\n'], ...
-        p.Results.Silent,p.Results.Brightfield,p.Results.Moving)
     % title and name figures based on what input and more are given
     if strcmpi(p.Results.Brightfield,'Yes')
         textFirstLastFig='BrightField and TRITIC Before Images Overlapped';
@@ -158,7 +153,6 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
             % (A3) but twice
             text={'Cropped Fixed Image','Cropped Moved Image'};
             data={reduced_fixed,reduced_moved};
-
             for i=1:2
                 % init the not completion of manual selection
                 closest_indices=[];
@@ -172,7 +166,7 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
                     originalData=data{i};
                     no_sub_div=2000;
                     [Y,E] = histcounts(data{i},no_sub_div);
-                    f4=figure; hold on
+                    figure; hold on
                     plot(Y)
                     if any(closest_indices)
                         scatter(closest_indices,Y(closest_indices),40,'r*')
@@ -186,7 +180,6 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
                     % close the histogram
                     close gcf
 
-                    %close(gcf)
                     % if the value is lower than selected point, then 0, otherwise 1
                     originalData(originalData<E(closest_indices))=0;
                     originalData(originalData>=E(closest_indices))=1;
@@ -199,7 +192,7 @@ function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitor
                     satisfied=getValidAnswer('Keep selection or turn again to manual selection?','',{'Continue the manual selection.','Keep current.'});       
                 end
                 %save the result of binarization
-                if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f4); end
+                if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,eval(sprintf('f4_%d',i))); end
                 saveas(eval(sprintf('f4_%d',i)),sprintf('%s/resultA8_%d_4_%s_BinarizationResult.tif',newFolder,textResultName,text{i}))
                 close gcf
                 data{i}=originalData;

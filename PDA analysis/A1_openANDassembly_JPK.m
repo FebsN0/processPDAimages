@@ -15,8 +15,9 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     p=inputParser();
     argName = 'Silent';         defaultVal = 'Yes';     addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     argName = 'saveFig';        defaultVal = 'Yes';     addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
-    argName = 'Normalization';  defaultVal = 'Yes';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
-
+    argName = 'Normalization';  defaultVal = 'No';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+    argName = 'filePath';       defaultVal = '';        addParameter(p,argName,defaultVal, @(x) ischar(x));
+    argName = 'backgroundOnly';          defaultVal = 'No';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     % validate and parse the inputs
     parse(p,varargin{:});
     silent=p.Results.Silent;
@@ -24,7 +25,12 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     norm=p.Results.Normalization;
 
     % select the files
-    [fileName, filePathData] = uigetfile('*.jpk', 'Select a .jpk AFM image','MultiSelect', 'on');
+    if strcmp(p.Results.backgroundOnly,'Yes') || ~strcmp(p.Results.filePath,'')
+        [fileName, filePathData] = uigetfile({'*.jpk'},'Select the .jpk AFM image to extract background friction coefficient',p.Results.filePath,'MultiSelect', 'on');
+    else
+        [fileName, filePathData] = uigetfile('*.jpk', 'Select a .jpk AFM image','MultiSelect', 'on');       
+    end
+
     if isequal(fileName,0)
         error('No File Selected');
     else
@@ -37,7 +43,11 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
 
     % save the useful figures into a directory. Not in the case of sections to save time.
     % in case of sections, only the assembled version will be saved
-    newFolder = fullfile(filePathData, 'Results Processing AFM and fluorescence images');
+    if strcmp(p.Results.backgroundOnly,'Yes')
+        newFolder = fullfile(filePathData, 'Results Processing AFM-background only');
+    else
+        newFolder = fullfile(filePathData, 'Results Processing AFM and fluorescence images');
+    end
     % check if dir already exists
     if exist(newFolder, 'dir')
         question= sprintf('Directory already exists and it may already contain results.\nDo you want to overwrite it or create new directory?');
@@ -91,12 +101,26 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     x_scan_pixelsAllScans=zeros(1,numFiles);
     alphaAllScans=zeros(1,numFiles);
     setpointN=zeros(1,numFiles);
+    idxSetN=zeros(1,numFiles);
     verticalForceAVG_N=zeros(1,numFiles);
     setN=cell(1,numFiles); avgN=cell(1,numFiles); h=cell(1,numFiles);
     % EXTRACT ALL DATA
-
-    f0=figure; hold on
+    
+    if strcmp(silent,'No')
+        f0=figure('Visible','on');
+    else
+        f0=figure('Visible','off');
+    end
+    axes1 = axes('Parent',f0);
+    hold(axes1,'on');   
     colors={"#0072BD","#D95319","#EDB120","#7E2F8E","#77AC30","#4DBEEE","#A2142F",'k'};   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    xlabel('Force [N]','FontSize',15)
+    legend1 = legend(axes1,'show');
+    set(legend1,...
+        'Position',[0.857175928885462 0.365668678093337 0.134722219262686 0.537724535479517]);
+    title('Distribution Raw Vertical Forces and user-setted setpoints','FontSize',18)
+
+
     for i=1:numFiles
         if numFiles>1
             fprintf('Processing the file %d over %d\n',i,numFiles)
@@ -121,31 +145,34 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
                 % raw_data_VD_nanoforce = raw_data_VD_force*1e9;
                 % figure
                 % imagesc(raw_data_VD_nanoforce), colormap parula, title('Raw data Vertical Deflection nanoforce','FontSize',17), colorbar                
+            elseif strcmp(data(j).Channel_name,'Vertical Deflection') && strcmp(data(j).Signal_type,'force')
+                raw_data_VD_force=data(j).AFM_image;               
             end
         end
-        
         
         if numFiles> 1
             verticalForceAVG_N(i)= mean(mean(data(j).AFM_image));
             setpointN(i)=metaData.SetP_N;
+            idxSetN(i)=size(data(j).AFM_image,2);
             setN{i}=xline(setpointN(i),'LineWidth',4,'DisplayName',sprintf('setpoint section %d',i),'Color',colors{i});
             avgN{i}=xline(verticalForceAVG_N(i),'--','LineWidth',2,'DisplayName',sprintf('avg vertical force section %d',i),'Color',colors{i});
             h{i}=histogram(raw_data_VD_force,30,'DisplayName',sprintf('raw vertical force section %d',i),'FaceColor',colors{i});
         else
-            [C, ia] = unique(round(raw_data_VD_force,8)); figure
-            for j=1:length(ia)
-                if j~=length(ia)
-                    sectionF=raw_data_VD_force(ia(j):ia(j+1)-1,:);
+        % find the setpoint values used in the experiments
+            [setpointN, idxSetN] = unique(round(mean(raw_data_VD_force,2),8)); % aggiunto mean in caso di glaa, check if still work
+            for j=1:length(idxSetN)
+                if j~=length(idxSetN)
+                    sectionF=raw_data_VD_force(idxSetN(j):idxSetN(j+1)-1,:);
                 else
-                    sectionF=raw_data_VD_force(ia(j):end,:);
+                    sectionF=raw_data_VD_force(idxSetN(j):end,:);
                 end
                 verticalForceAVG_N(j)=mean(mean(sectionF));
-                setN{j}=xline(C(j),'LineWidth',4,'DisplayName',sprintf('setpoint section %d',j),'Color',colors{j});
+                setN{j}=xline(setpointN(j),'LineWidth',4,'DisplayName',sprintf('setpoint section %d',j),'Color',colors{j});
                 avgN{j}=xline(verticalForceAVG_N(j),'--','LineWidth',2,'DisplayName',sprintf('avg vertical force section %d',j),'Color',colors{j});
                 h{j}=histogram(sectionF,30,'DisplayName',sprintf('raw vertical force section %d',j),'FaceColor',colors{j});                
             end
         end
-        
+
         % remove not useful information prior the process. Not show the figures. Later
         filtData=A2_CleanUpData2_AFM(data,secondMonitorMain,newFolder,'SaveFig','No');
         % save the sections before and after the processing
@@ -173,7 +200,7 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
         x_scan_pixelsAllScans(i)=allScansMetadata{i}.x_scan_pixels;  
     end
     hold off
-    xlabel('Force [N]'), legend
+    
     if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f0); end
     saveas(f0,sprintf('%s/resultA1_distributionVerticalForces.tif',newFolder))
     close all
@@ -272,20 +299,21 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
         AFM_HeightFittedMasked=dataOrderedEND;
         AFM_height_IO=rot90(concatenated_AFM_Height_IO,-1);
         
+        if strcmp(silent,'No')
+            f1=figure('Visible','on');
+        else
+            f1=figure('Visible','off');
+        end
+        imshow(AFM_height_IO); title('Baseline and foreground processed', 'FontSize',16), colormap parula
+        colorbar('Ticks',[0 1],'TickLabels',{'Background','Foreground'},'FontSize',13)
+        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
         if strcmp(saveFig,'Yes')
-            if strcmp(silent,'No')
-                f1=figure('Visible','on');
-            else
-                f1=figure('Visible','off');
-            end
-            imshow(AFM_height_IO); title('Baseline and foreground processed', 'FontSize',16), colormap parula
-            colorbar('Ticks',[0 1],'TickLabels',{'Background','Foreground'},'FontSize',13)
-            if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
             saveas(f1,sprintf('%s/resultA3_1_fittedHeightChannel_BaselineForeground_Assembled.tif',newFolder))
         end
     else       
         [AFM_HeightFittedMasked,AFM_height_IO,~]=processData(dataOrderedSTART,secondMonitorMain,newFolder,accuracy,silent,saveFig);
-        A2_CleanUpData2_AFM(AFM_HeightFittedMasked,secondMonitorMain,newFolder,'imageType',imgTyp,'phaseProcess','PostProcessed','Silent',silent,'SaveFig',saveFig,'Normalization','Yes');
+        % use this following line just to further check or to get the normalization in a second moment.
+        A2_CleanUpData2_AFM(AFM_HeightFittedMasked,secondMonitorMain,newFolder,'imageType',imgTyp,'phaseProcess','PostProcessed','Silent',silent,'SaveFig',saveFig,'Normalization','No');
     end
 
     varargout{1}=AFM_HeightFittedMasked;
@@ -294,6 +322,7 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     varargout{4}=filePathData;
     varargout{5}=newFolder;
     varargout{6}=setpointN;
+    varargout{7}=idxSetN;
 
     uiwait(msgbox('Click to continue'))
     close all
@@ -303,5 +332,5 @@ end
 function [AFM_HeightFittedMasked,AFM_height_IO,accuracy]=processData(data,secondMonitorMain,newFolder,accuracy,silent,saveFig)
     [AFM_HeightFitted,AFM_height_IO,accuracy]=A3_El_AFM(data,secondMonitorMain,newFolder,'fitOrder',accuracy,'Silent',silent,'SaveFig',saveFig);
     % Using the AFM_height_IO, fit the background again, yielding a more accurate height image
-    AFM_HeightFittedMasked=A4_El_AFM_masked(AFM_HeightFitted,AFM_height_IO,secondMonitorMain,newFolder,'Silent',silent,'SaveFig','No');
+    AFM_HeightFittedMasked=A4_El_AFM_masked(AFM_HeightFitted,AFM_height_IO,secondMonitorMain,newFolder,'Silent',silent,'SaveFig',saveFig);
 end
