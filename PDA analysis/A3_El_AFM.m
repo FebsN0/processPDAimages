@@ -64,100 +64,40 @@ function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain,fil
     raw_data_Height=flip(rot90(raw_data_Height),2);
     rawH=raw_data_Height;
     
-    f1=figure; fh=figure;
+    f1=figure; 
     if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f1); end
     i=0; text='Original';
-    tilt_plane_total = zeros(size(rawH));
     
     % in this snippet, remove outliers and data corresponding to those when the tip is not scanning anymore or
     % applying the plane fitting selecting background areas
     while true
-        % DISTRIBUTION HEIGHT
-        figure(fh)
-        histogram(rawH*1e9,100,'DisplayName','Distribution height');
-        xlabel(sprintf('Feature height (nm)'),'FontSize',15)
-        title('Distribution Height','FontSize',20)
         % normalized height
         figure(f1)
-        imagesc(rawH/max(max(rawH)))
+        imagesc(rawH*1e9)
         ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
-        colormap parula, c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
+        colormap parula, c = colorbar; c.Label.String = 'Height (nm)'; c.Label.FontSize=15;
         title(sprintf('%s Height (measured) channel',text),'FontSize',17)
         if i==1
             answer = questdlg('Satisfied of the results','','Yes','No','No');
             if strcmp(answer,'Yes'), break, end
         end
         hold on
-        answer = questdlg('Choose the operation','','Remotion','Plane Fitting','Remotion');
-        if strcmp(answer,'Remotion') 
+        answer = questdlg('Remove lines by selecting area?','','Yes','No','Yes');
+        if strcmp(answer,'Yes') 
             % Normalize using the 2D max value and map the intensity values in grayscale image I to new values in J            
-            title('Select area to remove','FontSize',17)
+            title('Select area to remove all the fast scan lines corresponding to the selected area.','FontSize',17)
             roi=drawrectangle('Label','Removed');
             uiwait(msgbox('Click to continue'))
             hold off
-            answer = questdlg('Type of remotion','','All fast scan lines','Only selected portion','Line');
-            xstart = round(roi.Position(1));        xend = xstart+round(roi.Position(3));
-            ystart = round(roi.Position(2));       yend = ystart+round(roi.Position(4));
+            xstart = round(roi.Position(1));
+            xend = xstart+round(roi.Position(3));
             if xstart<1, xstart=1; end;     if xend<1, xend=1; end
-            if ystart<1, ystart=1; end;     if yend<1, yend=1; end
-            if strcmp(answer,'All fast scan lines')
-                rawH(:,xstart:xend)=min(min(rawH));
-            else
-                rawH(ystart:yend,xstart:xend)=min(min(rawH));
-            end
+            rawH(:,xstart:xend)=min(min(rawH));
             text='Portion Removed - ';
-        else
-            % PLANE FITTING ON HEIGHT IMAGE BEFORE LINE LEVELING
-            title('Select background to plane fitting','FontSize',17)
-            xDataTotal = [];
-            yDataTotal = [];
-            zDataTotal = [];
-            while true
-                roi=drawrectangle('Label','Background Fitting');
-                xstart = round(roi.Position(1));    xend = xstart+round(roi.Position(3));
-                ystart = round(roi.Position(2));    yend = ystart+round(roi.Position(4));
-                if xstart<1, xstart=1; end
-                if ystart<1, ystart=1; end
-                if xend>size(rawH,2), xend=size(rawH,2); end
-                if yend>size(rawH,1), yend=size(rawH,1); end
-    
-                selected_region = rawH(ystart:yend, xstart:xend);
-                % create a mesh grid of the selected area and use it to fit respect to the selected region
-    
-                [x, y] = meshgrid(1:size(selected_region, 2), 1:size(selected_region, 1));
-                % transform x,y and z into flattened vectors and clean eventual errors
-                [xData, yData, zData] = prepareSurfaceData(x(:), y(:), double(selected_region(:)));
-                
-                xDataTotal = [xDataTotal; xData];
-                yDataTotal = [yDataTotal; yData];
-                zDataTotal = [zDataTotal; zData];
-                answer = questdlg('Select another region?','','Yes','No','No');
-                if strcmp(answer,'No')
-                    break
-                end
-            end
-            % Set up fittype and options.
-            ft = fittype( 'poly11' );
-            opts = fitoptions( 'Method', 'LinearLeastSquares' );
-            opts.Robust = 'LAR';
-            % Fit model to data.
-            fitresult = fit( [xData, yData], zData, ft, opts );
-            % build the plane using the entire height image
-            [x, y] = meshgrid(1:size(rawH, 2), 1:size(rawH, 1));
-            tilt_plane = fitresult.p10 * x + fitresult.p01 * y + fitresult.p00;
-            tilt_plane_total = tilt_plane_total + tilt_plane;
-            % correct the height by appling such a plane
-            rawH = double(rawH) - tilt_plane;
-            text='Plane fitting - ';
         end
         i=1;       
     end
-    % save histrogram
-    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,fh); end
-    saveas(fh,sprintf('%s/resultA3_1_DistributionHeight.tif',filepath))
-    saveas(f1,sprintf('%s/resultA3_2_Fitted_portionRemoved_Height.tif',filepath))
-    close all
-    
+
     for i=1:size(filtData,2)
         if i==1             % put the fixed raw height data channel
             AFM_Images(i)=struct(...
@@ -172,8 +112,6 @@ function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain,fil
                     'AFM_image', temp_img);
         end
     end
-
-
 
     height_image=AFM_Images(1).AFM_image;
     wb=waitbar(0/size(height_image,1),sprintf('Removing Polynomial Baseline %.0f of %.0f',0,size(height_image,1)),...
@@ -468,7 +406,7 @@ function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain,fil
     if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f4); end
     
     if SavFg
-        saveas(f4,sprintf('%s\\resultA3_3_BaselineForeground.tif',filepath))
+        saveas(f4,sprintf('%s\\resultA3_1_BaselineForeground.tif',filepath))
     end
     
     % converts any nonzero element of the yellow/blue image into a logical image.

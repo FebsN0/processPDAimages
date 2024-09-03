@@ -86,7 +86,7 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
         imgTyp = 'Entire';
     end
 
-    clear question options
+    clear question options argName defaultVal
     % init variables
     allScansImageSTART=cell(1,numFiles);
     if flag_processSignleSections

@@ -39,7 +39,7 @@ function [outputme] = A11_feature_CDiB(X_Data,Y_Data,secondMonitorMain,newFolder
         % define x line based on first and last elements and number of bins
         x_bin_centers = linspace(0,max(max(DataOI(:,1)))+0.1*max(max(DataOI(:,1))), p.Results.NumberOfBins);
     end
-    outputme=struct();
+
     for i=1:length(x_bin_centers)-1
         % find value above a specific element of X data
         a=find((DataOI(:,1)>x_bin_centers(i)));

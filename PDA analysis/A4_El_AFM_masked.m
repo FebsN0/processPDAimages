@@ -92,7 +92,12 @@ function Cropped_Images_Bk=A4_El_AFM_masked(Cropped_Images,AFM_height_IO,secondM
         uiwait(msgbox('Click to continue'))
     end
     close all
-
+    fh=figure;
+    histogram(AFM_noBk*1e9,100,'DisplayName','Distribution height');
+    xlabel(sprintf('Feature height (nm)'),'FontSize',15)
+    title('Distribution Height','FontSize',20)
+    if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,fh); end
+    saveas(fh,sprintf('%s/resultA4_1_OptHeightDistribution.tif',filepath))
     % substitutes to the raw cropped date the Height with no BK
     Cropped_Images_Bk=Cropped_Images;
     Cropped_Images_Bk(strcmp({Cropped_Images_Bk.Channel_name},'Height (measured)')).AFM_image=AFM_noBk;

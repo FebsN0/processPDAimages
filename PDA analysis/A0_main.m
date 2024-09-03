@@ -4,7 +4,7 @@ secondMonitorMain=objInSecondMonitor;
 % upload .jpk files. If more than one and if from same experiment in which setpoint is changed, then assembly.
 [AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM,filePathData,newFolder,setpoints,idxSetN]=A1_openANDassembly_JPK(secondMonitorMain);
 
-
+%%
 % to extract the friction coefficient, choose which method use.
 question=sprintf('Which method perform to extract the background friction coefficient?');
 options={ ...
@@ -16,6 +16,9 @@ options={ ...
     sprintf('6) Enter manually a value')};
 choice = getValidAnswer(question, '', options);
 
+if ~exist('filePathData','var')
+    filePathData=pwd;
+end
 % methods 2 and 3 require the .jpk file with HOVER MODE OFF but in the same condition (same scanned PDA area
 % of when HOVER MODE is ON)
 switch choice
@@ -23,15 +26,20 @@ switch choice
         % method 1 : get the friction glass experiment .jpk file
         [fileNameFriction, filePathDataFriction] = uigetfile({'*.jpk'},'Select the .jpk AFM image to extract glass friction coefficient',filePathData);
         [dataGlass,metaDataGlass]=A1_open_JPK(fullfile(filePathDataFriction,fileNameFriction));
+        if ~exist('newFolder','var')
+            newFolder=filePathDataFriction;
+        end
         avg_fc=A5_frictionGlassCalc_method1(metaDataGlass.Alpha,dataGlass,secondMonitorMain,newFolder);
         clear fileNameFriction filePathDataFriction dataGlass metaDataGlass
     case {2, 3}
         % before perform method 2 or 3, upload the data used to calc the glass friction coeffiecient. Basically it the same experiment but with Hover Mode OFF
-        % then clean the data.      
-        [AFM_HeightFittedMasked_HVOFF,AFM_height_IO_HVOFF,metaDataHoverModeOFF,~,~,setpointN_HVOff]=A1_openANDassembly_JPK(secondMonitorMain,'saveFig','No','filePath',filePathData,'backgroundOnly','Yes'); %#ok<ASGLU>
-               
+        % then clean the data.
+        [AFM_HeightFittedMasked_HVOFF,AFM_height_IO_HVOFF,metaDataHoverModeOFF,filePathHV,~,setpointN_HVOff]=A1_openANDassembly_JPK(secondMonitorMain,'saveFig','No','filePath',filePathData,'backgroundOnly','Yes'); %#ok<ASGLU>
         % METHOD 2 : MASKING ONLY
         % METHOD 3 : MASKING + OUTLIER REMOVAL
+        if ~exist('newFolder','var')
+            newFolder=filePathHV;
+        end
         eval(sprintf('avg_fc=A5_frictionGlassCalc_method%d(metaDataHoverModeOFF.Alpha,AFM_HeightFittedMasked_HVOFF,AFM_height_IO_HVOFF,setpointN_HVOff,secondMonitorMain,newFolder);',choice));
         clear dataHoverModeOFF metaDataHoverModeOFF filtDataHVOFF AFM_cropped_ImagesHVOFF AFM_height_IO_HVOFF AFM_H_NoBkHVOFF AFM_HeightFittedMasked_HVOFF setpointN_HVOff
     case 4  %TRCDA
@@ -51,7 +59,7 @@ end
 clear choice question options
 close all
 
-
+%%
 % Substitute to the AFM cropped channels the baseline adapted LD
 while true
     answer=getValidAnswer('Fitting AFM lateral channel data: which accuracy use?','',{'Low','Medium','High'});
@@ -124,12 +132,12 @@ clear f1 f2 f3 question options choice fileName Tritic_Mic_Image_After BF_Mic_Im
 clear BF_Mic_Image_aligned
     
 % Align AFM to BF and extract the coordinates for alighnment to be transferred to the other data
-[AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_data_optAlignment,results_AFM_BF_aligment]=A10_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_A6_LatDeflecFitted,newFolder,secondMonitorMain,'Margin',70);
+[AFM_IO_padded_sizeOpt,AFM_A10_IO_padded_sizeBF,AFM_data_optAlignment,results_AFM_BF_aligment]=A10_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_A6_LatDeflecFitted,newFolder,secondMonitorMain,'Margin',70);
 clear AFM_height_IO AFM_LatDeflecFitted
 
 
 % correlation FLUORESCENCE AND AFM DATA
-A11_correlation_AFM_BF(Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,AFM_IO_padded_sizeBF,AFM_data_optAlignment,setpoints,secondMonitorMain,newFolder);
+A11_correlation_AFM_BF(Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,AFM_A10_IO_padded_sizeBF,AFM_data_optAlignment,setpoints,secondMonitorMain,newFolder);
 
 
 
