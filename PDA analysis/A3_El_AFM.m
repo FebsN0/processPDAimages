@@ -1,4 +1,4 @@
-function [Cropped_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain,filepath,varargin)
+function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain,filepath,varargin)
 
 % The function extracts Images from the experiments.
 % It removes baseline and extracts foreground from the AFM image.
@@ -62,63 +62,151 @@ function [Cropped_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain
     raw_data_Height=filtData(strcmp({filtData.Channel_name},'Height (measured)')).AFM_image;
     % Orient the image by counterclockwise 180° and flip to coencide with the Microscopy image through rotations
     raw_data_Height=flip(rot90(raw_data_Height),2);
-
-    % Normalize using the 2D max value
-    visible_data_rot_Height=raw_data_Height/max(max(raw_data_Height));
-    %maps the intensity values in grayscale image I to new values in J
-    visible_data_rot_Height=imadjust(visible_data_rot_Height);
+    rawH=raw_data_Height;
     
-    if SeeMe
-        f1=figure;
-        imshow(visible_data_rot_Height)
-        colormap parula, title('Original Height (measured) channel','FontSize',17),
-        c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
+    f1=figure; fh=figure;
+    if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f1); end
+    i=0; text='Original';
+    tilt_plane_total = zeros(size(rawH));
+    
+    % in this snippet, remove outliers and data corresponding to those when the tip is not scanning anymore or
+    % applying the plane fitting selecting background areas
+    while true
+        % DISTRIBUTION HEIGHT
+        figure(fh)
+        histogram(rawH*1e9,100,'DisplayName','Distribution height');
+        xlabel(sprintf('Feature height (nm)'),'FontSize',15)
+        title('Distribution Height','FontSize',20)
+        % normalized height
+        figure(f1)
+        imagesc(rawH/max(max(rawH)))
         ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
-        if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f1); end
-    end
-
-    % THE IDEA OF CROPPING CAN BE USED TO REMOVE MANUALLY THE ARTIFACTS IN THE HEIGHT, WHICH CAN BE IGNORED IN
-    % ALL THE DATA, INCLUDING THE FLUORESCENCE
-    % Cropped_Images=A3_feature_removeArtifacts(visible_data_rot_Height)
+        colormap parula, c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
+        title(sprintf('%s Height (measured) channel',text),'FontSize',17)
+        if i==1
+            answer = questdlg('Satisfied of the results','','Yes','No','No');
+            if strcmp(answer,'Yes'), break, end
+        end
+        hold on
+        answer = questdlg('Choose the operation','','Remotion','Plane Fitting','Remotion');
+        if strcmp(answer,'Remotion') 
+            % Normalize using the 2D max value and map the intensity values in grayscale image I to new values in J            
+            title('Select area to remove','FontSize',17)
+            roi=drawrectangle('Label','Removed');
+            uiwait(msgbox('Click to continue'))
+            hold off
+            answer = questdlg('Type of remotion','','All fast scan lines','Only selected portion','Line');
+            xstart = round(roi.Position(1));        xend = xstart+round(roi.Position(3));
+            ystart = round(roi.Position(2));       yend = ystart+round(roi.Position(4));
+            if xstart<1, xstart=1; end;     if xend<1, xend=1; end
+            if ystart<1, ystart=1; end;     if yend<1, yend=1; end
+            if strcmp(answer,'All fast scan lines')
+                rawH(:,xstart:xend)=min(min(rawH));
+            else
+                rawH(ystart:yend,xstart:xend)=min(min(rawH));
+            end
+            text='Portion Removed - ';
+        else
+            % PLANE FITTING ON HEIGHT IMAGE BEFORE LINE LEVELING
+            title('Select background to plane fitting','FontSize',17)
+            xDataTotal = [];
+            yDataTotal = [];
+            zDataTotal = [];
+            while true
+                roi=drawrectangle('Label','Background Fitting');
+                xstart = round(roi.Position(1));    xend = xstart+round(roi.Position(3));
+                ystart = round(roi.Position(2));    yend = ystart+round(roi.Position(4));
+                if xstart<1, xstart=1; end
+                if ystart<1, ystart=1; end
+                if xend>size(rawH,2), xend=size(rawH,2); end
+                if yend>size(rawH,1), yend=size(rawH,1); end
     
-    cropped_image=visible_data_rot_Height;
+                selected_region = rawH(ystart:yend, xstart:xend);
+                % create a mesh grid of the selected area and use it to fit respect to the selected region
+    
+                [x, y] = meshgrid(1:size(selected_region, 2), 1:size(selected_region, 1));
+                % transform x,y and z into flattened vectors and clean eventual errors
+                [xData, yData, zData] = prepareSurfaceData(x(:), y(:), double(selected_region(:)));
+                
+                xDataTotal = [xDataTotal; xData];
+                yDataTotal = [yDataTotal; yData];
+                zDataTotal = [zDataTotal; zData];
+                answer = questdlg('Select another region?','','Yes','No','No');
+                if strcmp(answer,'No')
+                    break
+                end
+            end
+            % Set up fittype and options.
+            ft = fittype( 'poly11' );
+            opts = fitoptions( 'Method', 'LinearLeastSquares' );
+            opts.Robust = 'LAR';
+            % Fit model to data.
+            fitresult = fit( [xData, yData], zData, ft, opts );
+            % build the plane using the entire height image
+            [x, y] = meshgrid(1:size(rawH, 2), 1:size(rawH, 1));
+            tilt_plane = fitresult.p10 * x + fitresult.p01 * y + fitresult.p00;
+            tilt_plane_total = tilt_plane_total + tilt_plane;
+            % correct the height by appling such a plane
+            rawH = double(rawH) - tilt_plane;
+            text='Plane fitting - ';
+        end
+        i=1;       
+    end
+    % save histrogram
+    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,fh); end
+    saveas(fh,sprintf('%s/resultA3_1_DistributionHeight.tif',filepath))
+    saveas(f1,sprintf('%s/resultA3_2_Fitted_portionRemoved_Height.tif',filepath))
+    close all
+    
     for i=1:size(filtData,2)
-        temp_img=flip(rot90(filtData(i).AFM_image),2);
-        Cropped_Images(i)=struct(...
+        if i==1             % put the fixed raw height data channel
+            AFM_Images(i)=struct(...
                 'Channel_name', filtData(i).Channel_name,...
                 'Trace_type', filtData(i).Trace_type, ...
-                'AFM_image', temp_img);
+                'AFM_image', rawH);
+        else
+            temp_img=flip(rot90(filtData(i).AFM_image),2);
+            AFM_Images(i)=struct(...
+                    'Channel_name', filtData(i).Channel_name,...
+                    'Trace_type', filtData(i).Trace_type, ...
+                    'AFM_image', temp_img);
+        end
     end
 
-    wb=waitbar(0/size(cropped_image,1),sprintf('Removing Polynomial Baseline %.0f of %.0f',0,size(cropped_image,1)),...
+
+
+    height_image=AFM_Images(1).AFM_image;
+    wb=waitbar(0/size(height_image,1),sprintf('Removing Polynomial Baseline %.0f of %.0f',0,size(height_image,1)),...
         'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
     setappdata(wb,'canceling',0);
-    N_Cycluse_waitbar=size(cropped_image,2);
-
+    N_Cycluse_waitbar=size(height_image,2);    
     % Polynomial baseline fitting (line by line)
-    poly_filt_data=zeros(size(cropped_image,1),size(cropped_image,2));
-    for i=1:size(cropped_image,2)
+    poly_filt_data=zeros(size(height_image,1),size(height_image,2));
+    for i=1:size(height_image,2)
         if(exist('wb','var'))
             %if cancel is clicked, stop
-            if getappdata(wb,'canceling')
-               error('Process cancelled')
-            end
+            if getappdata(wb,'canceling'), error('Process cancelled'), end
         end
         waitbar(i/N_Cycluse_waitbar,wb,sprintf('Removing Polynomial Baseline ... Completed %2.1f %%',i/N_Cycluse_waitbar*100));
         % prepareCurveData function clean the data like Removing NaN or Inf, converting nondouble to double, converting complex to 
         % real and returning data as columns regardless of the input shapes.
-        % extract the i-th column of the cropped image ==> fitting on single column
-        [xData,yData] = prepareCurveData((1:size(cropped_image,1))',cropped_image(:,i));
+        % extract the i-th column of the image ==> fitting on single column
+        [xData,yData] = prepareCurveData((1:size(height_image,1))',height_image(:,i));
+        % in case of insufficient number of values for a given line (like entire line removed previously), skip the fitting
+        if length(xData) <= 2 || length(yData) <= 2
+            poly_filt_data(:,i)=height_image(:,i);
+            continue
+        end
         % Linear polynomial curve
         ft = fittype( 'poly1' );
         % group of coefficients: p1 and p2 ==> val(x) = p1*x + p2
-        [fitresult,~]=fit(xData,yData, ft );
-        % start the value from the origin 0
-        xData_mod=xData-1;
+        fitresult=fit(xData,yData, ft );
+        % like the plan fitting, create new vector of same length as well as line of the height image
+        xData = 1:size(height_image,1); xData=xData';
         % dont use the offset p2, rather the first value of the i-th column
-        baseline_y=(fitresult.p1*xData_mod+cropped_image(1,i));
+        baseline_y=(fitresult.p1*xData+height_image(1,i));
         % substract the baseline_y and then substract by the minimum ==> get the 0 value in height 
-        flag_poly_filt_data=cropped_image(:,i)-baseline_y;
+        flag_poly_filt_data=height_image(:,i)-baseline_y;
         poly_filt_data(:,i)=flag_poly_filt_data-min(min(flag_poly_filt_data));
     end
     waitbar(0/N_Cycluse_waitbar,wb,sprintf('Optimizing Butterworth Filter...'));
@@ -128,7 +216,7 @@ function [Cropped_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain
     % set the parameters for Butterworth filter ==> little recap: it is a low-pass filter with a frequency
     % response that is as flat as possible in the passband
     fc = 5; % Cut off frequency
-    fs = size(cropped_image,2); % Sampling rate
+    fs = size(height_image,2); % Sampling rate
     % Butterworth filter of order 6 with normalized cutoff frequency Wn
     % Return transfer function coefficients to be used in the filter function
     [b,a] = butter(6,fc/(fs/2)); 
@@ -147,6 +235,8 @@ function [Cropped_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain
         end
     end
     
+
+    %%% MAYBE NOT NECESSARY ANYMORE
     % Fitting of linear polynomial surface to the result of Poly1 fit
     backgrownd_th=E(1,bk_limit);
     Bk_poly_filt_data=poly_filt_data;
@@ -176,8 +266,6 @@ function [Cropped_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain
     %   - Sum of squares due to error
     %   - Degree-of-freedom adjusted coefficient of determination
     
-    
-    % Extract the (1) height no Bk, which is not used, (2) cropped AFM channels, (3) I/O image of Height and (4) info of the cropped area
     while true
         if ~flagAccuracy
             answer=getValidAnswer('Fitting AFM Height channel data: which fitting order range use?','',{'Low (1-3)','Medium (1-6)','High (1-9)'});
@@ -228,8 +316,9 @@ function [Cropped_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain
                 [pos_outliner]=isoutlier(flag_signal_y,'gesd');
             end
             [xData, yData] = prepareCurveData(flag_signal_x,flag_signal_y);
-            
-            if(size(xData,1)>2)
+            if length(xData) <= 2 || length(yData) <= 2
+                error('something is wrong. Too NaN values in the %d-th line\n',i)
+            else
                 opts = fitoptions( 'Method', 'LinearLeastSquares' );
                 opts.Robust = 'LAR';
                 fit_decision=NaN(3,limit);
@@ -261,9 +350,7 @@ function [Cropped_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain
                 fit_decision_final(i,3)=fit_decision(3,Ind);
                 % start the fitting.
                 % Although the fitresult seems to be unused, it is actually evaluated with eval function.
-                [fitresult, ~] = fit( xData, yData, ft, opts ); %#ok<ASGLU> % gof was suppressed
-            else
-                error('The extracted fast scan line is too short. Something is wrong');
+                fitresult= fit( xData, yData, ft, opts ); %#ok<NASGU> % % gof was suppressed
             end
             % build the y value using the polynomial coefficients and x value (1 ==> 512)
             % save polynomial coefficients (p1, p2, p3, ...) into fit_decision_final
@@ -381,7 +468,7 @@ function [Cropped_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain
     if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f4); end
     
     if SavFg
-        saveas(f4,sprintf('%s\\resultA3_1_BaselineForeground.tif',filepath))
+        saveas(f4,sprintf('%s\\resultA3_3_BaselineForeground.tif',filepath))
     end
     
     % converts any nonzero element of the yellow/blue image into a logical image.
