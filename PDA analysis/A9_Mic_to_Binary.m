@@ -4,18 +4,27 @@
 % more contrast)
 
 
-function [binary_image,reduced_Tritic_before,reduced_Tritic_after_aligned,FurtherDetails]=A9_Mic_to_Binary(imageBF_aligned,Tritic_before,Tritic_after_aligned,secondMonitorMain,newFolder)
+function varargout=A9_Mic_to_Binary(imageBF_aligned,secondMonitorMain,newFolder,varargin)
 
     p=inputParser();
     %Add default mandatory parameters.
     addRequired(p, 'imageBF_aligned');
-    addRequired(p,'Tritic_before')
-    addRequired(p,'Tritic_after_aligned')
-   
-    parse(p,imageBF_aligned,Tritic_before,Tritic_after_aligned);
+    
+    argName = 'TRITIC_before';        defaultVal = [];     addParameter(p,argName,defaultVal, @(x) ismatrix(x));
+    argName = 'TRITIC_after';         defaultVal = [];     addParameter(p,argName,defaultVal, @(x) ismatrix(x));
+
+    parse(p,imageBF_aligned,varargin{:});
     clearvars argName defaultVal
-     
-    % decide if crop the image
+
+    reduced_imageBF=imageBF_aligned;
+    if ~isempty(p.Results.TRITIC_before)
+        reduced_Tritic_before=p.Results.TRITIC_before;
+    end
+    if ~isempty(p.Results.TRITIC_after)
+        reduced_Tritic_after=p.Results.TRITIC_after;
+    end
+
+    % decide if crop the image. If not, leave as original size
     Crop_image = getValidAnswer('The image is not cropped yet, would Like to Crop the Image?', '', {'Yes','No'});
     if Crop_image == 1
         ftmp=figure;
@@ -33,13 +42,17 @@ function [binary_image,reduced_Tritic_before,reduced_Tritic_after_aligned,Furthe
         if(YEnd>size(imageBF_aligned,2)), YEnd=size(imageBF_aligned,2); end
         % extract the cropped area
         reduced_imageBF=imageBF_aligned(XBegin:XEnd,YBegin:YEnd);
-        reduced_Tritic_before=Tritic_before(XBegin:XEnd,YBegin:YEnd);
-        reduced_Tritic_after_aligned=Tritic_after_aligned(XBegin:XEnd,YBegin:YEnd);
-    else
-        reduced_imageBF                 =imageBF_aligned;
-        reduced_Tritic_before           =Tritic_before;
-        reduced_Tritic_after_aligned    =Tritic_after_aligned;
+        if exist('reduced_Tritic_before','var')
+            reduced_Tritic_before=reduced_Tritic_before(XBegin:XEnd,YBegin:YEnd);
+            varargout{2}=reduced_Tritic_before;
+        end
+        if exist('reduced_Tritic_after','var')
+            reduced_Tritic_after=reduced_Tritic_after(XBegin:XEnd,YBegin:YEnd);
+            varargout{3}=reduced_Tritic_after;
+        end
     end
+    
+    
 
     question=sprintf('Performs morphological opening operation?\n(In original code it is always yes, whereas commented in case of the PDCA code');
     answer=getValidAnswer(question,'',{'Yes','No'});
@@ -164,4 +177,8 @@ function [binary_image,reduced_Tritic_before,reduced_Tritic_after_aligned,Furthe
     end
     uiwait(msgbox('Click to continue',''));
     close all
+    
+    varargout{1}=binary_image;
+    varargout{4}=FurtherDetails;
+
 end

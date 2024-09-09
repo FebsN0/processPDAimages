@@ -65,39 +65,45 @@ function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain,fil
     rawH=raw_data_Height;
     
     f1=figure; 
-    if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f1); end
-    i=0; text='Original';
+    objInSecondMonitor(secondMonitorMain,f1);
+    text='Original';
     
     % in this snippet, remove outliers and data corresponding to those when the tip is not scanning anymore or
     % applying the plane fitting selecting background areas
+    flagRemoval=false;
     while true
-        % normalized height
         figure(f1)
         imagesc(rawH*1e9)
         ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
         colormap parula, c = colorbar; c.Label.String = 'Height (nm)'; c.Label.FontSize=15;
-        title(sprintf('%s Height (measured) channel',text),'FontSize',17)
-        if i==1
-            answer = questdlg('Satisfied of the results','','Yes','No','No');
-            if strcmp(answer,'Yes'), break, end
-        end
-        hold on
+        title(sprintf('%s Raw Height (measured) channel',text),'FontSize',17)
         answer = questdlg('Remove lines by selecting area?','','Yes','No','Yes');
-        if strcmp(answer,'Yes') 
-            % Normalize using the 2D max value and map the intensity values in grayscale image I to new values in J            
+        if strcmp(answer,'No')
+            break
+        else
+            hold on  
             title('Select area to remove all the fast scan lines corresponding to the selected area.','FontSize',17)
             roi=drawrectangle('Label','Removed');
             uiwait(msgbox('Click to continue'))
             hold off
-            xstart = round(roi.Position(1));
-            xend = xstart+round(roi.Position(3));
+            % take the coordinates along slow scan direction. Not useful extracting y coordinates because
+            % entire lines will be deleted
+            xstart = round(roi.Position(1));     xend = xstart+round(roi.Position(3));
             if xstart<1, xstart=1; end;     if xend<1, xend=1; end
-            rawH(:,xstart:xend)=min(min(rawH));
-            text='Portion Removed - ';
-        end
-        i=1;       
-    end
+            % substitute the value of selected lines with the minimum value.
+            % note: the min value is the one outside the selected area. Sometimes is very very low making it
+            % unclear
 
+            rawH(:,xstart:xend)=min(min(rawH(:,[1:xstart-1 xend+1:end])));
+            text='Portion Removed - ';
+            flagRemoval=true;
+        end
+    end
+    if flagRemoval
+        axis equal, xlim([0 size(rawH,2)]), ylim([0 size(rawH,1)])
+        saveas(f1,sprintf('%s\\resultA3_1_DefinitiveRawHeight_portionRemoved.tif',filepath))
+    end
+    close gcf
     for i=1:size(filtData,2)
         if i==1             % put the fixed raw height data channel
             AFM_Images(i)=struct(...
@@ -322,7 +328,7 @@ function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain,fil
         
         f2=figure;
         imshow(AFM_noBk_visible_data),colormap parula, title('Fitted Height (measured) channel', 'FontSize',16)
-        if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f2); end
+        objInSecondMonitor(secondMonitorMain,f2);
         c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
         ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
         
@@ -338,10 +344,9 @@ function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain,fil
     end
     
 
-
     f3=figure;
     subplot(121), imshow(AFM_noBk_visible_data),colormap parula, title('Fitted Height (measured) channel', 'FontSize',16)
-    if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f3); end
+    objInSecondMonitor(secondMonitorMain,f3);
     c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
     ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
 
@@ -403,10 +408,10 @@ function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain,fil
 
     imshow(seg_dial); title('Baseline and foreground processed', 'FontSize',16), colormap parula
     colorbar('Ticks',[0 1],'TickLabels',{'Background','Foreground'},'FontSize',13)
-    if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f4); end
+    objInSecondMonitor(secondMonitorMain,f4);
     
     if SavFg
-        saveas(f4,sprintf('%s\\resultA3_1_BaselineForeground.tif',filepath))
+        saveas(f4,sprintf('%s\\resultA3_2_BaselineForeground.tif',filepath))
     end
     
     % converts any nonzero element of the yellow/blue image into a logical image.

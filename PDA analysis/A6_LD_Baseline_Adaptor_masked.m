@@ -50,15 +50,17 @@ function [AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_masked(AFM_cropped_Image
     c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize = 15;
     title('Raw Lateral Deflection [V] - Trace','FontSize',18)
     xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
-    axis equal, xlim([0 512]), ylim([0 512])
+    axis equal, xlim([0 size(Lateral_Trace,2)]), ylim([0 size(Lateral_Trace,1)])
+
+
     subplot(122)
     imshow((imadjust(Lateral_Trace_clean_shift/max(max(Lateral_Trace_clean_shift))))), colormap parula; colorbar,
     c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize = 15;
     title({'Lateral Deflection - Trace [V]'; '(shifted toward minimum)'},'FontSize',18)
     xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
-    axis equal, xlim([0 512]), ylim([0 512])
+    axis equal, xlim([0 size(Lateral_Trace,2)]), ylim([0 size(Lateral_Trace,1)])
     
-    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
+    objInSecondMonitor(secondMonitorMain,f1);
     if SavFg
         saveas(f1,sprintf('%s/resultA6_1_RawAndShiftedLateralDeflection.tif',newFolder))
     end
@@ -205,20 +207,17 @@ function [AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_masked(AFM_cropped_Image
     c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize =15;
     xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
     title('Fitted Lateral Deflection channel [V] - Trace ','FontSize',15)
-    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2); end
+    objInSecondMonitor(secondMonitorMain,f2);
     if SavFg
         saveas(f2,sprintf('%s/resultA6_2_ResultsFittingOnLateralDeflections.tif',newFolder))
     end
-    if SeeMe
-        f3=figure('Visible','on');
-    else
-        f3=figure('Visible','off');
-    end
+
+    f3=figure;
     imshow(imadjust(Corrected_LD_Trace/max(max(Corrected_LD_Trace)))), colormap parula
     c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize =15;
     title('Fitted and corrected Lateral Force [N]','FontSize',17)
     xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
-    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
+    objInSecondMonitor(secondMonitorMain,f3);
     if SavFg
         saveas(f3,sprintf('%s/resultA6_3_ResultsDefinitiveLateralDeflectionsNewton.tif',newFolder))
     end

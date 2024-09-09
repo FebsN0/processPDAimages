@@ -4,48 +4,31 @@ secondMonitorMain=objInSecondMonitor;
 % upload .jpk files. If more than one and if from same experiment in which setpoint is changed, then assembly.
 [AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM,filePathData,newFolder,setpoints,idxSetN]=A1_openANDassembly_JPK(secondMonitorMain);
 
-%%
 % to extract the friction coefficient, choose which method use.
 question=sprintf('Which method perform to extract the background friction coefficient?');
 options={ ...
-    sprintf('1) Average fast scan lines containing only background.\nUse the .jpk image containing only background'), ...
-    sprintf('2) Masking PDA feature. Use the .jpk image containing both PDA and background\n(ReTrace Data required - Hover Mode OFF)'), ... 
-    sprintf('3) Masking PDA + outlier removal features. Use the .jpk image containing both PDA and background\n(ReTrace Data required - Hover Mode OFF)'), ...
-    sprintf('4) Use a previous calculated friction coefficient: (only) TRCDA= 0.2920'), ...
-    sprintf('5) Use a previous calculated friction coefficient: (only) PCDA  = 0.2626'), ...
+    sprintf('1) TRCDA (air) = 0.2920'), ...
+    sprintf('2) PCDA  (air)  = 0.2626'), ... 
+    sprintf('3) TRCDA-DMPC (air) = 0.148'), ...
+    sprintf('4) TRCDA-DOPC (air) = 0.154'), ...
+    sprintf('5) TRCDA-POPC (air) = 0.4123'), ...
     sprintf('6) Enter manually a value')};
 choice = getValidAnswer(question, '', options);
 
-if ~exist('filePathData','var')
-    filePathData=pwd;
+if ~exist('newFolder','var')
+    newFolder=[];
+end
+if ~exist('secondMonitorMain','var')
+    secondMonitorMain=objInSecondMonitor;
 end
 % methods 2 and 3 require the .jpk file with HOVER MODE OFF but in the same condition (same scanned PDA area
 % of when HOVER MODE is ON)
 switch choice
-    case 1
-        % method 1 : get the friction glass experiment .jpk file
-        [fileNameFriction, filePathDataFriction] = uigetfile({'*.jpk'},'Select the .jpk AFM image to extract glass friction coefficient',filePathData);
-        [dataGlass,metaDataGlass]=A1_open_JPK(fullfile(filePathDataFriction,fileNameFriction));
-        if ~exist('newFolder','var')
-            newFolder=filePathDataFriction;
-        end
-        avg_fc=A5_frictionGlassCalc_method1(metaDataGlass.Alpha,dataGlass,secondMonitorMain,newFolder);
-        clear fileNameFriction filePathDataFriction dataGlass metaDataGlass
-    case {2, 3}
-        % before perform method 2 or 3, upload the data used to calc the glass friction coeffiecient. Basically it the same experiment but with Hover Mode OFF
-        % then clean the data.
-        [AFM_HeightFittedMasked_HVOFF,AFM_height_IO_HVOFF,metaDataHoverModeOFF,filePathHV,~,setpointN_HVOff]=A1_openANDassembly_JPK(secondMonitorMain,'saveFig','No','filePath',filePathData,'backgroundOnly','Yes'); %#ok<ASGLU>
-        % METHOD 2 : MASKING ONLY
-        % METHOD 3 : MASKING + OUTLIER REMOVAL
-        if ~exist('newFolder','var')
-            newFolder=filePathHV;
-        end
-        eval(sprintf('avg_fc=A5_frictionGlassCalc_method%d(metaDataHoverModeOFF.Alpha,AFM_HeightFittedMasked_HVOFF,AFM_height_IO_HVOFF,setpointN_HVOff,secondMonitorMain,newFolder);',choice));
-        clear dataHoverModeOFF metaDataHoverModeOFF filtDataHVOFF AFM_cropped_ImagesHVOFF AFM_height_IO_HVOFF AFM_H_NoBkHVOFF AFM_HeightFittedMasked_HVOFF setpointN_HVOff
-    case 4  %TRCDA
-        avg_fc = 0.2920;
-    case 5                %PCDA
-        avg_fc = 0.2626;
+    case 1, avg_fc = 0.2920;
+    case 2, avg_fc = 0.2626;
+    case 3, avg_fc = 0.148;
+    case 4, avg_fc = 0.154;
+    case 5, avg_fc = 0.4123;                     
     case 6
         while true
             avg_fc = str2double(inputdlg('Enter a value for the glass fricction coefficient','',[1 50]));
@@ -59,7 +42,7 @@ end
 clear choice question options
 close all
 
-%%
+
 % Substitute to the AFM cropped channels the baseline adapted LD
 while true
     answer=getValidAnswer('Fitting AFM lateral channel data: which accuracy use?','',{'Low','Medium','High'});
@@ -71,7 +54,7 @@ while true
         case 3
             accuracy= 'High';
     end
-    [AFM_A6_LatDeflecFitted,~]=A6_LD_Baseline_Adaptor_masked(AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM.Alpha,avg_fc,secondMonitorMain,newFolder,'Accuracy',accuracy,'Silent', 'No');
+    [AFM_A6_LatDeflecFitted,~]=A6_LD_Baseline_Adaptor_masked(AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM.Alpha,avg_fc,secondMonitorMain,newFolder,'Accuracy',accuracy);
     if getValidAnswer('Satisfied of the fitting?','',{'y','n'}) == 1
         break
     end
@@ -82,23 +65,23 @@ close all
 %%
 
 % Open Brightfield image and the TRITIC (Before and After stimulation images)
-[fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the BrightField image',filePathData);
+[fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the BrightField image');
 [BF_Mic_Image,~,metaData_BF]=A7_open_ND2(fullfile(filePathData,fileName)); 
-f1=figure;
+f1=figure('Visible','off');
 imshow(imadjust(BF_Mic_Image)), title('BrightField - original','FontSize',17)
 if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
 saveas(f1,sprintf('%s/resultA8_0_BrightField.tif',newFolder))
 
 [fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the TRITIC Before Stimulation image',filePathData);
 [Tritic_Mic_Image_Before]=A7_open_ND2(fullfile(filePathData,fileName)); 
-f2=figure;
+f2=figure('Visible','off');
 imshow(imadjust(Tritic_Mic_Image_Before)), title('TRITIC Before Stimulation','FontSize',17)
 if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2); end
 saveas(f2,sprintf('%s/resultA8_0_TRITIC_Before_Stimulation.tif',newFolder))
 
 [fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the TRITIC After Stimulation image',filePathData);
 [Tritic_Mic_Image_After]=A7_open_ND2(fullfile(filePathData,fileName)); 
-f3=figure;
+f3=figure('Visible','off');
 imshow(imadjust(Tritic_Mic_Image_After)), title('TRITIC After Stimulation','FontSize',17)
 if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
 saveas(f3,sprintf('%s/resultA8_0_TRITIC_After_Stimulation.tif',newFolder))
@@ -128,17 +111,22 @@ clear f1 f2 f3 question options choice fileName Tritic_Mic_Image_After BF_Mic_Im
 
 
 % Produce the binary IO of Brightfield
-[BF_Mic_Image_IO,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,~]=A9_Mic_to_Binary(BF_Mic_Image_aligned,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,secondMonitorMain,newFolder); 
+[BF_Mic_Image_IO,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,~]=A9_Mic_to_Binary(BF_Mic_Image_aligned,secondMonitorMain,newFolder,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned); 
 clear BF_Mic_Image_aligned
     
 % Align AFM to BF and extract the coordinates for alighnment to be transferred to the other data
-[AFM_IO_padded_sizeOpt,AFM_A10_IO_padded_sizeBF,AFM_data_optAlignment,results_AFM_BF_aligment]=A10_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_A6_LatDeflecFitted,newFolder,secondMonitorMain,'Margin',70);
-clear AFM_height_IO AFM_LatDeflecFitted
+while true
+    [AFM_A10_IO_sizeOpt,AFM_A10_IO_padded_sizeBF,AFM_A10_data_optAlignment,results_AFM_BF_aligment]=A10_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_A6_LatDeflecFitted,newFolder,secondMonitorMain,'Margin',70);
+    if getValidAnswer('Satisfied of the fitting?','',{'y','n'}) == 1
+        break
+    end
+end
 
 
+
+%%
 % correlation FLUORESCENCE AND AFM DATA
-A11_correlation_AFM_BF(Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,AFM_A10_IO_padded_sizeBF,AFM_data_optAlignment,setpoints,secondMonitorMain,newFolder);
-
+A11_correlation_AFM_BF(AFM_A10_data_optAlignment,AFM_A10_IO_padded_sizeBF,setpoints,secondMonitorMain,newFolder,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned);
 
 
 save(sprintf('%s\\dataResults.mat',newFolder))

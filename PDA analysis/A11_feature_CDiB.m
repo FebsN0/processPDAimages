@@ -29,35 +29,41 @@ function [outputme] = A11_feature_CDiB(X_Data,Y_Data,secondMonitorMain,newFolder
     % if setpoint is declared, then manage the plot using that
     if ~isempty(p.Results.setpoints)
         setN= p.Results.setpoints';
-        x_bin_centers=zeros(length(setN)+1,1);
-        x_bin_centers(1)= setN(1)-((setN(2)-setN(1))/2);       
+        x_bin_start=zeros(length(setN)+1,1);
+        % first and last bin will include the first and last values instead of removing them
+        x_bin_start(1)= min(DataOI(:,1));
+        x_bin_start(end)=max(DataOI(:,1)); % last x_bin_end
         for i=2:length(setN)
-            x_bin_centers(i)=mean([setN(i-1),setN(i)]);
+            x_bin_start(i)=mean([setN(i-1),setN(i)]);
         end
-        x_bin_centers(length(setN)+1)=setN(end)+((setN(end)-setN(end-1))/2);
     else
         % define x line based on first and last elements and number of bins
-        x_bin_centers = linspace(0,max(max(DataOI(:,1)))+0.1*max(max(DataOI(:,1))), p.Results.NumberOfBins);
+        x_bin_start = linspace(0,max(max(DataOI(:,1)))+0.1*max(max(DataOI(:,1))), p.Results.NumberOfBins);
     end
 
-    for i=1:length(x_bin_centers)-1
+    for i=1:length(x_bin_start)-1
         % find value above a specific element of X data
-        a=find((DataOI(:,1)>x_bin_centers(i)));
-        b=find((DataOI(:,1)<=x_bin_centers(i+1)));
+        a=find((DataOI(:,1)>x_bin_start(i)));
+        b=find((DataOI(:,1)<=x_bin_start(i+1)));
         % returns the data common to both A and B, with no repetitions. The middle part
         flag_Array(:,1)=DataOI(intersect(a,b),1);
         flag_Array(:,2)=DataOI(intersect(a,b),2);
         % build the data for the barplot
         BinMean=mean(flag_Array(:,2),'omitnan');
-        BinSTD=std(flag_Array(:,2),'omitnan');
-        BinCenetr_V=mean(flag_Array(:,1),'omitnan');
         BinMean_Norm=BinMean/size(flag_Array,1);
-    
+        BinSTD=std(flag_Array(:,2),'omitnan');
+        % use setpoint as centers
+        if ~isempty(p.Results.setpoints)
+            BinCenetr_V=setN(i);
+        else
+            BinCenetr_V=mean(flag_Array(:,1),'omitnan');
+        end
+            
         outputme(i)=struct(...
             'BinStart',...
-            x_bin_centers(i),...
+            x_bin_start(i),...
             'BinEnd',...
-            x_bin_centers(i+1),...
+            x_bin_start(i+1),...
             'BinCenter',...
             BinCenetr_V,...
             'MeanBin',...
@@ -90,9 +96,13 @@ function [outputme] = A11_feature_CDiB(X_Data,Y_Data,secondMonitorMain,newFolder
     end
     if(~isempty(p.Results.Xlimit))
         xlim(p.Results.Xlimit)
+    else
+        xlim padded
     end
     if(~isempty(p.Results.Ylimit))
         xlim(p.Results.Ylimit)
+    else
+        xlim padded
     end
     
     xlabel(p.Results.XAxL,'FontSize',15);

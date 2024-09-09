@@ -141,12 +141,19 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_Images,AFM_height_IO,
         xyExp=scatter(vert_avg_fix, force_avg_fix, 100,'pentagram','filled', 'MarkerFaceColor', 'green','DisplayName','experimental data');
         xlabel('Set Point (N)'); ylabel('Delta Offset (N)');
         % Linear fitting
-        p = polyfit(vert_avg_fix, force_avg_fix, 1);
-        yfit = polyval(p, vert_avg_fix);
-        % plot curve fitting
-        xyFit=plot(vert_avg_fix, yfit, 'r-.','DisplayName','Fitted data'); grid on
+        [xData, yData] = prepareCurveData(vert_avg_fix,force_avg_fix);
+        % Set up fittype and options.
+        ft = fittype( 'poly1' ); opts = fitoptions( 'Method', 'LinearLeastSquares' ); opts.Robust = 'LAR';
+        % Fit model to data.
+        fitresult = fit( xData, yData, ft, opts );
+        p(1)=fitresult.p1;
+        p(2)=fitresult.p2;
+        xfit=linspace(min(xData),max(xData),100);
+        yfit=xfit*p(1)+p(2);
+        xyFit=plot(xfit, yfit, 'r-.','DisplayName','Fitted data'); grid on
+
         legend([xyExp(1),xyFit(1)],'Location','northwest','FontSize',15)
-        eqn = sprintf('Last executed Linear fitting: y = %0.3g x %0.3g', p(1), p(2));
+        eqn = sprintf('Last executed Linear fitting: y = %0.3g x + %0.3g', p(1), p(2));
         title({'Delta Offset vs Set Point'; eqn},'FontSize',15);
         hold off
         

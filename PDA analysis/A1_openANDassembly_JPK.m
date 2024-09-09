@@ -43,9 +43,13 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
 
     % save the useful figures into a directory. Not in the case of sections to save time.
     % in case of sections, only the assembled version will be saved
+
     if strcmp(p.Results.backgroundOnly,'Yes')
         newFolder = fullfile(filePathData, 'Results Processing AFM-background only');
-    else
+    elseif numFiles==1
+        [~,nameFile]=fileparts(fileName);
+        newFolder = fullfile(filePathData, sprintf('%s - Results Processing AFM and fluorescence images',nameFile));
+    else % case of more sections
         newFolder = fullfile(filePathData, 'Results Processing AFM and fluorescence images');
     end
     % check if dir already exists
@@ -113,7 +117,7 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     end
     axes1 = axes('Parent',f0);
     hold(axes1,'on');   
-    colors={"#0072BD","#D95319","#EDB120","#7E2F8E","#77AC30","#4DBEEE","#A2142F",'k'};   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    colors={"#0072BD","#D95319","#EDB120","#7E2F8E","#77AC30","#4DBEEE","#A2142F",'k','#FF00FF','#00FF00'};   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     xlabel('Force [N]','FontSize',15)
     legend1 = legend(axes1,'show');
     set(legend1,...
@@ -201,7 +205,7 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     end
     hold off
     
-    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f0); end
+    objInSecondMonitor(secondMonitorMain,f0);
     saveas(f0,sprintf('%s/resultA1_distributionVerticalForces.tif',newFolder))
     close all
 
@@ -306,7 +310,7 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
         end
         imshow(AFM_height_IO); title('Baseline and foreground processed', 'FontSize',16), colormap parula
         colorbar('Ticks',[0 1],'TickLabels',{'Background','Foreground'},'FontSize',13)
-        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
+        objInSecondMonitor(secondMonitorMain,f1);
         if strcmp(saveFig,'Yes')
             saveas(f1,sprintf('%s/resultA3_1_fittedHeightChannel_BaselineForeground_Assembled.tif',newFolder))
         end

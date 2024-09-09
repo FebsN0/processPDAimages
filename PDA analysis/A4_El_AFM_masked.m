@@ -76,7 +76,7 @@ function Cropped_Images_Bk=A4_El_AFM_masked(Cropped_Images,AFM_height_IO,secondM
         f1=figure('Visible','off');
     end
     imshow(imadjust(AFM_noBk/max(max(AFM_noBk)))),colormap parula, title('(Optimized) Fitted Height (measured) channel', 'FontSize',16)        
-    if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f1); end
+    objInSecondMonitor(secondMonitorMain,f1);
     c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
     ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
 
@@ -96,7 +96,7 @@ function Cropped_Images_Bk=A4_El_AFM_masked(Cropped_Images,AFM_height_IO,secondM
     histogram(AFM_noBk*1e9,100,'DisplayName','Distribution height');
     xlabel(sprintf('Feature height (nm)'),'FontSize',15)
     title('Distribution Height','FontSize',20)
-    if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,fh); end
+    objInSecondMonitor(secondMonitorMain,fh);
     saveas(fh,sprintf('%s/resultA4_1_OptHeightDistribution.tif',filepath))
     % substitutes to the raw cropped date the Height with no BK
     Cropped_Images_Bk=Cropped_Images;

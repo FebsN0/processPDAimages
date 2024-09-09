@@ -31,7 +31,7 @@ function avg_fc=A5_frictionGlassCalc_method2(alpha,AFM_cropped_ImagesHVOFF_fitte
     vertical_ReTrace=rot90(flipud(vertical_ReTrace));
     % plot lateral (masked force, N) and vertical data (force, N)
     f1=figure;
-    if ~isempty(secondMonitorMain); objInSecondMonitor(secondMonitorMain, f1); end
+    if ~isempty(secondMonitorMain); objInSecondMonitor(secondMonitorMain, f1); else, set(f1, WindowState','maximized'), end
     subplot(121)
     imagesc(flip(force))
     c= colorbar; c.Label.String = 'Force [N]'; c.FontSize = 15;
@@ -64,8 +64,8 @@ function avg_fc=A5_frictionGlassCalc_method2(alpha,AFM_cropped_ImagesHVOFF_fitte
     vertTrace_avg_fix = (vertTrace_avg + vertReTrace_avg) / 2;
     vertTrace_avg_fix = vertTrace_avg_fix(Idx);
     
-    f3=figure;
-    if ~isempty(secondMonitorMain); objInSecondMonitor(secondMonitorMain, f3); end
+    f2=figure;
+    if ~isempty(secondMonitorMain); objInSecondMonitor(secondMonitorMain, f2); else, set(f2, WindowState','maximized'), end
     plot(vertTrace_avg_fix, force_avg_fix, 'x');
     xlabel('Set Point (N)'); ylabel('Delta Offset (N)');
     xlim([0,max(vertTrace_avg_fix) * 1.1]);   

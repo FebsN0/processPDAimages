@@ -29,7 +29,8 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
     addRequired(p,'AFM_Elab') 
     
     argName = 'Silent';     defaultVal = 'No';  addParameter(p,argName,defaultVal,@(x) ismember(x,{'No','Yes'}));
-    argName = 'Margin';     defaultVal = 25;    addParameter(p,argName,defaultVal,@(x) isnumeric(x) && (x >= 0));
+    % how much bigger by fixed margin should be the BF compared to AFM size. Kind of fixed cropping
+    argName = 'Margin';     defaultVal = 100;    addParameter(p,argName,defaultVal,@(x) isnumeric(x) && (x >= 0));
     parse(p,BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_Elab,varargin{:});
     
     if(strcmp(p.Results.Silent,'Yes')), SeeMe=false; else, SeeMe=true; end
