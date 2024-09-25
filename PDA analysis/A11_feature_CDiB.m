@@ -28,13 +28,18 @@ function [outputme] = A11_feature_CDiB(X_Data,Y_Data,secondMonitorMain,newFolder
     
     % if setpoint is declared, then manage the plot using that
     if ~isempty(p.Results.setpoints)
-        setN= p.Results.setpoints';
-        x_bin_start=zeros(length(setN)+1,1);
+        setpointN=p.Results.setpoints;
+        if setpointN(1)>setpointN(end)
+            setpointN=flip(setpointN)*1e-9;
+            DataOI=flip(DataOI);
+        end
+ 
+        x_bin_start=zeros(length(setpointN)+1,1);
         % first and last bin will include the first and last values instead of removing them
         x_bin_start(1)= min(DataOI(:,1));
         x_bin_start(end)=max(DataOI(:,1)); % last x_bin_end
-        for i=2:length(setN)
-            x_bin_start(i)=mean([setN(i-1),setN(i)]);
+        for i=2:length(setpointN)
+            x_bin_start(i)=mean([setpointN(i-1),setpointN(i)]);
         end
     else
         % define x line based on first and last elements and number of bins
@@ -54,7 +59,7 @@ function [outputme] = A11_feature_CDiB(X_Data,Y_Data,secondMonitorMain,newFolder
         BinSTD=std(flag_Array(:,2),'omitnan');
         % use setpoint as centers
         if ~isempty(p.Results.setpoints)
-            BinCenetr_V=setN(i);
+            BinCenetr_V=setpointN(i);
         else
             BinCenetr_V=mean(flag_Array(:,1),'omitnan');
         end
@@ -111,7 +116,7 @@ function [outputme] = A11_feature_CDiB(X_Data,Y_Data,secondMonitorMain,newFolder
         title(p.Results.FigTitle,'FontSize',20);
     end
     
-    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,ftmp); end
+    objInSecondMonitor(secondMonitorMain,ftmp);
     saveas(ftmp,sprintf('%s/resultA11_end_%d_%s.fig',newFolder,p.Results.NumFig,p.Results.FigTitle))
     saveas(ftmp,sprintf('%s/resultA11_end_%d_%s.tiff',newFolder,p.Results.NumFig,p.Results.FigTitle))
 

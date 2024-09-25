@@ -13,22 +13,26 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     %init instance of inputParser
 
     p=inputParser();
-    argName = 'Silent';         defaultVal = 'Yes';     addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
-    argName = 'saveFig';        defaultVal = 'Yes';     addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
-    argName = 'Normalization';  defaultVal = 'No';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
-    argName = 'filePath';       defaultVal = '';        addParameter(p,argName,defaultVal, @(x) ischar(x));
-    argName = 'backgroundOnly';          defaultVal = 'No';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+    argName = 'Silent';                 defaultVal = 'Yes';     addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+    argName = 'saveFig';                defaultVal = 'Yes';     addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+    argName = 'Normalization';          defaultVal = 'No';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+    argName = 'filePath';               defaultVal = '';        addParameter(p,argName,defaultVal, @(x) ischar(x));
+    argName = 'backgroundOnly';         defaultVal = 'No';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     % validate and parse the inputs
     parse(p,varargin{:});
     silent=p.Results.Silent;
     saveFig=p.Results.saveFig;
     norm=p.Results.Normalization;
-
-    % select the files
-    if strcmp(p.Results.backgroundOnly,'Yes') || ~strcmp(p.Results.filePath,'')
-        [fileName, filePathData] = uigetfile({'*.jpk'},'Select the .jpk AFM image to extract background friction coefficient',p.Results.filePath,'MultiSelect', 'on');
+    if isempty(p.Results.filePath)
+        filePath=pwd;
     else
-        [fileName, filePathData] = uigetfile('*.jpk', 'Select a .jpk AFM image','MultiSelect', 'on');       
+        filePath=p.Results.filePath;
+    end
+    % select the files
+    if strcmp(p.Results.backgroundOnly,'Yes')
+        [fileName, filePathData] = uigetfile({'*.jpk'},'Select the .jpk AFM image to extract background friction coefficient',filePath,'MultiSelect', 'on');
+    else
+        [fileName, filePathData] = uigetfile({'*.jpk'},'Select a .jpk AFM image',filePath,'MultiSelect', 'on');       
     end
 
     if isequal(fileName,0)
@@ -44,17 +48,22 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     % save the useful figures into a directory. Not in the case of sections to save time.
     % in case of sections, only the assembled version will be saved
 
-    if strcmp(p.Results.backgroundOnly,'Yes')
-        newFolder = fullfile(filePathData, 'Results Processing AFM-background only');
+    if strcmp(p.Results.backgroundOnly,'Yes') && numFiles~=1
+        [upperFolder,~,~]=fileparts(fileparts(filePathData));
+        newFolder = fullfile(upperFolder, 'Results Processing AFM-background only');
+    elseif strcmp(p.Results.backgroundOnly,'Yes') && numFiles==1
+        [~,nameFile,~]=fileparts(fileName);
+        newFolder = fullfile(filePathData, sprintf('Results Processing AFM-background only _ %s',nameFile));
     elseif numFiles==1
         [~,nameFile]=fileparts(fileName);
         newFolder = fullfile(filePathData, sprintf('%s - Results Processing AFM and fluorescence images',nameFile));
     else % case of more sections
-        newFolder = fullfile(filePathData, 'Results Processing AFM and fluorescence images');
+        [upperFolder,~,~]=fileparts(fileparts(filePathData));
+        newFolder = fullfile(upperFolder, 'Results Processing AFM and fluorescence images');
     end
     % check if dir already exists
     if exist(newFolder, 'dir')
-        question= sprintf('Directory already exists and it may already contain results.\nDo you want to overwrite it or create new directory?');
+        question= sprintf('Directory already exists and it may already contain previous results.\nDo you want to overwrite it or create new directory?');
         options= {'Overwrite the existing dir','Create a new dir'};
         if getValidAnswer(question,'',options) == 1
             rmdir(newFolder, 's');
@@ -105,26 +114,7 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     x_scan_pixelsAllScans=zeros(1,numFiles);
     alphaAllScans=zeros(1,numFiles);
     setpointN=zeros(1,numFiles);
-    idxSetN=zeros(1,numFiles);
-    verticalForceAVG_N=zeros(1,numFiles);
-    setN=cell(1,numFiles); avgN=cell(1,numFiles); h=cell(1,numFiles);
-    % EXTRACT ALL DATA
-    
-    if strcmp(silent,'No')
-        f0=figure('Visible','on');
-    else
-        f0=figure('Visible','off');
-    end
-    axes1 = axes('Parent',f0);
-    hold(axes1,'on');   
-    colors={"#0072BD","#D95319","#EDB120","#7E2F8E","#77AC30","#4DBEEE","#A2142F",'k','#FF00FF','#00FF00'};   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    xlabel('Force [N]','FontSize',15)
-    legend1 = legend(axes1,'show');
-    set(legend1,...
-        'Position',[0.857175928885462 0.365668678093337 0.134722219262686 0.537724535479517]);
-    title('Distribution Raw Vertical Forces and user-setted setpoints','FontSize',18)
-
-
+   
     for i=1:numFiles
         if numFiles>1
             fprintf('Processing the file %d over %d\n',i,numFiles)
@@ -143,42 +133,38 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
                 raw_data_VD_volt=data(j).AFM_image;
                 raw_data_VD_force = raw_data_VD_volt*metaData.Vertical_kn*metaData.Vertical_Sn;     % F (N) = V (V) * Sn (m/V) * Kn (N/m)
                 data(j).AFM_image = raw_data_VD_force;
-                data(j).Signal_type = 'force';
-                % figure
-                % imagesc(raw_data_VD_force), colormap parula, title('Raw data Vertical Deflection force','FontSize',17), colorbar
-                % raw_data_VD_nanoforce = raw_data_VD_force*1e9;
-                % figure
-                % imagesc(raw_data_VD_nanoforce), colormap parula, title('Raw data Vertical Deflection nanoforce','FontSize',17), colorbar                
-            elseif strcmp(data(j).Channel_name,'Vertical Deflection') && strcmp(data(j).Signal_type,'force')
-                raw_data_VD_force=data(j).AFM_image;               
+                data(j).Signal_type = 'force';                            
             end
         end
         
+        % extract the setpoint information from metadata. In case of single scan, then put manually
         if numFiles> 1
-            verticalForceAVG_N(i)= mean(mean(data(j).AFM_image));
             setpointN(i)=metaData.SetP_N;
-            idxSetN(i)=size(data(j).AFM_image,2);
-            setN{i}=xline(setpointN(i),'LineWidth',4,'DisplayName',sprintf('setpoint section %d',i),'Color',colors{i});
-            avgN{i}=xline(verticalForceAVG_N(i),'--','LineWidth',2,'DisplayName',sprintf('avg vertical force section %d',i),'Color',colors{i});
-            h{i}=histogram(raw_data_VD_force,30,'DisplayName',sprintf('raw vertical force section %d',i),'FaceColor',colors{i});
         else
-        % find the setpoint values used in the experiments
-            [setpointN, idxSetN] = unique(round(mean(raw_data_VD_force,2),8)); % aggiunto mean in caso di glaa, check if still work
-            for j=1:length(idxSetN)
-                if j~=length(idxSetN)
-                    sectionF=raw_data_VD_force(idxSetN(j):idxSetN(j+1)-1,:);
+        % by default, setpoint start from 30 and increase by 20 nN
+            valueDefault = {'30'}; j=1; setpointN = [];
+            while true
+                question = sprintf('Enter the used setpoint [nN] for the section %d. Digit ''end'' to finish.',j);    
+                v = inputdlg(question,'',[1 40],valueDefault);
+                if strcmpi(v,'end')
+                    break;
                 else
-                    sectionF=raw_data_VD_force(idxSetN(j):end,:);
+                    v_num = str2double(v);
+                    if ~isnan(v_num)
+                        setpointN = [setpointN, v_num]; %#ok<AGROW>
+                        valueDefault= string(str2double(valueDefault)+20);
+                    else
+                        uiwait(msgbox(sprintf('Invalid input! Please enter a numeric value or ''end'' to finish. '),''));
+                    end
                 end
-                verticalForceAVG_N(j)=mean(mean(sectionF));
-                setN{j}=xline(setpointN(j),'LineWidth',4,'DisplayName',sprintf('setpoint section %d',j),'Color',colors{j});
-                avgN{j}=xline(verticalForceAVG_N(j),'--','LineWidth',2,'DisplayName',sprintf('avg vertical force section %d',j),'Color',colors{j});
-                h{j}=histogram(sectionF,30,'DisplayName',sprintf('raw vertical force section %d',j),'FaceColor',colors{j});                
             end
+            % express in Newton from nanoNewton
+            setpointN=setpointN*1e-9;
+            clear v_num question v valueDefault
         end
-
+            
         % remove not useful information prior the process. Not show the figures. Later
-        filtData=A2_CleanUpData2_AFM(data,secondMonitorMain,newFolder,'SaveFig','No');
+        filtData=A2_CleanUpData2_AFM(data,setpointN,secondMonitorMain,newFolder,'SaveFig','No');
         % save the sections before and after the processing
         allScansImageSTART{i}=filtData;
         allScansMetadata{i}=metaData;
@@ -187,8 +173,8 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
             [AFM_HeightFittedMasked,AFM_height_IO,accuracy]=processData(filtData,secondMonitorMain,newFolder,accuracy,'Yes','No');
             allScansImageEND{i}=AFM_HeightFittedMasked;
             allScans_AFM_HeightIO{i}=AFM_height_IO;
+            clear AFM_height_IO AFM_HeightFittedMasked
         end
-        clear AFM_height_IO AFM_HeightFittedMasked
         % y slow direction (rows) | x fast direction (columns)
         % save alpha, x_lengt and x_pixels to check errors later
         % if different x_length ==> no sense! slow fast scan lines should be equally long
@@ -203,18 +189,15 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
         y_scan_pixelsAllScans(i)=allScansMetadata{i}.y_scan_pixels;
         x_scan_pixelsAllScans(i)=allScansMetadata{i}.x_scan_pixels;  
     end
-    hold off
-    
-    objInSecondMonitor(secondMonitorMain,f0);
-    saveas(f0,sprintf('%s/resultA1_distributionVerticalForces.tif',newFolder))
     close all
 
     % error check: each section must be geometrically the same in term of length and pixels!
-    if  ~all(alphaAllScans == alphaAllScans(1)) || ...
-        ~all(y_scan_lengthAllScans == y_scan_lengthAllScans(1)) || ...
-        ~all(x_scan_lengthAllScans == x_scan_lengthAllScans(1)) || ...
-        ~all(y_scan_pixelsAllScans == y_scan_pixelsAllScans(1)) || ...
-        ~all(x_scan_pixelsAllScans == x_scan_pixelsAllScans(1)) 
+    if ~all(alphaAllScans == alphaAllScans(1)) || ...
+       ~all(y_scan_lengthAllScans == y_scan_lengthAllScans(1)) || ...
+       ~all(x_scan_lengthAllScans == x_scan_lengthAllScans(1)) || ...
+       ~all(y_scan_pixelsAllScans == y_scan_pixelsAllScans(1)) || ...
+       ~all(x_scan_pixelsAllScans == x_scan_pixelsAllScans(1))
+               
         error(sprintf('ERROR: the x lengths and/or alpha calibration factor (thus vertical parameters) of some sections are not the same!!\n\tCheck the uploaded data!!'))
     end
     % check the offset information and properly sort
@@ -252,7 +235,7 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
 
     % Further checks: the total scan area should be a square in term of um and pixels
     ratioLength=metaDataOrdered.x_scan_length\metaDataOrdered.y_scan_length;
-    ratioPixel=metaDataOrdered.y_scan_pixels\metaDataOrdered.x_scan_pixels;
+    ratioPixel=round(metaDataOrdered.y_scan_pixels\metaDataOrdered.x_scan_pixels,1);
     if ratioLength ~= 1 || ratioPixel ~= 1
         warning('ratioLength: %. x lengths and/or x pixels is not the same as well as the y length and/or y pixels!!')
     end
@@ -272,10 +255,16 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
         end
 
         for j=numFiles:-1:1
+            
             dataRAW=flip(allScansImageOrderedSTART{j}(i).Raw_afm_image);
             concatenatedData_Raw_afm_image      = cat(1,concatenatedData_Raw_afm_image,dataRAW);
             dataIMAGE=flip(allScansImageOrderedSTART{j}(i).AFM_image);
             concatenatedData_AFM_image_START    = cat(1,concatenatedData_AFM_image_START,dataIMAGE);
+            if numFiles>1
+                sizeSections(j)=size(dataRAW,1);
+            else
+                sizeSections=[];
+            end
             if flag_processSignleSections
                 dataPOST=flip(rot90(allScansImageOrderedEND{j}(i).AFM_image));
                 concatenatedData_AFM_image_END  = cat(1,concatenatedData_AFM_image_END,dataPOST);
@@ -295,7 +284,7 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     end
     
     % show and save figures post assembly
-    A2_CleanUpData2_AFM(dataOrderedSTART,secondMonitorMain,newFolder,'imageType',imgTyp,'phaseProcess','Raw','Silent',silent,'SaveFig',saveFig,'Normalization',norm);
+    [~,vertForceAVG]=A2_CleanUpData2_AFM(dataOrderedSTART,setpointN,secondMonitorMain,newFolder,'imageType',imgTyp,'phaseProcess','Raw','Silent',silent,'SaveFig',saveFig,'Normalization',norm,'sectionSize',sizeSections);
     
     % show and save figures post assembly postProcessing
     if flag_processSignleSections
@@ -317,18 +306,15 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     else       
         [AFM_HeightFittedMasked,AFM_height_IO,~]=processData(dataOrderedSTART,secondMonitorMain,newFolder,accuracy,silent,saveFig);
         % use this following line just to further check or to get the normalization in a second moment.
-        A2_CleanUpData2_AFM(AFM_HeightFittedMasked,secondMonitorMain,newFolder,'imageType',imgTyp,'phaseProcess','PostProcessed','Silent',silent,'SaveFig',saveFig,'Normalization','No');
+        A2_CleanUpData2_AFM(AFM_HeightFittedMasked,setpointN,secondMonitorMain,newFolder,'imageType',imgTyp,'phaseProcess','PostProcessed','Silent',silent,'SaveFig',saveFig,'Normalization','No');
     end
 
     varargout{1}=AFM_HeightFittedMasked;
     varargout{2}=AFM_height_IO;
     varargout{3}=metaDataOrdered;
-    varargout{4}=filePathData;
-    varargout{5}=newFolder;
-    varargout{6}=setpointN;
-    varargout{7}=idxSetN;
-
-    uiwait(msgbox('Click to continue'))
+    varargout{4}=newFolder;
+    varargout{5}=setpointN;
+    varargout{6}=vertForceAVG;
     close all
 end
 

@@ -130,7 +130,7 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_Images,AFM_height_IO,
         % remove NaN data
         force_avg_fix = force_avg_fix(~isnan(force_avg_fix));
         vert_avg_fix = vert_avg_fix(~isnan(force_avg_fix));
-        setpointFitting=unique(round(vert_avg_fix,8));
+        setpointFitting=unique(round(vert_avg_fix,9));
 
         % delete previous experimental data, keep curve fitting. Update the latter
         if exist('xyExp','var')
@@ -167,7 +167,7 @@ function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_Images,AFM_height_IO,
         if p(1) > 0.95 %%|| p(1) < 0
             uiwait(msgbox(sprintf('Slope outside the reasonable range ( 0 < m < 0.95 ) \x2192 stopped calculation!'),''));
             break
-        elseif length(setpointFitting) ~= length(setpoints)
+        elseif length(setpointFitting) < length(setpoints)
             uiwait(msgbox(sprintf('Missing data in the fitting \x2192 stopped calculation!'),''));
             break
         end

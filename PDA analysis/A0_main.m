@@ -2,16 +2,16 @@ clc, clear, close all
 
 secondMonitorMain=objInSecondMonitor;
 % upload .jpk files. If more than one and if from same experiment in which setpoint is changed, then assembly.
-[AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM,filePathData,newFolder,setpoints,idxSetN]=A1_openANDassembly_JPK(secondMonitorMain);
+[AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM,newFolder,setpoints,vertForceAVG]=A1_openANDassembly_JPK(secondMonitorMain);
 
 % to extract the friction coefficient, choose which method use.
 question=sprintf('Which method perform to extract the background friction coefficient?');
 options={ ...
-    sprintf('1) TRCDA (air) = 0.2920'), ...
+    sprintf('1) TRCDA (air) = 0.3405'), ...
     sprintf('2) PCDA  (air)  = 0.2626'), ... 
-    sprintf('3) TRCDA-DMPC (air) = 0.148'), ...
-    sprintf('4) TRCDA-DOPC (air) = 0.154'), ...
-    sprintf('5) TRCDA-POPC (air) = 0.4123'), ...
+    sprintf('3) TRCDA-DMPC (air) = 0.2693'), ...
+    sprintf('4) TRCDA-DOPC (air) = 0.3037'), ...
+    sprintf('5) TRCDA-POPC (air) = 0.2090'), ...
     sprintf('6) Enter manually a value')};
 choice = getValidAnswer(question, '', options);
 
@@ -24,11 +24,11 @@ end
 % methods 2 and 3 require the .jpk file with HOVER MODE OFF but in the same condition (same scanned PDA area
 % of when HOVER MODE is ON)
 switch choice
-    case 1, avg_fc = 0.2920;
+    case 1, avg_fc = 0.3405;
     case 2, avg_fc = 0.2626;
-    case 3, avg_fc = 0.148;
-    case 4, avg_fc = 0.154;
-    case 5, avg_fc = 0.4123;                     
+    case 3, avg_fc = 0.2693;
+    case 4, avg_fc = 0.3037;
+    case 5, avg_fc = 0.2090;                     
     case 6
         while true
             avg_fc = str2double(inputdlg('Enter a value for the glass fricction coefficient','',[1 50]));
@@ -107,17 +107,17 @@ end
 
 uiwait(msgbox('Click to continue',''));
 close gcf
-clear f1 f2 f3 question options choice fileName Tritic_Mic_Image_After BF_Mic_Image
+clear f1 f2 f3 question options choice fileName
 
 
 % Produce the binary IO of Brightfield
 [BF_Mic_Image_IO,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,~]=A9_Mic_to_Binary(BF_Mic_Image_aligned,secondMonitorMain,newFolder,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned); 
-clear BF_Mic_Image_aligned
+
     
 % Align AFM to BF and extract the coordinates for alighnment to be transferred to the other data
 while true
     [AFM_A10_IO_sizeOpt,AFM_A10_IO_padded_sizeBF,AFM_A10_data_optAlignment,results_AFM_BF_aligment]=A10_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_A6_LatDeflecFitted,newFolder,secondMonitorMain,'Margin',70);
-    if getValidAnswer('Satisfied of the fitting?','',{'y','n'}) == 1
+    if getValidAnswer('Satisfied of the alignment or restart?','',{'y','n'}) == 1
         break
     end
 end
@@ -126,7 +126,7 @@ end
 
 %%
 % correlation FLUORESCENCE AND AFM DATA
-A11_correlation_AFM_BF(AFM_A10_data_optAlignment,AFM_A10_IO_padded_sizeBF,setpoints,secondMonitorMain,newFolder,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned);
-
+[data_Height_LD,dataPlot_Height_LD_maxVD,data_Height_FLUO,data_LD_FLUO_padMask,dataPlot_LD_FLUO_padMask_maxVD, data_VD_FLUO, data_VD_LD]=A11_correlation_AFM_BF(AFM_A10_data_optAlignment,AFM_A10_IO_padded_sizeBF,vertForceAVG,secondMonitorMain,newFolder,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned);
 
 save(sprintf('%s\\dataResults.mat',newFolder))
+

@@ -133,7 +133,7 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
         % save the coordinates of cropped area respect to original area
         f2=figure;
         imshowpair(BF_IO_choice,AFM_IO_padded_sizeOpt,'falsecolor')
-        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2); end
+        objInSecondMonitor(secondMonitorMain,f2);
         title('Cropped Brightfield and resized AFM images - First cross-correlation','FontSize',14)
         saveas(f2,sprintf('%s/resultA10_2_BFcropped_AFMresize_postfirstCrossCorrelation.tif',newFolder))
     elseif answerCrop == 2
@@ -378,6 +378,11 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
                                     
     AFM_IO_padded_sizeBF=zeros(size(BF_Mic_Image_IO));
     AFM_IO_padded_sizeBF(coordinatesFromBForiginal(3):coordinatesFromBForiginal(4),coordinatesFromBForiginal(1):coordinatesFromBForiginal(2))= moving_final;
+    
+    if any(size(moving_final) ~= size(AFM_Elab(1).AFM_image))
+        error('The resulting size between AFM and Fluorescence are different. Try again this entire alignment step by cropping a bigger area or use manual method with caution.')
+    end
+    
     f5=figure;
     imshowpair(BF_Mic_Image_IO,AFM_IO_padded_sizeBF,'falsecolor')
     title('Brightfield original and AFM optimal with BF original size - End process. Check if everything is okay','FontSize',14)
