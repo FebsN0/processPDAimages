@@ -16,14 +16,19 @@ function res=objInSecondMonitor(varargin)
                 res = getValidAnswer(question,'',options);
             end
         else
-            res = [];
+            res = 'only1screen';
         end
     else 
-        % if the second monitor is a main monitor, then put the obj in the first monitor (second row
-        % screen var). varargin{1} is "res" var
-        if varargin{1}==1, z=1; else, z=2; end
-        % Get the position of the second monitor (not main)
-        secondMonitor = screens(z, :);
-        % Move the figure to the new position
-        set(varargin{2}, 'Position', secondMonitor,'WindowState','maximized');
+        if strcmp(varargin{1},'only1screen')
+            set(varargin{2},'WindowState','maximized');
+        else
+            % if the second monitor is a main monitor, then put the obj in the first monitor (second row
+            % screen var). varargin{1} is "res" var
+            if varargin{1}==1, z=1; else, z=2; end
+            % Get the position of the second monitor (not main)
+            secondMonitor = screens(z, :);
+            % Move the figure to the new position
+            set(varargin{2}, 'Position', secondMonitor,'WindowState','maximized');
+        end
     end
+end

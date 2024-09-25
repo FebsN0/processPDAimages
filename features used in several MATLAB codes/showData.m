@@ -16,6 +16,6 @@ function showData(secondMonitorMain,SeeMe,i,data,norm,titleData,labelBar,nameFig
     c.Label.FontSize=15;
     xlabel('slow scan line direction','FontSize',12), ylabel('fast scan line direction','FontSize',12)
     axis equal, xlim([0 size(data,2)]), ylim([0 size(data,1)])
-    if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,eval(sprintf('f%d',i))); end
+    objInSecondMonitor(secondMonitorMain,eval(sprintf('f%d',i)));
     saveas(eval(sprintf('f%d',i)),nameFig)
 end
