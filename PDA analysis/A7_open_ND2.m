@@ -276,13 +276,15 @@ function [IOI,complete_path_to_afm_file,metadataND2]=A7_open_ND2(varargin)
     elseif strcmpi(voxelSizeXdefaultUnit,"mm")
         voxelSizeXdefaultUnit=1e-3;
     end
-
+    
+    exposureTime = omeMeta.getPlaneExposureTime(0,0).value(ome.units.UNITS.MILLISECOND);
     voxelSizeX = omeMeta.getPixelsPhysicalSizeX(0).value(ome.units.UNITS.MICROMETER);   % in µm
     voxelSizeXdouble = voxelSizeX.doubleValue();                                        % The numeric value represented by this object after conversion to type double
     voxelSizeY = omeMeta.getPixelsPhysicalSizeY(0).value(ome.units.UNITS.MICROMETER);   % in µm
     voxelSizeYdouble = voxelSizeY.doubleValue();                                        % The numeric value represented by this object after conversion to type double
 
     metadataND2=struct(...
+                    'ExposureTime', exposureTime, ...
                     'ImageWidthPixels',stackSizeX, ...
                     'ImageHeightPixels',stackSizeY, ...
                     'pixelSizeUnit', voxelSizeXdefaultUnit, ...
