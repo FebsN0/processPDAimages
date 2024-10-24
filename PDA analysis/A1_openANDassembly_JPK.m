@@ -144,18 +144,15 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
         % by default, setpoint start from 30 and increase by 20 nN
             valueDefault = {'30'}; j=1; setpointN = [];
             while true
-                question = sprintf('Enter the used setpoint [nN] for the section %d. Digit ''end'' to finish.',j);    
-                v = inputdlg(question,'',[1 40],valueDefault);
-                if strcmpi(v,'end')
-                    break;
+                question = sprintf('Enter the used setpoint [nN] for the section %d. Click ''Cancel'' to terminate.',j);    
+                v_num = str2double(inputdlg(question,'',[1 40],valueDefault));
+                if isempty(v_num)
+                    break
+                elseif ~isnan(v_num)
+                    setpointN = [setpointN, v_num]; %#ok<AGROW>
+                    valueDefault= string(str2double(valueDefault)+20);
                 else
-                    v_num = str2double(v);
-                    if ~isnan(v_num)
-                        setpointN = [setpointN, v_num]; %#ok<AGROW>
-                        valueDefault= string(str2double(valueDefault)+20);
-                    else
-                        uiwait(msgbox(sprintf('Invalid input! Please enter a numeric value or ''end'' to finish. '),''));
-                    end
+                    uiwait(msgbox(sprintf('Invalid input! Please enter a numeric value or terminate. '),''));
                 end
             end
             % express in Newton from nanoNewton
@@ -189,7 +186,6 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
         y_scan_pixelsAllScans(i)=allScansMetadata{i}.y_scan_pixels;
         x_scan_pixelsAllScans(i)=allScansMetadata{i}.x_scan_pixels;  
     end
-    close all
 
     % error check: each section must be geometrically the same in term of length and pixels!
     if ~all(alphaAllScans == alphaAllScans(1)) || ...
@@ -315,7 +311,6 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     varargout{4}=newFolder;
     varargout{5}=setpointN;
     varargout{6}=vertForceAVG;
-    close all
 end
 
 

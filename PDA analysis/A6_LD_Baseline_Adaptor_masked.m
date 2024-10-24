@@ -182,8 +182,11 @@ function [AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_masked(AFM_cropped_Image
         end
     end
     Lateral_Trace_shift_noBK= Lateral_Trace_clean_shift - Bk_iterative;
+
+    
     % Friction force = friction coefficient * Normal Force
     Baseline_Friction_Force= vertical_Trace*avg_fc;
+
     % Friction force = calibration coefficient * Lateral Trace (V)
     Lateral_Trace_Force= Lateral_Trace_shift_noBK*alpha;
     % To read the baseline friction, to obtain the processed image:

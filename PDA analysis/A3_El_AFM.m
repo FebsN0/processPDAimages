@@ -77,7 +77,7 @@ function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain,fil
         ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
         colormap parula, c = colorbar; c.Label.String = 'Height (nm)'; c.Label.FontSize=15;
         title(sprintf('%s Raw Height (measured) channel',text),'FontSize',17)
-        answer = questdlg('Remove lines by selecting area?','','Yes','No','Yes');
+        answer = questdlg('Remove lines by selecting area?','','Yes','No','No');
         if strcmp(answer,'No')
             break
         else
@@ -103,7 +103,7 @@ function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain,fil
         axis equal, xlim([0 size(rawH,2)]), ylim([0 size(rawH,1)])
         saveas(f1,sprintf('%s\\resultA3_1_DefinitiveRawHeight_portionRemoved.tif',filepath))
     end
-    close gcf
+    close(f1)
     for i=1:size(filtData,2)
         if i==1             % put the fixed raw height data channel
             AFM_Images(i)=struct(...
@@ -332,14 +332,12 @@ function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain,fil
         c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
         ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
         
-        if flagAccuracy
-            close all
-            break
-        end
 
         if getValidAnswer('Satisfied of the fitting?','',{'y','n'}) == 1
-            close all
+            close(f2)
             break
+        else
+            flagAccuracy=false;
         end
     end
     
@@ -398,7 +396,7 @@ function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain,fil
             end
         end
     end
-    close all
+    close(f3)
     
     if SeeMe
         f4=figure('Visible','on');
@@ -413,7 +411,7 @@ function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain,fil
     if SavFg
         saveas(f4,sprintf('%s\\resultA3_2_BaselineForeground.tif',filepath))
     end
-    
+    close(f4)
     % converts any nonzero element of the yellow/blue image into a logical image.
     IO_Image=logical(seg_dial);
     if(exist('wb','var'))

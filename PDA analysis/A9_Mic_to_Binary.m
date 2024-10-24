@@ -10,11 +10,16 @@ function varargout=A9_Mic_to_Binary(imageBF_aligned,secondMonitorMain,newFolder,
     %Add default mandatory parameters.
     addRequired(p, 'imageBF_aligned');
     
-    argName = 'TRITIC_before';        defaultVal = [];     addParameter(p,argName,defaultVal, @(x) ismatrix(x));
-    argName = 'TRITIC_after';         defaultVal = [];     addParameter(p,argName,defaultVal, @(x) ismatrix(x));
+    argName = 'TRITIC_before';      defaultVal = [];        addParameter(p,argName,defaultVal, @(x) ismatrix(x));
+    argName = 'TRITIC_after';       defaultVal = [];        addParameter(p,argName,defaultVal, @(x) ismatrix(x));
+    argName = 'saveFig';            defaultVal = 'Yes';     addParameter(p, argName, defaultVal, @(x) ismember(x,{'No','Yes'}));
+    argName = 'Silent';             defaultVal = 'No';      addParameter(p, argName, defaultVal, @(x) ismember(x,{'Yes','No'})); 
 
     parse(p,imageBF_aligned,varargin{:});
     clearvars argName defaultVal
+
+    if(strcmp(p.Results.Silent,'Yes')), SeeMe=0; else, SeeMe=1; end
+    if(strcmp(p.Results.saveFig,'Yes')), saveFig=1; else, saveFig=0; end
 
     reduced_imageBF=imageBF_aligned;
     if ~isempty(p.Results.TRITIC_before)
@@ -32,7 +37,7 @@ function varargout=A9_Mic_to_Binary(imageBF_aligned,secondMonitorMain,newFolder,
         title('BrightField image post alignment')
         if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,ftmp); end
         [~,specs]=imcrop(figure_image);
-        close all
+        close gcf
         % take the coordinate of the cropped area
         YBegin=round(specs(1,1));
         XBegin=round(specs(1,2));
@@ -50,8 +55,9 @@ function varargout=A9_Mic_to_Binary(imageBF_aligned,secondMonitorMain,newFolder,
             reduced_Tritic_after=reduced_Tritic_after(XBegin:XEnd,YBegin:YEnd);
             varargout{3}=reduced_Tritic_after;
         end
+    else
+        varargout{3}=reduced_Tritic_after;
     end
-    
     
 
     question=sprintf('Performs morphological opening operation?\n(In original code it is always yes, whereas commented in case of the PDCA code');
@@ -83,7 +89,6 @@ function varargout=A9_Mic_to_Binary(imageBF_aligned,secondMonitorMain,newFolder,
         image2=reduced_imageBF; %%%%%%% in the original version Mic_to_Binary_PCDA.m, previous section was omitted %%%%%%%%%%%
     end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    close all
     closest_indices=[];
     satisfied='Manual Selection';
     first_In=true;
@@ -149,18 +154,23 @@ function varargout=A9_Mic_to_Binary(imageBF_aligned,secondMonitorMain,newFolder,
         imshow(binary_image); title('Binarized BrightField image', 'FontSize',16)
         satisfied=questdlg('Keep selection or turn to Manual', 'Manual Selection', 'Keep Current','Manual Selection','Keep Current');
     end
-    saveas(f1,sprintf('%s/resultA9_1_OriginalBrightField_BaselineForeground.tif',newFolder))
+    if saveFig
+        saveas(f1,sprintf('%s/resultA9_1_OriginalBrightField_BaselineForeground.tif',newFolder))
+    end
     close(f1)
     % create a Structuring Element to remove objects smaller than 2 pixels
     kernel=strel('square',2);
     binary_image=imerode(binary_image,kernel);
     binary_image=imdilate(binary_image,kernel);
-    f2=figure;
-    imshow(binary_image)
-    text=sprintf('Definitive Binarized BrightField (Morphological Opening - kernel: square 2 pixels)');
-    title(text,'FontSize',14)
-    if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f2); end
-    saveas(f2,sprintf('%s/resultA9_2_DefinitiveBinarizedBrightField.tif',newFolder))
+    if SeeMe && saveFig
+        f2=figure;
+        imshow(binary_image)
+        text=sprintf('Definitive Binarized BrightField (Morphological Opening - kernel: square 2 pixels)');
+        title(text,'FontSize',14)
+        if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f2); end
+        saveas(f2,sprintf('%s/resultA9_2_DefinitiveBinarizedBrightField.tif',newFolder))
+        close(f2)
+    end
 
     if Crop_image == 1
         FurtherDetails=struct(...
@@ -175,8 +185,6 @@ function varargout=A9_Mic_to_Binary(imageBF_aligned,secondMonitorMain,newFolder,
             'Threshold',    threshold,...
             'Cropped',      'No');
     end
-    uiwait(msgbox('Click to continue',''));
-    close all
     
     varargout{1}=binary_image;
     varargout{4}=FurtherDetails;

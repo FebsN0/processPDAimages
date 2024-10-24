@@ -1,4 +1,10 @@
-function varargout=A10_feature_manualAlignmentGUI(BF_IO,AFM_IO,AFM_IO_padded_original,max_c_it_OI,secondMonitorMain,newFolder)
+function varargout=A10_feature_manualAlignmentGUI(BF_IO,AFM_IO,AFM_IO_padded_original,max_c_it_OI,secondMonitorMain,newFolder,varargin)
+    p=inputParser(); 
+    argName = 'saveFig';    defaultVal = 'Yes';     addParameter(p, argName, defaultVal, @(x) ismember(x,{'No','Yes'}));
+    parse(p,varargin{:});
+    if(strcmp(p.Results.saveFig,'Yes')), saveFig=1; else, saveFig=0; end
+
+
     % Create the main figure  
     hFig = figure('Name', 'Image Manipulation GUI', 'NumberTitle', 'off', ...
                   'Position', [100, 100, 900, 700], 'MenuBar', 'none', ...
@@ -141,12 +147,14 @@ function varargout=A10_feature_manualAlignmentGUI(BF_IO,AFM_IO,AFM_IO_padded_ori
     end
     % last operations when terminated
     function on_close()
-        figure(f2max)
-        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2max); end
-        title('Trend Cross-correlation score','FontSize',14)
-        saveas(f2max,sprintf('%s/resultA10_4_trendScoreCrossCorrelation_manualApproach.tif',newFolder))
-        % Close the figure
-        delete(hFig); delete(f2max)
+        if saveFig
+            figure(f2max)
+            if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2max); end
+            title('Trend Cross-correlation score','FontSize',14)
+            saveas(f2max,sprintf('%s/resultA10_4_trendScoreCrossCorrelation_manualApproach.tif',newFolder))
+            % Close the figure
+            delete(hFig); delete(f2max)
+        end
     end
 
     uiwait(msgbox('Click to continue when the manual method is terminated',''));

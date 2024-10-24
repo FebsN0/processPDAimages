@@ -28,13 +28,14 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
     addRequired(p,'metaData_AFM')
     addRequired(p,'AFM_Elab') 
     
-    argName = 'Silent';     defaultVal = 'No';  addParameter(p,argName,defaultVal,@(x) ismember(x,{'No','Yes'}));
+    argName = 'saveFig';    defaultVal = 'Yes';     addParameter(p, argName, defaultVal, @(x) ismember(x,{'No','Yes'}));
+    argName = 'Silent';     defaultVal = 'No';      addParameter(p, argName, defaultVal, @(x) ismember(x,{'No','Yes'}));
     % how much bigger by fixed margin should be the BF compared to AFM size. Kind of fixed cropping
     argName = 'Margin';     defaultVal = 100;    addParameter(p,argName,defaultVal,@(x) isnumeric(x) && (x >= 0));
     parse(p,BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_Elab,varargin{:});
     
     if(strcmp(p.Results.Silent,'Yes')), SeeMe=false; else, SeeMe=true; end
-  
+    if(strcmp(p.Results.saveFig,'Yes')), saveFig=1; else, saveFig=0; end
 
     % Add a new column-Field to the AFM data struct with zero elements matrix and same BF image size
     [AFM_Elab(:).AFM_Padded]=deal(zeros(size(BF_Mic_Image_IO)));
@@ -95,31 +96,32 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
     end
     clear BFRatioHorizontal BFRatioVertical AFMRatioHorizontal AFMRatioVertical scaleAFM2BF_H scaleAFM2BF_V scale
     
+    % first correlation and best alignment the AFM IO height and BF images. Then show it
     [max_c_it_OI,~,~,final_time,rect,AFM_IO_padded_sizeOpt] = A10_feature_crossCorrelationAlignmentAFM(BF_Mic_Image_IO,AFM_IO_resized);
     f1=figure;
     imshowpair(BF_Mic_Image_IO,AFM_IO_padded_sizeOpt,'falsecolor')
     title('Brightfield and resized AFM images - Post First cross-correlation','FontSize',14)
     if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
-    saveas(f1,sprintf('%s/resultA10_1_BForiginal_AFMresize_firstCrossCorrelation.tif',newFolder))
-
+    if saveFig
+        saveas(f1,sprintf('%s/resultA10_1_BForiginal_AFMresize_firstCrossCorrelation.tif',newFolder))
+    end
     question='Choose one of the following options before run the optimization';
     options={ ...
         sprintf('1) Crop manually the BF image'), ...
         sprintf('2) Use a defined margin (%d pixels)?',p.Results.Margin), ... 
         sprintf('3) None')};
     answerCrop = getValidAnswer(question, '', options);
-    
+
     if answerCrop == 1
     % crop the right area containing the AFM image, if not, restart
         uiwait(msgbox('Crop the area of interest containing the stimulated part',''));
         [~,specs]=imcrop();
-        close(f1)
         % extract the cropped area
         XBegin=round(specs(1));
         YBegin=round(specs(2));
         XEnd=round(specs(1))+round(specs(3));
         YEnd=round(specs(2))+round(specs(end));
-        % track the coordinates of the new BF image. required in next steps
+        % save the coordinates of cropped area respect to original area to track the coordinates of the new BF image required in next steps
         coordinatesCrop= [XBegin XEnd YBegin YEnd];
         % if cropped outise image
         if(YEnd>size(BF_Mic_Image_IO,1)), YEnd=size(BF_Mic_Image_IO,1); end
@@ -128,18 +130,18 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
         BF_IO_choice=BF_Mic_Image_IO(YBegin:YEnd,XBegin:XEnd);
         % create AFM image with same BF cropped size
         [~,~,~,~,~,AFM_IO_padded_sizeOpt] = A10_feature_crossCorrelationAlignmentAFM(BF_IO_choice,AFM_IO_resized);
-                
 
-        % save the coordinates of cropped area respect to original area
-        f2=figure;
-        imshowpair(BF_IO_choice,AFM_IO_padded_sizeOpt,'falsecolor')
-        objInSecondMonitor(secondMonitorMain,f2);
-        title('Cropped Brightfield and resized AFM images - First cross-correlation','FontSize',14)
-        saveas(f2,sprintf('%s/resultA10_2_BFcropped_AFMresize_postfirstCrossCorrelation.tif',newFolder))
+        if saveFig
+            f2=figure('Visible','off');
+            imshowpair(BF_IO_choice,AFM_IO_padded_sizeOpt,'falsecolor')
+            objInSecondMonitor(secondMonitorMain,f2);
+            title('Cropped Brightfield and resized AFM images - First cross-correlation','FontSize',14)
+            saveas(f2,sprintf('%s/resultA10_2_BFcropped_AFMresize_postfirstCrossCorrelation.tif',newFolder))
+            close(f2)
+        end
     elseif answerCrop == 2
     % extract the BF with border depending on the margin
         % save the coordinates of AFM resized in the 2D space of BF original
-        close(f1)
         xbegin = rect(1); xend = rect(2);
         ybegin = rect(3); yend = rect(4);
         % FIX LEFT BORDER: if the BF border is very close and less than margin, then "modify" the margin to the extreme BF border
@@ -159,17 +161,21 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
         % track the coordinates of the new BF image. required in next steps
         coordinatesCrop= [tmp_xbegin tmp_xend tmp_ybegin tmp_yend];
         % note: rect is not valid anymore, since there is a new BF image
-        f2=figure;
-        imshowpair(BF_IO_choice,AFM_IO_padded_sizeOpt,'falsecolor')
-        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2); end
-        title('Reduced (by margin) Brightfield and resized AFM images - First cross-correlation','FontSize',14)
-        saveas(f2,sprintf('%s/resultA10_2_BFreducedMargin_AFMresize_postfirstCrossCorrelation.tif',newFolder))
+        if saveFig
+            f2=figure('Visible','off');
+            imshowpair(BF_IO_choice,AFM_IO_padded_sizeOpt,'falsecolor')
+            if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2); end
+            title('Reduced (by margin) Brightfield and resized AFM images - First cross-correlation','FontSize',14)
+            saveas(f2,sprintf('%s/resultA10_2_BFreducedMargin_AFMresize_postfirstCrossCorrelation.tif',newFolder))
+            close(f2)
+        end
     else
         % do nothing
         coordinatesCrop=zeros(4,1);
         BF_IO_choice=BF_Mic_Image_IO;
     end
-    
+
+
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% OPTIMIZATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%     
@@ -184,16 +190,19 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
         sprintf('(2) Automatic method\n Iterative process of expansion, reduction and rotation.'); ...
                 '(3) Stop here the process. The fist cross-correlatin is okay.'};
     answerMethod=getValidAnswer(question,'',options);
-    close all
+    close(f1)
+
     % in case the user believe that the first cross correlation is ok
     if answerMethod==1
     % manual approach
         [moving_final,AFM_IO_padded_sizeOpt,details_it_reg,rect,rotation_deg_tot]=A10_feature_manualAlignmentGUI(BF_IO_choice,AFM_IO_resized,AFM_IO_padded_sizeOpt,max_c_it_OI,secondMonitorMain,newFolder); % forse va AFM_IO_resized e non AFM_IO_padded
-        f3=figure('visible','off');
-        imshowpair(BF_IO_choice,AFM_IO_padded_sizeOpt,'falsecolor');
-        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
-        title('Reduced (by margin) Brightfield and resized AFM images - End Manual Approach','FontSize',14)
-        saveas(f3,sprintf('%s/resultA10_3_BFreduced_AFMopt_EndManualApproach.tif',newFolder))
+        if saveFig
+            f3=figure('visible','off');
+            imshowpair(BF_IO_choice,AFM_IO_padded_sizeOpt,'falsecolor');
+            if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
+            title('Reduced (by margin) Brightfield and resized AFM images - End Manual Approach','FontSize',14)
+            saveas(f3,sprintf('%s/resultA10_3_BFreduced_AFMopt_EndManualApproach.tif',newFolder))
+        end
         % process the AFM channel data using the details_it_reg
         for i=1:size(details_it_reg,1)
             % process rotation
@@ -244,12 +253,7 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
         before2=datetime('now');
         moving_OPT=AFM_IO_resized;
         % init plot where show overlapping of AFM-BF and trend of max correlation value
-        close all
-        if SeeMe
-            h_it=figure('visible','on');
-        else
-            h_it=figure('visible','off');
-        end
+        h_it=figure;
 
         f2max=figure; grid on
         max_c_it_OI_prev=max_c_it_OI;
@@ -343,7 +347,7 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
                 end
             end
         end
-
+        %%%% end iteration %%%
         % remove the all zero elements
         tmp=details_it_reg(1:z,:);
         details_it_reg = tmp;
@@ -351,25 +355,21 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
         % calc the calculates the time taken for the entire process
         final_time2=minus(datetime('now'),before2);
         waitbar(1/1,wb,'Completed the EXP/RED/ROT optimization');
-        uiwait(msgbox('Process Completed. Click to continue',''));
-        figure(h_it)
-        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,h_it); end
-        title('Reduced (by margin) Brightfield and resized AFM images - End Iterative Process','FontSize',14)
-        saveas(h_it,sprintf('%s/resultA10_3_reducedBF_AFM_EndIterativeProcess.tif',newFolder))
-        figure(f2max)
-        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2max); end
-        title('Trend Cross-correlation score (max value among the four different image editing)','FontSize',14)
-        saveas(f2max,sprintf('%s/resultA10_4_TrendCross-correlationScore_EndIterativeProcess.tif',newFolder))
-        
         uiwait(msgbox(sprintf('Performed %d Cycles in %3.2f min',N_cycles_opt,minutes(final_time2))))
+        
+        if saveFig
+            figure(f2max)
+            if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2max); end
+            title('Trend Cross-correlation score (max value among the four different image editing)','FontSize',14)
+            saveas(f2max,sprintf('%s/resultA10_4_TrendCross-correlationScore_EndIterativeProcess.tif',newFolder))
+        end
+        close(f2max), close(h_it)
         if(exist('wb','var'))
             delete (wb)
-        end
-        close all     
+        end    
     else
         details_it_reg=nan;
         moving_final=AFM_IO_resized;
-
     end
 
     % fix the coordinates of AFM final respect to BF original size (until now was respect to BF cropped (if margin or crop mode was choosen).
@@ -382,13 +382,16 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
     if any(size(moving_final) ~= size(AFM_Elab(1).AFM_image))
         error('The resulting size between AFM and Fluorescence are different. Try again this entire alignment step by cropping a bigger area or use manual method with caution.')
     end
-    
-    f5=figure;
-    imshowpair(BF_Mic_Image_IO,AFM_IO_padded_sizeBF,'falsecolor')
-    title('Brightfield original and AFM optimal with BF original size - End process. Check if everything is okay','FontSize',14)
-    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f5); end
-    saveas(f5,sprintf('%s/resultA10_5_BForiginal_AFMopt_withBForiginalSize.tif',newFolder))
-  
+
+    if SeeMe && saveFig
+        f5=figure;
+        imshowpair(BF_Mic_Image_IO,AFM_IO_padded_sizeBF,'falsecolor')
+        title('Brightfield original and AFM optimal with BF original size - End process.','FontSize',14)
+        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f5); end
+        saveas(f5,sprintf('%s/resultA10_5_BForiginal_AFMopt_withBForiginalSize.tif',newFolder))
+        uiwait(msgbox('Click to continue.'))
+        close(f5)
+    end
 
     % place the the AFM data in the same space of BF image (no data modification)
     for flag_size=1:size(AFM_Elab,2)
@@ -410,9 +413,6 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
     'MethodOptimization', answerMethod, ...
     'OperationPerformed0', details_it_reg, ...
     'TotalRotation', rotation_deg_tot);
-
-    uiwait(msgbox('Click to continue'))
-    close all
 end
 
 
