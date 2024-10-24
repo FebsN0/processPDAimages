@@ -1,5 +1,13 @@
+
+% OUTPUT:
+%       1: Height VS Lateral Deflection           -- 2: Height VS Lateral Deflection (up to max vertical deflection)
+%       3: Height VS FLUORESCENCE         
+%       4: Lateral Deflection VS FLUORESCENCE     -- 5: Lateral Deflection VS FLUORESCENCE (up to max vertical deflection)
+%       6: Vertical Deflection VS FLUORESCENCE    -- 7: Vertical Deflection VS Lateral Deflection
+%       8: delta fluorescence data (in correspondence of AFM data)
+
+
 function varargout=A11_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints,secondMonitorMain,newFolder,varargin)
-    close all
     
     p=inputParser();
     addRequired(p,'AFM_data');
@@ -7,7 +15,8 @@ function varargout=A11_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints,secon
     argName = 'TRITIC_before';      defaultVal = [];     addParameter(p,argName,defaultVal, @(x) ismatrix(x));
     argName = 'TRITIC_after';       defaultVal = [];     addParameter(p,argName,defaultVal, @(x) ismatrix(x));
     argName = 'Silent';             defaultVal = 'Yes';  addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
-    argName = 'afterHeating';       defaultVal = 'No';   addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));   
+    argName = 'afterHeating';       defaultVal = 'No';   addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+    argName = 'TRITIC_expTime';     defaultVal = '';     addParameter(p,argName,defaultVal, @(x) ischar(x));
     argName = 'innerBorderCalc';    defaultVal = 'No';   addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
 
     parse(p,AFM_data,AFM_IO_Padded,varargin{:});
@@ -17,7 +26,13 @@ function varargout=A11_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints,secon
     if(strcmp(p.Results.innerBorderCalc,'Yes')); innerBord=1; else, innerBord=0; end
     % in case one of the two is missing, substract by min value
     if(strcmp(p.Results.afterHeating,'Yes')); flag_heat=true; else, flag_heat=false; end
-    
+    % in case of after heating, better specify which exposure time has been used to track the saturation upper limit
+    if ~isempty(p.Results.TRITIC_expTime)
+        expTime=sprintf(' - %s',p.Results.TRITIC_expTime);
+    else
+        expTime='';
+    end
+
     numBins=100; %default
     flag_onlyAFM=false;
     if ~flag_heat && (~isempty(p.Results.TRITIC_before) && ~isempty(p.Results.TRITIC_after))
@@ -62,9 +77,11 @@ function varargout=A11_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints,secon
         Delta_ADJ=Delta-Min_Delta_glass;
         Delta_ADJ(AFM_data(idx_LD).AFM_Padded==0)=nan;
         Delta_ADJ(Delta_ADJ<0 | ~isnan(Delta_glass))=nan;
-    
-        plotSave2(SeeMe,Delta_glass,Delta_ADJ,'Tritic glass','Tritic whole','Fluorescence emission','resultA11_1_FluorescenceGlassPDA.tif',secondMonitorMain,newFolder)
-   end
+        
+        if ~flag_heat
+            plotSave2(SeeMe,Delta_glass,Delta_ADJ,'Tritic glass','Tritic whole','Fluorescence emission','resultA11_1_FluorescenceGlassPDA.tif',secondMonitorMain,newFolder)
+        end
+    end
    if innerBord 
         % Identification of borders from the binarised Height image
         AFM_IO_Padded_Borders=AFM_IO_Padded;
@@ -124,7 +141,7 @@ function varargout=A11_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints,secon
         close all 
    end
     
-    % Remove glass regions from the big AFM_Padded Height and LD and VD AFM images
+    % Like what done to Delta_ADJ Remove glass regions from the big AFM_Padded Height and LD and VD AFM images
     % take glass regions
     AFM_data(idx_H).Padded_masked_glass=AFM_data(idx_H).AFM_Padded;
     AFM_data(idx_H).Padded_masked_glass(AFM_IO_Padded==1)=nan;
@@ -157,7 +174,6 @@ function varargout=A11_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints,secon
     AFM_data(idx_LD).Padded_masked_maxVD(~isnan(AFM_data(idx_LD).Padded_masked_glass))=nan; % opposite of masked_glass
     AFM_data(idx_LD).Padded_masked_maxVD(AFM_data(idx_LD).AFM_Padded<=0)=nan;
     AFM_data(idx_LD).Padded_masked_maxVD(AFM_data(idx_LD).AFM_Padded>maxVD)=nan;
-
     
     varargout{1}=[];
     varargout{2}=[];
@@ -180,7 +196,7 @@ function varargout=A11_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints,secon
 
     if ~flag_onlyAFM
         % 8 - HEIGHT VS FLUORESCENCE INCREASE
-        dataPlot_Height_FLUO=A11_feature_CDiB(AFM_data(idx_H).Padded_masked(:),Delta_ADJ(:),secondMonitorMain,newFolder,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL',sprintf('Feature height (nm)'),'FigTitle','Height Vs Fluorescence increase','NumFig',3);
+        dataPlot_Height_FLUO=A11_feature_CDiB(AFM_data(idx_H).Padded_masked(:),Delta_ADJ(:),secondMonitorMain,newFolder,'NumberOfBins',numBins,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL',sprintf('Feature height (nm)'),'FigTitle',sprintf('Height Vs Fluorescence increase%s',expTime),'NumFig',3);
         %[BC_Height_Border_Vs_Delta2ADJ_Border]=A11_feature_CDiB(AFM_Height_Border(:),TRITIC_Border_Delta(:),secondMonitorMain,newFolder,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Feature height (nm)','FigTitle','Height Vs Fluorescence increase (borders)','NumFig',2);
         %[BC_Height_Inner_Vs_Delta2ADJ_Inner]=A11_feature_CDiB(AFM_Height_Inner(:),TRITIC_Inner_Delta(:),secondMonitorMain,newFolder,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Feature height (nm)','FigTitle','Height Vs Fluorescence increase (inner regions)','NumFig',2);
         varargout{3}=dataPlot_Height_FLUO;
@@ -208,6 +224,7 @@ function varargout=A11_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints,secon
         %[BC_VD_Vs_LD_Inner]=A11_feature_CDiB(AFM_VD_Inner(:),AFM_LD_Inner(:),secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'ypar',1e9,'YAyL','Lateral Force (nN)','XAxL','Vertical Force (nN)','FigTitle','LD Vs VD Inner','NumFig',4);
         varargout{7}=dataPlot_VD_LD;
     end
+    varargout{8}=Delta_ADJ;
 end
 
 
