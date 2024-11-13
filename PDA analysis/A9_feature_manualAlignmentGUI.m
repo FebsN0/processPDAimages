@@ -115,7 +115,7 @@ function varargout=A9_feature_manualAlignmentGUI(BF_IO,AFM_IO,AFM_IO_padded_orig
 
     % run a cross correlation (xcorr2_fft) and alignment
     function exeSingleCrossCorr()
-        [max_c_it_OI,~,~,~,rect,AFM_IO_padded] = A10_feature_crossCorrelationAlignmentAFM(fixedImg1,modifiedImg2);
+        [max_c_it_OI,~,~,~,rect,AFM_IO_padded] = A9_feature_crossCorrelationAlignmentAFM(fixedImg1,modifiedImg2);
         figure(f2max)
         % update the counter and the score
         score = max_c_it_OI/maxC_original;
@@ -151,7 +151,7 @@ function varargout=A9_feature_manualAlignmentGUI(BF_IO,AFM_IO,AFM_IO_padded_orig
             figure(f2max)
             if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2max); end
             title('Trend Cross-correlation score','FontSize',14)
-            saveas(f2max,sprintf('%s/resultA10_4_trendScoreCrossCorrelation_manualApproach.tif',newFolder))
+            saveas(f2max,sprintf('%s/resultA9_4_trendScoreCrossCorrelation_manualApproach.tif',newFolder))
             % Close the figure
             delete(hFig); delete(f2max)
         end

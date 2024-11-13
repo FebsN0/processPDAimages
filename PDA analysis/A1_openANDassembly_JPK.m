@@ -280,7 +280,7 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     end
     
     % show and save figures post assembly
-    [~,vertForceAVG]=A2_CleanUpData2_AFM(dataOrderedSTART,setpointN,secondMonitorMain,newFolder,'imageType',imgTyp,'phaseProcess','Raw','Silent',silent,'SaveFig',saveFig,'Normalization',norm,'sectionSize',sizeSections);
+    [vertForceAVG]=A2_CleanUpData2_AFM(dataOrderedSTART,setpointN,secondMonitorMain,newFolder,'imageType',imgTyp,'phaseProcess','Raw','Silent',silent,'SaveFig',saveFig,'Normalization',norm,'sectionSize',sizeSections);
     
     % show and save figures post assembly postProcessing
     if flag_processSignleSections

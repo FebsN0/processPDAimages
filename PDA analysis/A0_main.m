@@ -70,21 +70,21 @@ close all
 f1=figure('Visible','off');
 imshow(imadjust(BF_Mic_Image)), title('BrightField - original','FontSize',17)
 if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
-saveas(f1,sprintf('%s/resultA8_0_BrightField.tif',newFolder))
+saveas(f1,sprintf('%s/resultA6_1_BrightField.tif',newFolder))
 
 [fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the TRITIC Before Stimulation image',filePathData);
 [Tritic_Mic_Image_Before]=A6_open_ND2(fullfile(filePathData,fileName)); 
 f2=figure('Visible','off');
 imshow(imadjust(Tritic_Mic_Image_Before)), title('TRITIC Before Stimulation','FontSize',17)
 if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2); end
-saveas(f2,sprintf('%s/resultA8_0_TRITIC_Before_Stimulation.tif',newFolder))
+saveas(f2,sprintf('%s/resultA6_2_TRITIC_Before_Stimulation.tif',newFolder))
 
 [fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the TRITIC After Stimulation image',filePathData);
 [Tritic_Mic_Image_After]=A6_open_ND2(fullfile(filePathData,fileName)); 
 f3=figure('Visible','off');
 imshow(imadjust(Tritic_Mic_Image_After)), title('TRITIC After Stimulation','FontSize',17)
 if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
-saveas(f3,sprintf('%s/resultA8_0_TRITIC_After_Stimulation.tif',newFolder))
+saveas(f3,sprintf('%s/resultA6_3_TRITIC_After_Stimulation.tif',newFolder))
 
 close all
 
@@ -116,7 +116,7 @@ close gcf
     
 % Align AFM to BF and extract the coordinates for alighnment to be transferred to the other data
 while true
-    [AFM_A10_IO_sizeOpt,AFM_A10_IO_padded_sizeBF,AFM_A10_data_optAlignment,results_AFM_BF_aligment]=A9_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_A6_LatDeflecFitted,newFolder,secondMonitorMain,'Margin',70);
+    [AFM_A10_IO_sizeOpt,AFM_A10_IO_padded_sizeBF,AFM_A10_data_optAlignment,results_AFM_BF_aligment]=A9_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_A6_LatDeflecFitted,newFolder,secondMonitorMain,'Margin',100);
     if getValidAnswer('Satisfied of the alignment or restart?','',{'y','n'}) == 1
         break
     end

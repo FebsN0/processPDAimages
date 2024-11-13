@@ -31,7 +31,7 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A9
     argName = 'saveFig';    defaultVal = 'Yes';     addParameter(p, argName, defaultVal, @(x) ismember(x,{'No','Yes'}));
     argName = 'Silent';     defaultVal = 'No';      addParameter(p, argName, defaultVal, @(x) ismember(x,{'No','Yes'}));
     % how much bigger by fixed margin should be the BF compared to AFM size. Kind of fixed cropping
-    argName = 'Margin';     defaultVal = 100;    addParameter(p,argName,defaultVal,@(x) isnumeric(x) && (x >= 0));
+    argName = 'Margin';     defaultVal = 100;       addParameter(p,argName,defaultVal,@(x) isnumeric(x) && (x >= 0));
     parse(p,BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_Elab,varargin{:});
     
     if(strcmp(p.Results.Silent,'Yes')), SeeMe=false; else, SeeMe=true; end
@@ -97,13 +97,13 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A9
     clear BFRatioHorizontal BFRatioVertical AFMRatioHorizontal AFMRatioVertical scaleAFM2BF_H scaleAFM2BF_V scale
     
     % first correlation and best alignment the AFM IO height and BF images. Then show it
-    [max_c_it_OI,~,~,final_time,rect,AFM_IO_padded_sizeOpt] = A10_feature_crossCorrelationAlignmentAFM(BF_Mic_Image_IO,AFM_IO_resized);
+    [max_c_it_OI,~,~,final_time,rect,AFM_IO_padded_sizeOpt] = A9_feature_crossCorrelationAlignmentAFM(BF_Mic_Image_IO,AFM_IO_resized);
     f1=figure;
     imshowpair(BF_Mic_Image_IO,AFM_IO_padded_sizeOpt,'falsecolor')
     title('Brightfield and resized AFM images - Post First cross-correlation','FontSize',14)
     if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
     if saveFig
-        saveas(f1,sprintf('%s/resultA10_1_BForiginal_AFMresize_firstCrossCorrelation.tif',newFolder))
+        saveas(f1,sprintf('%s/resultA9_1_BForiginal_AFMresize_firstCrossCorrelation.tif',newFolder))
     end
     question='Choose one of the following options before run the optimization';
     options={ ...
@@ -129,14 +129,14 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A9
         % crop the BF original
         BF_IO_choice=BF_Mic_Image_IO(YBegin:YEnd,XBegin:XEnd);
         % create AFM image with same BF cropped size
-        [~,~,~,~,~,AFM_IO_padded_sizeOpt] = A10_feature_crossCorrelationAlignmentAFM(BF_IO_choice,AFM_IO_resized);
+        [~,~,~,~,~,AFM_IO_padded_sizeOpt] = A9_feature_crossCorrelationAlignmentAFM(BF_IO_choice,AFM_IO_resized);
 
         if saveFig
             f2=figure('Visible','off');
             imshowpair(BF_IO_choice,AFM_IO_padded_sizeOpt,'falsecolor')
             objInSecondMonitor(secondMonitorMain,f2);
             title('Cropped Brightfield and resized AFM images - First cross-correlation','FontSize',14)
-            saveas(f2,sprintf('%s/resultA10_2_BFcropped_AFMresize_postfirstCrossCorrelation.tif',newFolder))
+            saveas(f2,sprintf('%s/resultA9_2_BFcropped_AFMresize_postfirstCrossCorrelation.tif',newFolder))
             close(f2)
         end
     elseif answerCrop == 2
@@ -166,7 +166,7 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A9
             imshowpair(BF_IO_choice,AFM_IO_padded_sizeOpt,'falsecolor')
             if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2); end
             title('Reduced (by margin) Brightfield and resized AFM images - First cross-correlation','FontSize',14)
-            saveas(f2,sprintf('%s/resultA10_2_BFreducedMargin_AFMresize_postfirstCrossCorrelation.tif',newFolder))
+            saveas(f2,sprintf('%s/resultA9_2_BFreducedMargin_AFMresize_postfirstCrossCorrelation.tif',newFolder))
             close(f2)
         end
     else
@@ -195,13 +195,13 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A9
     % in case the user believe that the first cross correlation is ok
     if answerMethod==1
     % manual approach
-        [moving_final,AFM_IO_padded_sizeOpt,details_it_reg,rect,rotation_deg_tot]=A10_feature_manualAlignmentGUI(BF_IO_choice,AFM_IO_resized,AFM_IO_padded_sizeOpt,max_c_it_OI,secondMonitorMain,newFolder,saveFig); % forse va AFM_IO_resized e non AFM_IO_padded
+        [moving_final,AFM_IO_padded_sizeOpt,details_it_reg,rect,rotation_deg_tot]=A9_feature_manualAlignmentGUI(BF_IO_choice,AFM_IO_resized,AFM_IO_padded_sizeOpt,max_c_it_OI,secondMonitorMain,newFolder,saveFig); % forse va AFM_IO_resized e non AFM_IO_padded
         if saveFig
             f3=figure('visible','off');
             imshowpair(BF_IO_choice,AFM_IO_padded_sizeOpt,'falsecolor');
             if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
             title('Reduced (by margin) Brightfield and resized AFM images - End Manual Approach','FontSize',14)
-            saveas(f3,sprintf('%s/resultA10_3_BFreduced_AFMopt_EndManualApproach.tif',newFolder))
+            saveas(f3,sprintf('%s/resultA9_3_BFreduced_AFMopt_EndManualApproach.tif',newFolder))
         end
         % process the AFM channel data using the details_it_reg
         for i=1:size(details_it_reg,1)
@@ -279,7 +279,7 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A9
             moving_iterative{3} = imrotate(moving_OPT,Rot_par,'nearest','loose');
             moving_iterative{4} = imrotate(moving_OPT,-Rot_par,'nearest','loose');
             for i=1:4
-                [max_c_it_OI,imax,sz] = A10_feature_crossCorrelationAlignmentAFM(BF_IO_choice,moving_iterative{i},'runAlignAFM',false);
+                [max_c_it_OI,imax,sz] = A9_feature_crossCorrelationAlignmentAFM(BF_IO_choice,moving_iterative{i},'runAlignAFM',false);
                 max_c_iterative(i)=max_c_it_OI;
                 imax_iterative(i)=imax;
                 sz_iterative(i,:) = sz;
@@ -326,7 +326,7 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A9
                 drawnow
                 
                 % adjust the AFM height 0/1 image, dont run FFT, just alignment section
-                [~,~,~,~,rect,AFM_IO_padded_sizeOpt] = A10_feature_crossCorrelationAlignmentAFM(BF_IO_choice,moving_OPT,'runFFT',false,'idxCCMax',imax_OI,'sizeCCMax',size_OI);   
+                [~,~,~,~,rect,AFM_IO_padded_sizeOpt] = A9_feature_crossCorrelationAlignmentAFM(BF_IO_choice,moving_OPT,'runFFT',false,'idxCCMax',imax_OI,'sizeCCMax',size_OI);   
                 figure(h_it);
                 if exist('pairAFM_BF','var')
                     delete(pairAFM_BF)
@@ -361,7 +361,7 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A9
             figure(f2max)
             if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2max); end
             title('Trend Cross-correlation score (max value among the four different image editing)','FontSize',14)
-            saveas(f2max,sprintf('%s/resultA10_4_TrendCross-correlationScore_EndIterativeProcess.tif',newFolder))
+            saveas(f2max,sprintf('%s/resultA9_4_TrendCross-correlationScore_EndIterativeProcess.tif',newFolder))
         end
         close(f2max), close(h_it)
         if(exist('wb','var'))
@@ -388,7 +388,7 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A9
         imshowpair(BF_Mic_Image_IO,AFM_IO_padded_sizeBF,'falsecolor')
         title('Brightfield original and AFM optimal with BF original size - End process.','FontSize',14)
         if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f5); end
-        saveas(f5,sprintf('%s/resultA10_5_BForiginal_AFMopt_withBForiginalSize.tif',newFolder))
+        saveas(f5,sprintf('%s/resultA9_5_BForiginal_AFMopt_withBForiginalSize.tif',newFolder))
         uiwait(msgbox('Click to continue.'))
         close(f5)
     end

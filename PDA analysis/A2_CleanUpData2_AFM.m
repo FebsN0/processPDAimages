@@ -26,7 +26,7 @@ function [varargout]=A2_CleanUpData2_AFM(data,setpoints,secondMonitorMain,newFol
 
     clearvars argName defaultVal
 
-    if(strcmp(p.Results.cleanOnly,'Yes'));
+    if(strcmp(p.Results.cleanOnly,'Yes'))
         cleanOnly=1;
     else
         cleanOnly=0;

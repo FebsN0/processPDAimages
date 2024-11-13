@@ -155,7 +155,7 @@ function varargout=A8_Mic_to_Binary(imageBF_aligned,secondMonitorMain,newFolder,
         satisfied=questdlg('Keep selection or turn to Manual', 'Manual Selection', 'Keep Current','Manual Selection','Keep Current');
     end
     if saveFig
-        saveas(f1,sprintf('%s/resultA9_1_OriginalBrightField_BaselineForeground.tif',newFolder))
+        saveas(f1,sprintf('%s/resultA8_1_OriginalBrightField_BaselineForeground.tif',newFolder))
     end
     close(f1)
     % create a Structuring Element to remove objects smaller than 2 pixels
@@ -168,7 +168,7 @@ function varargout=A8_Mic_to_Binary(imageBF_aligned,secondMonitorMain,newFolder,
         text=sprintf('Definitive Binarized BrightField (Morphological Opening - kernel: square 2 pixels)');
         title(text,'FontSize',14)
         if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f2); end
-        saveas(f2,sprintf('%s/resultA9_2_DefinitiveBinarizedBrightField.tif',newFolder))
+        saveas(f2,sprintf('%s/resultA8_2_DefinitiveBinarizedBrightField.tif',newFolder))
         close(f2)
     end
 

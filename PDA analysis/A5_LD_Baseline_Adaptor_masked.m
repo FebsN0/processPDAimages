@@ -62,7 +62,7 @@ function [AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Image
     
     objInSecondMonitor(secondMonitorMain,f1);
     if SavFg
-        saveas(f1,sprintf('%s/resultA6_1_RawAndShiftedLateralDeflection.tif',newFolder))
+        saveas(f1,sprintf('%s/resultA5_1_RawAndShiftedLateralDeflection.tif',newFolder))
     end
 
 
@@ -212,7 +212,7 @@ function [AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Image
     title('Fitted Lateral Deflection channel [V] - Trace ','FontSize',15)
     objInSecondMonitor(secondMonitorMain,f2);
     if SavFg
-        saveas(f2,sprintf('%s/resultA6_2_ResultsFittingOnLateralDeflections.tif',newFolder))
+        saveas(f2,sprintf('%s/resultA5_2_ResultsFittingOnLateralDeflections.tif',newFolder))
     end
 
     f3=figure;
@@ -222,7 +222,7 @@ function [AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Image
     xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
     objInSecondMonitor(secondMonitorMain,f3);
     if SavFg
-        saveas(f3,sprintf('%s/resultA6_3_ResultsDefinitiveLateralDeflectionsNewton.tif',newFolder))
+        saveas(f3,sprintf('%s/resultA5_3_ResultsDefinitiveLateralDeflectionsNewton.tif',newFolder))
     end
 
     AFM_Elab=AFM_cropped_Images;
