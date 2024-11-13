@@ -69,7 +69,9 @@ function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain,fil
     text='Original';
     
     % in this snippet, remove outliers and data corresponding to those when the tip is not scanning anymore or
-    % applying the plane fitting selecting background areas
+    % applying the plane fitting selecting background areas. Remove ENTIRE LINE.
+    % Removing single selected portion leads to high error fitting. So it would be better just remove entire
+    % line
     flagRemoval=false;
     while true
         figure(f1)

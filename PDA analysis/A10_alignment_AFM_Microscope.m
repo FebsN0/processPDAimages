@@ -195,7 +195,7 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A1
     % in case the user believe that the first cross correlation is ok
     if answerMethod==1
     % manual approach
-        [moving_final,AFM_IO_padded_sizeOpt,details_it_reg,rect,rotation_deg_tot]=A10_feature_manualAlignmentGUI(BF_IO_choice,AFM_IO_resized,AFM_IO_padded_sizeOpt,max_c_it_OI,secondMonitorMain,newFolder); % forse va AFM_IO_resized e non AFM_IO_padded
+        [moving_final,AFM_IO_padded_sizeOpt,details_it_reg,rect,rotation_deg_tot]=A10_feature_manualAlignmentGUI(BF_IO_choice,AFM_IO_resized,AFM_IO_padded_sizeOpt,max_c_it_OI,secondMonitorMain,newFolder,saveFig); % forse va AFM_IO_resized e non AFM_IO_padded
         if saveFig
             f3=figure('visible','off');
             imshowpair(BF_IO_choice,AFM_IO_padded_sizeOpt,'falsecolor');
