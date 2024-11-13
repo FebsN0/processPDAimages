@@ -1,4 +1,4 @@
-function [moving_tr]=A8_limited_registration(moved,fixed,newFolder,secondMonitorMain,varargin)
+function [moving_tr]=A7_limited_registration(moved,fixed,newFolder,secondMonitorMain,varargin)
 % Function to align optical images to each other (TRITC after and BF to TRITC before)
 % if BF is given, it must be the first input
 

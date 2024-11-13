@@ -1,5 +1,5 @@
 % to align AFM height IO image to BF IO image, the main alignment
-function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A10_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_Elab,newFolder,secondMonitorMain,varargin)
+function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A9_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_Elab,newFolder,secondMonitorMain,varargin)
     % OUTPUT DETAILS
     %   - AFM_IO_padded :   AFM height 0/1 data ALIGNED with BF 0/1 data BUT the image is slighly bigger (in
     %                       case of margin or only crop) which values, outside AFM height is only 0. Briefly,

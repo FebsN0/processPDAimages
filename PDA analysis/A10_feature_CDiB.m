@@ -1,6 +1,6 @@
 % Function to collect data into bins
 
-function [outputme] = A11_feature_CDiB(X_Data,Y_Data,secondMonitorMain,newFolder,varargin)
+function [outputme] = A10_feature_CDiB(X_Data,Y_Data,secondMonitorMain,newFolder,varargin)
 
     p=inputParser();
     argName = 'setpoints';      defaultVal = [];                                        addParameter(p,argName,defaultVal);

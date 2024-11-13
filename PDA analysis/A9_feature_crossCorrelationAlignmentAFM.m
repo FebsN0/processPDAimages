@@ -1,4 +1,4 @@
-function varargout = A10_feature_crossCorrelationAlignmentAFM(BF_IO,AFM_IO,varargin)
+function varargout = A9_feature_crossCorrelationAlignmentAFM(BF_IO,AFM_IO,varargin)
     % init
     varargout=cell(9,1);
         % 1 = max_c_it_OI;  % 2 = imax;

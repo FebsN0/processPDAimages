@@ -1,4 +1,4 @@
-function varargout=A10_feature_manualAlignmentGUI(BF_IO,AFM_IO,AFM_IO_padded_original,max_c_it_OI,secondMonitorMain,newFolder,varargin)
+function varargout=A9_feature_manualAlignmentGUI(BF_IO,AFM_IO,AFM_IO_padded_original,max_c_it_OI,secondMonitorMain,newFolder,varargin)
     p=inputParser(); 
     argName = 'saveFig';    defaultVal = 'Yes';     addParameter(p, argName, defaultVal, @(x) ismember(x,{'No','Yes'}));
     parse(p,varargin{:});

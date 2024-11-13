@@ -7,7 +7,7 @@
 %       8: delta fluorescence data (in correspondence of AFM data)
 
 
-function varargout=A11_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints,secondMonitorMain,newFolder,varargin)
+function varargout=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints,secondMonitorMain,newFolder,varargin)
     
     p=inputParser();
     addRequired(p,'AFM_data');

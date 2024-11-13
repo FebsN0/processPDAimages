@@ -4,7 +4,7 @@
 % Check manually the processed image afterwards and compare with the AFM VD
 % image!
 
-function [AFM_Elab,Bk_iterative]=A6_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,alpha,avg_fc,secondMonitorMain,newFolder,varargin)
+function [AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,alpha,avg_fc,secondMonitorMain,newFolder,varargin)
     % in case of code error, the waitbar won't be removed. So the following command force its closure
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)

@@ -4,7 +4,7 @@
 % more contrast)
 
 
-function varargout=A9_Mic_to_Binary(imageBF_aligned,secondMonitorMain,newFolder,varargin)
+function varargout=A8_Mic_to_Binary(imageBF_aligned,secondMonitorMain,newFolder,varargin)
 
     p=inputParser();
     %Add default mandatory parameters.
