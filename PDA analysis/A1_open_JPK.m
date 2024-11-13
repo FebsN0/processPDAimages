@@ -137,20 +137,26 @@ function [varargout]=A1_open_JPK(varargin)
                     Vertical_kn=(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==33076)).Value)/(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==33028)).Value);
                     %calculate Alpha. 14.75 is from linear fitting of the Ortuso and Sugihara work about wedge method calibration
                     Alpha=Vertical_Sn*Vertical_kn*14.75; % For further detail please refer to aforementioned publication
-    
+        
+                    % Baseline correction allow to correct the setpoint according on the value of measured
+                    % vertical deflection at the approaching moment (unavoidable presence of interaction
+                    % between the tip and the sample)
                     if(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32820)).Value==1)
-                        Baseline_Raw=((file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32819)).Value-file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32821)).Value)-file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32980)).Value);
+                        Baseline_V = file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32821)).Value;
+                        SetP_V_Raw = file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32819)).Value;
+                        SetP_V = SetP_V_Raw - Baseline_V - file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32980)).Value;
                         Bline_adjust='Yes';
                     else
-                        Baseline_Raw=((file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32819)).Value)-file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32980)).Value);
+                        Baseline_V = 0;
+                        SetP_V_Raw = file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32819)).Value;
+                        SetP_V = SetP_V_Raw - Baseline_V - file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32980)).Value;
                         Bline_adjust='No';
                     end
                     
-                    SetP_V=Baseline_Raw;
-                    Raw=(Baseline_Raw-(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32981)).Value))/(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32980)).Value); % Setpoint in Volts [V]
-                    SetP_m=(Raw)*(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==33028)).Value)+(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==33029)).Value); % Setpoint in meters [m]
-                    SetP_N=(Raw)*(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==33076)).Value)+(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==33077)).Value); % Setpoint in force [N]
-                    
+                    Baseline_N = Baseline_V*Vertical_kn*Vertical_Sn;
+                    SetP_m=SetP_V*Vertical_Sn               +(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==33029)).Value); % Setpoint in meters [m]
+                    SetP_N=SetP_V*Vertical_kn*Vertical_Sn   +(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==33077)).Value); % Setpoint in force [N]
+
                     % save every important information from Metadata
                     Details_Img=struct(...
                         'Type', Type,...
@@ -163,8 +169,8 @@ function [varargout]=A1_open_JPK(varargin)
                         'y_scan_pixels', y_scan_pixels,...
                         'I_Gain', I_Gain,...
                         'P_Gain', P_Gain,...
-                        'Baseline_V', Baseline_Raw,...
-                        'Baseline_N', nan,...
+                        'Baseline_V', Baseline_V,...
+                        'Baseline_N', Baseline_N,...
                         'SetP_V', SetP_V,...
                         'SetP_m', SetP_m,...
                         'SetP_N', SetP_N,...
@@ -260,7 +266,7 @@ function [varargout]=A1_open_JPK(varargin)
                     if(strcmp(Bline_adjust,'No'))
                         afm_image=((double(imread(complete_path_to_afm_file,i))*multiplyer))+offset;
                     else
-                        Details_Img.Baseline_N=(Baseline_Raw*multiplyer)+offset;
+                        %Details_Img.Baseline_N=(Baseline_V*multiplyer)+offset;
                         afm_image=((double(imread(complete_path_to_afm_file,i))*multiplyer))+offset;
                     end
                 end

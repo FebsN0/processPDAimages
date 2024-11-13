@@ -57,7 +57,7 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     elseif numFiles==1
         [~,nameFile]=fileparts(fileName);
         newFolder = fullfile(filePathData, sprintf('%s - Results Processing AFM and fluorescence images',nameFile));
-    else % case of more sections
+    else % case of more sections and normal scans
         [upperFolder,~,~]=fileparts(fileparts(filePathData));
         newFolder = fullfile(upperFolder, 'Results Processing AFM and fluorescence images');
     end
@@ -82,12 +82,7 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
 
     flag_processSignleSections=false;
     if numFiles > 1
-        question= sprintf('More .jpk files are uploaded. Are they from the same experiment which only setpoint is changed?');
-        options= {'Yes','No'};
-        if getValidAnswer(question,'',options) ~= 1
-            error('Restart again and select only one .jpk file if the more uploaded .jpk are from different experiment')
-        end
-        question= sprintf('Process single sections before assembling?');
+        question= sprintf('Process single sections before assembling (usually no)?');
         options= {'Yes','No'};
         if getValidAnswer(question,'',options) == 1
             flag_processSignleSections=true;
@@ -128,12 +123,17 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
         
         % if the vertical deflection is expressed in volts, then convert into force
         for j=1:length(data)
-            if strcmp(data(j).Channel_name,'Vertical Deflection') && strcmp(data(j).Signal_type,'volts')
-                fprintf('\t Original Vertical Deflection in Volts ==> converted to Force unit\n')
-                raw_data_VD_volt=data(j).AFM_image;
-                raw_data_VD_force = raw_data_VD_volt*metaData.Vertical_kn*metaData.Vertical_Sn;     % F (N) = V (V) * Sn (m/V) * Kn (N/m)
-                data(j).AFM_image = raw_data_VD_force;
-                data(j).Signal_type = 'force';                            
+            if strcmp(data(j).Channel_name,'Vertical Deflection') 
+                if strcmp(data(j).Signal_type,'volts')
+                    fprintf('\t Original Vertical Deflection in Volts ==> converted to Force unit\n')
+                    raw_data_VD_volt=data(j).AFM_image;
+                    raw_data_VD_force = raw_data_VD_volt*metaData.Vertical_kn*metaData.Vertical_Sn;     % F (N) = V (V) * Sn (m/V) * Kn (N/m)
+                    % ADJUST THE RAW VERTICAL FORCE WITH THE BASELINE
+                    %%%%%%%%%%%%%%%raw_data_VD_force = raw_data_VD_force + metaData.B
+                    data(j).AFM_image = raw_data_VD_force;
+                    data(j).Signal_type = 'force';
+                end
+                data(j).AFM_image = data(j).AFM_image - metaData.Baseline_N;
             end
         end
         
@@ -161,7 +161,7 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
         end
             
         % remove not useful information prior the process. Not show the figures. Later
-        filtData=A2_CleanUpData2_AFM(data,setpointN,secondMonitorMain,newFolder,'SaveFig','No');
+        filtData=A2_CleanUpData2_AFM(data,setpointN,secondMonitorMain,newFolder,'cleanOnly','Yes');
         % save the sections before and after the processing
         allScansImageSTART{i}=filtData;
         allScansMetadata{i}=metaData;
