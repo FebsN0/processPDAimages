@@ -11,21 +11,23 @@ colors={"#0072BD","#D95319","#EDB120","#7E2F8E","#77AC30","#4DBEEE","#A2142F",'k
 
 secondMonitorMain=objInSecondMonitor;
 fmain=figure;
-% upload .jpk files. If more than one and if from same experiment in which setpoint is changed, then assembly.
 m=1;
-maxScans=str2double(cell2mat(inputdlg('How many scans?')));
-results_Height_fluo_allScans=cell(1,maxScans);
-fitresult_allScans=cell(1,maxScans);
-nameData=cell(1,maxScans);
-answer=getValidAnswer('Choose an option','',{'Compare same AFM with different TRITIC exposure time','Compare different AFM with same TRITIC exposure time'});
+
+answer=getValidAnswer('Choose an option','',{'Compare SAME AFM scan with different TRITIC with DIFFERENT exposure time','Compare DIFFERENT AFM scans with different TRITIC with SAME exposure time'});
 if answer==1
     flagDifferentExposTime=true;
 else
     flagDifferentExposTime=false;
 end
 
+% Init
+maxScans=str2double(cell2mat(inputdlg('How many scans in total?')));
+results_Height_fluo_allScans=cell(1,maxScans);
+fitresult_allScans=cell(1,maxScans);
+nameData=cell(1,maxScans);
+
 while true
-    [AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM,newFolder,setpoints]=A1_openANDassembly_JPK(secondMonitorMain,'saveFig','No');
+    [AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM,newFolder,setpoints]=A1_openANDassembly_JPK(secondMonitorMain,'saveFig','Yes');
     % Open Brightfield image and the TRITIC after sample heating and AFM scanning 
     [fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the BrightField image');
     [BF_Mic_Image,~,metaData_BF]=A7_open_ND2(fullfile(filePathData,fileName)); 
@@ -106,7 +108,7 @@ while true
         plot(x,x*fitresult.p1+fitresult.p2,'Color',colors{m},'LineWidth',2,'DisplayName',sprintf('Fit   - %s',nameData{m}))
         m=m+1;
     
-        if m>maxScans || ~strcmp(questdlg('Continue by changing only time exposure of fluorescence?','','Yes'),'Yes')
+        if m>maxScans
             break
         end
     end

@@ -14,7 +14,7 @@ options={ ...
     sprintf('5) TRCDA-POPC (air) = 0.2090'), ...
     sprintf('6) Enter manually a value')};
 choice = getValidAnswer(question, '', options);
-
+    
 if ~exist('newFolder','var')
     newFolder=[];
 end
@@ -112,7 +112,7 @@ clear f1 f2 f3 question options choice fileName
 
 % Produce the binary IO of Brightfield
 [BF_Mic_Image_IO,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,~]=A9_Mic_to_Binary(BF_Mic_Image_aligned,secondMonitorMain,newFolder,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned); 
-
+close gcf
     
 % Align AFM to BF and extract the coordinates for alighnment to be transferred to the other data
 while true
