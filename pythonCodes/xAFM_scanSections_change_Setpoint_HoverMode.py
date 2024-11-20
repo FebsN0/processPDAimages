@@ -1,16 +1,19 @@
 # Python code for ExperimentPlanner
 # JPK Script
-checkVersion('SPM', 6, 4, 32)
+checkVersion('SPM', 6, 4, 25)
 
 from com.jpk.inst.lib import JPKScript
 from com.jpk.spm.data import AmplitudeSetpointFeedbackSettings
+from com.jpk.data import SetpointFeedbackSettings
 from com.jpk.spm.data import HoverSpatialScanningStyle
 from com.jpk.spm.data import SimpleSpatialScanningStyle
+
+from datetime import datetime
 
 '''
 Set amplitude setpoint for AC-Mode
 Please note: setpoint MUST be given in the current scaling
-of the setpoint (nm) or (V), depending on an active sensitivity
+of the setpoint (nm) or (V), depending on a active sensitivity
 calibration
 '''
 def setAmplitudeSetpoint(value):
@@ -24,7 +27,7 @@ def setAmplitudeSetpoint(value):
     conversionSet = instrument.getChannelInfo(feedbackChannel).getConversionSet()
     calibrationSlot = conversionSet.getDefaultCalibrationSlot()
     setpointCalibrationSlot = feedbackSettings.getSetpointCalibrationSlot()
-    setpointVolts = conversionSet.scale(value, calibrationSlot, setpointCalibrationSlot )
+    setpointVolts = conversionSet.scale(value, calibrationSlot, setpointCalibrationSlot)
 
     #set new setpoint
     parameters = AmplitudeSetpointFeedbackSettings.Parameters(feedbackSettings)
@@ -34,7 +37,48 @@ def setAmplitudeSetpoint(value):
     return value
 
 '''
-Enable/disable HoverMode
+Set vertical deflection setpoint for Contact-Mode
+'''
+def setVDeflectionSetpoint(value):
+    print('SET SETPOINT %.2e' % value)
+    instrument = JPKScript.getInstrument()
+    feedbackModeInfo = instrument.getCurrentFeedbackModeInfo()
+    feedbackSettings = feedbackModeInfo.getPrimaryFeedbackSettings()
+    feedbackChannel = feedbackModeInfo.getFeedbackChannel()
+
+    # scale setpoint value to base volts
+    conversionSet = instrument.getChannelInfo(feedbackChannel).getConversionSet()
+    calibrationSlot = conversionSet.getDefaultCalibrationSlot()
+    setpointCalibrationSlot = feedbackSettings.getSetpointCalibrationSlot()
+    setpointVolts = conversionSet.scale(value, calibrationSlot, setpointCalibrationSlot)
+
+     #set new setpoint
+    parameters = SetpointFeedbackSettings.Parameters(feedbackSettings)
+    parameters.setRelativeSetpoint(setpointVolts)
+    newFeedbackSettings = feedbackSettings.createModifiedSettings(parameters)
+    feedbackModeInfo.setPrimaryFeedbackSettings(newFeedbackSettings)
+    return value
+
+'''
+Get current vertical deflection baseline in current vertical
+deflection unit, depending on calibration
+'''
+def getBaseline():
+    instrument = JPKScript.getInstrument()
+    feedbackModeInfo = instrument.getCurrentFeedbackModeInfo()
+    feedbackSettings = feedbackModeInfo.getPrimaryFeedbackSettings()
+    baselineVolts = feedbackSettings.getBaseline()
+
+    feedbackChannel = feedbackModeInfo.getFeedbackChannel()
+    conversionSet = instrument.getChannelInfo(feedbackChannel).getConversionSet()
+    calibrationSlot = conversionSet.getDefaultCalibrationSlot()
+
+    baseline = conversionSet.scale(baselineVolts, calibrationSlot)
+    print('GET BASELINE = %.2e' % baseline)
+    return baseline
+
+'''
+Enable / disable HoverMode
 '''
 def enableHoverMode(enable):
     print('ENABLE HOVER-MODE %s' % enable)
@@ -47,75 +91,80 @@ def enableHoverMode(enable):
         mode.setSpatialScanningStyle(SimpleSpatialScanningStyle(style))
 
 '''
-Define a list of setpoints here in VOLTS scaling. If you have calibrated 
+Define a list of setpoints, here in VOLTS scaling. If you have calibrated 
 the sensitivity value, setpoint must be given in METER, 30 nm = 30e-9
-Otherwise, enter the sensitivity and spring constant. Conver the nN into Volts
 '''
-
-setpointListNanoNewton = [30, 50, 70, 90, 110]   # nN
-setpointListNewton=[x * 1e-9 for x in setpointListNanoNewton]   # N
-springConstant= 0.452                                # N/m
-sensitivity=63.65                              # nm/V
-setpointListVolts=[x / (springConstant*sensitivity) for x in setpointListNanoNewton]
-
+setpointList = [10e-9, 20e-9, 30e-9, 40e-9, 50e-9]
 
 '''
-Setup the parameters: initial scan size of a single section at the current x,y offset position, pixel size, scan line rate.
+setup the base direcory for saving data
+this will be extended later in the loop to
+sort HoverMode ON/OFF scans
 '''
-array = [0]         # 0: HOVER MODE ON      # 1: HOVER MODE OFF
-# setup the base directory for saving data this will be extended later in the loop to sort HoverMode ON/OFF scans
-baseDirName='/home/jpkuser/jpkdata/Fabiano/experiments/1_lipidEffects/3_3_1 TRCDA:DOPC/4'
-
-# if 10 setpoints  ==> 10 slow direction scan sections with a size of 5 um if fast scan line direction is 50 um long
-scanSizeFast =  80.0e-6     # 50 um
-scanSizeSlow =  scanSizeFast / len(setpointListVolts)          
-fastPixels=     1024           # 640 for 5 sections ==> 140*5 = 640 pixels
-slowPixels=     fastPixels/len(setpointListVolts)
-scan_rate=      0.18    # Hz
-
+baseDirName = '/home/barner/test'
 Imaging.setOutputDirectory(baseDirName)
 Imaging.setAutosave(True)
-# extract the origin of scanning
+
+'''
+Setup the inital scan size at the current x,y offset position
+'''
+scanSizeFast = 10.0e-6
+scanSizeSlow = 2.0e-6
+
 xOffset = Imaging.getXOffset()
 yOffset = Imaging.getYOffset()
-# save the origin of y axis, so when the first entire scan is completed, switch hover mode and come back to the y origin
-yOffset_origin = yOffset                             
 Scanner.retractPiezo()
 Imaging.setScanSize(scanSizeFast, scanSizeSlow)
-Imaging.setScanPixels(fastPixels, slowPixels)
-Imaging.setLineRate(scan_rate)
+Imaging.setOutputDirectory(baseDirName+'/')
+scanIndex = 0
 
-'''
-Start the measurement
-'''
+# create textfile for meta data
+f = open(baseDirName+'/baseline.txt', 'w')
+# write headder
+f.write('# Start time = %s' % datetime.now())
+f.write('# Scan output directory = %s\n' % baseDirName)
+f.write('# ScanSizeFast (X) = %e\n' % scanSizeFast)
+f.write('# ScanSizeSlow (Y) = %e\n' % scanSizeSlow)
+f.write('# ScanIndex Setpoint BaselineStart BaselineEnd XOffset YOffset\n')
 
-# define mode Hover Mode
-textToPrint = ["START SCAN 1 HOVER MODE ON", "START SCAN 2 HOVER MODE OFF"]
-textDirectory = ["/HoverMode_ON", "/HoverMode_OFF"]
-conditionHVmode = [True, False]
+try:
+    '''
+    Start the measurement
+    '''
+    for setpoint in setpointList:
 
-# two for cycles:
-# Cycle 1 HoverMode ON
-# Cycle 2 HoverMode OFF 
-for i in array:
-    Imaging.setOutputDirectory(baseDirName+textDirectory[i])
-    enableHoverMode(conditionHVmode[i])
+        #increment scan index
+        scanIndex += 1
 
-    #Scanner.approach()
-    for setpoint in setpointListVolts:
-        print('yOFFSET: %e' % yOffset)
-        Imaging.setScanOffset(xOffset, yOffset)
         # Set setpoint
-        setAmplitudeSetpoint(setpoint)    
+        #setAmplitudeSetpoint(setpoint)
+        setVDeflectionSetpoint(setpoint)
+    
+        # approach and measure current baseline
         Scanner.approachPiezo()
+        baselineStart = getBaseline()
+       
+        # start image scan
         Imaging.startScanning(1)
+
+        # retract piezo and update baseline
         Scanner.retractPiezo()
-            
-        # Move the scan in the slow scan direction by scanSizeSlow 
+        Scanner.approachPiezo()
+        baselineEnd = getBaseline()
+        Scanner.retract()
+
+        # write meta data to text file
+        f.write('%d %e %e %e %e %e\n' % (scanIndex, setpoint, baselineStart, baselineEnd, xOffset, yOffset))
+        f.flush()
+
+        # Move the scan in the slow scanDirection by scanSizeSlow 
         yOffset += scanSizeSlow
-    Scanner.retract()
-    yOffset=yOffset_origin
-    Imaging.setScanOffset(xOffset, yOffset)
+        Imaging.setScanOffset(xOffset, yOffset)
 
+finally:
+    f.close()
+    
 print('DONE....')
-
+    
+    
+    
