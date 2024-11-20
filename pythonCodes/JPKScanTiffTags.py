@@ -170,9 +170,9 @@ else:
     # check if the scan is retrace or trace and make a flag
     Channel_retrace    = bool(tags.get(0x8051).value)   # es True x Retrace or False x Trace
     if Channel_retrace:
-        trace_type_flag = 'Trace'
-    else:
         trace_type_flag = 'ReTrace'
+    else:
+        trace_type_flag = 'Trace'
     # store basic info
     dataChannel ={
         'Channel_Name' : ChannelFancyName,
