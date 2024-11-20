@@ -59,7 +59,7 @@ function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain,fil
     if(strcmp(p.Results.SaveFig,'Yes')); SavFg=1; else, SavFg=0; end
     
     % Extract the height channel
-    raw_data_Height=filtData(strcmp({filtData.Channel_name},'Height (measured)')).AFM_image;
+    raw_data_Height=filtData(strcmp([filtData.Channel_name],'Height (measured)')).AFM_image;
     % Orient the image by counterclockwise 180° and flip to coencide with the Microscopy image through rotations
     raw_data_Height=flip(rot90(raw_data_Height),2);
     rawH=raw_data_Height;

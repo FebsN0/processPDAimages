@@ -39,7 +39,7 @@ function [varargout]=A2_CleanUpData2_AFM(data,setpoints,secondMonitorMain,newFol
     end
     
     if cleanOnly
-        % Check if the data struct has exactly the specific fields and 5 rows (removed not useful data)
+        % Check if the data struct has exactly the specific fields and 5 or 10 rows (removed not useful data)
         fieldNames=fieldnames(data);
         for j=1:length(fieldnames(data))
             if ~((strcmpi(fieldNames{j},'Channel_name') || strcmpi(fieldNames{j},'Trace_type') ||  strcmpi(fieldNames{j},'Signal_type') || ...
@@ -50,10 +50,10 @@ function [varargout]=A2_CleanUpData2_AFM(data,setpoints,secondMonitorMain,newFol
         end
     
         %find only those rows of interest (trace: latDefle, Height and vertDefle, retrace: latDefle, vertDefle)
-        traceMask=strcmpi({data.Trace_type},'trace');
-        channelMask1= strcmpi({data.Channel_name},'Height (measured)');
-        channelMask2= strcmpi({data.Channel_name},'Vertical Deflection');
-        channelMask3= strcmpi({data.Channel_name},'Lateral Deflection');
+        traceMask=strcmpi([data.Trace_type],'Trace');
+        channelMask1= strcmpi([data.Channel_name],'Height (measured)');
+        channelMask2= strcmpi([data.Channel_name],'Vertical Deflection');
+        channelMask3= strcmpi([data.Channel_name],'Lateral Deflection');
         defMask= (traceMask & channelMask1) | channelMask2 | channelMask3;
         varargout{1} = data(defMask);
     else
@@ -61,12 +61,12 @@ function [varargout]=A2_CleanUpData2_AFM(data,setpoints,secondMonitorMain,newFol
     % part assumes they already assembled. The following part does nothing to the data but solely extract them to make figures.
     % If savFig is false, then not save. However, vertical distribution is always plotted regardless the saveFig result.
     % Therefore, the following line is outside the figure processing
-        data_VD_trace=  data(strcmp({data.Channel_name},'Vertical Deflection') & strcmp({data.Trace_type},'Trace')).AFM_image;
+        data_VD_trace=  data(strcmp([data.Channel_name],'Vertical Deflection') & strcmp([data.Trace_type],'Trace')).AFM_image;
         if SavFg
-            data_Height=    data(strcmp({data.Channel_name},'Height (measured)')).AFM_image;
-            data_LD_trace=  data(strcmp({data.Channel_name},'Lateral Deflection') & strcmp({data.Trace_type},'Trace')).AFM_image;
-            data_LD_retrace=data(strcmp({data.Channel_name},'Lateral Deflection') & strcmp({data.Trace_type},'ReTrace')).AFM_image;
-            data_VD_retrace=data(strcmp({data.Channel_name},'Vertical Deflection') & strcmp({data.Trace_type},'ReTrace')).AFM_image;
+            data_Height=    data(strcmp([data.Channel_name],'Height (measured)')).AFM_image;
+            data_LD_trace=  data(strcmp([data.Channel_name],'Lateral Deflection') & strcmp([data.Trace_type],'Trace')).AFM_image;
+            data_LD_retrace=data(strcmp([data.Channel_name],'Lateral Deflection') & strcmp([data.Trace_type],'ReTrace')).AFM_image;
+            data_VD_retrace=data(strcmp([data.Channel_name],'Vertical Deflection') & strcmp([data.Trace_type],'ReTrace')).AFM_image;
             % rotate
             if step==2
                 data_Height= flip(rot90(data_Height),2);

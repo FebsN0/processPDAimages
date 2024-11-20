@@ -101,7 +101,7 @@ function Cropped_Images_Bk=A4_El_AFM_masked(Cropped_Images,AFM_height_IO,secondM
     close(fh)
     % substitutes to the raw cropped date the Height with no BK
     Cropped_Images_Bk=Cropped_Images;
-    Cropped_Images_Bk(strcmp({Cropped_Images_Bk.Channel_name},'Height (measured)')).AFM_image=AFM_noBk;
+    Cropped_Images_Bk(strcmp([Cropped_Images_Bk.Channel_name],'Height (measured)')).AFM_image=AFM_noBk;
 end
     
 

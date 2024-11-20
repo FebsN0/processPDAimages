@@ -109,7 +109,8 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     x_scan_pixelsAllScans=zeros(1,numFiles);
     alphaAllScans=zeros(1,numFiles);
     setpointN=zeros(1,numFiles);
-   
+    
+
     for i=1:numFiles
         if numFiles>1
             fprintf('Processing the file %d over %d\n',i,numFiles)
@@ -121,23 +122,30 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
         % calculates alpha, based on the pub), it returns the location of the file.
         [data,metaData]=A1_open_JPK(fullName);
         
-        % if the vertical deflection is expressed in volts, then convert into force
+        % after doing a lot of investigations, it was discovered that the vertical force (meaured)
+        % is actually not correct because it exclude the baseline correction, therefore vertical deflection is
+        % exactly what the detector reads, excluding the baseline correction. So baseline correction needs
+        % to be applied also in vertical deflection         
         for j=1:length(data)
-            if strcmp(data(j).Channel_name,'Vertical Deflection') 
-                if strcmp(data(j).Signal_type,'volts')
+            if strcmp(data(j).Channel_name,'Vertical Deflection')
+                % if the vertical deflection is expressed in volts, then convert into force
+                % (first versions of experimentPlanner didnt allowed working in newton units as setpoint)
+                if strcmp(data(j).Signal_type,'Volt_V')
                     fprintf('\t Original Vertical Deflection in Volts ==> converted to Force unit\n')
                     raw_data_VD_volt=data(j).AFM_image;
-                    raw_data_VD_force = raw_data_VD_volt*metaData.Vertical_kn*metaData.Vertical_Sn;     % F (N) = V (V) * Sn (m/V) * Kn (N/m)
-                    % ADJUST THE RAW VERTICAL FORCE WITH THE BASELINE
-                    %%%%%%%%%%%%%%%raw_data_VD_force = raw_data_VD_force + metaData.B
+                    raw_data_VD_force = raw_data_VD_volt*metaData.Vertical_kn*metaData.Vertical_Sn;     % F (N) = V (V) * Sn (m/V) * Kn (N/m)       
                     data(j).AFM_image = raw_data_VD_force;
-                    data(j).Signal_type = 'force';
+                    data(j).Signal_type = 'Force_N';
                 end
+                %%%%%%%%%%%%%%%%%%% NOT SURE IF IT WORK IN CASE OF VERTICAL DEFLE IN V
+                % ADJUST THE RAW VERTICAL FORCE WITH THE BASELINE
+                %%%%%%%%%%%%%%%raw_data_VD_force = raw_data_VD_force + metaData.B
                 data(j).AFM_image = data(j).AFM_image - metaData.Baseline_N;
             end
         end
         
-        % extract the setpoint information from metadata. In case of single scan, then put manually
+        % extract the setpoint information from metadata. In case of single scan in which setpoint
+        % has changed manually (which is technically wrong), then put manually
         if numFiles> 1
             setpointN(i)=metaData.SetP_N;
         else
@@ -180,9 +188,9 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
         %                           which it is done % when a new experiment is started, but not
         %                           when different sections from the single experiment are done  
         alphaAllScans(i)=allScansMetadata{i}.Alpha;     
-        y_OriginAllScans(i)=allScansMetadata{i}.y_Origin;
-        y_scan_lengthAllScans(i)=allScansMetadata{i}.y_scan_length;
-        x_scan_lengthAllScans(i)=allScansMetadata{i}.x_scan_length;
+        y_OriginAllScans(i)=allScansMetadata{i}.y_Origin_m;
+        y_scan_lengthAllScans(i)=allScansMetadata{i}.y_scan_length_m;
+        x_scan_lengthAllScans(i)=allScansMetadata{i}.x_scan_length_m;
         y_scan_pixelsAllScans(i)=allScansMetadata{i}.y_scan_pixels;
         x_scan_pixelsAllScans(i)=allScansMetadata{i}.x_scan_pixels;  
     end
@@ -230,7 +238,7 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     metaDataOrdered.y_scan_pixels= sum(y_scan_pixelsAllScans);
 
     % Further checks: the total scan area should be a square in term of um and pixels
-    ratioLength=metaDataOrdered.x_scan_length\metaDataOrdered.y_scan_length;
+    ratioLength=metaDataOrdered.x_scan_length_m\metaDataOrdered.y_scan_length_m;
     ratioPixel=round(metaDataOrdered.y_scan_pixels\metaDataOrdered.x_scan_pixels,1);
     if ratioLength ~= 1 || ratioPixel ~= 1
         warning('ratioLength: %. x lengths and/or x pixels is not the same as well as the y length and/or y pixels!!')

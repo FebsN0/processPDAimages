@@ -1,6 +1,12 @@
         % varargout = return any number of output arguments
 function [varargout]=A1_open_JPK(varargin)
 
+    
+% the python file is assumed to be in a parallel directory to the current
+    mainFolder=fileparts(pwd);
+    pythonFile=sprintf('%s\\pythonCodes\\JPKScanTiffTags.py',mainFolder);
+             
+    
 % This function opens .JPK image files and .JPK-force curves.
 % It is also able to import a number of parameters relative to the hile.
 %
@@ -25,8 +31,10 @@ function [varargout]=A1_open_JPK(varargin)
 %
 % Author updates: Altieri F.
 % University of Tokyo
+% Important implementation: using python to extract metadata
+% run on Command Window "pyversion". If it return nothing, python may be not installed or you dont have the
+% rignt version. Check on the website https://www.mathworks.com/support/requirements/python-compatibility.html
 % 
-% Last update 17.June.2024
 
 
 %%%%%%%%%%%%%%%%%%% UPDATES %%%%%%%%%%%%%%%%%%%%%
@@ -40,6 +48,10 @@ function [varargout]=A1_open_JPK(varargin)
     flag_manual_select=1;
     valid_extensions={'.jpk';'.jpk-force';'.jpk-force-map'};
     valid_extensions_getfile={'*.jpk';'*.jpk-force';'*.jpk-force-map'};
+    % when opening .jpk file using tiff to extract metadata, appear useless warning. The following two lines
+    % suppress such a warning
+    %MSGID='imageio:tiffutils:libtiffWarning';
+    %warning('off', MSGID)
 
     %if open_JPK is run with an input file
     if(~isempty(varargin))
@@ -72,10 +84,13 @@ function [varargout]=A1_open_JPK(varargin)
             end
         end
     end
+    
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%--------------- PROCESS .JPK IMAGE DATA ---------------%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     if(strcmp(extension,valid_extensions{1,1}))
+        % the two commands (iminfo and Tiff) are very similar: Tiff is necessary to read properly specific data.
         if(~isempty(varargin))
             file_info=imfinfo(varargin{1,1});
         else
@@ -100,205 +115,121 @@ function [varargout]=A1_open_JPK(varargin)
         setappdata(wb,'canceling',0);
     
         for i=1:number_of_images
-            
-            if(i==1) %the first row of file_info contains metadata information
-                %update the wait bar dialog box
-                waitbar(i/number_of_images,wb,sprintf('Metadata of Image'));
-                %UnknownTags is another struct which contains several information
-                % Find such info by finding the index of a specific ID
-                Type=(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32816)).Value);              %scan mode (ie. contact or ac mode)
-                x_Origin=(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32832)).Value);          %origin axis
-                y_Origin=(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32833)).Value);
-                x_scan_length=(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32834)).Value);     %size of the image (ie 50um)
-                y_scan_length=(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32835)).Value);
-                x_scan_pixels=(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32838)).Value);     %resolution (512)
-                y_scan_pixels=(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32839)).Value);
-                scanangle=rad2deg(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32836)).Value);  %direction of scanning
-    
-                if(strcmp(Type,'contact'))
-                    % the 32830 ID contains further information in string format
-                    % ==> split and extract specific info into cell array
-                    flag_data=strsplit(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32830)).Value)';
-                    % Apply function to each cell in cell array
-                    %   - [@function to apply], targetCellArray ==> in this case check if the flag_data
-                    %       contains information regarding i- and p- gain and take the index where it locates     
-                    flag=find(~cellfun(@isempty,strfind(flag_data,'setpoint-feedback-settings.i-gain')));
-                    % conver to number
-                    I_Gain=cellfun(@str2double, flag_data(flag+2,1));
-                    flag=find(~cellfun(@isempty,strfind(flag_data,'setpoint-feedback-settings.p-gain')));
-                    P_Gain=cellfun(@str2double, flag_data(flag+2,1));
-                    % ID 33028 contains LinearScaling in meter (distance)
-                    % ID 32980 contains LinearScaling in volts (volts)
-                    % vertical sensitivity (m/V)
-                    Vertical_Sn=(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==33028)).Value)/(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32980)).Value);
-                    % ID 33076 contains LinearScaling in newton (Force)
-                    % ID 33028 contains LinearScaling in meter (distance)
-                    % vertical stiffness (N/m)
-                    Vertical_kn=(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==33076)).Value)/(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==33028)).Value);
-                    %calculate Alpha. 14.75 is from linear fitting of the Ortuso and Sugihara work about wedge method calibration
-                    Alpha=Vertical_Sn*Vertical_kn*14.75; % For further detail please refer to aforementioned publication
-        
-                    % Baseline correction allow to correct the setpoint according on the value of measured
-                    % vertical deflection at the approaching moment (unavoidable presence of interaction
-                    % between the tip and the sample)
-                    if(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32820)).Value==1)
-                        Baseline_V = file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32821)).Value;
-                        SetP_V_Raw = file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32819)).Value;
-                        SetP_V = SetP_V_Raw - Baseline_V - file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32980)).Value;
-                        Bline_adjust='Yes';
-                    else
-                        Baseline_V = 0;
-                        SetP_V_Raw = file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32819)).Value;
-                        SetP_V = SetP_V_Raw - Baseline_V - file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32980)).Value;
-                        Bline_adjust='No';
-                    end
-                    
-                    Baseline_N = Baseline_V*Vertical_kn*Vertical_Sn;
-                    SetP_m=SetP_V*Vertical_Sn               +(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==33029)).Value); % Setpoint in meters [m]
-                    SetP_N=SetP_V*Vertical_kn*Vertical_Sn   +(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==33077)).Value); % Setpoint in force [N]
+            %update the wait bar dialog box
+            waitbar(i/number_of_images,wb,sprintf('Loading Channel %.0f of %.0f',i,number_of_images));
+             
+            if i==1
+            % execute python file to extract metadata when i=1 ==> metadata stored in page 0 of the tiff file
 
-                    % save every important information from Metadata
-                    Details_Img=struct(...
-                        'Type', Type,...
-                        'x_Origin', x_Origin,...
-                        'y_Origin', y_Origin,...
-                        'Scanangle', scanangle,...
-                        'x_scan_length', x_scan_length,...
-                        'y_scan_length', y_scan_length,...
-                        'x_scan_pixels', x_scan_pixels,...
-                        'y_scan_pixels', y_scan_pixels,...
-                        'I_Gain', I_Gain,...
-                        'P_Gain', P_Gain,...
-                        'Baseline_V', Baseline_V,...
-                        'Baseline_N', Baseline_N,...
-                        'SetP_V', SetP_V,...
-                        'SetP_m', SetP_m,...
-                        'SetP_N', SetP_N,...
-                        'Vertical_Sn', Vertical_Sn,...
-                        'Vertical_kn', Vertical_kn,...
-                        'Alpha', Alpha);
-                    
-                elseif(strcmp(Type,'ac'))
-                    
-                    I_Gain=abs((file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32818)).Value));
-                    
-                    Reference_Amplitude=(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32821)).Value);
-                    Set_Amplitude=(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32822)).Value);
-                    Oscillation_Freq=(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32823)).Value);
-                    Reference_Phase_shift=(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32824)).Value);
-                    Scan_Rate=(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32841)).Value);
-                    
-                    Vertical_Sn=(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==33028)).Value)/(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32980)).Value);
-                    Vertical_kn=(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==33076)).Value)/(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==33028)).Value);
-                    
-                    Details_Img=struct(...
-                        'Type', Type,...
-                        'x_Origin', x_Origin,...
-                        'y_Origin', y_Origin,...
-                        'Scanangle', scanangle,...
-                        'x_scan_length', x_scan_length,...
-                        'y_scan_length', y_scan_length,...
-                        'x_scan_pixels', x_scan_pixels,...
-                        'y_scan_pixels', y_scan_pixels,...
-                        'I_Gain', I_Gain,...
-                        'Reference_Amp', Reference_Amplitude,...
-                        'Set_Amplitude', Set_Amplitude,...
-                        'Oscillation_Freq', Oscillation_Freq,...
-                        'Regerence_Ph_Shift', Reference_Phase_shift,...
-                        'Scan_Rate', Scan_Rate,...
-                        'Vertical_Sn', Vertical_Sn,...
-                        'Vertical_kn', Vertical_kn);
-                    
-                else
-                    error('Code not valid for type of AFM imaging...')
+                % REASON: The previous A1_open_JPK.m version uses fixed tag ID’s to read the available calibration slots!
+                % like 
+                % """
+                % Type=(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32816)).Value); 
+                % """
+                % However, Joerg Barner from JPK support said that it is dangerous use this approach because there is no guaranty
+                % that all slots are available (depending on available calibration) or the slots are given always in the same order
+        
+                % For example, the Tag 32896 is the number of available slots reported after that line (give a look
+                % into file_info to better understand) like ['raw','volts', 'distance','force'].
+                % A potential problem is that there is the risk that are not in the same order. For example, it can be
+                % like ['volts','force','raw','distance'] INSTEAD of the order previously reported
+        
+                % you need to read all of them, then you need to find the right slots (slot-name) ‘volts’, ‘distance’
+                % and ‘force’ to compute the vertical calibration parameters
+                % Used the python script instead of tifffile MATLAB library because it doesn't properly find HEX tag
+                % IDs. Also, the original python code has been kindly provided by Joerg, assuring accurate results.
+                % proper updates are made: the original version extract only metadata. The new version extract and
+                % properly convert the data for each channel type
+                % convert python dictionary object into matlab dictionary. To access matlab dictionary, use metadata("nameKey")            
+                metadata = dictionary(pyrunfile(sprintf("%s '%s' %d'",pythonFile,complete_path_to_afm_file,i),"metadata")); 
+                % for pixels it require more handling than other parameters
+                x_scan_pixels= metadata("x_scan_pixels"); x_scan_pixels=double(x_scan_pixels{1});
+                y_scan_pixels= metadata("y_scan_pixels"); y_scan_pixels=double(y_scan_pixels{1});
+                % scan mode (ie. contact or ac mode)
+                Type=string(metadata("FeedbackMode"));
+                % vertical sensitivity (m/V)
+                Vertical_Sn=cell2mat(metadata("sensitivity_m_V"));
+                % vertical stiffness (N/m)
+                Vertical_kn=cell2mat(metadata("springConstant_N_m"));
+                %calculate Alpha. 14.75 is from linear fitting of the Ortuso and Sugihara work about wedge method calibration
+                Alpha=Vertical_Sn*Vertical_kn*14.75; % For further detail please refer to aforementioned publication
+                % save every important information from Metadata. Same for AC and Contact mode
+
+                Details_Img=struct( ...
+                    'Type', Type,...
+                    'Scan_Rate_Hz',     cell2mat(metadata("scan_rate")),...
+                    'x_Origin_m',       cell2mat(metadata("x_Origin")),...
+                    'y_Origin_m',       cell2mat(metadata("y_Origin")),...
+                    'Scanangle_deg',    rad2deg(cell2mat(metadata("scanangle"))),...
+                    'x_scan_length_m',  cell2mat(metadata("x_scan_length")),...
+                    'y_scan_length_m',  cell2mat(metadata("y_scan_length")),...
+                    'x_scan_pixels',    x_scan_pixels,...
+                    'y_scan_pixels',    y_scan_pixels,...
+                    'Vertical_Sn',      Vertical_Sn,...
+                    'Vertical_kn',      Vertical_kn,...
+                    'Alpha',            Alpha,...
+                    'P_Gain',           cell2mat(metadata("P_Gain")),...
+                    'I_Gain',           cell2mat(metadata("I_Gain")));
+                % same properties are unique for some scanning modes, but the following are specific.
+                if strcmp(Type,'contact')
+                    % Activated Baseline correction allow to correct the setpoint according on the value of measured
+                    % vertical deflection at the approaching moment (unavoidable presence of interaction
+                    % between the tip and the sample). Here there is no check if correction was enabled, because it is
+                    % already processed in the python script. So, if correction was disabled, baselineVolts = 0     
+                    absoluteSetpoint_V      = cell2mat(metadata("AbsoluteSetpoint"));
+                    baseline_V              = cell2mat(metadata("BaselineV"));
+                    EffectiveSetpoint_V     = absoluteSetpoint_V - baseline_V;
+                    % baseline and setpoint in Newton
+                    baseline_N              = cell2mat(metadata("BaselineForce_N")); absoluteSetpoint_N = cell2mat(metadata("absoluteSetpointForce_N"));
+                    EffectiveSetpoint_N     = absoluteSetpoint_N - baseline_N;
+                    % save the data
+                    Details_Img.baselineAdjust  = cell2mat(metadata("BaselineAdjust"));
+                    Details_Img.Baseline_V      = baseline_V;
+                    Details_Img.Baseline_N      = baseline_N;
+                    Details_Img.SetP_V          = EffectiveSetpoint_V;
+                    Details_Img.SetP_N          = EffectiveSetpoint_N;
+                % in case of AC-mode
+                else       
+                    Details_Img.Reference_Amp       = cell2mat(metadata("Reference_Amplitude"));
+                    Details_Img.Set_Amplitude       = cell2mat(metadata("Set_Amplitude"));
+                    Details_Img.Oscillation_Freq    = cell2mat(metadata("Oscillation_Freq"));
+                    Details_Img.Regerence_Ph_Shift  = cell2mat(metadata("Reference_Phase_shift"));
                 end
-                
-                
+            % extract data from each channel
             else
                 % start processing the data
-                waitbar(i/number_of_images,wb,sprintf('Loading Channel %.0f of %.0f',i,number_of_images));
-                
-                % extract the name of the channel
-                Channel_Name=(file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32850)).Value);
-                % extract and put in cell array more details
-                strsp=(strsplit((file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32851)).Value)))';
-                % check if the scan is retrace or trace and make a flag
-                for k=1:size(strsp,1)
-                    if(strcmp(strsp{k,1},'retrace')==1)
-                        if(strcmp(strsp{k+2,1},'true'))
-                            trace_type_flag='ReTrace';
-                        else
-                            trace_type_flag='Trace';
-                        end
-                        break
-                    end
-                end
-                
-                % in order to take the z values matrix of each image, take the
-                % coefficients to fix the z values
-                type_of_ch=file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32897)).Value;
-                               
-                if(strcmp(type_of_ch,'nominal')||(strcmp(type_of_ch,'voltsamplitude')))
-                    m_ID=33028;
-                    off_ID=33029;
-                elseif ((strcmp(type_of_ch,'force'))||(strcmp(type_of_ch,'calibrated'))||(strcmp(type_of_ch,'distanceamplitude')))
-                    m_ID=33076;
-                    off_ID=33077;
-                elseif(strcmp(type_of_ch,'volts'))
-                    typpe_of_ch_det=file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==32848)).Value;
-                    if(strcmp(typpe_of_ch_det,'capacitiveSensorXPosition'))||(strcmp(typpe_of_ch_det,'servoDacY'))||(strcmp(typpe_of_ch_det,'servoDacX'))||(strcmp(typpe_of_ch_det,'capacitiveSensorYPosition'))
-                        m_ID=33028;
-                        off_ID=33029;
-                    else
-                        m_ID=32980;
-                        off_ID=32981;
-                    end
-                else
-                    m_ID=32980;
-                    off_ID=32981;
-                end  
-                multiplyer=file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==m_ID)).Value;
-                offset=file_info(i).UnknownTags(find([file_info(i).UnknownTags.ID]==off_ID)).Value;
-                %extract image data (Z values) with imgread
-                if(~strcmp(Channel_Name,'Vertical Deflection'))
-                    afm_image=((double(imread(complete_path_to_afm_file,i))*multiplyer))+offset;
-                else
-                    if(strcmp(Bline_adjust,'No'))
-                        afm_image=((double(imread(complete_path_to_afm_file,i))*multiplyer))+offset;
-                    else
-                        %Details_Img.Baseline_N=(Baseline_V*multiplyer)+offset;
-                        afm_image=((double(imread(complete_path_to_afm_file,i))*multiplyer))+offset;
-                    end
-                end
-                
+                dataChannel = dictionary(pyrunfile(sprintf("%s '%s' %d'",pythonFile,complete_path_to_afm_file,i),"dataChannel")); 
+                multiplyer  = cell2mat(dataChannel("multiplier"));
+                offset      = cell2mat(dataChannel("offset"));
+                %extract image data (Z values) with imread and properly scale 
+                afm_image=((double(imread(complete_path_to_afm_file,i))*multiplyer))+offset;
                 %organize the all the important data into a struct var
                 Image(i-1)=struct(...
-                    'Channel_name',...
-                    Channel_Name,...
-                    'Signal_type',...
-                    type_of_ch,...
-                    'Trace_type',...
-                    trace_type_flag,...
-                    'Raw_afm_image',...
-                    imread(complete_path_to_afm_file,i),...
-                    'Scale_factor',...
-                    multiplyer,...
-                    'Offset',...
-                    offset,...
-                    'AFM_image',...
-                    afm_image); %#ok<AGROW>
+                    'Channel_name',     string(dataChannel("Channel_Name")), ...
+                    'Trace_type',       string(dataChannel("trace_type_flag")),...
+                    'Raw_afm_image',    imread(complete_path_to_afm_file,i),...
+                    'Scale_factor',     multiplyer,...
+                    'Offset',           offset,...
+                    'Signal_type',      string(dataChannel("type_of_ch")),...
+                    'AFM_image',        afm_image);
             end
             
-            %if cancel is clicked, stop and delete dialog
+            %if cancel is clicked during the data extraction, stop and delete dialog
             if(exist('wb','var'))
                 if getappdata(wb,'canceling')
-                    delete (wb)
-                    break
+                    delete(wb)
+                    error('Stopped the data extraction')
                 end
             end
         end
-        delete (wb)
-        [~,index] = sortrows({Image.Channel_name}.'); Image = Image(index); clear index
+        
+        delete(wb)
+        % re organize the struct in alphabetic order. Transform 1x10 cell array into 1x10 string array and
+        % transpose otherwise sortrows doesnt correctly read
+        [~,index]=sortrows(string({Image.Channel_name})');
+        
+
+        Image = Image(index); clear index
         % save the output image data. NOTE: the data is already expressed in the correct unit.
         % I.E. lateral deflection data is expressed in Volt
         varargout{1}=Image;
@@ -314,7 +245,7 @@ function [varargout]=A1_open_JPK(varargin)
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%%%%%%%%%%%%%%%%%%%%%----------- PROCESS .JPK-FORCE FORCE CURVE DATA -----------%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    
+    % Never modified but it is my goal to fix it
     elseif(strcmp(extension,valid_extensions{2,1}))
         %create directory where the force-curve data locates if doesnt exist 
         [FilePath,FileName,~]=fileparts(complete_path_to_afm_file);
