@@ -3,10 +3,77 @@
 from tifffile import TiffFile
 import sys
 
+def extractSlotsData(tags):
+    # information are stored as tiff tag ID and they are given as hex value
 
-# load the input from MATLAB
+    # feedback channel for 'contact' mode (vDeflection) can have multile calibration
+    # slots (e.g. V, m, N) ==> read all the slots and store into dictionary
+    # ATTENTION!!!!
+    # there is NO GUARANTY that all slots are available (depending on available calibration
+    # and whenever is not available, is defined as "None") or the slots are given always
+    # in the same order (usually "raw -> volts -> distance -> force", but it may be scrambled),
+    
+    # necessary tags for the slot (the origin tag ID is 0x8090) are offseted relative to
+    # this origin by n * 0x30 for each cycle, n is updated up to numSlots
+    numSlots = tags.get(0x8080).value
+    slots = {}
+    # to properly convert raw pixel into desired unit pixel of each channel
+    for n in range (numSlots):
+        slotNameTag          = tags.get(0x8090 + n * 0x30)
+        encoderNameTag       = tags.get(0x80A1 + n * 0x30)       
+        encoderUnitTag       = tags.get(0x80A2 + n * 0x30)
+        scalingTypeTag       = tags.get(0x80A3 + n * 0x30)
+    # the scaling multiplyer and offet are used for converting raw integer 
+    # pixel values (image channels) into physical units like [V], [m], [N]...
+    # NOTE: scalingTypeTag = 'None' | 'NullScaling' (raw) | 'LinearScaling' (volts, etc)
+    #           if scalingTypeTag = 'LinearScaling' ==> value[unit] = raw * multiplier + offset,
+    # otherwise if scalingTypeTag = 'NullScaling'   ==> value[unit] = raw
+        scalingMultiplyerTag = tags.get(0x80A4 + n * 0x30)  
+        scalingOffsetTag     = tags.get(0x80A5 + n * 0x30)
+
+        slotName = slotNameTag.value
+        # some tags might have a 'None' value which needs to be handled, otherwise will results in error
+        if encoderNameTag:
+            encoderName = encoderNameTag.value
+        else:
+            encoderName = 'None'        # if empty
+        if encoderUnitTag:
+            encoderUnit = encoderUnitTag.value
+        else:
+            encoderUnit = 'None'        # if empty
+        if scalingTypeTag:
+            scalingType = scalingTypeTag.value
+        else:
+            scalingType = 'None'        # if empty
+        # extract multiplier and offset respectively
+        if scalingMultiplyerTag:
+            scalingMultiplyer = scalingMultiplyerTag.value
+        else:
+            scalingMultiplyer = 1.      # if empty or raw 
+    
+        if scalingOffsetTag:
+            scalingOffset = scalingOffsetTag.value
+        else:
+            scalingOffset = 0.          # if empty or raw
+
+        # for each slot, append to the existing slots dictionary object which store all slots
+        slots.update({
+            slotName: {
+                'slotName'          : slotName,
+                'encoderName'       : encoderName,
+                'encoderUnit'       : encoderUnit,
+                'scalingType'       : scalingType,
+                'scalingMultiplyer' : scalingMultiplyer,
+                'scalingOffset'     : scalingOffset
+            }
+        })
+    return slots
+
+
+# upload the inputs from MATLAB
 tiffFile = TiffFile(sys.argv[1])
 pageIdx=sys.argv[2]
+pageIdx=int(pageIdx.strip("'"))
 
 if pageIdx == 1:
     # calibration slots of feedback channel (contact mode -> vDelfection) 
@@ -55,73 +122,11 @@ if pageIdx == 1:
         'BaselineV'         : baselineVolts,
     }
     
-    # feedback channel for 'contact' mode (vDeflection)
-    # can have multile calibration slots (e.g. V, m, N)
-    # read all slots into dictionary
-    # ATTENTION!!!!
-    # there is no guaranty that all slots are available (depending on available calibration)
-    # or the slots are given always in the same order
+    # extract other information to extrapolate vertical parameters to convert volt into force
+    slots=extractSlotsData(tags)
     
-    numSlots = tags.get(0x8080).value # previously known as 32896
-    slots = {}
-    # for each slot (usually "raw -> volts -> distance -> force"), extract the values needed
-    # to properly convert raw pixel into desired unit pixel of each channel
-    for n in range (numSlots):
-        slot = {}
-    
-        # necessary tags for the slot the origin tag ID is 0x8090, all slots
-        # are offseted relative to this origin by n * 0x30
-        # for each cycle, n is updated up to numSlots
-        slotNameTag = tags.get(0x8090 + n * 0x30)
-        encoderNameTag = tags.get(0x80A1 + n * 0x30)
-        encoderUnitTag = tags.get(0x80A2 + n * 0x30)
-        scalingTypeTag = tags.get(0x80A3 + n * 0x30)
-        scalingMultiplyerTag = tags.get(0x80A4 + n * 0x30)
-        scalingOffsetTag = tags.get(0x80A5 + n * 0x30)
-    
-        # the scaling multiplyer and offet are used for converting raw integer 
-        # pixel values (image channels) into physical units like [V], [m], [N]...
-        # value[unit] = raw * multiplier + offset
-    
-        # read the final tag values
-        # some tags might have a 'None' value which needs to be handled 
-        slotName = slotNameTag.value
-        encoderName = encoderNameTag.value
-        if encoderUnitTag:  
-            encoderUnit = encoderUnitTag.value
-        else:                   # if empty
-            encoderUnit = 'None'
-        
-        # NullScaling OR LinearScaling
-        scalingType = scalingTypeTag.value
-        # extract multiplier and offset respectively
-        # if None => value = 1 and 0
-        # else    => value = multiplier AND offset
-        if scalingMultiplyerTag:
-            scalingMultiplyer = scalingMultiplyerTag.value
-        else:
-            scalingMultiplyer = 1.
-    
-        if scalingOffsetTag:
-            scalingOffset = scalingOffsetTag.value
-        else:
-            scalingOffset = 0.
-    
-        # append slot to 'slots' dictionary for easier
-        # handling
-        slots.update({
-            slotName: {
-                'slotName' : slotName,
-                'encoderName' : encoderName,
-                'encoderUnit' : encoderUnit,
-                'scalingType' : scalingType,
-                'scalingMultiplyer' : scalingMultiplyer,
-                'scalingOffset' : scalingOffset
-            }
-        })
-    
-    
-    # find slots 'distance' and 'force' in the 'slots' dictionary
+    # extract the single slot dictionary 'distance' and 'force' from the 'slots' dictionary
+    # in case one of them doesnt exist, it will results as 'None'
     slotVolts = slots.get('volts')
     slotDistance = slots.get('distance')
     slotForce = slots.get('force')
@@ -129,7 +134,9 @@ if pageIdx == 1:
     # recompute the sensitivity [m/v] and spring constant [N/m] as a 
     # ratio of the scaling multipliers V -> Distance and Distance -> Force
     # the scaling offset is not needed to be taken into account!!!!
-    if slotVolts and slotDistance and slotForce:
+    # is one the dictionary is missing, then it is not possible to extraxt vertical parameters.
+    # it is very unlikely that this happens.. but still...
+    if slotVolts  and slotDistance and slotForce:
     
         sensitivity = slotDistance.get('scalingMultiplyer') / slotVolts.get('scalingMultiplyer')
         springConstant = slotForce.get('scalingMultiplyer') / slotDistance.get('scalingMultiplyer')
@@ -145,14 +152,19 @@ if pageIdx == 1:
             'BaselineForce_N' : baselineForce,
             'relativeSetpointForce_N' : relativeSetpointForce
         })
+    else:
+        print("One of the slots is missing, it is not possible to extract vertical parameters!")
 else:
     # each page contains data for specific channel
     # es. lateralDeflection in Trace mode is 2nd page
-    # es. lateralDeflection in ReTrace mode is 3rd page
+    # es. vaerticallDeflection in ReTrace mode is 3rd page
+
     pageI = tiffFile.pages.get(pageIdx-1)
     tags = pageI.tags
     # extract basic info of the i-channel
-    ChannelFancyName   = tags.get(0x8052).value         # es Lateral Deflection
+    # extract the name of the channel (es Lateral Deflection)
+    ChannelFancyName   = tags.get(0x8052).value
+    # check if the scan is retrace or trace and make a flag
     Channel_retrace    = bool(tags.get(0x8051).value)   # es True x Retrace or False x Trace
     if Channel_retrace:
         trace_type_flag = 'Trace'
@@ -163,5 +175,50 @@ else:
         'Channel_Name' : ChannelFancyName,
         'trace_type_flag' : trace_type_flag
     }
+    # extract multiplier and offset to convert the image into the proper unit
+    slots=extractSlotsData(tags)
+    # extract the single slot dictionary 'distance' and 'force' from the 'slots' dictionary.
+    # in case one of them doesnt exist, it will results as 'None'
+    slotRaw = slots.get('raw')
+    slotVolts = slots.get('volts')
+    slotDistance = slots.get('distance')
+    slotForce = slots.get('force')
+    slotNominal = slots.get('nominal')          # x Height (measured) channel
+    slotCalibrated = slots.get('calibrated')    # x Height            channel
+    
+    if slotForce and slotDistance and slotVolts:
+        if slotForce.get("scalingType") == "LinearScaling":
+            multiplier =  slotForce.get("scalingMultiplyer")
+            offset =      slotForce.get("scalingOffset")
+            type_of_ch = 'Force_N'
+        elif slotDistance.get("scalingType") == "LinearScaling":
+            multiplier =  slotDistance.get("scalingMultiplyer")
+            offset =      slotDistance.get("scalingOffset")
+            type_of_ch = 'Distance_m'
+        elif slotVolts.get("scalingType") == "LinearScaling":
+            multiplier =  slotVolts.get("scalingMultiplyer")
+            offset =      slotVolts.get("scalingOffset")
+            type_of_ch = 'Volt_V'
+        else:
+            print('No one slot is available to convert raw data!')
+            multiplier = 1
+            offset = 0
+            type_of_ch = 'Raw'
+    elif slotCalibrated and ChannelFancyName == "Height":
+        type_of_ch = 'Calibrated'
+        multiplier = slotCalibrated.get('scalingMultiplyer')
+        offset =   slotCalibrated.get('scalingOffset')
+    
+    elif slotNominal and ChannelFancyName == "Height (measured)":
+            type_of_ch = 'Nomimal'
+            multiplier = slotNominal.get('scalingMultiplyer')
+            offset =   slotNominal.get('scalingOffset')
+    else:
+        raise ValueError('No available slots (even raw pixel), something went wrong in the experiment!')
 
-        
+    
+    dataChannel.update({
+        'multiplier' : multiplier,
+        'offset'     : offset,
+        'type_of_ch' : type_of_ch
+    })
