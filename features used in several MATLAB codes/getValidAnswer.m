@@ -1,28 +1,26 @@
-function user_choice = getValidAnswer(question, title, options)
-    % old version        
-    %while true
-        %userInput = input([question, ' '], 's');
-        % if any(strcmpi(userInput, possibleAnswers))
-        %     answer = userInput;
-        %     break;
-        % else
-        %     fprintf('\nInvalid answer. Please try again.\n\n');
-        % end
-    %end
-
+function user_choice = getValidAnswer(question, title, options, default_choice)
+    
+    % Manage the default option. If not specified, then first option is default
+    if nargin < 4 || isempty(default_choice)
+        default_choice = 1; 
+    end
+    if ~isnumeric(default_choice) || default_choice < 1 || default_choice > numel(options) || ~ismember(options{default_choice},options)
+        error('Invalid default choice!.');
+    end
+    
     % Default dialog box size
     base_width = 450; button_height = 40; spacing = 10;
     % Check the longest string in the question and how many rows
     max_question_length = max(cellfun(@length, strsplit(question, '\n')));
     num_lines_question = length(strsplit(question, '\n'));
     
-        % if options is just Yes and No, then simple dialog box
+    % if options is just Yes and No, then simple dialog box
     if length(options) == 2 && any(strcmpi(options, 'yes') | strcmpi(options, 'y')) && any(strcmpi(options, 'no') | strcmpi(options, 'n'))
         flagYesNo=1;
         max_option_length = 3;
         num_lines_options = 1;
     else
-       % In case of option not containing Yes and No, check how many options rows. Since the options may contains \n, check the length better
+    % check how many options rows. Since the options may contains \n, check the length better
         flagYesNo=0;
         num_lines_options = length(options);
         num_lines_options_split = 0;
@@ -50,28 +48,10 @@ function user_choice = getValidAnswer(question, title, options)
     sizeRowOptions                  =  num_lines_options*FontsizeOptions;
     sizeRowDistanceBetweenOptions   = (num_lines_options)* (button_height + spacing);
     sizeRowQuestion                 = num_lines_question*FontsizeQuestion;
-    
-    dialog_height = (sizeRowQuestion + sizeRowOptions + sizeRowDistanceBetweenOptions);
-    
-    % if flagYesNo
-    %     sizeRowQuestionOptions = 50;
-    %     dialog_height = sizeRowQuestionOptions + sizeRowDistanceBetweenOptions;
-    % else
-    %     if num_lines_options == 2 && num_lines_question <= 1 % minimal condition
-    %         sizeRowQuestionOptions = 50;
-    %     elseif num_lines_options == 2 && num_lines_question == 2
-    %         sizeRowQuestionOptions = 70;
-    %     else
-    %         sizeRowQuestionOptions = sizeRowQuestion+sizeRowOptions;
-    %     end
-    %     dialog_height = sizeRowQuestionOptions + sizeRowDistanceBetweenOptions);
-    % end
-    % Calc width based on length of every texts
-    dialog_width = max(base_width, FontsizeQuestion * max_length / 1.4);
-    
     % Calc height based on number of options. If too small, than take the base_height.
-   
-    
+    dialog_height = (sizeRowQuestion + sizeRowOptions + sizeRowDistanceBetweenOptions);
+    dialog_width = max(base_width, FontsizeQuestion * max_length / 1.4);
+
     % Locate the dialog box in the center
     screenSize = get(0, 'ScreenSize');
     screen_width = screenSize(3);
@@ -79,38 +59,49 @@ function user_choice = getValidAnswer(question, title, options)
     dialog_x = (screen_width - dialog_width) / 2;
     dialog_y = (screen_height - dialog_height) / 2;
         
-    % Open dialog box
+    % Open dialog box and associate the enter button
     dialog_fig = figure('Name', title, 'NumberTitle', 'off', 'MenuBar', 'none', ...
         'ToolBar', 'none', 'Resize', 'off', 'Position', [dialog_x, dialog_y, dialog_width, dialog_height*1.3], ...
-        'WindowStyle', 'modal');
-    
+        'WindowStyle', 'modal','KeyPressFcn', @keyPressCallback);
 
     % Insert the question in the dialog box
     textHeight = sizeRowQuestion*2;
     textWidth = dialog_width - 2*spacing;
     fromLeft = spacing;
     fromBottom = dialog_height*1.3 -(spacing + textHeight);
-    
     uicontrol('Style', 'text', 'Position', [fromLeft, fromBottom, textWidth , textHeight], ...
         'String', question, 'FontSize', FontsizeQuestion, 'HorizontalAlignment', 'center','ForegroundColor', 'red');
-    
+
+    % store the user choice
     user_choice = 0;
-    % buttons Callback
+
+    % create the Button Callback function
     function buttonCallback(choice)
         user_choice = choice;
         uiresume(dialog_fig);
     end
 
+    % create the Enter keyboard button Callback function
+    function keyPressCallback(~, event)
+        if strcmp(event.Key, 'return') || strcmp(event.Key, 'enter')
+            buttonCallback(default_choice);
+        end
+    end
+
+    % create object for each button
+    button_handles = gobjects(1, numel(options));
     if flagYesNo
         % fixed in y, moving in x
         button_start_y = 15;
         opts = {'Yes','No'};
         for i=1:2
          % Name button = first char of the given option ( 1) bla bla ==> 1, Yes ==> Y
-            uicontrol('Style', 'pushbutton', 'Position', [dialog_width/3*i-10, button_start_y, 50, 30], ...
-                'String', opts{i}, 'FontSize', FontsizeOptions, 'Callback', @(src, event) buttonCallback(i));
+            button_handles(i)= uicontrol('Style', 'pushbutton',...
+                'Position', [dialog_width/3*i-10, button_start_y, 50, 30], ...
+                'String', opts{i}, 'FontSize', FontsizeOptions,...
+                'Callback', @(src, event) buttonCallback(i));
         end
-    else
+   else
         % pattern to find in the options (especially those having like (<number>)
         % ^expression indicate to check at the beginning of the input text
         pattern = {'^\(\d+\)\s', ...        % (<number>)
@@ -141,15 +132,26 @@ function user_choice = getValidAnswer(question, title, options)
             button_position_y = button_start_y + (button_height+spacing)*(i-1);
             
             % Name button = first char of the given option ( 1) bla bla ==> 1              % cubic button
-            uicontrol('Style', 'pushbutton', 'Position', [spacing, button_position_y, button_height, button_height], ...
-                'String', icon, 'FontSize', FontsizeOptions, 'Callback', @(src, event) buttonCallback(num_lines_options-i+1));
+            button_handles(i)=uicontrol('Style', 'pushbutton',...
+                'Position', [spacing, button_position_y, button_height, button_height], ...
+                'String', icon, 'FontSize', FontsizeOptions,...
+                'Callback', @(src, event) buttonCallback(num_lines_options-i+1));
             
             % insert label of each button with the entire text option
-            uicontrol('Style', 'text', 'Position', [70 + spacing, button_position_y, dialog_width - 80 - 2*spacing, button_height], ...
+            uicontrol('Style', 'text',...
+                'Position', [70 + spacing, button_position_y, dialog_width - 80 - 2*spacing, button_height], ...
                 'String', text, 'FontSize', 12, 'HorizontalAlignment', 'left');
         end
+        % flipped because the for cycle before is inverted
+        button_handles=flip(button_handles);
     end
-    %wait until user make a choice
+    
+    % Make bold the default button
+    set(button_handles(default_choice), 'FontWeight', 'bold');
+
+    % Wait user choice selection before continuing
     uiwait(dialog_fig);
+
+    % close the window
     close(dialog_fig);
 end
