@@ -84,7 +84,7 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     if numFiles > 1
         question= sprintf('Process single sections before assembling (usually no)?');
         options= {'Yes','No'};
-        if getValidAnswer(question,'',options) == 1
+        if getValidAnswer(question,'',options,2) == 1
             flag_processSignleSections=true;
         end
         imgTyp = 'Assembled';

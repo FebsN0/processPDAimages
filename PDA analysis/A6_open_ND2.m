@@ -149,7 +149,7 @@ function [IOI,complete_path_to_afm_file,metadataND2]=A6_open_ND2(varargin)
         globalMetadata = r.getGlobalMetadata();
         
         for s = 1:numSeries
-            fprintf('Reading series #%d\n', s);
+            %fprintf('Reading series #%d\n', s);
             r.setSeries(s - 1);
             pixelType = r.getPixelType();
             bpp = javaMethod('getBytesPerPixel', 'loci.formats.FormatTools', ...

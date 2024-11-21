@@ -214,7 +214,9 @@ function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain,fil
     
     while true
         if ~flagAccuracy
-            answer=getValidAnswer('Fitting AFM Height channel data: which fitting order range use?','',{'Low (1-3)','Medium (1-6)','High (1-9)'});
+            question='Fitting AFM Height channel data: which fitting order range use?';
+            options={'Low (1-3)','Medium (1-6)','High (1-9)'};
+            answer=getValidAnswer(question,'',options);
             switch answer
                 case 1
                     accuracy= 'Low';

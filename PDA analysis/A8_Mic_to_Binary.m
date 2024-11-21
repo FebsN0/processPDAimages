@@ -61,7 +61,7 @@ function varargout=A8_Mic_to_Binary(imageBF_aligned,secondMonitorMain,newFolder,
     
 
     question=sprintf('Performs morphological opening operation?\n(In original code it is always yes, whereas commented in case of the PDCA code');
-    answer=getValidAnswer(question,'',{'Yes','No'});
+    answer=getValidAnswer(question,'',{'Yes','No'},2);
     if answer == 1
         % init a matrix with same imageBF's size
         Im_Neg = zeros(size(reduced_imageBF));

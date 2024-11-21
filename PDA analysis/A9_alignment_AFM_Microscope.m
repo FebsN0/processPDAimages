@@ -110,7 +110,7 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A9
         sprintf('1) Crop manually the BF image'), ...
         sprintf('2) Use a defined margin (%d pixels)?',p.Results.Margin), ... 
         sprintf('3) None')};
-    answerCrop = getValidAnswer(question, '', options);
+    answerCrop = getValidAnswer(question, '', options,2);
 
     if answerCrop == 1
     % crop the right area containing the AFM image, if not, restart
@@ -189,7 +189,7 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A9
         sprintf('(1) Manual method\n Choose which operation (expansion, reduction and rotation) run.'); ...
         sprintf('(2) Automatic method\n Iterative process of expansion, reduction and rotation.'); ...
                 '(3) Stop here the process. The fist cross-correlatin is okay.'};
-    answerMethod=getValidAnswer(question,'',options);
+    answerMethod=getValidAnswer(question,'',options,2);
     close(f1)
 
     % in case the user believe that the first cross correlation is ok

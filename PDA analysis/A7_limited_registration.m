@@ -75,7 +75,8 @@ function [moving_tr]=A7_limited_registration(moved,fixed,newFolder,secondMonitor
         if saveFig
             saveas(f1,sprintf('%s/resultA7_%d_1_comparisonOriginalAndBackgroundSubstracted.tif',newFolder,textResultName))   
         end
-        awnser=getValidAnswer(sprintf('Use the Backgrownd Subtracted Image?\nIf not, it will be used the original BF data'),'',{'Yes','No'});
+        question=sprintf('Use the Backgrownd Subtracted Image?\nIf not, it will be used the original BF data');
+        awnser=getValidAnswer(question,'',{'Yes','No'});
         close(f1)
         if awnser == 1
             if strcmpi(p.Results.Moving,'Yes')
@@ -134,7 +135,7 @@ function [moving_tr]=A7_limited_registration(moved,fixed,newFolder,secondMonitor
         reduced_moved_blurred=imgaussfilt(reduced_moved,sigma);
         % choose if run the automatic binarization or not
         question='Do you want to perform manual (for too dimmered images) or automatic selection?';
-        answer=getValidAnswer(question,'',{'manual','automatic'});
+        answer=getValidAnswer(question,'',{'manual','automatic'},2);
         %%%%%%%%%%%%%%%%%%%%%%%% MANUAL SELECTION %%%%%%%%%%%%%%%%%%%%%%%%
         if answer == 1
             % find the point to transform separately the images fixed and moved into 0/1, similarly to step 3
@@ -177,7 +178,8 @@ function [moving_tr]=A7_limited_registration(moved,fixed,newFolder,secondMonitor
                     subpl2=subplot(122);
                     imshow(originalData)
                     title(sprintf('Result Binarization of %s',text{i}), 'FontSize',16)
-                    satisfied=getValidAnswer('Keep selection or turn again to manual selection?','',{'Continue the manual selection.','Keep current.'});       
+                    question='Keep selection or turn again to manual selection?';
+                    satisfied=getValidAnswer(question,'',{'Continue the manual selection.','Keep current.'});       
                 end
                 %save the result of binarization
                 if saveFig

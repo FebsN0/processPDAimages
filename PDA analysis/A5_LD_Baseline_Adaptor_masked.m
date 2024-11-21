@@ -4,7 +4,7 @@
 % Check manually the processed image afterwards and compare with the AFM VD
 % image!
 
-function [AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,alpha,avg_fc,secondMonitorMain,newFolder,varargin)
+function [AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,alpha,secondMonitorMain,newFolder,varargin)
     % in case of code error, the waitbar won't be removed. So the following command force its closure
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)
@@ -28,13 +28,18 @@ function [AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Image
     Lateral_ReTrace = (AFM_cropped_Images(strcmpi([AFM_cropped_Images.Channel_name],'Lateral Deflection') & strcmpi([AFM_cropped_Images.Trace_type],'ReTrace')).AFM_image);
     vertical_Trace  = (AFM_cropped_Images(strcmpi([AFM_cropped_Images.Channel_name],'Vertical Deflection') & strcmpi([AFM_cropped_Images.Trace_type],'Trace')).AFM_image);
 
+    
+    % the code assumes the experiment was done in hover mode (no retrace data) ==> add automatically something
+    % to check from metadata in hover mode was enabled
+    % if getValidAnswer('Was the HOVER MODE ON?','',{'y','n'})==2
+    % % substract lateral deflection trace from retrace if HOVER MODE UNACTIVATED,
+    %     Lateral_Trace_clean =Lateral_Trace - Lateral_ReTrace;
+    % else
+    %     Lateral_Trace_clean =Lateral_Trace;
+    % end
 
-    if getValidAnswer('Was the HOVER MODE ON?','',{'y','n'})==2
-    % substract lateral deflection trace from retrace if HOVER MODE UNACTIVATED,
-        Lateral_Trace_clean =Lateral_Trace - Lateral_ReTrace;
-    else
-        Lateral_Trace_clean =Lateral_Trace;
-    end
+    Lateral_Trace_clean =Lateral_Trace;
+
     %Subtract the minimum of the image
     Lateral_Trace_clean_shift= Lateral_Trace_clean - min(min(Lateral_Trace_clean));
     % Mask W to cut the PDA from the baseline fitting. Where there is PDA in corrispondece of the mask, then mask the
@@ -183,7 +188,37 @@ function [AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Image
     end
     Lateral_Trace_shift_noBK= Lateral_Trace_clean_shift - Bk_iterative;
 
+    % choose friction coefficients depending on the case (experimental results done in another moment),
+    % or manually put the value
+    question=sprintf('Which method perform to extract the background friction coefficient?');
+    options={ ...
+        sprintf('1) TRCDA (air) = 0.3405'), ...
+        sprintf('2) PCDA  (air)  = 0.2626'), ... 
+        sprintf('3) TRCDA-DMPC (air) = 0.2693'), ...
+        sprintf('4) TRCDA-DOPC (air) = 0.3037'), ...
+        sprintf('5) TRCDA-POPC (air) = 0.2090'), ...
+        sprintf('6) Enter manually a value')};
+    choice = getValidAnswer(question, '', options);
     
+    switch choice
+        case 1, avg_fc = 0.3405;
+        case 2, avg_fc = 0.2626;
+        case 3, avg_fc = 0.2693;
+        case 4, avg_fc = 0.3037;
+        case 5, avg_fc = 0.2090;                     
+        case 6
+            while true
+                avg_fc = str2double(inputdlg('Enter a value for the glass fricction coefficient','',[1 50]));
+                if any(isnan(avg_fc)) || avg_fc <= 0 || avg_fc >= 1
+                    questdlg('Invalid input! Please enter a numeric value','','OK','OK');
+                else
+                    break
+                end
+            end
+    end
+    clear choice question options wb
+
+
     % Friction force = friction coefficient * Normal Force
     Baseline_Friction_Force= vertical_Trace*avg_fc;
 
