@@ -1,48 +1,68 @@
-clc, clear, close all
+% before continuing, install the proper python libraries in a virtual environment and setup matlab to use
+% python in that venv. To check if it is not using the right venv, check with pyenv.
+% If you have like:
+%   Executable: "C:\Users\username\AppData\Local\Programs\Python\Python311\pythonw.exe"
+% You have not setted the venv! Follow the next instruction
+% Source: https://www.mathworks.com/matlabcentral/answers/1750425-python-virtual-environments-with-matlab
+%
+% 1) create virtual environment to save libraries in there to avoid conflicts and activate it
+% from prompt terminal (Be sure to use the right Python version, like python311 or py)
+%   C:\Users\username>  python -m venv nameVirtEnv
+%  ====> nameVirtEnv folder will be created in C:\Users\username
+%   C:\Users\username>  nameVirtEnv\Scripts\activate (name venv appear before C:\Users\username> )
+%       (to exit from venv: deactivate)
+% check if properly created:
+%   where python   ===> C:\Users\user\nameVirtEnv\Scripts\python.exe
+%
+% 2) upgrade pip and Install libraries
+%   (nameVirtEnv) C:\Users\username> py -m pip install upgrade pip
+%   (nameVirtEnv) C:\Users\username> py -m pip --version ====> pip XX.X.X from C:\Users\username\nameVirtEnv\Lib\site-packages\pip (python 3.XX)
+% if something is different, something is wrong. Repeat!
+%   (nameVirtEnv) C:\Users\username> python -m pip install tifffile numpy
+%   (nameVirtEnv) C:\Users\username> py -m pip freeze  ===> list installed libraries
+% 3) Start python and Verify that modules can be loaded in Python. If so, everything is ready
+%   (nameVirtEnv) C:\Users\username> python
+%   >>> import tifffile
+%
+% 4) Find the location of the Python executable in the virtual environment. A symbolic path will be like
+%           "C:\Users\username\nameVirtEnv\Scripts\python.exe"
+%   (nameVirtEnv) C:\Users\username$ python 
+%   >>> import sys 
+%   >>> sys.executable 
+%
+% 5) Setup steps in MATLAB: in command window, set the Python environment to match the location of the Python executable in the virtual environment. 
+%   pyenv('Version', 'C:\Users\username\nameVirtEnv\Scripts\python','ExecutionMode','OutOfProcess') 
+% The Executable contains now the new path to the venv
+%
+% 6) check if everything is properly prepared:
+%   py.importlib.import_module('tifffile') 
+%           ===> ans = Python module with properties: ...
+% AWESOME! EVERYTHING IS READY!
 
+
+clc, clear, close all
+% check python and matlab version https://www.mathworks.com/support/requirements/python-compatibility.html
+vers=version('-release'); pe = pyenv; pe=pe.Version;
+pv1=["2024b","3.9","3.10","3.11","3.12"];
+pv2=["2024a","2023b","3.9", "3.10", "3.11"];
+pv3=["2023a","3.8","3.9","3.10"];
+if  ~(ismember(vers,pv1) && ismember(pe,pv1)) && ~(ismember(vers,pv2) && ismember(pe,pv2)) && ~(ismember(vers,pv3) && ismember(pe,pv3))
+	error("Matlab and Python version not compatible. Check and update")
+end
+clear vers pv* pe
 secondMonitorMain=objInSecondMonitor;
 % upload .jpk files. If more than one and if from same experiment in which setpoint is changed, then assembly.
 [AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM,newFolder,setpoints,vertForceAVG]=A1_openANDassembly_JPK(secondMonitorMain);
 
-% to extract the friction coefficient, choose which method use.
-question=sprintf('Which method perform to extract the background friction coefficient?');
-options={ ...
-    sprintf('1) TRCDA (air) = 0.3405'), ...
-    sprintf('2) PCDA  (air)  = 0.2626'), ... 
-    sprintf('3) TRCDA-DMPC (air) = 0.2693'), ...
-    sprintf('4) TRCDA-DOPC (air) = 0.3037'), ...
-    sprintf('5) TRCDA-POPC (air) = 0.2090'), ...
-    sprintf('6) Enter manually a value')};
-choice = getValidAnswer(question, '', options);
-    
+  
 if ~exist('newFolder','var')
     newFolder=[];
 end
 if ~exist('secondMonitorMain','var')
     secondMonitorMain=objInSecondMonitor;
 end
-% methods 2 and 3 require the .jpk file with HOVER MODE OFF but in the same condition (same scanned PDA area
-% of when HOVER MODE is ON)
-switch choice
-    case 1, avg_fc = 0.3405;
-    case 2, avg_fc = 0.2626;
-    case 3, avg_fc = 0.2693;
-    case 4, avg_fc = 0.3037;
-    case 5, avg_fc = 0.2090;                     
-    case 6
-        while true
-            avg_fc = str2double(inputdlg('Enter a value for the glass fricction coefficient','',[1 50]));
-            if any(isnan(avg_fc)) || avg_fc <= 0 || avg_fc >= 1
-                questdlg('Invalid input! Please enter a numeric value','','OK','OK');
-            else
-                break
-            end
-        end
-end
-clear choice question options
+
 close all
-
-
 % Substitute to the AFM cropped channels the baseline adapted LD
 while true
     answer=getValidAnswer('Fitting AFM lateral channel data: which accuracy use?','',{'Low','Medium','High'});
@@ -54,16 +74,18 @@ while true
         case 3
             accuracy= 'High';
     end
-    [AFM_A6_LatDeflecFitted,~]=A5_LD_Baseline_Adaptor_masked(AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM.Alpha,avg_fc,secondMonitorMain,newFolder,'Accuracy',accuracy);
+    [AFM_A6_LatDeflecFitted,~]=A5_LD_Baseline_Adaptor_masked(AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM.Alpha,secondMonitorMain,newFolder,'Accuracy',accuracy);
     if getValidAnswer('Satisfied of the fitting?','',{'y','n'}) == 1
         break
     end
 end
 
 close all
-
 %%
 
+[nameDir,numberExperiment,~]=fileparts(fileparts(newFolder));
+[~,nameExperiment,~]=fileparts(fileparts(nameDir));
+fprintf('\nAFM data is taken from the following experiment:\n\tEXPERIMENT: %s\t\tNUMBER:\t %s\n\n',nameExperiment,numberExperiment)
 % Open Brightfield image and the TRITIC (Before and After stimulation images)
 [fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the BrightField image');
 [BF_Mic_Image,~,metaData_BF]=A6_open_ND2(fullfile(filePathData,fileName)); 
@@ -93,6 +115,8 @@ while true
     Tritic_Mic_Image_After_aligned=A7_limited_registration(Tritic_Mic_Image_After,Tritic_Mic_Image_Before,newFolder,secondMonitorMain);
     if getValidAnswer('Satisfied of the alignment?','',{'y','n'}) == 1
         break
+    else
+        close gcf
     end
 end
 
@@ -101,9 +125,10 @@ while true
     BF_Mic_Image_aligned=A7_limited_registration(BF_Mic_Image,Tritic_Mic_Image_Before,newFolder,secondMonitorMain,'Brightfield','Yes','Moving','Yes');
     if getValidAnswer('Satisfied of the alignment?','',{'y','n'}) == 1
         break
+    else
+        close gcf
     end
 end
-
 
 uiwait(msgbox('Click to continue',''));
 close gcf
@@ -116,8 +141,8 @@ close gcf
     
 % Align AFM to BF and extract the coordinates for alighnment to be transferred to the other data
 while true
-    [AFM_A10_IO_sizeOpt,AFM_A10_IO_padded_sizeBF,AFM_A10_data_optAlignment,results_AFM_BF_aligment]=A9_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_A6_LatDeflecFitted,newFolder,secondMonitorMain,'Margin',100);
-    if getValidAnswer('Satisfied of the alignment or restart?','',{'y','n'}) == 1
+    [AFM_A10_IO_sizeOpt,AFM_A10_IO_padded_sizeBF,AFM_A10_data_optAlignment,results_AFM_BF_aligment]=A9_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_A6_LatDeflecFitted,newFolder,secondMonitorMain,'Margin',150);
+    if getValidAnswer('Satisfied of the alignment (y) or restart (n)?','',{'y','n'}) == 1
         break
     end
 end
