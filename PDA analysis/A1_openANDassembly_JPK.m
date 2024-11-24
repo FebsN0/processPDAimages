@@ -131,36 +131,33 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
         if i==1, fprintf('\tVertical_Sn: %d\n\tVertical_kn: %d\n',vSn,vKn), end
 
         if vSn > 1e-6 || vKn > 0.9
-            question='Anomaly in the vertical parameters!';
+            question=sprintf(['Anomaly in the vertical parameters!\n' ...
+                '\tVertical_Sn: %d\n\tVertical_kn: %d\n'],vSn,vKn);
             options={'Keep the current vertical parameters',...
                 'Enter manually the corrected values (or automatically take from the previous section if already entered)'};
             answ= getValidAnswer(question,'',options,2);
         end
 
-        if ~prevV_flag & answ==2
-            vertParameters=zeros(2,1);
-            question ={'Enter the sensitivity kn [m/V]:','Enter the spring constant Sn [nN/m]:'};
-            while true
-                vertParameters = str2double(inputdlg(question,'Setting parameters for the alignment',[1 80]));
-                if any(isnan(vertParameters)), questdlg('Invalid input! Please enter a numeric value','','OK','OK');
-                else, break
+        if answ==2
+            % for the first section. From the second use the same vertical parameters without asking
+            if ~prevV_flag
+                vertParameters=zeros(2,1);
+                question ={'Enter the sensitivity kn [m/V]:','Enter the spring constant Sn [nN/m]:'};
+                while true
+                    vertParameters = str2double(inputdlg(question,'Setting parameters for the alignment',[1 80]));
+                    if any(isnan(vertParameters)), questdlg('Invalid input! Please enter a numeric value','','OK','OK');
+                    else, break
+                    end
                 end
+                prevV_flag=true;
             end
-            corr_vKn=vertParameters(1);
-            corr_vSn=vertParameters(2)*1e-9;       
-            prevV_flag=true;
-        else
-            corr_vKn=metaData.Vertical_kn;
-            corr_vSn=metaData.Vertical_Sn;   
-        end
-        
-        % correct the metadata and the anomaly correction flag
-        if prevV_flag
-            factor=corr_vSn*corr_vKn;
-            metadata.SetP_N=metadata.SetP_V*factor;
+            % correct the metadata and the anomaly correction flag
+            metaData.Vertical_kn=vertParameters(1);
+            metaData.Vertical_Sn=vertParameters(2)*1e-9;
+            factor=metaData.Vertical_kn*metaData.Vertical_Sn; 
+            metaData.Alpha=factor*14.75;
+            metaData.SetP_N=metaData.SetP_V*factor;
             metaData.Baseline_N=metaData.Baseline_V*factor;
-            metaData.Vertical_Sn=corr_vSn;
-            metaData.Vertical_kn=corr_vKn;
             metaData.AnomalyCorrected=true;
         end
 
