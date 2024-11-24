@@ -159,10 +159,10 @@ function [IOI,complete_path_to_afm_file,metadataND2]=A6_open_ND2(varargin)
             imageList = cell(numImages, 2);
             colorMaps = cell(numImages);
             for i = 1:numImages
-                if mod(i, 72) == 1
-                    fprintf('\n    ');
-                end
-                fprintf('.');
+                % if mod(i, 72) == 1
+                %     fprintf('\n    ');
+                % end
+                % fprintf('.');
                 arr = bfGetPlane(r, i, varargin{:});
         
                 % retrieve color map data
@@ -237,7 +237,7 @@ function [IOI,complete_path_to_afm_file,metadataND2]=A6_open_ND2(varargin)
             result{s, 2} = seriesMetadata;
             result{s, 3} = colorMaps;
             result{s, 4} = r.getMetadataStore();
-            fprintf('\n');
+            %fprintf('\n');
         end
         r.close();
     end

@@ -148,7 +148,7 @@ function [varargout]=A2_CleanUpData2_AFM(data,setpoints,secondMonitorMain,newFol
             h{i}=histogram(verticalForceSingleSection,400,'DisplayName',sprintf('raw vertical force section %d',i),'FaceColor',colors{i});
         end
         legend1 = legend('FontSize',15);
-        set(legend1,'Location','best');
+        set(legend1,'Location','bestoutside');
         title('Distribution Raw Vertical Forces','FontSize',18), xlabel('Force [nN]','FontSize',15)
         objInSecondMonitor(secondMonitorMain,f0);
         saveas(f0,sprintf('%s/resultA2_1_distributionVerticalForces.tif',newFolder))

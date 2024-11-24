@@ -40,8 +40,8 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A9
     % Add a new column-Field to the AFM data struct with zero elements matrix and same BF image size
     [AFM_Elab(:).AFM_Padded]=deal(zeros(size(BF_Mic_Image_IO)));
     % x and y lengths of AFM image are in meters ==> convert to um 
-    metaData_AFM.x_scan_length=metaData_AFM.x_scan_length*1e6;
-    metaData_AFM.y_scan_length=metaData_AFM.y_scan_length*1e6;
+    metaData_AFM.x_scan_length=metaData_AFM.x_scan_length_m*1e6;
+    metaData_AFM.y_scan_length=metaData_AFM.y_scan_length_m*1e6;
     % Optical microscopy and AFM image resolution can be entered here
     
     if SeeMe
@@ -195,7 +195,9 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A9
     % in case the user believe that the first cross correlation is ok
     if answerMethod==1
     % manual approach
-        [moving_final,AFM_IO_padded_sizeOpt,details_it_reg,rect,rotation_deg_tot]=A9_feature_manualAlignmentGUI(BF_IO_choice,AFM_IO_resized,AFM_IO_padded_sizeOpt,max_c_it_OI,secondMonitorMain,newFolder,saveFig); % forse va AFM_IO_resized e non AFM_IO_padded
+        [moving_final,AFM_IO_padded_sizeOpt,details_it_reg,rect,rotation_deg_tot]=A9_feature_manualAlignmentGUI(...
+            BF_IO_choice,AFM_IO_resized,AFM_IO_padded_sizeOpt,max_c_it_OI,secondMonitorMain,newFolder); 
+        % forse va AFM_IO_resized e non AFM_IO_padded
         if saveFig
             f3=figure('visible','off');
             imshowpair(BF_IO_choice,AFM_IO_padded_sizeOpt,'falsecolor');
@@ -380,7 +382,11 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A9
     AFM_IO_padded_sizeBF(coordinatesFromBForiginal(3):coordinatesFromBForiginal(4),coordinatesFromBForiginal(1):coordinatesFromBForiginal(2))= moving_final;
     
     if any(size(moving_final) ~= size(AFM_Elab(1).AFM_image))
-        error('The resulting size between AFM and Fluorescence are different. Try again this entire alignment step by cropping a bigger area or use manual method with caution.')
+        messageError=sprintf(['\nThe resulting size between AFM (%dx%d) and Fluorescence (%dx%d) are different.\n',...
+            'Try again this entire alignment step by cropping a bigger area or increase margin ',...
+            'or use manual method with caution.\n',...
+            'This happened because during the rotation or excessive expansion, one of the AFM matrix border went outside the fluorescence border.\n'],size(AFM_Elab(1).AFM_image),size(moving_final));
+        error(messageError) %#ok<SPERR>
     end
 
     if SeeMe && saveFig
