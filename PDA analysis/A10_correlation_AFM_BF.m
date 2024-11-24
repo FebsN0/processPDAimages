@@ -6,6 +6,11 @@
 %       6: Vertical Deflection VS FLUORESCENCE    -- 7: Vertical Deflection VS Lateral Deflection
 %       8: delta fluorescence data (in correspondence of AFM data)
 
+% the following script process data from different situation:
+%       1) normal experiment:   AFM + pre and post scan fluorescence image  + BF image
+%       2) after heating:       AFM + single scan fluorescence image        + BF image
+%               NOTE: it doesn't matter if before or after scanning
+%       3) process only AFM data
 
 function varargout=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints,secondMonitorMain,newFolder,varargin)
     
@@ -35,54 +40,62 @@ function varargout=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints,secon
 
     numBins=100; %default
     flag_onlyAFM=false;
+    % prepare the fluorescence data X normal experiment and calc Delta fluorescence
     if ~flag_heat && (~isempty(p.Results.TRITIC_before) && ~isempty(p.Results.TRITIC_after))
-        % process data before heating : show the pre and post AFM/Fluorescence
         BF_Before=p.Results.TRITIC_before;
         BF_After=p.Results.TRITIC_after;
-        % Determination of delta fluorescence:
         Delta = BF_After-BF_Before;
-    elseif flag_heat && (xor(isempty(p.Results.TRITIC_before),isempty(p.Results.TRITIC_after)))     % at least one of the two fluorescence data must be provided
+    % prepare the fluorescence data X afterHeating experiment. At least one fluorescence image must be provided
+    elseif flag_heat && (xor(isempty(p.Results.TRITIC_before),isempty(p.Results.TRITIC_after)))     
         % Calc the fluorescence delta by removing the minimum value
-        if isempty(p.Results.TRITIC_before)
-            BF_After=p.Results.TRITIC_after;
-            Delta=BF_After-min(min(BF_After));
-            numBins=500;
-        else            
-            BF_Before=p.Results.TRITIC_before;
-            Delta=BF_Before-min(min(BF_Before));
-        end
+        % when (p.Results.TRITIC_before) = 0, take the after, otherwise the before
+        Delta = (isempty(p.Results.TRITIC_before)*(p.Results.TRITIC_after-min(p.Results.TRITIC_after(:)))) + ...
+                (~isempty(p.Results.TRITIC_before)*(p.Results.TRITIC_before-min(p.Results.TRITIC_before(:))));
+        numBins=500;
+        
+        % if isempty(p.Results.TRITIC_before)
+        %     BF_After=p.Results.TRITIC_after;
+        %     Delta=BF_After-min(BF_After(:));
+        % 
+        % else            
+        %     BF_Before=p.Results.TRITIC_before;
+        %     Delta=BF_Before-min(BF_Before(:));
+        % end
+    % process only AFM data
     else
-        % show anything except those related with fluorescence. I.e. only AFM data
         flag_onlyAFM=true;
     end
 
-
-
     % find the idx of Height and Lateral/vertical Deflection in Trace Mode
-    idx_LD = strcmp({AFM_data.Channel_name},'Lateral Deflection') & strcmp({AFM_data.Trace_type},'Trace');
-    idx_H = strcmp({AFM_data.Channel_name},'Height (measured)');
-    idx_VD =  strcmp({AFM_data.Channel_name},'Vertical Deflection') & strcmp({AFM_data.Trace_type},'Trace');
+    idx_LD = strcmp([AFM_data.Channel_name],'Lateral Deflection') & strcmp([AFM_data.Trace_type],'Trace');
+    idx_H = strcmp([AFM_data.Channel_name],'Height (measured)');
+    idx_VD =  strcmp([AFM_data.Channel_name],'Vertical Deflection') & strcmp([AFM_data.Trace_type],'Trace');
  
-    
+    % prepare Delta in correspondence of any background using AFM height I/O
+    % (crystal/PDA/polymer == 1   ||   background = 0)
+    % NOTE: AFM_IO_Padded has the same size as well the BF images original
     if ~flag_onlyAFM
-        % empty value in correspondence of crystal using AFM height I/O (value 1) from the previous
-        % function (NOTE: AFM_IO_Padded has the same size as well the BF images original)
         Delta_glass=Delta;
-        Delta_glass(AFM_IO_Padded==1)=nan;                          % remove crystal data
+        % remove fluorescence data outside crystals 
+        Delta_glass(AFM_IO_Padded==1)=nan;                          
         Delta_glass(Delta<=0)=nan;
-        Delta_glass(AFM_data(idx_LD).AFM_Padded==0)=nan;      % remove the data outise the AFM data
+        % remove the data outside the AFM data which is only zero
+        Delta_glass(AFM_data(idx_LD).AFM_Padded==0)=nan;            
         % Intensity minimum in the glass region to be subtracted:
         Min_Delta_glass=min(min(Delta_glass,[],"omitnan"));
         % fix the fluorescence using the minimum value
         Delta_ADJ=Delta-Min_Delta_glass;
+        % remove the data outside the AFM data which is only zero
         Delta_ADJ(AFM_data(idx_LD).AFM_Padded==0)=nan;
+        % exclude data of background prepared few lines before
         Delta_ADJ(Delta_ADJ<0 | ~isnan(Delta_glass))=nan;
-        
+        % save the delta in correspondence of crystal and background
         if ~flag_heat
             plotSave2(SeeMe,Delta_glass,Delta_ADJ,'Tritic glass','Tritic whole','Fluorescence emission','resultA10_1_FluorescenceGlassPDA.tif',secondMonitorMain,newFolder)
         end
     end
-   if innerBord 
+
+    if innerBord 
         % Identification of borders from the binarised Height image
         AFM_IO_Padded_Borders=AFM_IO_Padded;
         AFM_IO_Padded_Borders(AFM_IO_Padded_Borders<=0)=nan;

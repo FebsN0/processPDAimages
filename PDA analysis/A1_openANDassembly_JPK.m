@@ -110,7 +110,8 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     alphaAllScans=zeros(1,numFiles);
     setpointN=zeros(1,numFiles);
     
-
+    prevV_flag=false;
+    answ=[];
     for i=1:numFiles
         if numFiles>1
             fprintf('Processing the file %d over %d\n',i,numFiles)
@@ -121,13 +122,72 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
         % open jpk, it returns the AFM file, the details (position of tip, IGain, Pgain, Sn, Kn and
         % calculates alpha, based on the pub), it returns the location of the file.
         [data,metaData]=A1_open_JPK(fullName);
+        % for unknown reasons, some jpk file have wrong and unreasonable vertical calibrations.
+        % so it is better to check the metadata!
         
-        % after doing a lot of investigations, it was discovered that the vertical force (meaured)
+        vSn=metaData.Vertical_Sn;
+        vKn=metaData.Vertical_kn;
+        % the other sections have all the same vertical parameters
+        if i==1, fprintf('\tVertical_Sn: %d\n\tVertical_kn: %d\n',vSn,vKn), end
+
+        if vSn > 1e-6 || vKn > 0.9
+            question='Anomaly in the vertical parameters!';
+            options={'Keep the current vertical parameters',...
+                'Enter manually the corrected values (or automatically take from the previous section if already entered)'};
+            answ= getValidAnswer(question,'',options,2);
+        end
+
+        if ~prevV_flag & answ==2
+            vertParameters=zeros(2,1);
+            question ={'Enter the sensitivity kn [m/V]:','Enter the spring constant Sn [nN/m]:'};
+            while true
+                vertParameters = str2double(inputdlg(question,'Setting parameters for the alignment',[1 80]));
+                if any(isnan(vertParameters)), questdlg('Invalid input! Please enter a numeric value','','OK','OK');
+                else, break
+                end
+            end
+            corr_vKn=vertParameters(1);
+            corr_vSn=vertParameters(2)*1e-9;       
+            prevV_flag=true;
+        else
+            corr_vKn=metaData.Vertical_kn;
+            corr_vSn=metaData.Vertical_Sn;   
+        end
+        
+        % correct the metadata and the anomaly correction flag
+        if prevV_flag
+            factor=corr_vSn*corr_vKn;
+            metadata.SetP_N=metadata.SetP_V*factor;
+            metaData.Baseline_N=metaData.Baseline_V*factor;
+            metaData.Vertical_Sn=corr_vSn;
+            metaData.Vertical_kn=corr_vKn;
+            metaData.AnomalyCorrected=true;
+        end
+
+
+        % after doing a lot of investigations, it was discovered that the vertical force (measured)
         % is actually not correct because it exclude the baseline correction, therefore vertical deflection is
         % exactly what the detector reads, excluding the baseline correction. So baseline correction needs
         % to be applied also in vertical deflection         
         for j=1:length(data)
             if strcmp(data(j).Channel_name,'Vertical Deflection')
+                % in case of the anomaly of vertical parameters, use the vertical deflection in volt rather
+                % than force and convert with the corrected values. First double check if the average of
+                % meaured vertical force is numerically exaggerated. What we can be sure is that the volt is
+                % more trustful than newton
+                if strcmp(data(j).Signal_type,'Force_N') & prevV_flag
+                    Data_VD_forceAnomaly=data(j).AFM_image;
+                    avgData_VD_forceAnomaly=mean(Data_VD_forceAnomaly(:));
+                    question=sprintf(['Since the anomaly occurred, double-check the vertical deflection expressed in newton.\n' ...
+                        'Averaged vertical deflection = %.2f\n' ...
+                        'Convert the vertical deflection from Volt into Newton using the corrected vertical parameters?'],avgData_VD_forceAnomaly);
+                    answ=getValidAnswer(question,'',{'yes','no'});
+                    if answ==1
+                        corr_data_VD_force = data(j).AFM_image*factor;
+                        data(j).AFM_image = corr_data_VD_force;
+                    end
+                end
+
                 % if the vertical deflection is expressed in volts, then convert into force
                 % (first versions of experimentPlanner didnt allowed working in newton units as setpoint)
                 if strcmp(data(j).Signal_type,'Volt_V')
@@ -137,9 +197,9 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
                     data(j).AFM_image = raw_data_VD_force;
                     data(j).Signal_type = 'Force_N';
                 end
-                %%%%%%%%%%%%%%%%%%% NOT SURE IF IT WORK IN CASE OF VERTICAL DEFLE IN V
+                %%%%%%%%%%%%%%%%%%% 
                 % ADJUST THE RAW VERTICAL FORCE WITH THE BASELINE
-                %%%%%%%%%%%%%%%raw_data_VD_force = raw_data_VD_force + metaData.B
+                %%%%%%%%%%%%%%%
                 data(j).AFM_image = data(j).AFM_image - metaData.Baseline_N;
             end
         end
@@ -234,14 +294,14 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     % the others don't change. 
     % since it is ordered, the first element already contains the true y_Origin
     metaDataOrdered= allScansMetadataOrdered{1};
-    metaDataOrdered.y_scan_length= sum(y_scan_lengthAllScans);
+    metaDataOrdered.y_scan_length_m= sum(y_scan_lengthAllScans);
     metaDataOrdered.y_scan_pixels= sum(y_scan_pixelsAllScans);
 
     % Further checks: the total scan area should be a square in term of um and pixels
     ratioLength=metaDataOrdered.x_scan_length_m\metaDataOrdered.y_scan_length_m;
     ratioPixel=round(metaDataOrdered.y_scan_pixels\metaDataOrdered.x_scan_pixels,1);
     if ratioLength ~= 1 || ratioPixel ~= 1
-        warning('ratioLength: %. x lengths and/or x pixels is not the same as well as the y length and/or y pixels!!')
+        warning('\tratioLength: %.2f\n\tratioPixel %.2f\n X length/pixels is not the same as well as the Y length/pixels!!',ratioLength,ratioPixel)
     end
     clear y_scan_pixelsAllScans y_scan_lengthAllScans y_OriginAllScans ratioLength ratioPixel idx allScansMetadataOrdered j i
 

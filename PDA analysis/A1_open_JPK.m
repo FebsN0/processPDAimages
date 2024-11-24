@@ -1,5 +1,5 @@
         % varargout = return any number of output arguments
-function [varargout]=A1_open_JPK(varargin)
+function [varargout]=A1_open_JPK(pathJpk,varargin)
 
     
 % the python file is assumed to be in a parallel directory to the current
@@ -45,79 +45,73 @@ function [varargout]=A1_open_JPK(varargin)
     % in case of code error, the waitbar won't be removed. So the following command force its closure
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)
-    flag_manual_select=1;
     valid_extensions={'.jpk';'.jpk-force';'.jpk-force-map'};
     valid_extensions_getfile={'*.jpk';'*.jpk-force';'*.jpk-force-map'};
-    % when opening .jpk file using tiff to extract metadata, appear useless warning. The following two lines
-    % suppress such a warning
-    %MSGID='imageio:tiffutils:libtiffWarning';
-    %warning('off', MSGID)
-
-    %if open_JPK is run with an input file
-    if(~isempty(varargin))
-        if(isfile(varargin{1,1}))
-            [~,~,extension]=fileparts(varargin{1,1});                   %returns the path name, file name, and extension for the specified file
-            if(any(strcmp(extension,valid_extensions)))                 %verify if extension of input file is valid
-                complete_path_to_afm_file=varargin{1,1};
-                flag_manual_select=0;
-            else
-                clearvars extension
-            end
-        end
+    
+    p = inputParser;
+    % if pathfile is entered, verify if extension of input file is valid
+    addOptional(p, 'pathJpk', [], @(x) isempty(x) || (ischar(x) && endsWith(x, valid_extensions, 'IgnoreCase', true)));
+    addParameter(p, 'metadataExtractionOnly', 'no', @(x) ischar(x) && any(strcmpi(x, {'yes', 'no'})));
+    parse(p, pathJpk, varargin{:});
+    
+    if strcmpi(p.Results.metadataExtractionOnly,'Yes')
+        flagOnlyMetadata = 1;
+    else
+        flagOnlyMetadata = 0;
     end
 
+    %if open_JPK is run with an input file
+    if p.Results.pathJpk
+        complete_path_to_afm_file=p.Results.pathJpk;
     %if open_JPK is run without an input file ==> UIGETFILE
-    while(flag_manual_select==1)
+    else
         [afm_file_name,AFM_file_path,afm_file_index]=uigetfile(valid_extensions_getfile,'Choose AFM File');
-        complete_path_to_afm_file=sprintf('%c%c',AFM_file_path,afm_file_name);
-        %check the extension of uploaded file
-        [~,~,extension]=fileparts(complete_path_to_afm_file);
         if(afm_file_index==0)
             error('No File Selected')
         else
-            if(any(strcmp(extension,valid_extensions)))
-                fprintf('\n\nDetails of storage location:\n %s\n',sprintf('%c%c',AFM_file_path,afm_file_name))
-                flag_manual_select=0;
-            else
-                clearvars afm_file_name AFM_file_path afm_file_index complete_path_to_afm_file extension
-                waitfor(warndlg({'Accepted file formats limited to:','*.jpk','*.jpk-force','*.jpk-force-map (currently not supported)'},'Warning'));
+            complete_path_to_afm_file=sprintf('%c%c',AFM_file_path,afm_file_name);
+            %check the extension of uploaded file
+            if ~endsWith(complete_path_to_afm_file, valid_extensions, 'IgnoreCase', true);
+                error('Invalid format file')
             end
         end
     end
+    [~,~,extension]=fileparts(complete_path_to_afm_file);
     
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%--------------- PROCESS .JPK IMAGE DATA ---------------%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     if(strcmp(extension,valid_extensions{1,1}))
-        % the two commands (iminfo and Tiff) are very similar: Tiff is necessary to read properly specific data.
-        if(~isempty(varargin))
-            file_info=imfinfo(varargin{1,1});
-        else
-            %returns a structure whose fields contain information about an image in a graphics file, filename.
-            % #row indicate #pics contained in the .jpk file
-            file_info=imfinfo(complete_path_to_afm_file);
-        end
+        %returns a structure whose fields contain information about an image in a graphics file, filename.
+        % #row indicate #pics contained in the .jpk file
+        file_info=imfinfo(complete_path_to_afm_file);
+        
         number_of_images=numel(file_info);
-        % Create or update wait bar dialog box. INPUT are:
-        %   - fractionalNumber* first call is zero
-        %   - text to appear ==> in this case 0 is the start
-        %   - CreateCancelBtn ==> Cancel button callback
-        %   - 'setappdata(gcbf,''canceling'',1)' ==> When a user clicks the Cancel button MATLAB sets the
-        %       'canceling' flag, to 1 (true) in the figure application data (appdata).
-        %       NOTE: when cancel is clicked, the dialog box stop run but it
-        %       doesn't close automatically. So the code tests for that value within the for loop
-        %       and exits the loop if the flag value is 1.
-        wb=waitbar(0/number_of_images,sprintf('Loading Channel %.0f of %.0f',0,number_of_images),...
-            'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
-        % set the logical flag in cancel situation to false. When cancel is
-        % clicked, then it becomes true
-        setappdata(wb,'canceling',0);
-    
+
+        if ~flagOnlyMetadata
+            % Create or update wait bar dialog box. INPUT are:
+            %   - fractionalNumber* first call is zero
+            %   - text to appear ==> in this case 0 is the start
+            %   - CreateCancelBtn ==> Cancel button callback
+            %   - 'setappdata(gcbf,''canceling'',1)' ==> When a user clicks the Cancel button MATLAB sets the
+            %       'canceling' flag, to 1 (true) in the figure application data (appdata).
+            %       NOTE: when cancel is clicked, the dialog box stop run but it
+            %       doesn't close automatically. So the code tests for that value within the for loop
+            %       and exits the loop if the flag value is 1.
+            wb=waitbar(0/number_of_images,sprintf('Loading Channel %.0f of %.0f',0,number_of_images),...
+                'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
+            % set the logical flag in cancel situation to false. When cancel is
+            % clicked, then it becomes true
+            setappdata(wb,'canceling',0);
+        end
+
         for i=1:number_of_images
-            %update the wait bar dialog box
-            waitbar(i/number_of_images,wb,sprintf('Loading Channel %.0f of %.0f',i,number_of_images));
-             
+            if ~flagOnlyMetadata
+                %update the wait bar dialog box
+                waitbar(i/number_of_images,wb,sprintf('Loading Channel %.0f of %.0f',i,number_of_images));
+            end
+
             if i==1
             % execute python file to extract metadata when i=1 ==> metadata stored in page 0 of the tiff file
 
@@ -195,6 +189,9 @@ function [varargout]=A1_open_JPK(varargin)
                     Details_Img.Oscillation_Freq    = cell2mat(metadata("Oscillation_Freq"));
                     Details_Img.Regerence_Ph_Shift  = cell2mat(metadata("Reference_Phase_shift"));
                 end
+                if flagOnlyMetadata
+                    break
+                end
             % extract data from each channel
             else
                 % start processing the data
@@ -223,16 +220,21 @@ function [varargout]=A1_open_JPK(varargin)
             end
         end
         
-        delete(wb)
-        % re organize the struct in alphabetic order. Transform 1x10 cell array into 1x10 string array and
-        % transpose otherwise sortrows doesnt correctly read
-        [~,index]=sortrows(string({Image.Channel_name})');
+        if(exist('wb','var'))
+            delete(wb)
+        end
         
-
-        Image = Image(index); clear index
-        % save the output image data. NOTE: the data is already expressed in the correct unit.
-        % I.E. lateral deflection data is expressed in Volt
-        varargout{1}=Image;
+        if ~flagOnlyMetadata
+            % re organize the struct in alphabetic order. Transform 1x10 cell array into 1x10 string array and
+            % transpose otherwise sortrows doesnt correctly read
+            [~,index]=sortrows(string({Image.Channel_name})');
+            Image = Image(index); clear index
+            % save the output image data. NOTE: the data is already expressed in the correct unit.
+            % I.E. lateral deflection data is expressed in Volt
+            varargout{1}=Image;
+        else
+            varargout{1}=[];
+        end
         % save the output metadata
         varargout{2}=Details_Img;
         % save the pathname where the image was processed

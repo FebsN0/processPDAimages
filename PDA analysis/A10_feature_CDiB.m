@@ -110,6 +110,8 @@ function [outputme] = A10_feature_CDiB(X_Data,Y_Data,secondMonitorMain,newFolder
         xlim padded
     end
     
+    grid on
+    grid minor
     xlabel(p.Results.XAxL,'FontSize',15);
     ylabel(p.Results.YAyL,'FontSize',15);
     if (~isempty(p.Results.FigTitle))
