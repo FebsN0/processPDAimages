@@ -54,12 +54,14 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     elseif strcmp(p.Results.backgroundOnly,'Yes') && numFiles==1
         [~,nameFile,~]=fileparts(fileName);
         newFolder = fullfile(filePathData, sprintf('Results Processing AFM-background only _ %s',nameFile));
-    elseif numFiles==1
+    else % in case normal scans
+        if numFiles==1
         [~,nameFile]=fileparts(fileName);
-        newFolder = fullfile(filePathData, sprintf('%s - Results Processing AFM and fluorescence images',nameFile));
-    else % case of more sections and normal scans
+        else
+            nameFile='Entire Section';
+        end
         [upperFolder,~,~]=fileparts(fileparts(filePathData));
-        newFolder = fullfile(upperFolder, 'Results Processing AFM and fluorescence images');
+        newFolder = fullfile(upperFolder, sprintf('Results Processing AFM and fluorescence images - %s',nameFile));
     end
     % check if dir already exists
     if exist(newFolder, 'dir')
@@ -71,7 +73,7 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
         else
             % create new directory with different name
             nameFolder = inputdlg('Enter the name new folder','',[1 80]);
-            newFolder = fullfile(filePathData,nameFolder{1});
+            newFolder = fullfile(upperFolder,nameFolder{1});
             mkdir(newFolder);
             clear nameFolder
         end
@@ -109,6 +111,10 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     x_scan_pixelsAllScans=zeros(1,numFiles);
     alphaAllScans=zeros(1,numFiles);
     setpointN=zeros(1,numFiles);
+    SetP_V_AllScans=zeros(1,numFiles);
+    SetP_N_AllScans=zeros(1,numFiles);
+    Baseline_V_AllScans=zeros(1,numFiles);
+    Baseline_N_AllScans=zeros(1,numFiles);
     
     prevV_flag=false;
     answ=[];
@@ -226,6 +232,7 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
         end
             
         % remove not useful information prior the process. Not show the figures. Later
+        % setpoint array here is useless. putted to avoid error
         filtData=A2_CleanUpData2_AFM(data,setpointN,secondMonitorMain,newFolder,'cleanOnly','Yes');
         % save the sections before and after the processing
         allScansImageSTART{i}=filtData;
@@ -249,7 +256,11 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
         y_scan_lengthAllScans(i)=allScansMetadata{i}.y_scan_length_m;
         x_scan_lengthAllScans(i)=allScansMetadata{i}.x_scan_length_m;
         y_scan_pixelsAllScans(i)=allScansMetadata{i}.y_scan_pixels;
-        x_scan_pixelsAllScans(i)=allScansMetadata{i}.x_scan_pixels;  
+        x_scan_pixelsAllScans(i)=allScansMetadata{i}.x_scan_pixels;
+        SetP_V_AllScans(i)=allScansMetadata{i}.SetP_V;
+        SetP_N_AllScans(i)=allScansMetadata{i}.SetP_N;
+        Baseline_V_AllScans(i)=allScansMetadata{i}.Baseline_V;
+        Baseline_N_AllScans(i)=allScansMetadata{i}.Baseline_N;
     end
 
     % error check: each section must be geometrically the same in term of length and pixels!
@@ -257,8 +268,7 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
        ~all(y_scan_lengthAllScans == y_scan_lengthAllScans(1)) || ...
        ~all(x_scan_lengthAllScans == x_scan_lengthAllScans(1)) || ...
        ~all(y_scan_pixelsAllScans == y_scan_pixelsAllScans(1)) || ...
-       ~all(x_scan_pixelsAllScans == x_scan_pixelsAllScans(1))
-               
+       ~all(x_scan_pixelsAllScans == x_scan_pixelsAllScans(1))        
         error(sprintf('ERROR: the x lengths and/or alpha calibration factor (thus vertical parameters) of some sections are not the same!!\n\tCheck the uploaded data!!'))
     end
     % check the offset information and properly sort
@@ -282,7 +292,6 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     %       y_Origin
     %       y_scan_length
     %       y_scan_pixels
-    % assumption: ignoring the following values, since they are not used in the following parts
     %       Baseline_V
     %       Baseline_N
     %       SetP_V
@@ -293,12 +302,17 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     metaDataOrdered= allScansMetadataOrdered{1};
     metaDataOrdered.y_scan_length_m= sum(y_scan_lengthAllScans);
     metaDataOrdered.y_scan_pixels= sum(y_scan_pixelsAllScans);
+    % in case of setpoints and baseline, create an array if different values in case of setpoint
+    metaDataOrdered.SetP_V=unique(SetP_V_AllScans(idx));
+    metaDataOrdered.SetP_N=unique(SetP_N_AllScans(idx));
+    metaDataOrdered.Baseline_V=Baseline_V_AllScans(idx);
+    metaDataOrdered.Baseline_N=Baseline_N_AllScans(idx);
 
     % Further checks: the total scan area should be a square in term of um and pixels
-    ratioLength=metaDataOrdered.x_scan_length_m\metaDataOrdered.y_scan_length_m;
-    ratioPixel=round(metaDataOrdered.y_scan_pixels\metaDataOrdered.x_scan_pixels,1);
+    ratioLength=round(metaDataOrdered.x_scan_length_m\metaDataOrdered.y_scan_length_m,2);
+    ratioPixel=round(metaDataOrdered.x_scan_pixels\metaDataOrdered.y_scan_pixels,1);
     if ratioLength ~= 1 || ratioPixel ~= 1
-        warning('\tratioLength: %.2f\n\tratioPixel %.2f\n X length/pixels is not the same as well as the Y length/pixels!!',ratioLength,ratioPixel)
+        warning('\n\ttratioLengthXY: %.2f\n\tratioPixelXY %.2f\nX length/pixels is not the same as well as the Y length/pixels!!',ratioLength,ratioPixel)
     end
     clear y_scan_pixelsAllScans y_scan_lengthAllScans y_OriginAllScans ratioLength ratioPixel idx allScansMetadataOrdered j i
 
@@ -345,7 +359,8 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     end
     
     % show and save figures post assembly
-    [vertForceAVG]=A2_CleanUpData2_AFM(dataOrderedSTART,setpointN,secondMonitorMain,newFolder,'imageType',imgTyp,'phaseProcess','Raw','Silent',silent,'SaveFig',saveFig,'Normalization',norm,'sectionSize',sizeSections);
+
+    [vertForceAVG]=A2_CleanUpData2_AFM(dataOrderedSTART,setpointN,secondMonitorMain,newFolder,'metadata',metaDataOrdered,'imageType',imgTyp,'phaseProcess','Raw','Silent',silent,'SaveFig',saveFig,'Normalization',norm,'sectionSize',sizeSections);
     
     % show and save figures post assembly postProcessing
     if flag_processSignleSections

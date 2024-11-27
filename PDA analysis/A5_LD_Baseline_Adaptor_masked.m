@@ -190,12 +190,12 @@ function [AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Image
 
     % choose friction coefficients depending on the case (experimental results done in another moment),
     % or manually put the value
-    question=sprintf('Which method perform to extract the background friction coefficient?');
+    question=sprintf('Which background friction coefficient use?');
     options={ ...
         sprintf('1) TRCDA (air) = 0.3405'), ...
         sprintf('2) PCDA  (air)  = 0.2626'), ... 
         sprintf('3) TRCDA-DMPC (air) = 0.2693'), ...
-        sprintf('4) TRCDA-DOPC (air) = 0.3037'), ...
+        sprintf('4) TRCDA-DOPC (air) = 0.3316 (only 3_3_1)'), ...
         sprintf('5) TRCDA-POPC (air) = 0.2090'), ...
         sprintf('6) Enter manually a value')};
     choice = getValidAnswer(question, '', options);
@@ -204,7 +204,7 @@ function [AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Image
         case 1, avg_fc = 0.3405;
         case 2, avg_fc = 0.2626;
         case 3, avg_fc = 0.2693;
-        case 4, avg_fc = 0.3037;
+        case 4, avg_fc = 0.3316; % from 0.3070; updated using only 3_3_1 NOTE: issues wth the experiments in which only two setpoints have been used
         case 5, avg_fc = 0.2090;                     
         case 6
             while true
@@ -221,7 +221,6 @@ function [AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Image
 
     % Friction force = friction coefficient * Normal Force
     Baseline_Friction_Force= vertical_Trace*avg_fc;
-
     % Friction force = calibration coefficient * Lateral Trace (V)
     Lateral_Trace_Force= Lateral_Trace_shift_noBK*alpha;
     % To read the baseline friction, to obtain the processed image:

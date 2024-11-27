@@ -20,7 +20,7 @@ function [varargout]=A2_CleanUpData2_AFM(data,setpoints,secondMonitorMain,newFol
     argName = 'SaveFig';        defaultVal = 'Yes';     addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     argName = 'Normalization';  defaultVal = 'No';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     argName = 'sectionSize';    defaultVal = [];        addParameter(p,argName,defaultVal);
-
+    argName = 'metadata';       defaultVal = [];        addParameter(p,argName,defaultVal);
     % validate and parse the inputs
     parse(p,data,varargin{:});
 
@@ -157,5 +157,32 @@ function [varargout]=A2_CleanUpData2_AFM(data,setpoints,secondMonitorMain,newFol
             warndlg('Number of rounded vertical forces is less than number of setpoint!')
         end
         varargout{1}=vertForceAVG*1e-9;     % convert nanoNewton into Newton
+
+        % plot the baseline trend
+        if ~isempty(p.Results.metadata)
+            metadata=p.Results.metadata;
+            totTimeScan = (metadata.x_scan_pixels/metadata.Scan_Rate_Hz)/60;
+            totTimeSection = totTimeScan/numSetpoints;
+            if SeeMe
+                f1=figure('Visible','on');
+            else
+                f1=figure('Visible','off');
+            end
+            % we dont have the baseline info at the end of the scan. It is saved only in the baseline.txt file
+            arrayTime=0:totTimeSection:totTimeScan-totTimeSection;
+            baselineN=metadata.Baseline_N*1e9;
+            if length(baselineN) > 1
+                if abs(baselineN(2) - baselineN(1)) > 10 
+                    warning('\n\tThe baseline of the first section varies by more than 10nN from the first one!!\n\tThe current scan is not really realiable... ')
+                end
+                plot(arrayTime,metadata.Baseline_N*1e9,'-*','LineWidth',2,'MarkerSize',15,'MarkerEdgeColor','red')
+                title('Baseline Trend among the sections','FontSize',18)
+                ylabel('Baseline shift [nN]','FontSize',15), xlabel('Time [min]','FontSize',15), grid on, grid minor
+                objInSecondMonitor(secondMonitorMain,f0);
+                saveas(f1,sprintf('%s/resultA2_0_baselineTrend.tif',newFolder))
+            else
+                warning('\n\tPlotting the baseline trend is not possible because only one baseline value is stored in the metadata (Scan = Section)')
+            end
+        end
     end
 end
