@@ -1,4 +1,4 @@
-function avg_fc_def=A5_frictionGlassCalc_method3(alpha,AFM_Images,AFM_height_IO,setpoints,secondMonitorMain,newFolder)
+function avg_fc_def=A1_frictionGlassCalc_method3(alpha,AFM_Images,AFM_height_IO,setpoints,secondMonitorMain,newFolder)
 %
 % This function opens the AFM cropped data previously created to calculate the glass friction
 % coefficient. This method is more accurated than the method 2.

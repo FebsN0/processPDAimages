@@ -1,4 +1,4 @@
-function LineDataFilt = A5_method3feature_DeleteEdgeDataAndOutlierRemoval(LineData, pix, fOutlierRemoval)
+function LineDataFilt = A1_method3feature_DeleteEdgeDataAndOutlierRemoval(LineData, pix, fOutlierRemoval)
 % Delete edge data by searching non-zero data area (segment) and put zero in edge of segment (last part of the segment)
 %
 % INPUT:    1) single fast scan line (force, N)

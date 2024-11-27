@@ -1,4 +1,4 @@
-function avg_fc=A5_frictionGlassCalc_method1(dataBK,metaDataBK,secondMonitorMain,filePath,varargin)
+function avg_fc=A1_frictionGlassCalc_method1(dataBK,metaDataBK,secondMonitorMain,filePath,varargin)
 
 % This function opens an .JPK image file in which the tip scanned the glass in order to retrieve the glass
 % friction coefficient at different setpoints
@@ -25,7 +25,8 @@ function avg_fc=A5_frictionGlassCalc_method1(dataBK,metaDataBK,secondMonitorMain
     clearvars argName defaultVal
     if(strcmp(p.Results.Silent,'Yes'));  SeeMe=0; else, SeeMe=1; end
     
-    newFolder=fullfile(filePath,'Results Only Background');
+    % create a new directory where store the BK results of every processes scan
+    newFolder=fullfile(filePath,'Results All Only-Background');
     if exist(newFolder, 'dir')
         question= sprintf('Directory already exists and it may already contain previous results.\nDo you want to overwrite it or create new directory?');
         options= {'Overwrite the existing dir','Create a new dir'};
@@ -50,7 +51,7 @@ function avg_fc=A5_frictionGlassCalc_method1(dataBK,metaDataBK,secondMonitorMain
     else
         f1=figure('Visible','off');
     end
-    xlabel('Vertical Deflection [N]','FontSize',15), ylabel('Lateral Deflection [N]','FontSize',15), grid on
+    xlabel('Vertical Deflection [nN]','FontSize',15), ylabel('Lateral Deflection [nN]','FontSize',15), grid on
     title(sprintf('Results of %d curves of AFM only background',numFiles),'FontSize',15);
     pfs=[];
     colors={"#0072BD","#D95319","#EDB120","#7E2F8E","#77AC30","#4DBEEE","#A2142F",'k'};
@@ -59,10 +60,11 @@ function avg_fc=A5_frictionGlassCalc_method1(dataBK,metaDataBK,secondMonitorMain
         dataSingle=dataBK{j};
         metadataSingle=metaDataBK{j};
         % latDefl expressed in Volt
-        latDefl_trace   = dataSingle(strcmpi({dataSingle.Channel_name},'Lateral Deflection') & strcmpi({dataSingle.Trace_type},'Trace')).AFM_image;
-        latDefl_retrace = dataSingle(strcmpi({dataSingle.Channel_name},'Lateral Deflection') & strcmpi({dataSingle.Trace_type},'ReTrace')).AFM_image;
+        latDefl_trace   = dataSingle(strcmpi([dataSingle.Channel_name],'Lateral Deflection') & strcmpi([dataSingle.Trace_type],'Trace')).AFM_image;
+        latDefl_retrace = dataSingle(strcmpi([dataSingle.Channel_name],'Lateral Deflection') & strcmpi([dataSingle.Trace_type],'ReTrace')).AFM_image;
         % verDefl expressed in Newton
-        verForce        = dataSingle(strcmpi({dataSingle.Channel_name},'Vertical Deflection') & strcmpi({dataSingle.Trace_type},'Trace')).AFM_image;
+        verForce        = dataSingle(strcmpi([dataSingle.Channel_name],'Vertical Deflection') & strcmpi([dataSingle.Trace_type],'Trace')).AFM_image;
+        
         % obtain the setpoint value. Note: because of little instabilities, round the vertical values to the fixed setpoint 
         % (i.e. 3.091 nN --> 3.000 nN)
         verForce = round(verForce,9);
@@ -74,9 +76,11 @@ function avg_fc=A5_frictionGlassCalc_method1(dataBK,metaDataBK,secondMonitorMain
         W = latDefl_trace - Delta;                          
         % convert W into force (in Newton units) using alpha calibration factor
         force=W*metadataSingle.Alpha;
-           
+        % convert into nN
+        force=force*1e9;
+        verForce=verForce*1e9;
         % find unique groups of vertical force and its index
-        [vertForceAVG, start_indices] = unique(round(mean(verForce,1),9));
+        [vertForceAVG, start_indices] = unique(round(mean(verForce,1),1));
         % flip, so the coefficient will be positive
         if start_indices(1)>start_indices(end)
             verForce=flip(verForce,2);
@@ -96,7 +100,8 @@ function avg_fc=A5_frictionGlassCalc_method1(dataBK,metaDataBK,secondMonitorMain
             %average the scan line and then the group in which the setpoint is same
             force_avg_singleSetpoint(i)=mean(mean(force(:,start_indices(i):last)));
             force_std_singleSetpoint(i)=std(mean(force(:,start_indices(i):last)));
-        end  
+        end
+
         [x,y]=prepareCurveData(vertForceAVG,force_avg_singleSetpoint);
 
         %FITTING VERTICAl and LATERAL DEFLECTION (both expressed in Newton)
@@ -110,15 +115,15 @@ function avg_fc=A5_frictionGlassCalc_method1(dataBK,metaDataBK,secondMonitorMain
         hold on
         eqn = sprintf('y = %0.3gx + %0.3g', fitresult.p1, fitresult.p2);
         pf(j)=plot(x,y,'DisplayName',sprintf('Fitted curve: %s',eqn),'Color',colors{j});
-        ps=plot(vertForceAVG,force_avg_singleSetpoint,'k*','DisplayName','Experimental data');
-        pe=errorbar(vertForceAVG,force_avg_singleSetpoint,force_std_singleSetpoint, 'k', 'LineStyle', 'none', 'Marker','none','LineWidth', 1.5,'DisplayName','StandardDeviation');
+        ps=plot(vertForceAVG,force_avg_singleSetpoint,'k*','DisplayName','lateralForce_avg');
+        pe=errorbar(vertForceAVG,force_avg_singleSetpoint,force_std_singleSetpoint, 'k', 'LineStyle', 'none', 'Marker','none','LineWidth', 1.5,'DisplayName','lateralForce_std');
         xlim([0,max(vertForceAVG) * 1.1]);
         hold off        
         
         fc(j)=fitresult.p1;
         pfs=[pfs pf(j)];
     end
-    legend([ps,pe,pfs],'Location','northwest','FontSize',15)
+    legend([ps,pe,pfs],'Location','northwest','FontSize',15,'Interpreter','none')
 
     %legend([ps,pe,pf(1),pf(2),pf(3)],'Location','northwest','FontSize',15)
     objInSecondMonitor(secondMonitorMain,f1);
