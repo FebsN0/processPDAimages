@@ -1,4 +1,4 @@
-function avg_fc=A1_frictionGlassCalc_method1(dataBK,metaDataBK,secondMonitorMain,filePath,varargin)
+function avg_fc=A1_frictionGlassCalc_method1(dataBK,metaDataBK,secondMonitorMain,newFolder,varargin)
 
 % This function opens an .JPK image file in which the tip scanned the glass in order to retrieve the glass
 % friction coefficient at different setpoints
@@ -25,25 +25,6 @@ function avg_fc=A1_frictionGlassCalc_method1(dataBK,metaDataBK,secondMonitorMain
     clearvars argName defaultVal
     if(strcmp(p.Results.Silent,'Yes'));  SeeMe=0; else, SeeMe=1; end
     
-    % create a new directory where store the BK results of every processes scan
-    newFolder=fullfile(filePath,'Results All Only-Background');
-    if exist(newFolder, 'dir')
-        question= sprintf('Directory already exists and it may already contain previous results.\nDo you want to overwrite it or create new directory?');
-        options= {'Overwrite the existing dir','Create a new dir'};
-        if getValidAnswer(question,'',options) == 1
-            rmdir(newFolder, 's');
-            mkdir(newFolder);
-        else
-            % create new directory with different name
-            nameFolder = inputdlg('Enter the name new folder','',[1 80]);
-            newFolder = fullfile(filePathData,nameFolder{1});
-            mkdir(newFolder);
-            clear nameFolder
-        end
-    else
-        mkdir(newFolder);
-    end
-
     numFiles=length(dataBK);
     fc=zeros(1,numFiles);
     if SeeMe
@@ -59,16 +40,17 @@ function avg_fc=A1_frictionGlassCalc_method1(dataBK,metaDataBK,secondMonitorMain
         % extract the needed data
         dataSingle=dataBK{j};
         metadataSingle=metaDataBK{j};
+        % verDefl expressed in Newton
+        verForce = dataSingle(strcmpi([dataSingle.Channel_name],'Vertical Deflection') & strcmpi([dataSingle.Trace_type],'Trace')).AFM_image;
+        % convert N into nN
+        verForce=verForce*1e9;
+        % obtain the setpoint value. Note: because of little instabilities, round the vertical values to the fixed setpoint 
+        % (i.e. 3.091 nN --> 3.000 nN)
+        verForce = round(verForce);
+
         % latDefl expressed in Volt
         latDefl_trace   = dataSingle(strcmpi([dataSingle.Channel_name],'Lateral Deflection') & strcmpi([dataSingle.Trace_type],'Trace')).AFM_image;
         latDefl_retrace = dataSingle(strcmpi([dataSingle.Channel_name],'Lateral Deflection') & strcmpi([dataSingle.Trace_type],'ReTrace')).AFM_image;
-        % verDefl expressed in Newton
-        verForce        = dataSingle(strcmpi([dataSingle.Channel_name],'Vertical Deflection') & strcmpi([dataSingle.Trace_type],'Trace')).AFM_image;
-        
-        % obtain the setpoint value. Note: because of little instabilities, round the vertical values to the fixed setpoint 
-        % (i.e. 3.091 nN --> 3.000 nN)
-        verForce = round(verForce,9);
-     
         % average trace and retrace scan lines (lateral deflection) to cancel out errors.
         % Calc Delta (loop offset)
         Delta =  (latDefl_trace + latDefl_retrace)/2;
@@ -78,16 +60,30 @@ function avg_fc=A1_frictionGlassCalc_method1(dataBK,metaDataBK,secondMonitorMain
         force=W*metadataSingle.Alpha;
         % convert into nN
         force=force*1e9;
-        verForce=verForce*1e9;
-        % find unique groups of vertical force and its index
-        [vertForceAVG, start_indices] = unique(round(mean(verForce,1),1));
-        % flip, so the coefficient will be positive
-        if start_indices(1)>start_indices(end)
-            verForce=flip(verForce,2);
-            force=flip(force,2);
-            start_indices=flip(start_indices);
+        
+        % separate lateral deflection data by section depending on setpoint variation
+        numSections=length(metadataSingle.y_scan_pixels);
+        start_indices=zeros(1,numSections);
+        vertForceAVG=zeros(1,numSections);
+        % easily separate each section if the original data were more sections
+        if numSections~=1
+            for i=1:numSections
+                start_indices(i)=metadataSingle.y_scan_pixels(i)*(i-1)+1;
+                vertForceAVG(i)=round(metadataSingle.SetP_N(i)*1e9);
+            end
+        else
+        % in case the data was originally an entire scan as entire section (not recommended operation), separate by finding the
+        % setpoint changes in the (measured and corrected by baseline) vertical deflection data
+            % find unique groups of vertical force and its index
+            [vertForceAVG, start_indices] = unique(round(mean(verForce,1)));
+            % flip, so the coefficient will be positive
+            if start_indices(1)>start_indices(end)
+                verForce=flip(verForce,2);
+                force=flip(force,2);
+                start_indices=flip(start_indices);
+                start_indices=start_indices';
+            end
         end
-
         % Using the previous indexes, group the lateral deflection scan lines in correspondence with the same applied setpoint
         force_avg_singleSetpoint=zeros(length(start_indices),1);
         force_std_singleSetpoint=zeros(length(start_indices),1);
@@ -101,7 +97,8 @@ function avg_fc=A1_frictionGlassCalc_method1(dataBK,metaDataBK,secondMonitorMain
             force_avg_singleSetpoint(i)=mean(mean(force(:,start_indices(i):last)));
             force_std_singleSetpoint(i)=std(mean(force(:,start_indices(i):last)));
         end
-
+        force_avg_singleSetpoint=flip(force_avg_singleSetpoint);
+        force_std_singleSetpoint=flip(force_std_singleSetpoint);
         [x,y]=prepareCurveData(vertForceAVG,force_avg_singleSetpoint);
 
         %FITTING VERTICAl and LATERAL DEFLECTION (both expressed in Newton)
@@ -114,7 +111,7 @@ function avg_fc=A1_frictionGlassCalc_method1(dataBK,metaDataBK,secondMonitorMain
         figure(f1)
         hold on
         eqn = sprintf('y = %0.3gx + %0.3g', fitresult.p1, fitresult.p2);
-        pf(j)=plot(x,y,'DisplayName',sprintf('Fitted curve: %s',eqn),'Color',colors{j});
+        pf(j)=plot(x,y,'DisplayName',sprintf('Fitted curve: %s',eqn),'Color',colors{j},'LineWidth',2);
         ps=plot(vertForceAVG,force_avg_singleSetpoint,'k*','DisplayName','lateralForce_avg');
         pe=errorbar(vertForceAVG,force_avg_singleSetpoint,force_std_singleSetpoint, 'k', 'LineStyle', 'none', 'Marker','none','LineWidth', 1.5,'DisplayName','lateralForce_std');
         xlim([0,max(vertForceAVG) * 1.1]);
