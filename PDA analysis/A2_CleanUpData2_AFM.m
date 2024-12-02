@@ -156,7 +156,6 @@ function [varargout]=A2_CleanUpData2_AFM(data,setpoints,secondMonitorMain,newFol
         if length(vertForceAVG)~=numSetpoints
             warndlg('Number of rounded vertical forces is less than number of setpoint!')
         end
-        varargout{1}=vertForceAVG*1e-9;     % convert nanoNewton into Newton
 
         % plot the baseline trend
         if ~isempty(p.Results.metadata)

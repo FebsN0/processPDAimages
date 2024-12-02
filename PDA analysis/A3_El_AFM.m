@@ -1,4 +1,4 @@
-function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain,filepath,varargin)
+function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,secondMonitorMain,filepath,varargin)
 
 % The function extracts Images from the experiments.
 % It removes baseline and extracts foreground from the AFM image.
@@ -73,11 +73,12 @@ function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain,fil
     % Removing single selected portion leads to high error fitting. So it would be better just remove entire
     % line
     flagRemoval=false;
+    idxPortionRemoved=[];
     while true
         figure(f1)
         imagesc(rawH*1e9)
         ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
-        colormap parula, c = colorbar; c.Label.String = 'Height (nm)'; c.Label.FontSize=15;
+        colormap parula, c = colorbar; c.Label.String = 'Height [nm] (Note that it is not corrected yet)'; c.Label.FontSize=15;
         title(sprintf('%s Raw Height (measured) channel',text),'FontSize',17)
         answer = questdlg('Remove lines by selecting area?','','Yes','No','No');
         if strcmp(answer,'No')
@@ -97,10 +98,16 @@ function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,secondMonitorMain,fil
             % unclear
 
             rawH(:,xstart:xend)=min(min(rawH(:,[1:xstart-1 xend+1:end])));
+            % save the information of which region are removed. Useful for friction calculation to avoid
+            % entire area. Sometime the cantilever goes crazy. In case of normal experiment no problem because
+            % the removed region is considered background, so lateral and vertical deflection data are simply
+            % ignored. But in case of friction data, it may be a problem
+            idxPortionRemoved=[idxPortionRemoved; xstart xend];
             text='Portion Removed - ';
             flagRemoval=true;
         end
     end
+
     if flagRemoval
         axis equal, xlim([0 size(rawH,2)]), ylim([0 size(rawH,1)])
         saveas(f1,sprintf('%s\\resultA3_1_DefinitiveRawHeight_portionRemoved.tif',filepath))

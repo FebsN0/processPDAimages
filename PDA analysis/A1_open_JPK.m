@@ -2,11 +2,25 @@
 function [varargout]=A1_open_JPK(pathJpk,varargin)
 
     
-% the python file is assumed to be in a parallel directory to the current
-    mainFolder=fileparts(pwd);
-    pythonFile=sprintf('%s\\pythonCodes\\JPKScanTiffTags.py',mainFolder);
-             
-    
+% the python file is assumed to be in a directory called "PythonCodes". Find it to a max distance of 4 upper
+% folders
+    % Maximum levels to search
+    maxLevels = 4; originalPos=pwd; found=false;
+    for i=1:maxLevels
+        if exist("PythonCodes","dir")
+            found=true;
+            break
+        end
+        cd ..      
+    end
+    if ~found
+        error('PythonCodes directory not found. Please, put the directory close to "PDA analysis" folder or move to the proper position')
+    else
+        % Construct the path to the Python file
+        pythonFile = fullfile(pwd, 'PythonCodes', 'JPKScanTiffTags.py');
+        % return to original position
+        cd(originalPos)
+    end
 % This function opens .JPK image files and .JPK-force curves.
 % It is also able to import a number of parameters relative to the hile.
 %

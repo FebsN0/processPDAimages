@@ -54,14 +54,6 @@ secondMonitorMain=objInSecondMonitor;
 % upload .jpk files. If more than one and if from same experiment in which setpoint is changed, then assembly.
 [AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM,newFolder,setpoints,vertForceAVG]=A1_openANDassembly_JPK(secondMonitorMain);
 
-  
-if ~exist('newFolder','var')
-    newFolder=[];
-end
-if ~exist('secondMonitorMain','var')
-    secondMonitorMain=objInSecondMonitor;
-end
-
 close all
 % Substitute to the AFM cropped channels the baseline adapted LD
 while true
