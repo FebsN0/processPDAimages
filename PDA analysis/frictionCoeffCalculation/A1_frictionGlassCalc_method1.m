@@ -32,8 +32,7 @@ function avg_fc=A1_frictionGlassCalc_method1(dataBK,metaDataBK,secondMonitorMain
     else
         f1=figure('Visible','off');
     end
-    xlabel('Vertical Deflection [nN]','FontSize',15), ylabel('Lateral Deflection [nN]','FontSize',15), grid on
-    title(sprintf('Results of %d curves of AFM only background',numFiles),'FontSize',15);
+    limitsXYdata=zeros(2,2,numFiles);
     pfs=[];
     colors={"#0072BD","#D95319","#EDB120","#7E2F8E","#77AC30","#4DBEEE","#A2142F",'k'};
     for j=1:numFiles
@@ -99,7 +98,7 @@ function avg_fc=A1_frictionGlassCalc_method1(dataBK,metaDataBK,secondMonitorMain
         end
         force_avg_singleSetpoint=flip(force_avg_singleSetpoint);
         force_std_singleSetpoint=flip(force_std_singleSetpoint);
-        [x,y]=prepareCurveData(vertForceAVG,force_avg_singleSetpoint);
+        [x,y]=prepareCurveData(vertForceAVG,force_avg_singleSetpoint');
 
         %FITTING VERTICAl and LATERAL DEFLECTION (both expressed in Newton)
         % group of coefficients: p1 and p2 ==> val(x) = p1*x + p2
@@ -114,17 +113,29 @@ function avg_fc=A1_frictionGlassCalc_method1(dataBK,metaDataBK,secondMonitorMain
         pf(j)=plot(x,y,'DisplayName',sprintf('Fitted curve: %s',eqn),'Color',colors{j},'LineWidth',2);
         ps=plot(vertForceAVG,force_avg_singleSetpoint,'k*','DisplayName','lateralForce_avg');
         pe=errorbar(vertForceAVG,force_avg_singleSetpoint,force_std_singleSetpoint, 'k', 'LineStyle', 'none', 'Marker','none','LineWidth', 1.5,'DisplayName','lateralForce_std');
-        xlim([0,max(vertForceAVG) * 1.1]);
+
+        xMin=min(vertForceAVG); xMax=max(vertForceAVG);
+        yMin=min(force_avg_singleSetpoint-force_std_singleSetpoint); yMax=max(force_avg_singleSetpoint+force_std_singleSetpoint);
+        limitsXYdata(:,:,j)=[xMin,xMax;yMin,yMax];
         hold off        
         
         fc(j)=fitresult.p1;
         pfs=[pfs pf(j)];
     end
     legend([ps,pe,pfs],'Location','northwest','FontSize',15,'Interpreter','none')
+    
+    % find the absolute minimum and maximum in all the data to better show the final results
+    absMinX=min(limitsXYdata(1,1,:)); absMaxX=max(limitsXYdata(1,2,:));
+    absMinY=min(limitsXYdata(2,1,:)); absMaxY=max(limitsXYdata(2,2,:));
+    % prepare the plot for the definitive results
+    xlim([absMinX*0.7 absMaxX*1.1]), ylim([absMinY*0.7 absMaxY*1.1])
+
+    xlabel('Setpoint (nN)','Fontsize',15); ylabel('Delta Offset (nN)','Fontsize',15); grid on, grid minor
+    title('Delta Offset vs Vertical Force - Method 1','FontSize',20);
 
     %legend([ps,pe,pf(1),pf(2),pf(3)],'Location','northwest','FontSize',15)
     objInSecondMonitor(secondMonitorMain,f1);
-    saveas(f1,sprintf('%s/resultA5method1_2_DeltaOffsetVSsetpoint.tif',newFolder))
+    saveas(f1,sprintf('%s/resultMethod_1_DeltaOffsetVSsetpoint.tif',newFolder))
     avg_fc=mean(fc);
     
 end

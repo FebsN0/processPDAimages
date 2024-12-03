@@ -3,6 +3,8 @@ clc, clear, close all
 currDir=pwd;
 cd('E:\1_mixingPCinTRCDA\AFM data')
 
+secondMonitorMain=objInSecondMonitor;
+
 % to extract the friction coefficient, choose which method use.
 question=sprintf('Which method perform to extract the background friction coefficient?');
 options={ ...
@@ -11,9 +13,6 @@ options={ ...
     sprintf('3) Masking PDA + outlier removal features. Use the .jpk image containing both PDA and background\n(ReTrace Data required - Hover Mode OFF)')};
 choice = getValidAnswer(question, '', options);
 
-if ~exist('secondMonitorMain','var')
-    secondMonitorMain=objInSecondMonitor;
-end
 
        
 % methods 2 and 3 require the .jpk file with HOVER MODE OFF but in the same condition (same scanned PDA area
@@ -23,7 +22,7 @@ switch choice
     case 1
         nameOperation = "backgroundOnly";
         [AFM_onlyBK,metadata_onlyBK,~,~,filePath]=prepareData(nameOperation,secondMonitorMain);
-        fileResultPath=prepareDirResults(filePath,nameOperation);
+        fileResultPath=prepareDirResults(filePath);
         avg_fc=A1_frictionGlassCalc_method1(AFM_onlyBK,metadata_onlyBK,secondMonitorMain,fileResultPath);
     % method 2 or 3 : get the friction from BACKGROUND+PDA .jpk file experiments.
     case {2, 3} 
@@ -35,7 +34,7 @@ switch choice
             nameOperation = "backgroundCrystal_maskAndOutlierRemoval";
         end
         [AFM_onlyBK,metadata_onlyBK,AFM_heightIO_onlyBK,setpointN_onlyBK,filePath,nameScan]=prepareData(nameOperation,secondMonitorMain);
-        fileResultPath=prepareDirResults(filePath,nameOperation);
+        fileResultPath=prepareDirResults(filePath);
         resFit_friction=A1_frictionGlassCalc_method_2_3(AFM_onlyBK,metadata_onlyBK,AFM_heightIO_onlyBK,secondMonitorMain,fileResultPath,choice,nameScan);
 end
 clear question options
@@ -94,9 +93,9 @@ function [AFM_onlyBK,metadata_onlyBK,AFM_heightIO_onlyBK,setpointN_onlyBK,filePa
             latDefl_retrace = AFM_data(strcmpi([AFM_data.Channel_name],'Lateral Deflection') & strcmpi([AFM_data.Trace_type],'ReTrace')).AFM_image;
             avgValDataTrace= mean(latDefl_trace(:));
             avgValDataReTrace= mean(latDefl_retrace(:));
-            for i=1:size(idxRemovedPortion,1)
-                latDefl_trace(:,idxRemovedPortion(i,1):idxRemovedPortion(i,2))=avgValDataTrace;
-                latDefl_retrace(:,idxRemovedPortion(i,1):idxRemovedPortion(i,2))=avgValDataReTrace;
+            for j=1:size(idxRemovedPortion,1)
+                latDefl_trace(:,idxRemovedPortion(j,1):idxRemovedPortion(j,2))=avgValDataTrace;
+                latDefl_retrace(:,idxRemovedPortion(j,1):idxRemovedPortion(j,2))=avgValDataReTrace;
             end
             AFM_data(strcmpi([AFM_data.Channel_name],'Lateral Deflection') & strcmpi([AFM_data.Trace_type],'Trace')).AFM_image=latDefl_trace;
             AFM_data(strcmpi([AFM_data.Channel_name],'Lateral Deflection') & strcmpi([AFM_data.Trace_type],'Trace')).AFM_image=latDefl_retrace;
@@ -112,16 +111,17 @@ function [AFM_onlyBK,metadata_onlyBK,AFM_heightIO_onlyBK,setpointN_onlyBK,filePa
     end
 end
 
-function newFolder=prepareDirResults(filePath,nameOperation)
+function newFolder=prepareDirResults(filePath)
     % create a new directory where store the BK results of every processes scan
-    newFolder=fullfile(filePath,sprintf("Results of All %s scans",nameOperation));
+    newFolder=fullfile(filePath,"Results of All background scans");
     if exist(newFolder, 'dir')
         question= sprintf('Directory already exists and it may already contain previous results.\nDo you want to overwrite it or create new directory?');
-        options= {'Overwrite the existing dir','Create a new dir'};
-        if getValidAnswer(question,'',options) == 1
+        options= {'Keep the dir','Overwrite the existing dir','Create a new dir'};
+        answer=getValidAnswer(question,'',options);
+        if answer == 2
             rmdir(newFolder, 's');
             mkdir(newFolder);
-        else
+        elseif answer==3
             % create new directory with different name
             nameFolder = inputdlg('Enter the name new folder','',[1 80]);
             newFolder = fullfile(filePathData,nameFolder{1});
