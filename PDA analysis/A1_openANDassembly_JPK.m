@@ -325,7 +325,7 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
 
     % Further checks: the total scan area should be a square in term of um and pixels
     ratioLength=metaDataOrdered.x_scan_length_m\metaDataOrdered.y_scan_length_m;
-    if ratioLength ~= 1
+    if round(ratioLength,4) ~= 1.0
         warning('\n\ttratioLengthXY: %.2f\nX length is not the same as well as the Y length!!',ratioLength)
     end
     clear y_scan_pixelsAllScans y_scan_lengthAllScans y_OriginAllScans ratioLength ratioPixel idx allScansMetadataOrdered j i

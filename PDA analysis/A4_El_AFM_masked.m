@@ -92,7 +92,11 @@ function Cropped_Images_Bk=A4_El_AFM_masked(Cropped_Images,AFM_height_IO,secondM
         uiwait(msgbox('Click to continue'))
     end
     close(f1)
-    fh=figure;
+    if SeeMe
+        fh=figure('Visible','on');
+    else
+        fh=figure('Visible','off');
+    end
     histogram(AFM_noBk*1e9,100,'DisplayName','Distribution height');
     xlabel(sprintf('Feature height (nm)'),'FontSize',15)
     title('Distribution Height','FontSize',20)
