@@ -54,35 +54,45 @@ function resFrictionAllExp=A1_frictionGlassCalc_method1(dataBK,metaDataBK,second
         W = latDefl_trace - Delta;                          
         % convert W into force (in Newton units) using alpha calibration factor
         force=W*metadataSingle.Alpha;
-        % flip and rotate to have the start of scan line to left and the low setpoint to bottom)
-        force=rot90(flipud(force));
-        vertical_Trace=rot90(flipud(vertical_Trace));
-        vertical_ReTrace=rot90(flipud(vertical_ReTrace));
         % convert N into nN
         force=force*1e9;
         vertical_Trace=vertical_Trace*1e9;
         vertical_ReTrace=vertical_ReTrace*1e9;
        
-        % Remove extreme outliers using a defined threshold of 4nN ==> not reliable data ==> trace and retrace in vertical
-        % should be almost the same.
-        % This threshold is used as max acceptable difference between trace and retrace of vertical data        
+        %%%%%%% FIRST CLEARING %%%%%%%
+        % Remove outliers among Vertical Deflection data using a defined threshold of 4nN 
+        % ==> trace and retrace in vertical deflection should be almost the same.
+        % This threshold is used as max acceptable difference between trace and retrace of vertical data
         Th = 4;
         % average of each single fast line
-        vertTrace_avg = mean(vertical_Trace,2);
-        vertReTrace_avg = mean(vertical_ReTrace,2);
+        vertTrace_avg = mean(vertical_Trace);
+        vertReTrace_avg = mean(vertical_ReTrace);
         % find the idx (slow direction) for which the difference 
         % of average vertical force between trace and retrace is acceptable
         Idx = abs(vertTrace_avg - vertReTrace_avg) < Th;
-        % using this idx, remove strong outliers in entire lines in the lateral force too
-        force_fixed = force(Idx,:);
+        % using this idx, remove strong outliers in entire lines in the lateral force
+        force_firstClearing = force(:,Idx==1);
         % prepare the x data for the fitting
-        vertForce_avg_fixed = (vertTrace_avg(Idx,:) + vertReTrace_avg(Idx)) / 2;
-        % average the fast lines of force
-        [force_fixed_avg,vertForce_avg_fixed2]=feature_avgLatForce(force_fixed,vertForce_avg_fixed);
+        vertForce_firstClearing = (vertical_Trace(:,Idx==1) + vertical_Trace(:,Idx==1)) / 2;
+        
+        %%%%%% SECOND CLEARING %%%%%%%
+        % build 1-dimensional array which contain 0 or 1 according to the idx of regions manually removed 
+        % (0 = removed slow line)
+        array01RemovedRegion=ones(1,size(force_firstClearing,2));
+        if ~isempty(idxRemovedPortion)
+            for n=1:size(idxRemovedPortion,1)
+                array01RemovedRegion(idxRemovedPortion(n,1):idxRemovedPortion(n,2))=0;         
+            end
+        end
+        % remove the values in corrispondence of removed regions
+        vertForce_secondClearing=vertForce_firstClearing(:,array01RemovedRegion==1);
+        force_secondClearing=force_firstClearing(:,array01RemovedRegion==1);
+        % clean and obtain the averaged vector
+        [vertForce_avg,force_avg]=feature_avgLatForce(vertForce_secondClearing,force_secondClearing);
         % plot the experimental data
-        limitsXYdata(:,:,j)=feature_plotErrorBar(vertForce_avg_fixed2,force_fixed_avg,j,nameScan);
+        limitsXYdata(:,:,j)=feature_plotErrorBar(vertForce_avg,force_avg,j,nameScan);
         % fit the data and plot the fitted curve
-        resFit=feature_fittingForceSetpoint(vertForce_avg_fixed2,force_fixed_avg,j);   
+        resFit=feature_fittingForceSetpoint(vertForce_avg,force_avg,j);   
         % store the slope and offset
         resFrictionAllExp(j).slope=resFit(1);
         resFrictionAllExp(j).offset=resFit(2);         

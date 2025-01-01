@@ -1,4 +1,4 @@
-function resFrictionAllExp=A1_frictionGlassCalc_method_2_3(AFM_AllScanImages,metadata_AllScan,AFM_AllScan_height_IO,secondMonitorMain,newFolder,choice,nameScan_AllScan,varargin)
+function resFrictionAllExp=A1_frictionGlassCalc_method_2_3(AFM_AllScanImages,metadata_AllScan,AFM_AllScan_height_IO,secondMonitorMain,newFolder,choice,nameScan_AllScan,idxRemovedPortion_onlyBK,varargin)
 
 % This function opens the AFM data previously created to calculate the background friction
 % coefficient. This method should be more accurated than the method 1.
@@ -41,10 +41,11 @@ function resFrictionAllExp=A1_frictionGlassCalc_method_2_3(AFM_AllScanImages,met
         % extract the needed data
         dataSingle=AFM_AllScanImages{j};
         metadataSingle=metadata_AllScan{j};
-        numSetpoint=length(metadataSingle.SetP_N);
+        Setpoint=round((metadataSingle.SetP_N)*1e9);
         AFM_height_IO=AFM_AllScan_height_IO{j};
         nameScan=nameScan_AllScan{j};
         resFrictionAllExp(j).nameScan = nameScan;
+        idxRemovedPortion=idxRemovedPortion_onlyBK{j};
         % extract data (lateral deflection Trace and Retrace, vertical deflection) and then mask (BK-PDA)
         % elementXelement ==> 
         %       1 (crystal)   => 0
@@ -53,6 +54,18 @@ function resFrictionAllExp=A1_frictionGlassCalc_method_2_3(AFM_AllScanImages,met
         Lateral_ReTrace_masked  = (dataSingle(strcmpi([dataSingle.Channel_name],'Lateral Deflection') & strcmpi([dataSingle.Trace_type],'ReTrace')).AFM_image).*(~AFM_height_IO);
         vertical_Trace   = (dataSingle(strcmpi([dataSingle.Channel_name],'Vertical Deflection') & strcmpi([dataSingle.Trace_type],'Trace')).AFM_image);
         vertical_ReTrace = (dataSingle(strcmpi([dataSingle.Channel_name],'Vertical Deflection') & strcmpi([dataSingle.Trace_type],'ReTrace')).AFM_image);
+        % note: in case of portions previously removed, a specific check is required to not consider the
+        % values in corrispondence of removed portions
+        for i=1:size(Lateral_Trace_masked,2)
+            for n=1:size(idxRemovedPortion,1)
+                if i >= idxRemovedPortion(n,1) && i <= idxRemovedPortion(n,2)
+                    Lateral_Trace_masked(:,i)=0;
+                    Lateral_ReTrace_masked(:,i)=0;
+                    vertical_Trace(:,i)=0;
+                    vertical_ReTrace(:,i)=0;
+                end
+            end
+        end
         alpha=metadataSingle.Alpha;
         % Calc Delta (offset loop) in BK only
         Delta = (Lateral_Trace_masked + Lateral_ReTrace_masked) / 2;
@@ -60,26 +73,21 @@ function resFrictionAllExp=A1_frictionGlassCalc_method_2_3(AFM_AllScanImages,met
         W = Lateral_Trace_masked - Delta;            
         % convert W into force (in Newton units) using alpha calibration factor and show results.
         force=W*alpha;
-        % flip and rotate to have the start of scan line to left and the low setpoint to bottom)
-        force=rot90(flipud(force));
-        vertical_Trace=rot90(flipud(vertical_Trace));
-        vertical_ReTrace=rot90(flipud(vertical_ReTrace));
         % convert N into nN
         force=force*1e9;
         vertical_Trace=vertical_Trace*1e9;
         vertical_ReTrace=vertical_ReTrace*1e9;
 
-        % plot lateral (masked force, N) and vertical data (masked force, N). Not show up but save fig
-        
+        % plot lateral (masked force, N) and vertical data (masked force, N). Not show up but save fig        
         f1=figure('Visible','off');
         subplot(121)
-        imagesc(flip(force))
+        imagesc(force)
         c= colorbar; c.Label.String = 'Force [nN]'; c.FontSize = 15;
         title({'Lateral Force in BK regions';'(PDA masked out)'},'FontSize',20)
         xlabel(' fast direction - scan line','FontSize',15), ylabel('slow direction','FontSize',15)
         axis equal, xlim([0 size(force,2)]), ylim([0 size(force,1)])
         subplot(122)
-        imagesc(flip(vertical_Trace.*(~rot90(flipud(AFM_height_IO)))))
+        imagesc(vertical_Trace.*(~AFM_height_IO))
         c= colorbar; c.Label.String = 'Force [nN]'; c.FontSize = 15;
         title({'Vertical Force in BK regions';'(PDA masked out)'},'FontSize',20)
         sgtitle(sprintf('Background of %s',nameScan),'Fontsize',20,'interpreter','none')
@@ -89,28 +97,44 @@ function resFrictionAllExp=A1_frictionGlassCalc_method_2_3(AFM_AllScanImages,met
         saveas(f1,fullfile(newFolder,sprintf('resultMethod_mask_2_3_Lat_Vert_ForceInBKregions_scan_%s.tif',nameScan)))
         close(f1)
 
-
-        % Remove outliers using a defined threshold of 4nN ==> not reliable data ==> trace and retrace in vertical
-        % should be almost the same.
+        %%%%%%% FIRST CLEARING %%%%%%%
+        % Remove outliers among Vertical Deflection data using a defined threshold of 4nN 
+        % ==> trace and retrace in vertical deflection should be almost the same.
         % This threshold is used as max acceptable difference between trace and retrace of vertical data        
         Th = 4;
         % average of each single fast line
-        vertTrace_avg = mean(vertical_Trace,2);
-        vertReTrace_avg = mean(vertical_ReTrace,2);
+        vertTrace_avg = mean(vertical_Trace);
+        vertReTrace_avg = mean(vertical_ReTrace);
         % find the idx (slow direction) for which the difference 
         % of average vertical force between trace and retrace is acceptable
         Idx = abs(vertTrace_avg - vertReTrace_avg) < Th;
         % using this idx, remove strong outliers in entire lines in the lateral force
-        force_fixed = force(Idx,:);
+        force_firstClearing = force(:,Idx==1);
         % prepare the x data for the fitting
-        vertForce_avg_fixed = (vertTrace_avg(Idx,:) + vertReTrace_avg(Idx)) / 2;
+        vertForce_firstClearing = (vertical_Trace(:,Idx==1) + vertical_Trace(:,Idx==1)) / 2;
+
+        %%%%%% SECOND CLEARING %%%%%%%
+        % build 1-dimensional array which contain 0 or 1 according to the idx of regions manually removed 
+        % (0 = removed slow line)
+        array01RemovedRegion=ones(1,size(force_firstClearing,2));
+        if ~isempty(idxRemovedPortion)
+            for n=1:size(idxRemovedPortion,1)
+                array01RemovedRegion(idxRemovedPortion(n,1):idxRemovedPortion(n,2))=0;         
+            end
+        end
+        % remove the values in corrispondence of removed regions
+        vertForce_secondClearing=vertForce_firstClearing(:,array01RemovedRegion==1);
+        force_secondClearing=force_firstClearing(:,array01RemovedRegion==1);
 
         % depending on the choosen method
         if choice == 2
-            [force_fixed_avg,vertForce_avg_fixed2]=avgLatForce(force_fixed,vertForce_avg_fixed);
             figure(f_fcAll)
-            limitsXYdata(:,:,j)=plotErrorBar(vertForce_avg_fixed2,force_fixed_avg,j,nameScan);
-            resFit=fittingForceSetpoint(vertForce_avg_fixed2,force_fixed_avg,j);
+            % put zero in those element of vertical data in correspondence of zero element of lateral data
+            vertForce_secondClearing(force_secondClearing==0)=0;
+            [vertForce_avg,force_avg]=feature_avgLatForce(vertForce_secondClearing,force_secondClearing);
+            % plot experimental values (avg and std)            
+            limitsXYdata(:,:,j)=feature_plotErrorBar(vertForce_avg,force_avg,j,nameScan);
+            resFit=feature_fittingForceSetpoint(vertForce_avg,force_avg,j,'fitting','Yes','image','Yes');
             fOutlierRemoval_text='';
         else
     %%%%%%%%%%%------- SETTING PARAMETERS FOR THE EDGE REMOVAL -------%%%%%%%%%%%
@@ -142,12 +166,12 @@ function resFrictionAllExp=A1_frictionGlassCalc_method_2_3(AFM_AllScanImages,met
                 end
 
                 % show a dialog box indicating the index of fast scan line along slow direction and which pixel size is processing
-                wb=waitbar(0/size(force_fixed,1),sprintf('Image %d - Processing the Outliers Removal Mode %d (pixel size %d / %d) \n\t Line %.0f Completeted  %2.1f %%',j,fOutlierRemoval,0,pixData(1),0,0),...
+                wb=waitbar(0/size(force_secondClearing,2),sprintf('Image %d - Processing the Outliers Removal Mode %d (pixel size %d / %d) \n\t Line %.0f Completeted  %2.1f %%',j,fOutlierRemoval,0,pixData(1),0,0),...
                          'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
                 setappdata(wb,'canceling',0);               
             else
                 % reset the bar
-                waitbar(0/size(force_fixed,1),wb,sprintf('Image %d - Processing the Outliers Removal Mode %d (pixel size %d / %d) \n\t Line %.0f Completeted  %2.1f %%',j,fOutlierRemoval,0,pixData(1),0,0));
+                waitbar(0/size(force_secondClearing,2),wb,sprintf('Image %d - Processing the Outliers Removal Mode %d (pixel size %d / %d) \n\t Line %.0f Completeted  %2.1f %%',j,fOutlierRemoval,0,pixData(1),0,0));
             end
             
             % start the counter for removal and init variables where store all the results, in order to
@@ -156,14 +180,23 @@ function resFrictionAllExp=A1_frictionGlassCalc_method_2_3(AFM_AllScanImages,met
             arrayPixSizes=0:pixData(2):pixData(1);
             fitResults_fc=zeros(length(arrayPixSizes),2);
             xDataAllPixelSizes=cell(length(arrayPixSizes),1);
+            yDataAllPixelSizes=cell(length(arrayPixSizes),1);
+            avg_fc_pix=zeros(1,length(arrayPixSizes));
             for pix = arrayPixSizes
                 % init matrix.
-                filteredForce = zeros(size(force_fixed));                                     
-                % process the single fast scan line with a given pixel size
-                for i=1:size(force_fixed,1)
-
-                    filteredForce(i,:) = A1_method3feature_DeleteEdgeDataAndOutlierRemoval(force_fixed(i,:), pix, fOutlierRemoval);
-                       
+                force_thirdClearing = zeros(size(force_secondClearing));
+                % copy and then put zeros according to the lateral force
+                vertForce_thirdClearing = vertForce_secondClearing;
+                % process the single fast scan line with a given pixel size. Delete the outliers
+                for i=1:size(force_thirdClearing,2)
+                    % provide i-th single fast scan line and obtain new processed fast line with new zero
+                    % elements
+                    latTmp = A1_method3feature_DeleteEdgeDataAndOutlierRemoval(force_secondClearing(:,i), pix, fOutlierRemoval);                                           
+                    force_thirdClearing(:,i)=latTmp;
+                    % remove the elements in the vertical data where there are zero values in lateral data                    
+                    vertTmp=vertForce_thirdClearing(:,i);
+                    vertTmp(latTmp==0)=0;
+                    vertForce_thirdClearing(:,i)=vertTmp;                    
                     % update dialog box and check if cancel is clicked
                     if(exist('wb','var'))
                         %if cancel is clicked, stop and delete dialog
@@ -171,39 +204,50 @@ function resFrictionAllExp=A1_frictionGlassCalc_method_2_3(AFM_AllScanImages,met
                             error('Manually stopped the process')
                         end
                     end
-                    waitbar(i/size(force_fixed,1),wb,sprintf('Image %d - Processing the Outliers Removal Mode %d (pixel size %d / %d) \n\t Line %.0f Completeted  %2.1f %%',j,fOutlierRemoval,pix,pixData(1),i,i/size(force_fixed,1)*100));
+                    waitbar(i/size(force_secondClearing,2),wb,sprintf('Image %d - Processing the Outliers Removal Mode %d (pixel size %d / %d) \n\t Line %.0f Completeted  %2.1f %%',j,fOutlierRemoval,pix,max(arrayPixSizes),i,i/size(force_firstClearing,2)*100));
                 end
-                % get the average of the removed-pixel lateral force and re-adjust vertical data depending on
-                % lateral force
-                [filteredForce_avg_fixed,vertForce_avg_fixed2,numSetpFit]=avgLatForce(filteredForce,vertForce_avg_fixed);
-                
-                % obtain the friction coeff as single fitting
-                [fitResults,xData]=fittingForceSetpoint(vertForce_avg_fixed2,filteredForce_avg_fixed);
-                avg_fc_tmp=fitResults(1);
+                % to fit, use the average of single fast scan line. In this way, it will be possible track the
+                % removal of entire block. Otherwise, prepareCurve provide entire block difficult to
+                % distinguish. For example, since there are vertical values higher than the setpoint, the
+                % unique function won't provide number of elements equal to the number of setpoint               
+                [vertForce_avg,force_avg]=feature_avgLatForce(vertForce_thirdClearing,force_thirdClearing);
+                % if one of the block in lateral force is totally zeroed because of the pix removal 
+                % (very common for large pix size), stop the execution. Since the zeroing is simultaneous to
+                % vertical data too, use the latter to easy reference.
+                % Moreover, it could happen that by removing edges, the average of vertical data shift away
+                % because there is another spike. Stop the calcultion also in this case because low
+                % reliability
+                SetpFit=unique(round(vertForce_avg,-1));
+                if ~isequal(SetpFit,Setpoint)
+                    uiwait(msgbox(sprintf('Missing data in the fitting \x2192 stopped calculation!'),''));
+                    break
+                end
+                % obtain the friction coeff as single fitting. No plot
+                % fitting the lateral versus vertical data.
+                [fitResults,xData,yData]=feature_fittingForceSetpoint(vertForce_avg,force_avg,j,'fitting','Yes','imageProcessing','No');
+                avg_fc_tmp=fitResults(1);               
+
                 % two way to stop the removal code
                 % 1) slope higher than 0.95 has no sense
                 % 2) number of overall common vertical force lower than used setpoint
                 if avg_fc_tmp > 0.95 %%|| p(1) < 0
                     uiwait(msgbox(sprintf('Slope outside the reasonable range ( 0 < m < 0.95 ) \x2192 stopped calculation!'),''));
                     break
-                elseif numSetpFit < numSetpoint
-                    uiwait(msgbox(sprintf('Missing data in the fitting \x2192 stopped calculation!'),''));
-                    break
                 end
                 
-                % store the results of every pix size.
+                % store the results of every pix size if no break occurred
                 fitResults_fc(Cnt,:)=fitResults;
                 xDataAllPixelSizes{Cnt}=xData;
-                avg_fc_pix(Cnt) = fitResults_fc(Cnt);                                       %#ok<AGROW>
-                pixx(Cnt) = pix;                                                            %#ok<AGROW>
-                filteredForce_avg_fixed_allPix{Cnt}=filteredForce_avg_fixed;                %#ok<AGROW>
-                vertForce_avg_fixed2_allPix{Cnt}=vertForce_avg_fixed2;                      %#ok<AGROW>
+                yDataAllPixelSizes{Cnt}=yData;
+                avg_fc_pix(Cnt) = fitResults(1);                
                 Cnt = Cnt+1;
             end
-            
+            % prepare the end data
+            pix=arrayPixSizes(1:Cnt-1);
+            avg_fc_pix=avg_fc_pix(1:Cnt-1);
             % plot all the frictions coefficient in function of pixel size          
             f2=figure;         
-            plot(pixx, avg_fc_pix, 'x-','LineWidth',2,'MarkerSize',10,'Color','blue'); grid on
+            plot(pix, avg_fc_pix, 'x-','LineWidth',2,'MarkerSize',10,'Color','blue'); grid on
             xlabel('Pixel size','fontsize',15); ylabel('Glass friction coefficient','fontsize',15);
             title(sprintf('Result Method 3 (Mask + Outliers Removal - %s)',fOutlierRemoval_text(2:end)),'FontSize',20);
             if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2); end
@@ -213,32 +257,21 @@ function resFrictionAllExp=A1_frictionGlassCalc_method_2_3(AFM_AllScanImages,met
             hold on
             scatter(pixData(2)*idx_x-pixData(2),avg_fc_pix(idx_x),400,'pentagram','filled', 'MarkerFaceColor', 'red');
             
-            % extract the correct　data depending on the chosen idx
-            avg_fc_def=avg_fc_pix(idx_x);
-            filteredForce_avg_fixed=filteredForce_avg_fixed_allPix{idx_x};
-            vertForce_avg_fixed2=vertForce_avg_fixed2_allPix{idx_x};   
+            % extract the correct　data depending on the chosen idx              
+            resFit=fitResults_fc(idx_x,:);
+            vertForce_avg_best=xDataAllPixelSizes{idx_x};
+            force_avg_best=yDataAllPixelSizes{idx_x};
             % finish the plot and save
             mainText=sprintf('Result Method 3 (Mask + Outliers Removal - %s) - %s',fOutlierRemoval_text(2:end),nameScan);
-            resultChoice= sprintf('Friction coefficient: %0.3g',avg_fc_def);
+            resultChoice= sprintf('Friction coefficient: %0.3g',avg_fc_pix(idx_x));
             title({mainText; resultChoice},'FontSize',20,'interpreter','none');            
             saveas(f2,sprintf('%s/resultMethod3_1_pixelVSfrictionCoeffs_%s%s.tif',newFolder,nameScan,fOutlierRemoval_text))
             close(f2)
-            % return to the main general figure where compare all the scans. Plot the errorbar and take the
-            % min max XY values to better figure limits
+            % return to the main general figure where compare all the scans.
+            % Plot the errorbar and the fitted curve and take the min max XY values to better figure limits
             figure(f_fcAll)
-            limitsXYdata(:,:,j)=plotErrorBar(vertForce_avg_fixed2,filteredForce_avg_fixed,j,nameScan);
-            % based on the chosen idx, take the relative fittting results to plot the fitting curve
-            resFit=fitResults_fc(idx_x,:);
-            xdataDef=xDataAllPixelSizes{idx_x};
-            xfit=linspace(min(xdataDef),max(xdataDef),100);
-            yfit=xfit*resFit(1)+resFit(2);
-            hold on
-            if resFit(2) < 0
-                signM='-';
-            else
-                signM='+';
-            end
-            plot(xfit, yfit, '-.','color',globalColor(j),'DisplayName',sprintf('%s: %0.3g x %s %0.3g',nameScan,resFit(1),signM,abs(resFit(2))),'LineWidth',2);  
+            limitsXYdata(:,:,j)=feature_plotErrorBar(vertForce_avg_best,force_avg_best,j,nameScan);
+            feature_fittingForceSetpoint(vertForce_avg_best,force_avg_best,j,'fitting','No','imageProcessing','Yes','fitResults',resFit);
         end
         resFrictionAllExp(j).slope=resFit(1);
         resFrictionAllExp(j).offset=resFit(2);       
@@ -261,75 +294,3 @@ function resFrictionAllExp=A1_frictionGlassCalc_method_2_3(AFM_AllScanImages,met
     end     
 end
 
- 
-
-function [force_fixed_avg,vert_fixed_avg,numSetpFit]=avgLatForce(force,vert_avg)    
-    force_fixed_avg = zeros(1, size(force,1));
-    % adjust again vertical force
-    % average fast line of lateral force ignoring zero values
-    for i=1:size(force,1)
-        tmp = force(i,:);
-        force_fixed_avg(i) = mean(tmp(tmp~=0));
-    end  
-    % remove nan data and lines from vertical force using lateral force
-    force_fixed_avg = force_fixed_avg(~isnan(force_fixed_avg));
-    vert_fixed_avg = vert_avg(~isnan(force_fixed_avg));
-    numSetpFit=length(unique(round(vert_fixed_avg)));
-end
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%% SAME FUNCTION FOR METHOD 2 and 3 but method 3 uses this function %%%
-%%% many times depending on pix value                                %%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Output = fitting results. Useful to plot the results of every methods for better comparison
-function [p,xData]=fittingForceSetpoint(x,y,varargin)
-    % Linear fitting
-    [xData, yData] = prepareCurveData(x,y');
-    % Set up fittype and options.
-    ft = fittype( 'poly1' ); opts = fitoptions( 'Method', 'LinearLeastSquares' ); opts.Robust = 'LAR';
-    % Fit model to data.
-    fitresult = fit( xData, yData, ft, opts );
-    p(1)=fitresult.p1;
-    p(2)=fitresult.p2;
-    % in case of method 2, plot the relation of a given experiment.
-    % in case of method 3, avoid to plot every curve
-    if nargin == 3
-        xfit=linspace(min(xData),max(xData),100);
-        yfit=xfit*p(1)+p(2);
-        if p(2) < 0
-            signM='-';
-        else
-            signM='+';
-        end
-        plot(xfit, yfit, '-.','color',globalColor(varargin{1}),'DisplayName',sprintf('Fitted data: %0.3g x %s %0.3g',p(1),signM,abs(p(2))),'LineWidth',2);    
-    end
-end               
-
-
-% pseudo global variable
-function col = globalColor(n)
-    colors={"#0072BD","#D95319","#EDB120","#7E2F8E","#77AC30","#4DBEEE","#A2142F",'k','#FF00FF','#00FF00','#0000FF','#FF0000'};
-    col=colors{n};
-end
-
-
-% since the size of the two array may chance when pix size increase, the best approach is to find the
-% variation point in verticalData
-function limsXY=plotErrorBar(vertForce,latForce,j,nameScan)
-    [x,idx]=unique(round(vertForce));
-    latForce_Blocks=cell(1,length(idx));
-    for i =1:length(idx)-1
-        latForce_Blocks{i}=latForce(idx(i):(idx(i+1)-1));
-    end
-    latForce_Blocks{end}=latForce(idx(end):end);
-    y=cellfun(@mean,latForce_Blocks);
-    err=cellfun(@std,latForce_Blocks);
-    errorbar(x,y,err,'-s','Linewidth',1.3,'capsize',15,'Color',globalColor(j),...
-        'markerFaceColor',globalColor(j),'markerEdgeColor',globalColor(j),'MarkerSize',10,...
-        'DisplayName',sprintf('Experiment %s',nameScan));
-    % store the max and min of each axis for a better show
-    xMin=min(x); xMax=max(x);
-    yMin=min(y-err); yMax=max(y+err);
-    limsXY=[xMin,xMax;yMin,yMax];
-end
