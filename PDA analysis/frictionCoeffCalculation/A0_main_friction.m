@@ -8,33 +8,24 @@ options={ ...
     sprintf('1) Average fast scan lines containing only background.\nUse the .jpk image containing only background'), ...
     sprintf('2) Masking PDA feature. Use the .jpk image containing both PDA and background\n(ReTrace Data required - Hover Mode OFF)'), ... 
     sprintf('3) Masking PDA + outlier removal features. Use the .jpk image containing both PDA and background\n(ReTrace Data required - Hover Mode OFF)')};
-choice = getValidAnswer(question, '', options);   
+method = getValidAnswer(question, '', options);   
+clear question options
 
-% methods 2 and 3 require the .jpk file with HOVER MODE OFF but in the same condition (same scanned PDA area
-% of when HOVER MODE is ON)
-switch choice
+switch method
     % method 1 : get the friction from ONLY BACKGROUND .jpk file experiments.
     case 1
         nameOperation = "backgroundOnly";
-        [AFM_onlyBK,metadata_onlyBK,~,filePath,nameScan,idxRemovedPortion_onlyBK]=prepareData(nameOperation,secondMonitorMain,filePath);        
-        fileResultPath=prepareDirResults(filePath);
-        avg_fc=A1_frictionGlassCalc_method1(AFM_onlyBK,metadata_onlyBK,secondMonitorMain,fileResultPath,nameScan,idxRemovedPortion_onlyBK);
     % method 2 or 3 : get the friction from BACKGROUND+PDA .jpk file experiments.
-    case {2, 3} 
-        % METHOD 2 : MASKING ONLY
-        % METHOD 3 : MASKING + OUTLIER REMOVAL
-        if choice ==2
-            nameOperation = "backgroundCrystal_maskOnly";
-        else
-            nameOperation = "backgroundCrystal_maskAndOutlierRemoval";
-        end
-        [AFM_onlyBK,metadata_onlyBK,AFM_heightIO_onlyBK,filePath,nameScan,idxRemovedPortion_onlyBK]=prepareData(nameOperation,secondMonitorMain,filePath);
-        fileResultPath=prepareDirResults(filePath);
-        resFit_friction=A1_frictionGlassCalc_method_2_3(AFM_onlyBK,metadata_onlyBK,AFM_heightIO_onlyBK,secondMonitorMain,fileResultPath,choice,nameScan,idxRemovedPortion_onlyBK);
+    case 2
+        nameOperation = "backgroundCrystal_maskOnly";
+    case 3
+        nameOperation = "backgroundCrystal_maskAndOutlierRemoval";
 end
-clear question options
-close all
 
+[AFM_onlyBK,metadata_onlyBK,AFM_heightIO_onlyBK,filePath,nameScan,idxRemovedPortion_onlyBK]=prepareData(nameOperation,secondMonitorMain,filePath);        
+fileResultPath=prepareDirResults(filePath);  
+resFit_friction=A1_frictionCalc_method_1_2_3(AFM_onlyBK,metadata_onlyBK,AFM_heightIO_onlyBK,secondMonitorMain,fileResultPath,method,nameScan,idxRemovedPortion_onlyBK);
+close all
 
 function varargout=prepareData(nameOperation,secondMonitorMain,filePath)
     % prepare the data to calculate the friction, regardless the method.
@@ -76,7 +67,7 @@ function varargout=prepareData(nameOperation,secondMonitorMain,filePath)
         end
 
 % method 1: AFM_onlyBK,metadata_onlyBK,secondMonitorMain,filePath
-% method 2_3: metaDataHoverModeOFF.Alpha,AFM_HeightFittedMasked_HVOFF,AFM_height_IO_HVOFF,vertforceAVG_HVOff,secondMonitorMain,filePathHV,choice
+% method 2_3: metaDataHoverModeOFF.Alpha,AFM_HeightFittedMasked_HVOFF,AFM_height_IO_HVOFF,vertforceAVG_HVOff,secondMonitorMain,filePathHV,method
         
         % if never processed, then pre process the AFM data and save the results
         if flag_exeA1
