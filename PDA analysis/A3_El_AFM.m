@@ -41,7 +41,6 @@ function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,sec
     argName = 'fitOrder';   defaultVal = '';        addParameter(p,argName,defaultVal, @(x) ismember(x,{'','Low','Medium','High'}));
     argName = 'AutoElab';   defaultVal = 'No';      addParameter(p, argName, defaultVal,@(x) ismember(x,{'No','Yes'}));
     argName = 'Silent';     defaultVal = 'Yes';     addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
-    argName = 'SaveFig';    defaultVal = 'Yes';     addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     % validate and parse the inputs
     parse(p,filtData,varargin{:});
     clearvars argName defaultVal
@@ -56,7 +55,6 @@ function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,sec
     end
 
     if(strcmp(p.Results.Silent,'Yes'));  SeeMe=0; else, SeeMe=1; end
-    if(strcmp(p.Results.SaveFig,'Yes')); SavFg=1; else, SavFg=0; end
     
     % Extract the height channel
     raw_data_Height=filtData(strcmp([filtData.Channel_name],'Height (measured)')).AFM_image;
@@ -64,67 +62,18 @@ function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,sec
     raw_data_Height=flip(rot90(raw_data_Height),2);
     rawH=raw_data_Height;
     
-    f1=figure; 
-    objInSecondMonitor(secondMonitorMain,f1);
-    text='Original';
-    
-    % in this snippet, remove outliers and data corresponding to those when the tip is not scanning anymore or
-    % applying the plane fitting selecting background areas. Remove ENTIRE LINE.
-    % Removing single selected portion leads to high error fitting. So it would be better just remove entire
-    % line
-    flagRemoval=false;
-    idxPortionRemoved=[];
-    while true
-        figure(f1)
-        imagesc(rawH*1e9)
-        ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
-        colormap parula, c = colorbar; c.Label.String = 'Height [nm] (Note that it is not corrected yet)'; c.Label.FontSize=15;
-        title(sprintf('%s Raw Height (measured) channel',text),'FontSize',17)
-        answer = questdlg('Remove lines by selecting area?','','Yes','No','No');
-        if strcmp(answer,'No')
-            break
-        else
-            hold on  
-            title('Select area to remove all the fast scan lines corresponding to the selected area.','FontSize',17)
-            roi=drawrectangle('Label','Removed');
-            uiwait(msgbox('Click to continue'))
-            hold off
-            % take the coordinates along slow scan direction. Not useful extracting y coordinates because
-            % entire lines will be deleted
-            xstart = round(roi.Position(1));     xend = xstart+round(roi.Position(3));
-            if xstart<1, xstart=1; end;     if xend<1, xend=1; end
-            % substitute the value of selected lines with the minimum value.
-            % note: the min value is the one outside the selected area. Sometimes is very very low making it
-            % unclear
-
-            rawH(:,xstart:xend)=min(min(rawH(:,[1:xstart-1 xend+1:end])));
-            % save the information of which region are removed. Useful for friction calculation to avoid
-            % entire area. Sometime the cantilever goes crazy. In case of normal experiment no problem because
-            % the removed region is considered background, so lateral and vertical deflection data are simply
-            % ignored. But in case of friction data, it may be a problem
-            idxPortionRemoved=[idxPortionRemoved; xstart xend];
-            text='Portion Removed - ';
-            flagRemoval=true;
-        end
-    end
-
-    if flagRemoval
-        axis equal, xlim([0 size(rawH,2)]), ylim([0 size(rawH,1)])
-        saveas(f1,sprintf('%s\\resultA3_1_DefinitiveRawHeight_portionRemoved.tif',filepath))
-    end
-    close(f1)
     for i=1:size(filtData,2)
         if i==1             % put the fixed raw height data channel
             AFM_Images(i)=struct(...
                 'Channel_name', filtData(i).Channel_name,...
                 'Trace_type', filtData(i).Trace_type, ...
-                'AFM_image', rawH);
+                'AFM_image', rawH); %#ok<AGROW>
         else
             temp_img=flip(rot90(filtData(i).AFM_image),2);
             AFM_Images(i)=struct(...
                     'Channel_name', filtData(i).Channel_name,...
                     'Trace_type', filtData(i).Trace_type, ...
-                    'AFM_image', temp_img);
+                    'AFM_image', temp_img); %#ok<AGROW>
         end
     end
 
@@ -133,7 +82,7 @@ function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,sec
         'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
     setappdata(wb,'canceling',0);
     N_Cycluse_waitbar=size(height_image,2);    
-    % Polynomial baseline fitting (line by line)
+    % Polynomial baseline fitting (line by line) ==> remove the "tilted" effect, which is order 1
     poly_filt_data=zeros(size(height_image,1),size(height_image,2));
     for i=1:size(height_image,2)
         if(exist('wb','var'))
@@ -141,12 +90,14 @@ function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,sec
             if getappdata(wb,'canceling'), error('Process cancelled'), end
         end
         waitbar(i/N_Cycluse_waitbar,wb,sprintf('Removing Polynomial Baseline ... Completed %2.1f %%',i/N_Cycluse_waitbar*100));
-        % prepareCurveData function clean the data like Removing NaN or Inf, converting nondouble to double, converting complex to 
-        % real and returning data as columns regardless of the input shapes.
-        % extract the i-th column of the image ==> fitting on single column
+        % prepareCurveData function clean the data like Removing NaN or Inf, converting nondouble to double,
+        % converting complex to  real and returning data as columns regardless of the input shapes.
+        % extract the i-th column of the image ==> fitting on single column (fast lines)
         [xData,yData] = prepareCurveData((1:size(height_image,1))',height_image(:,i));
         % in case of insufficient number of values for a given line (like entire line removed previously), skip the fitting
+        % find better solution to manage these lines...
         if length(xData) <= 2 || length(yData) <= 2
+            warning("The %d-th line has not enough data for fitting ==> skipped",i)
             poly_filt_data(:,i)=height_image(:,i);
             continue
         end
@@ -162,6 +113,29 @@ function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,sec
         flag_poly_filt_data=height_image(:,i)-baseline_y;
         poly_filt_data(:,i)=flag_poly_filt_data-min(min(flag_poly_filt_data));
     end
+    
+    if SeeMe
+        f1=figure('Visible','on');
+    else
+        f1=figure('Visible','off');
+    end
+
+    imshow(poly_filt_data/max(poly_filt_data(:)));
+    title('Height (measured) channel - Line Tilted effect removed', 'FontSize',16), 
+    colormap parula; c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
+    objInSecondMonitor(secondMonitorMain,f1);
+    saveas(f1,sprintf('%s\\resultA3_1_HeightRemovedTiltLine.tif',filepath))
+    
+    if SeeMe
+        uiwait(msgbox('Click to continue'))
+    end
+    close(f1)
+
+    % remove regions manually considered outliers by substuting the values with NaN. Not good entire remotion.
+    % for better details, see the documentation of the function
+    % 3 because it A3 and 2 because it generates the 2nd image during the A3 running
+    [poly_filt_data,idxPortionRemoved]=A3_featureRemovePortion(poly_filt_data,secondMonitorMain,filepath,3,2);
+
     waitbar(0/N_Cycluse_waitbar,wb,sprintf('Optimizing Butterworth Filter...'));
     % distribute the fitted data among bins using N bins. OUTUPUT: Y=bin counts; E= bin edges
     % many will be zero (background), whereas other will be low to high height
@@ -188,8 +162,10 @@ function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,sec
         end
     end
     
-
-    %%% MAYBE NOT NECESSARY ANYMORE
+    %%% MAYBE NOT NECESSARY ANYMORE: not really clear how much useful it is... it is like what have done
+    %%% before, but 3dimensional to remove tilted plane instead of from single fast line.
+    %%% I have compared the figures of before and after the following snippet and there are apparently no
+    %%% difference (of course the matric are different)
     % Fitting of linear polynomial surface to the result of Poly1 fit
     backgrownd_th=E(1,bk_limit);
     Bk_poly_filt_data=poly_filt_data;
@@ -208,17 +184,30 @@ function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,sec
     fit_surf=plus(a,fit_surf);
     fit_surf=plus(y_Bk_surf,fit_surf);
     fit_surf=plus(x_Bk_surf,fit_surf);
-    
     % Subtraction of fitted polynomial background
     filt_data_no_Bk=minus(poly_filt_data,fit_surf);
     filt_data_no_Bk=filt_data_no_Bk-min(min(filt_data_no_Bk));
-   
+
+    if SeeMe
+        f2=figure('Visible','on');
+    else
+        f2=figure('Visible','off');
+    end
+    imshow(filt_data_no_Bk/max(filt_data_no_Bk(:)));
+    title('Height (measured) channel - Surface Tilted effect removed', 'FontSize',16), 
+    colormap parula; c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
+    objInSecondMonitor(secondMonitorMain,f2);
+    saveas(f2,sprintf('%s\\resultA3_2_HeightRemovedTiltSurface.tif',filepath))
+    if SeeMe
+        uiwait(msgbox('Click to continue'))
+    end
+    close(f2)
+
     warning ('off','all');
     % For each different fitting depending on the accuracy (poly1 to poly9), extract 3 information:
     %   - Sum of squares due to error / Degree-of-freedom adjusted coefficient of determination
     %   - Sum of squares due to error
     %   - Degree-of-freedom adjusted coefficient of determination
-    
     while true
         if ~flagAccuracy
             question='Fitting AFM Height channel data: which fitting order range use?';
@@ -241,7 +230,6 @@ function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,sec
         else
             limit=9;
         end
-
         %init vars
         % the fit_decision_final will contain the best fit_decision and the polynomial parameters (if grade = 3
         % ==> # parameters = 4)
@@ -270,14 +258,26 @@ function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,sec
                 flag_signal_x(pos_outliner==1)=nan;
                 [pos_outliner]=isoutlier(flag_signal_y,'gesd');
             end
+            flagRemovedPortion=false;
             [xData, yData] = prepareCurveData(flag_signal_x,flag_signal_y);
-            if length(xData) <= 2 || length(yData) <= 2
-                error('something is wrong. Too NaN values in the %d-th line\n',i)
+            % when the fast scan line correspond to those of removed portion, skip the fitting
+            if ~isempty(idxPortionRemoved)
+                for j=1:size(idxPortionRemoved,1)
+                    if i >= idxPortionRemoved(j,1) && i <= idxPortionRemoved(j,2)
+                        flagRemovedPortion = true;
+                        break
+                    end
+                end
+            end          
+            if flagRemovedPortion 
+                continue
+            % check in case of strange issue. Theoretically it may not happen anymore
+            elseif length(xData) <= 2 || length(yData) <= 2
+                error('something is wrong in the data. Too few values in the %d-th line not involved by manual removal\n',i)
             else
                 opts = fitoptions( 'Method', 'LinearLeastSquares' );
                 opts.Robust = 'LAR';
-                fit_decision=NaN(3,limit);
-                
+                fit_decision=NaN(3,limit);                
                 for z=1:limit
                     % based on the choosen accuracy, run the fitting using different curves to find the best fit
                     % before returning the definitive fitted single fast scan line
@@ -291,11 +291,8 @@ function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,sec
                     fit_decision(1,z)=abs(gof.sse)/gof.adjrsquare;
                     fit_decision(2,z)=gof.sse;
                     fit_decision(3,z)=gof.adjrsquare;
-                end
-    
-                
-                [~,Ind]=min(fit_decision(2,:));
-                
+                end 
+                [~,Ind]=min(fit_decision(2,:));               
                 ft = fittype(sprintf('poly%d',Ind));
                 waitbar(i/N_Cycluse_waitbar,wb,sprintf('Processing %d° Ord Pol fit ... Line %.0f Completeted  %2.1f %%',Ind,i,i/N_Cycluse_waitbar*100));
               
@@ -305,18 +302,18 @@ function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,sec
                 fit_decision_final(i,3)=fit_decision(3,Ind);
                 % start the fitting.
                 % Although the fitresult seems to be unused, it is actually evaluated with eval function.
-                fitresult= fit( xData, yData, ft, opts ); %#ok<NASGU> % % gof was suppressed
+                fitresult= fit( xData, yData, ft, opts ); %#ok<NASGU>              
+                % build the y value using the polynomial coefficients and x value (1 ==> 512)
+                % save polynomial coefficients (p1, p2, p3, ...) into fit_decision_final
+                commPart =[];
+                j=1;
+                for n=Ind:-1:0
+                    commPart = sprintf('%s + %s', commPart,sprintf('fitresult.p%d*(x).^%d',j,n));
+                    eval(sprintf('fit_decision_final(i,%d)= fitresult.p%d;',j+3,j))
+                    j=j+1;
+                end
+                Bk_iterative(:,i)= eval(commPart);
             end
-            % build the y value using the polynomial coefficients and x value (1 ==> 512)
-            % save polynomial coefficients (p1, p2, p3, ...) into fit_decision_final
-            commPart =[];
-            j=1;
-            for n=Ind:-1:0
-                commPart = sprintf('%s + %s', commPart,sprintf('fitresult.p%d*(x).^%d',j,n));
-                eval(sprintf('fit_decision_final(i,%d)= fitresult.p%d;',j+3,j))
-                j=j+1;
-            end
-            Bk_iterative(:,i)= eval(commPart);
         end
                 
         to_avg=find(fit_decision_final(:,3)<0.95);
@@ -331,31 +328,34 @@ function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,sec
                 end
             end
         end
-       
+
         AFM_noBk=minus(filt_data_no_Bk,Bk_iterative);
-        AFM_noBk=AFM_noBk-min(min(AFM_noBk));
-        AFM_noBk_visible_data=AFM_noBk/max(max(AFM_noBk));
-        AFM_noBk_visible_data=imadjust(AFM_noBk_visible_data);
+        AFM_noBk=AFM_noBk-min(AFM_noBk(:));
+        AFM_noBk_visible_data=imadjust(AFM_noBk/max(AFM_noBk(:)));
         
-        f2=figure;
-        imshow(AFM_noBk_visible_data),colormap parula, title('Fitted Height (measured) channel', 'FontSize',16)
-        objInSecondMonitor(secondMonitorMain,f2);
+        f3=figure;
+        imshow(AFM_noBk_visible_data),colormap parula,
+        title('Height (measured) channel - Single Line Fitted', 'FontSize',16)
+        objInSecondMonitor(secondMonitorMain,f3);
         c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
         ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
         
-
         if getValidAnswer('Satisfied of the fitting?','',{'y','n'}) == 1
-            close(f2)
-            break
+            saveas(f3,sprintf('%s\\resultA3_3_HeightLineFitted.tif',filepath))
+            close(f3), break
         else
             flagAccuracy=false;
         end
     end
-    
+    % remove portions: 3 because it A3 and 5 because it generates the 5th image during the A3 running
+    [AFM_noBk,idxPortionRemoved]=A3_featureRemovePortion(AFM_noBk,secondMonitorMain,filepath,3,5,idxPortionRemoved);
 
-    f3=figure;
-    subplot(121), imshow(AFM_noBk_visible_data),colormap parula, title('Fitted Height (measured) channel', 'FontSize',16)
-    objInSecondMonitor(secondMonitorMain,f3);
+    % start the binarization to create the 0/1 height image. At the same time show normal and logical image
+    % for better comparison
+    f4=figure;
+    subplot(121), imshow(AFM_noBk_visible_data),colormap parula,
+    title('Height (measured) channel - Single Line Fitted', 'FontSize',16)
+    objInSecondMonitor(secondMonitorMain,f4);
     c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
     ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
 
@@ -370,8 +370,7 @@ function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,sec
             T = adaptthresh(mat2gray(AFM_noBk));
             seg_AFM = imbinarize(mat2gray(AFM_noBk),T);
         else
-            clearvars seg_AFM th_segmentation seg_dial
-            
+            clearvars seg_AFM th_segmentation seg_dial           
             imhistfig=figure('visible','on');hold on,plot(Y)
             if any(closest_indices)
                 scatter(closest_indices,Y(closest_indices),40,'r*')
@@ -407,22 +406,22 @@ function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,sec
             end
         end
     end
-    close(f3)
+    close(f4)
     
     if SeeMe
-        f4=figure('Visible','on');
+        f5=figure('Visible','on');
     else
-        f4=figure('Visible','off');
+        f5=figure('Visible','off');
     end
 
     imshow(seg_dial); title('Baseline and foreground processed', 'FontSize',16), colormap parula
     colorbar('Ticks',[0 1],'TickLabels',{'Background','Foreground'},'FontSize',13)
-    objInSecondMonitor(secondMonitorMain,f4);
-    
-    if SavFg
-        saveas(f4,sprintf('%s\\resultA3_2_BaselineForeground.tif',filepath))
+    objInSecondMonitor(secondMonitorMain,f5);
+    saveas(f5,sprintf('%s\\resultA3_4_BaselineForeground.tif',filepath))
+    if SeeMe
+        uiwait(msgbox('Click to continue'))
     end
-    close(f4)
+    close(f5)
     % converts any nonzero element of the yellow/blue image into a logical image.
     IO_Image=logical(seg_dial);
     if(exist('wb','var'))
