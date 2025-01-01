@@ -4,7 +4,7 @@
 % Check manually the processed image afterwards and compare with the AFM VD
 % image!
 
-function [AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,alpha,secondMonitorMain,newFolder,varargin)
+function [AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,alpha,idxPortionRemoved,secondMonitorMain,newFolder,varargin)
     % in case of code error, the waitbar won't be removed. So the following command force its closure
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)
@@ -69,7 +69,8 @@ function [AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Image
     if SavFg
         saveas(f1,sprintf('%s/resultA5_1_RawAndShiftedLateralDeflection.tif',newFolder))
     end
-
+    
+    [Lateral_Trace_clean_shift,idxPortionRemoved] = A3_featureRemovePortion(Lateral_Trace_clean_shift,secondMonitorMain,filepath,idxPortionRemoved);
 
 
     % apply the PDA mask

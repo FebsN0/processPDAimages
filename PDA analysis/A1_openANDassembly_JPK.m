@@ -24,14 +24,12 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
 
     p=inputParser();
     argName = 'Silent';                 defaultVal = 'Yes';     addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
-    argName = 'saveFig';                defaultVal = 'Yes';     addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     argName = 'Normalization';          defaultVal = 'No';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     argName = 'filePath';               defaultVal = '';        addParameter(p,argName,defaultVal, @(x) ischar(x));
     argName = 'backgroundOnly';         defaultVal = 'No';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     % validate and parse the inputs
     parse(p,varargin{:});
     silent=p.Results.Silent;
-    saveFig=p.Results.saveFig;
     norm=p.Results.Normalization;
     if isempty(p.Results.filePath)
         filePath=pwd;
@@ -52,12 +50,12 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
             numFiles = length(fileName);
         else
             numFiles = 1; % if only one file, filename is a string
+            % note: single scan image suppose they are entire scan, which is not recommended to use because of
+            % unupdated baseline which will be used to correct vertical deflection data
         end
     end
 
-    % save the useful figures into a directory. Not in the case of sections to save time.
-    % in case of sections, only the assembled version will be saved
-
+    % save the useful figures into a directory
     if strcmp(p.Results.backgroundOnly,'Yes') && numFiles~=1
         [upperFolder,~,~]=fileparts(fileparts(filePathData));
         newFolder = fullfile(upperFolder, 'Results Processing AFM-background only');
@@ -91,28 +89,9 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
         mkdir(newFolder);
     end
 
-
-    flag_processSingleSections=false;
-    if numFiles > 1
-        question= sprintf('Process single sections before assembling (usually no)?');
-        options= {'Yes','No'};
-        if getValidAnswer(question,'',options,2) == 1
-            flag_processSingleSections=true;
-        end
-        imgTyp = 'Assembled';
-    else
-        %if only one file, the var is not a cell
-        fullName=fullfile(filePathData,fileName);
-        imgTyp = 'Entire';
-    end
-
     clear question options argName defaultVal
     % init variables
     allScansImageSTART=cell(1,numFiles);
-    if flag_processSingleSections
-        allScansImageEND=cell(1,numFiles);
-        allScans_AFM_HeightIO=cell(1,numFiles);
-    end
     allScansMetadata=cell(1,numFiles);
     y_OriginAllScans=zeros(1,numFiles);
     y_scan_lengthAllScans=zeros(1,numFiles);
@@ -131,7 +110,12 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     for i=1:numFiles
         if numFiles>1
             fprintf('Processing the file %d over %d\n',i,numFiles)
+            imgTyp = 'Assembled';
             fullName=fullfile(filePathData,fileName{i});
+        else
+            % if only one file, the var is not a cell
+            fullName=fullfile(filePathData,fileName);
+            imgTyp = 'Entire';
         end
         if i==1, accuracy=''; end
        
@@ -177,7 +161,6 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
             metaData.Baseline_N=metaData.Baseline_V*factor;
             metaData.AnomalyCorrected=true;
         end
-
 
         % after doing a lot of investigations, it was discovered that the (measured) vertical force 
         % is actually not correct because it exclude the baseline correction (even if during the experiment was enabled
@@ -250,13 +233,7 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
         % save the sections before and after the processing
         allScansImageSTART{i}=filtData;
         allScansMetadata{i}=metaData;
-        % in case the process of single section, dont save and show the single figures not save the post processed data of each section
-        if flag_processSingleSections
-            [AFM_HeightFittedMasked,AFM_height_IO,accuracy,idxRemovedPortion]=processData(filtData,secondMonitorMain,newFolder,accuracy,'Yes','No');
-            allScansImageEND{i}=AFM_HeightFittedMasked;
-            allScans_AFM_HeightIO{i}=AFM_height_IO;
-            clear AFM_height_IO AFM_HeightFittedMasked
-        end
+
         % y slow direction (rows) | x fast direction (columns)
         % save alpha, x_lengt and x_pixels to check errors later
         % if different x_length ==> no sense! slow fast scan lines should be equally long
@@ -292,11 +269,6 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     %   Trace_type
     %   AFM data
     dataOrderedSTART=allScansImageOrderedSTART{1};
-    if flag_processSingleSections
-        allScansImageOrderedEND=allScansImageEND(idx);
-        allScans_AFM_HeightIO_ordered=allScans_AFM_HeightIO(idx);
-        dataOrderedEND=allScansImageOrderedEND{1};
-    end
  
     clear allScansMetadata allScansImageSTART allScansImageEND metaData data alphaAllScans x_scan_pixelsAllScans x_scan_lengthAllScans
     
@@ -330,21 +302,13 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     end
     clear y_scan_pixelsAllScans y_scan_lengthAllScans y_OriginAllScans ratioLength ratioPixel idx allScansMetadataOrdered j i
 
-    if flag_processSingleSections
-        concatenated_AFM_Height_IO = [];
-    end
     % ASSEMBLY BY CONCATENATION
     for i=1:size(dataOrderedSTART,2)
         % assembly the pre processed single sections
         concatenatedData_Raw_afm_image=[];
         concatenatedData_AFM_image_START=[];
-        % assembly the post processed single sections
-        if flag_processSingleSections
-            concatenatedData_AFM_image_END=[];
-        end
 
-        for j=numFiles:-1:1
-            
+        for j=numFiles:-1:1            
             dataRAW=flip(allScansImageOrderedSTART{j}(i).Raw_afm_image);
             concatenatedData_Raw_afm_image      = cat(1,concatenatedData_Raw_afm_image,dataRAW);
             dataIMAGE=flip(allScansImageOrderedSTART{j}(i).AFM_image);
@@ -354,51 +318,19 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
             else
                 sizeSections=[];
             end
-            if flag_processSingleSections
-                dataPOST=flip(rot90(allScansImageOrderedEND{j}(i).AFM_image));
-                concatenatedData_AFM_image_END  = cat(1,concatenatedData_AFM_image_END,dataPOST);
-                % no need to process iteratively in case of AFM Height IO image
-                if i==1
-                    dataIO=flip(rot90(allScans_AFM_HeightIO_ordered{j}));
-                    concatenated_AFM_Height_IO  = cat(1,concatenated_AFM_Height_IO,dataIO);
-                end
-            end
         end
 
         dataOrderedSTART(i).Raw_afm_image= flip(concatenatedData_Raw_afm_image);
         dataOrderedSTART(i).AFM_image=flip(concatenatedData_AFM_image_START);
-        if flag_processSingleSections
-            dataOrderedEND(i).AFM_image   = flip(rot90(concatenatedData_AFM_image_END,-1));
-        end
     end
     
     % show and save figures post assembly
-
-    A2_CleanUpData2_AFM(dataOrderedSTART,setpointN,secondMonitorMain,newFolder,'metadata',metaDataOrdered,'imageType',imgTyp,'phaseProcess','Raw','Silent',silent,'SaveFig',saveFig,'Normalization',norm,'sectionSize',sizeSections);
-    
-    % show and save figures post assembly postProcessing
-    if flag_processSingleSections
-        A2_CleanUpData2_AFM(dataOrderedEND,secondMonitorMain,newFolder,'imageType',imgTyp,'phaseProcess','PostProcessed','Silent',silent,'SaveFig',saveFig,'Normalization',norm);
-        AFM_HeightFittedMasked=dataOrderedEND;
-        AFM_height_IO=rot90(concatenated_AFM_Height_IO,-1);
-        
-        if strcmp(silent,'No')
-            f1=figure('Visible','on');
-        else
-            f1=figure('Visible','off');
-        end
-        imshow(AFM_height_IO); title('Baseline and foreground processed', 'FontSize',16), colormap parula
-        colorbar('Ticks',[0 1],'TickLabels',{'Background','Foreground'},'FontSize',13)
-        objInSecondMonitor(secondMonitorMain,f1);
-        if strcmp(saveFig,'Yes')
-            saveas(f1,sprintf('%s/resultA3_1_fittedHeightChannel_BaselineForeground_Assembled.tif',newFolder))
-        end
-    else       
-        [AFM_HeightFittedMasked,AFM_height_IO,~,idxRemovedPortion]=processData(dataOrderedSTART,secondMonitorMain,newFolder,accuracy,silent,saveFig);
-        % use this following line just to further check or to get the normalization in a second moment.
-        A2_CleanUpData2_AFM(AFM_HeightFittedMasked,setpointN,secondMonitorMain,newFolder,'imageType',imgTyp,'phaseProcess','PostProcessed','Silent',silent,'SaveFig',saveFig,'Normalization','No');
-    end
-
+    A2_CleanUpData2_AFM(dataOrderedSTART,setpointN,secondMonitorMain,newFolder,'metadata',metaDataOrdered,'imageType',imgTyp,'phaseProcess','Raw','Silent',silent,'Normalization',norm,'sectionSize',sizeSections);
+    % process the data (A3 and A4 to create optimized and 0\1 height images
+    [AFM_HeightFittedMasked,AFM_height_IO,~,idxRemovedPortion]=processData(dataOrderedSTART,secondMonitorMain,newFolder,accuracy,silent);
+    % show and save figures post height image processing without normalization
+    A2_CleanUpData2_AFM(AFM_HeightFittedMasked,setpointN,secondMonitorMain,newFolder,'imageType',imgTyp,'phaseProcess','PostProcessed','Silent',silent,'Normalization','No');
+    % save the outputs
     varargout{1}=AFM_HeightFittedMasked;
     varargout{2}=AFM_height_IO;
     varargout{3}=metaDataOrdered;
@@ -407,9 +339,9 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     varargout{6}=idxRemovedPortion;
 end
 
-
-function [AFM_HeightFittedMasked,AFM_height_IO,accuracy,idxRemovedPortion]=processData(data,secondMonitorMain,newFolder,accuracy,silent,saveFig)
-    [AFM_HeightFitted,AFM_height_IO,accuracy,idxRemovedPortion]=A3_El_AFM(data,secondMonitorMain,newFolder,'fitOrder',accuracy,'Silent',silent,'SaveFig',saveFig);
-    % Using the AFM_height_IO, fit the background again, yielding a more accurate height image
-    AFM_HeightFittedMasked=A4_El_AFM_masked(AFM_HeightFitted,AFM_height_IO,secondMonitorMain,newFolder,'Silent',silent,'SaveFig',saveFig);
+function [AFM_HeightFittedMasked,AFM_height_IO,accuracy,idxRemovedPortion]=processData(data,secondMonitorMain,newFolder,accuracy,silent)
+    [AFM_HeightFitted,AFM_height_IO,accuracy,idxRemovedPortion]=A3_El_AFM(data,secondMonitorMain,newFolder,'fitOrder',accuracy,'Silent',silent);
+    % Using the AFM_height_IO, fit the background again, yielding a more accurate height image by using the
+    % 0\1 height image
+    [AFM_HeightFittedMasked,idxRemovedPortion]=A4_El_AFM_masked(AFM_HeightFitted,AFM_height_IO,idxRemovedPortion,secondMonitorMain,newFolder,'Silent',silent);
 end

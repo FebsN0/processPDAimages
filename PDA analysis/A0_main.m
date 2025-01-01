@@ -66,7 +66,7 @@ while true
         case 3
             accuracy= 'High';
     end
-    [AFM_A6_LatDeflecFitted,~]=A5_LD_Baseline_Adaptor_masked(AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM.Alpha,secondMonitorMain,newFolder,'Accuracy',accuracy);
+    [AFM_A6_LatDeflecFitted,~]=A5_LD_Baseline_Adaptor_masked(AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM.Alpha,idxPortionRemoved,secondMonitorMain,newFolder,'Accuracy',accuracy);
     if getValidAnswer('Satisfied of the fitting?','',{'y','n'}) == 1
         break
     end
