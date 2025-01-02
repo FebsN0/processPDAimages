@@ -27,6 +27,8 @@ fileResultPath=prepareDirResults(filePath);
 resFit_friction=A1_frictionCalc_method_1_2_3(AFM_onlyBK,metadata_onlyBK,AFM_heightIO_onlyBK,secondMonitorMain,fileResultPath,method,nameScan,idxRemovedPortion_onlyBK);
 close all
 
+clear AFM_onlyBK metadata_onlyBK AFM_heightIO_onlyBK secondMonitorMain fileResultPath method nameScan idxRemovedPortion_onlyBK filePath nameOperation
+
 function varargout=prepareData(nameOperation,secondMonitorMain,filePath)
     % prepare the data to calculate the friction, regardless the method.
     % AWARE: if using only background method, select the proper data. Here there is no check about the type of
