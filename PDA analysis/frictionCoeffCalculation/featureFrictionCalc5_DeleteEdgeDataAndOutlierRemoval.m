@@ -22,7 +22,7 @@ function LineDataFilt = featureFrictionCalc5_DeleteEdgeDataAndOutlierRemoval(Lin
     %           ==> skip to end+1 element which is zero and detect a new segment
     %   2) if == 0 ==> nothing happens, skip to next iteration
     
-    processSingleSegment=true; i=1; idxConnectedSegment=1;
+    processSingleSegment=true; i=1;
     while processSingleSegment
         % DETECTION NEW SEGMENT
         if LineData(i) ~= 0
@@ -69,7 +69,7 @@ function LineDataFilt = featureFrictionCalc5_DeleteEdgeDataAndOutlierRemoval(Lin
                     % Replace segment
                     LineDataFilt(StartPos:EndPos) = Segment;
                 else
-                % method 2: Find the i-th segment and attach to the previous found one to build a single large
+                % method 2 or 3: Find the i-th segment and attach to the previous found one to build a single large
                 % connected segment and track the idx
                     ConnectedSegment = [ConnectedSegment; Segment];          %#ok<AGROW>
                     %idxConnectedSegment(Cnt)=length(ConnectedSegment)+1
@@ -85,11 +85,11 @@ function LineDataFilt = featureFrictionCalc5_DeleteEdgeDataAndOutlierRemoval(Lin
         end
     end
     
-    % Process one large connected segment. Note that if mode = 2, connected segment lacks of resetted edges
+    % Process one large connected segment. Note that if mode = 2 or 3, connected segment lacks of resetted edges
     % of the previous part.
-    % Here, ConnectedSegment is just the concatenation of each nonFiltered segment previously found .
+    % Here, ConnectedSegment is just the concatenation of each nonFiltered segments previously found .
     % in this way, the function filloutliers has more data to process so the result should be more consistent
-    if fOutlierRemoval == 2
+    if fOutlierRemoval == 2 || fOutlierRemoval == 3
         ConnectedSegment2 = filloutliers(ConnectedSegment, 0);
         % substitute the pieces of connectedSegment2 with the corresponding part of original fast scan line
         Cnt2 = 1;

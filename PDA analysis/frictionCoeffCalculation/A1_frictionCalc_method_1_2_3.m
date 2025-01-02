@@ -31,8 +31,6 @@ function resFrictionAllExp=A1_frictionCalc_method_1_2_3(AFM_AllScanImages,metada
     % in case of code error, the waitbar won't be removed. So the following command force its closure
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)
-    % allowed min number of elements in a section for a reliable fitting
-    minElements=20;
     numFiles=length(AFM_AllScanImages);
     limitsXYdata=zeros(2,2,numFiles);
     % init the var where store the different coefficient frictions of any scan image
@@ -46,7 +44,6 @@ function resFrictionAllExp=A1_frictionCalc_method_1_2_3(AFM_AllScanImages,metada
         % extract the needed data
         dataSingle=AFM_AllScanImages{j};
         metadataSingle=metadata_AllScan{j};
-        Setpoint=round((metadataSingle.SetP_N)*1e9);
         AFM_height_IO=AFM_AllScan_height_IO{j};
         nameScan=nameScan_AllScan{j};
         resFrictionAllExp(j).nameScan = nameScan;
@@ -63,11 +60,11 @@ function resFrictionAllExp=A1_frictionCalc_method_1_2_3(AFM_AllScanImages,metada
         %       1 (crystal)   => 0
         %       0 (BK)        => 1
         % method 1: no mask because the code supposes the AFM images are made of background only 
-        %   ==> original AFM_height01 : 1=PDA ==> 0 | 0=BK ==> 1
-        % method 2 and 3: yes mask because PDA+background
+        %   ==> original AFM_height01 : 1=PDA ==> 0 | 0=BK ==> 1        
         if method == 1
             mask=zeros(size(dataSingle(1).AFM_image));
         else
+        % method 2 and 3: yes mask because PDA+background
             mask=AFM_height_IO;
         end
         Lateral_Trace   = (dataSingle(strcmpi([dataSingle.Channel_name],'Lateral Deflection') & strcmpi([dataSingle.Trace_type],'Trace')).AFM_image).*(~mask);
@@ -91,31 +88,25 @@ function resFrictionAllExp=A1_frictionCalc_method_1_2_3(AFM_AllScanImages,metada
         %   second clearing: remove entire fast scan lines by using the idx of manually selected portions        
         % show also the lateral and vertical data after clearing
         [vertForce_clear,force_clear]=featureFrictionCalc1_clearingAndPlotData(vertical_Trace,vertical_ReTrace,force,idxRemovedPortion,newFolder,nameScan,secondMonitorMain,method);
-
+        clear vertical_ReTrace vertical_Trace force alpha W Delta mask AFM_height_IO Lateral_Trace Lateral_ReTrace
         figure(f_fcAll)
         % calc the friction coefficient depending on the method
-        if method == 1
+        % method 1 and 2 are technically identical. Only the AFM data change (method 2 use masked images)
+        if method == 1 || method == 2
             % clean and obtain the averaged vector
-            [vertForce_avg,force_avg]=featureFrictionCalc2_avgLatForce(vertForce_clear,force_clear);
-            % plot the experimental data
-            limitsXYdata(:,:,j)=featureFrictionCalc3_plotErrorBar(vertForce_avg,force_avg,j,nameScan);
-            % fit the data and plot the fitted curve
-            resFit=featureFrictionCalc4_fittingForceSetpoint(vertForce_avg,force_avg,j);
-            fOutlierRemoval_text='';
-        elseif method == 2           
             [vertForce_avg,force_avg]=featureFrictionCalc2_avgLatForce(vertForce_clear,force_clear);
             %%%%%%% check NaN elements %%%%%%%
             flag=checkNaNelements(vertForce_avg,idxSection,minElements);
             if flag
-                uiwait(msgbox(sprintf('Not enough elements (lower than %d elements) in some section for the fitting \x2192 stopped calculation!',minElements),''));
-                break
+                uiwait(msgbox('Aware! In some section there are few elements left necessary for the fitting. Try to change the mask (maybe too "brutal") or use smaller manually removed portion.',''));
             end
             % remove NaN elements 
             force_avg_clear=y_avg(~isnan(force_avg));
             vertForce_avg_clear=x_avg(~isnan(vertForce_avg));
-            % plot experimental values (avg and std)            
+            % plot the experimental data
             limitsXYdata(:,:,j)=featureFrictionCalc3_plotErrorBar(vertForce_avg_clear,force_avg_clear,j,nameScan);
-            resFit=featureFrictionCalc4_fittingForceSetpoint(vertForce_avg,force_avg,j,'fitting','Yes','image','Yes');
+            % fit the data and plot the fitted curve. By default: yes fitting and image
+            resFit=featureFrictionCalc4_fittingForceSetpoint(vertForce_avg_clear,force_avg_clear,j);
             fOutlierRemoval_text='';
         else
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -127,30 +118,8 @@ function resFrictionAllExp=A1_frictionCalc_method_1_2_3(AFM_AllScanImages,metada
             % 2) the step size (i.e. in each iteration, the size pixel increases until the desired number of point
             
             % ask modalities only once, at the first iterated file
-            if j==1
-                pixData=zeros(2,1);
-                question ={'Maximum pixels to remove from both edges of a segment? ' ...
-                    'Enter the step size of pixel loop: '};
-                while true
-                    pixData = str2double(inputdlg(question,'SETTING PARAMETERS FOR THE EDGE REMOVAL',[1 90]));
-                    if any(isnan(pixData)), questdlg('Invalid input! Please enter a numeric value','','OK','OK');
-                    else, break
-                    end
-                end
-                % choose the removal modality    
-                question= 'Choose the modality of removal outliers';
-                options={ ...
-                sprintf('1) Apply outlier removal to each segment after pixel reduction.'), ...
-                sprintf('2) Apply outlier removal to one large connected segment after pixel reduction.'),...
-                sprintf('3) Apply outlier removal to entire same-setpoint section.')};                
-                fOutlierRemoval = getValidAnswer(question, '', options);
-                if fOutlierRemoval==1
-                    fOutlierRemoval_text='_SingleSegmentsProcess';
-                elseif fOutlierRemoval==2
-                    fOutlierRemoval_text='_ConnectedSegmentProcess';                                   
-                else
-                    fOutlierRemoval_text='_EntireSectionProcess';
-                end
+            if j==1   
+                [pixData,fOutlierRemoval,fOutlierRemoval_text]=prepareSettingsPixel;
                 % show a dialog box indicating the index of fast scan line along slow direction and which pixel size is processing
                 wb=waitbar(0/size(force_clear,2),sprintf('Image %d - Processing the Outliers Removal Mode %d (pixel size %d / %d) \n\t Line %.0f Completeted  %2.1f %%',j,fOutlierRemoval,0,pixData(1),0,0),...
                          'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
@@ -164,6 +133,9 @@ function resFrictionAllExp=A1_frictionCalc_method_1_2_3(AFM_AllScanImages,metada
             % extract the desired one
             Cnt=1;
             arrayPixSizes=0:pixData(2):pixData(1);
+            % allowed min number of elements in a section for a reliable fitting
+            minElements=pixData(3);
+            % init
             fitResults_fc=zeros(length(arrayPixSizes),2);
             xDataAllPixelSizes=cell(length(arrayPixSizes),1);
             yDataAllPixelSizes=cell(length(arrayPixSizes),1);
@@ -173,16 +145,62 @@ function resFrictionAllExp=A1_frictionCalc_method_1_2_3(AFM_AllScanImages,metada
                 force_thirdClearing = zeros(size(force_clear));
                 % copy and then put zeros according to the lateral force
                 vertForce_thirdClearing = vertForce_clear;
-                % process the single fast scan line with a given pixel size. Delete the outliers
+
+                % Delete the outliers and remove edges depending on the current iterative pixel size
+                % by substitution with new zero elements along fast scan lines
+                sec=1;  % counter for section
+                latOriginalLine=[]; % init the entire line for 3rd option
+                vertOriginalLine=[];% init the entire line for 3rd option
                 for i=1:size(force_thirdClearing,2)
-                    % provide i-th single fast scan line and obtain new processed fast line with new zero
-                    % elements
-                    latTmp = featureFrictionCalc5_DeleteEdgeDataAndOutlierRemoval(force_clear(:,i), pix, fOutlierRemoval);                                           
-                    force_thirdClearing(:,i)=latTmp;
-                    % remove the elements in the vertical data where there are zero values in lateral data                    
-                    vertTmp=vertForce_thirdClearing(:,i);
-                    vertTmp(latTmp==0)=0;
-                    vertForce_thirdClearing(:,i)=vertTmp;                    
+                    % if 1 or 2 option, provide i-th single fast scan line to the outlier removal algorithm                     
+                    if fOutlierRemoval == 1 || fOutlierRemoval == 2
+                        latOriginalLine=force_clear(:,i);
+                        vertOriginalLine=vertForce_clear(:,i);
+                    else
+                    % if 3 option, build entire section as single line to make more robust the data                    
+                        startIdx=idxSection(sec);
+                        % when last section
+                        if sec == length(idxSection)
+                            lastIdx=size(force_thirdClearing,2);
+                        else
+                            lastIdx=idxSection(sec+1)-1;
+                        end
+                        if i>=startIdx && i<=lastIdx                               
+                            latOriginalLine=[latOriginalLine;force_clear(:,i)]; %#ok<AGROW>
+                            vertOriginalLine=[vertOriginalLine;vertForce_clear(:,i)]; %#ok<AGROW>
+                            % when last idx, avoid the continue otherwise it will increase
+                            if i~=lastIdx
+                                continue
+                            end
+                        end
+                        % if this line is reached, start to remove outliers.
+                        % if option 1 or 2, latOriginalLine is the single fast scan line
+                        % if option 3, latOriginalLine is made of single fast scan lines in a section with same setpoint 
+                    end
+                    % the output/filtered line has same size as the input line
+                    latTmpLine = featureFrictionCalc5_DeleteEdgeDataAndOutlierRemoval(latOriginalLine, pix, fOutlierRemoval);                                           
+                    % zeroing elements in vertical data at the same idx of lat data
+                    vertTmpLine=vertOriginalLine;
+                    vertTmpLine(latTmpLine==0)=0;
+
+                    % reshape in case of 3rd option, otherwise just substitute the single fast scan line if
+                    % 1st or 2nd option
+                    if fOutlierRemoval==3
+                        forceSectionTmp=reshape(latTmpLine,[size(force_thirdClearing,1)],sectionSize(sec));
+                        force_thirdClearing(:,startIdx:lastIdx)=forceSectionTmp;
+                        vertSectionTmp=reshape(vertTmpLine,[size(force_thirdClearing,1)],sectionSize(sec));
+                        vertForce_thirdClearing(:,startIdx:lastIdx)=vertSectionTmp;
+                        % increase the section counter to start to assembly and remove outliers of the next section
+                        sec=sec+1;
+                    else
+                        force_thirdClearing(:,i)=latTmpLine;
+                        vertForce_thirdClearing(:,i)=vertTmpLine;    
+                    end
+                    % reset
+                    latOriginalLine=[]; 
+                    vertOriginalLine=[];
+                
+                    clear latTmpLine vertTmp
                     % update dialog box and check if cancel is clicked
                     if(exist('wb','var'))
                         %if cancel is clicked, stop and delete dialog
@@ -202,34 +220,25 @@ function resFrictionAllExp=A1_frictionCalc_method_1_2_3(AFM_AllScanImages,metada
                 % if one of the block in lateral force is totally zeroed or very few elements are left because 
                 % of the pix removal (very common for large pix size), stop the execution because few data make
                 % the fitting not reliable anymore. Moreover, when few values are left, there could be a shift in vertical
-                % data from the setpoint: if so, stop the process. Ignore the NaN
-                tmp=vertForce_avg(~isnan(vertForce_avg));
-                SetpFit=unique(round(tmp,-1));
-                if ~isequal(SetpFit,Setpoint)
-                    uiwait(msgbox(sprintf('Missing setpoint in the fitting \x2192 stopped calculation!'),''));
-                    break
-                end
-                %%%%%%%% SECOND CONSTRAINT TO STOP THE PROCESS %%%%%%%%%
+                % data from the original setpoint: if so, stop the process. Ignore the NaN
                 flag=checkNaNelements(vertForce_avg,idxSection,minElements);
                 if flag
                     uiwait(msgbox(sprintf('Not enough elements (lower than %d elements) in some section for the fitting \x2192 stopped calculation!',minElements),''));
                     break
                 end
-                %%%%%%%% THIRD CONSTRAINT TO STOP THE PROCESS %%%%%%%%%
-                % here apparently everything is ok and there is enough data to continue, but it could happen
-                % that the fitting yield anomalous slope. Therefore, prepare the data for the fitting and
-                % remove any possible NaN elements
+                % Prepare the data for the fitting and remove any possible NaN elements
                 force_avg_clear=force_avg(~isnan(force_avg));
                 vertForce_avg_clear=vertForce_avg(~isnan(vertForce_avg));
                 % obtain the friction coeff as single fitting. No plot
                 % fitting the lateral versus vertical data.
                 [fitResults,xData,yData]=featureFrictionCalc4_fittingForceSetpoint(vertForce_avg_clear,force_avg_clear,j,'fitting','Yes','imageProcessing','No');
                 avg_fc_tmp=fitResults(1);               
-
-                % two way to stop the removal code
+                %%%%%%%% SECOND CONSTRAINT TO STOP THE PROCESS %%%%%%%%%
+                % here apparently everything is ok and there is enough data to continue, but it could happen
+                % that the fitting yield anomalous slope.
                 % 1) slope higher than 0.95 has no sense
                 % 2) number of overall common vertical force lower than used setpoint
-                if avg_fc_tmp > 0.95 %%|| p(1) < 0
+                if avg_fc_tmp > 0.95 || avg_fc_tmp < 0
                     uiwait(msgbox(sprintf('Slope outside the reasonable range ( 0 < m < 0.95 ) \x2192 stopped calculation!'),''));
                     break
                 end
@@ -315,5 +324,34 @@ function flag=checkNaNelements(vectorAvg,idxSection,minElements)
         flag=true;
     else
         flag=false;
+    end
+end
+
+function [pixData,fOutlierRemoval,fOutlierRemoval_text]=prepareSettingsPixel
+    % choose the removal modality    
+    question= 'Choose the modality of removal outliers';
+    options={ ...
+    sprintf('1) Apply outlier removal to each segment after pixel reduction.'), ...
+    sprintf('2) Apply outlier removal to one large connected segment after pixel reduction.'),...
+    sprintf('3) Apply outlier removal to entire same-setpoint section.')};                
+    fOutlierRemoval = getValidAnswer(question, '', options);
+    if fOutlierRemoval==1
+        fOutlierRemoval_text='_SingleSegmentsProcess';
+    elseif fOutlierRemoval==2
+        fOutlierRemoval_text='_ConnectedSegmentProcess';                                   
+    else
+        fOutlierRemoval_text='_EntireSectionProcess';
+    end
+    % define the size of the pixel
+    pixData=zeros(3,1);
+    question ={'Maximum pixels to remove from both edges of a segment:' ...
+        'Enter the step size of pixel loop:'...
+        'Minimum number of elements in a section required for the fitting:'};
+    defValues={'50' '2' '20'};
+    while true
+        pixData = str2double(inputdlg(question,'SETTING PARAMETERS FOR THE EDGE REMOVAL',[1 90],defValues));
+        if any(isnan(pixData)), questdlg('Invalid input! Please enter a numeric value','','OK','OK');
+        else, break
+        end
     end
 end
