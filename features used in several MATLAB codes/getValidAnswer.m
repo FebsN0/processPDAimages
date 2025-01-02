@@ -1,5 +1,9 @@
 function user_choice = getValidAnswer(question, title, options, default_choice)
     
+    % persistent allow to store a number sequence (for example if there are more than 9 options, it is
+    % necessary to store two/three/etc digits when the function is called
+    persistent numericInput
+
     % Manage the default option. If not specified, then first option is default
     if nargin < 4 || isempty(default_choice)
         default_choice = 1; 
@@ -33,7 +37,7 @@ function user_choice = getValidAnswer(question, title, options, default_choice)
                 num_lines_options_split = 1;
             end
             for j=1:length(splittedCell)
-                lengthRow(i,j)= cellfun(@length, splittedCell(j));
+                lengthRow(i,j)= cellfun(@length, splittedCell(j)); %#ok<AGROW>
             end
         end
         max_option_length = max(max(lengthRow));
@@ -59,10 +63,11 @@ function user_choice = getValidAnswer(question, title, options, default_choice)
     dialog_x = (screen_width - dialog_width) / 2;
     dialog_y = (screen_height - dialog_height) / 2;
         
-    % Open dialog box and associate the enter button
+    % Open dialog box and associate the buttons and close button
     dialog_fig = figure('Name', title, 'NumberTitle', 'off', 'MenuBar', 'none', ...
         'ToolBar', 'none', 'Resize', 'off', 'Position', [dialog_x, dialog_y, dialog_width, dialog_height*1.3], ...
-        'WindowStyle', 'modal','KeyPressFcn', @keyPressCallback);
+        'WindowStyle', 'modal','KeyPressFcn', @keyPressCallback,...
+        'CloseRequestFcn',@closeRequestCallback);
 
     % Insert the question in the dialog box
     textHeight = sizeRowQuestion*2;
@@ -74,19 +79,6 @@ function user_choice = getValidAnswer(question, title, options, default_choice)
 
     % store the user choice
     user_choice = 0;
-
-    % create the Button Callback function
-    function buttonCallback(choice)
-        user_choice = choice;
-        uiresume(dialog_fig);
-    end
-
-    % create the Enter keyboard button Callback function
-    function keyPressCallback(~, event)
-        if strcmp(event.Key, 'return') || strcmp(event.Key, 'enter')
-            buttonCallback(default_choice);
-        end
-    end
 
     % create object for each button
     button_handles = gobjects(1, numel(options));
@@ -151,7 +143,78 @@ function user_choice = getValidAnswer(question, title, options, default_choice)
 
     % Wait user choice selection before continuing
     uiwait(dialog_fig);
+    % Check if the user closed the window without making a choice
+    if isnan(user_choice)
+        error('Closed window. Stopped the process.')
+    end
 
-    % close the window
-    close(dialog_fig);
+    % create the Button Callback function
+    function buttonCallback(choice)
+        user_choice = choice;
+        uiresume(dialog_fig);
+        delete(dialog_fig);
+    end    
+
+    % create the keyboard buttons Callback function. It allows to select the possible option by clicking the
+    % specific related button on the keyboard
+    % i.e. if the desired option is 2, then click 2 on keyboard   
+    function keyPressCallback(~, event)
+        % init. The first time will be empty
+        if isempty(numericInput)
+            numericInput = '';
+        end
+        % if escape\Esc is clicked, close and stop
+        if strcmp(event.Key, 'escape')
+            closeRequestCallback
+        % click by return/enter to end the selection.
+        elseif strcmp(event.Key, 'return') || strcmp(event.Key, 'enter')
+            if ~isempty(numericInput)
+                % if there is a sequence, convert it to a number
+                numPressed = str2double(numericInput);
+                % reset to restart next time
+                numericInput = '';
+                if numPressed >= 0 && numPressed <= numel(options)
+                    buttonCallback(numPressed);
+                    clc
+                    fprintf('\nDefinitive selection: %d\n',numPressed)                    
+                end
+            else
+                % In case the sequence number is empty, select default option
+                buttonCallback(default_choice);
+                clc
+                fprintf('\nDefinitive selection: %d\n',default_choice)                
+            end       
+        elseif ismember(event.Key, {'1','2','3','4','5','6','7','8','9','0'})
+            % check if the clicked button is a number button. If so, add to the sequence number
+            numericInput = strcat(numericInput, event.Key);
+            % if the sequence number is a number higher than the number of possible options
+            if str2double(numericInput) > numel(options)
+                % Reset to the last pressed number
+                numericInput = event.Key; 
+            end
+        elseif strcmp(event.Key, 'backspace') && ~isempty(numericInput)
+            % Remove the last number by clicking Backspace button
+            numericInput = numericInput(1:end-1);
+        elseif strcmpi(event.Key, 'y') && flagYesNo
+            % if click y ==> then yes. Note: it should be guaranted that the first option is always yes
+            clc
+            fprintf('\nDefinitive selection: Yes\n')
+            buttonCallback(1);
+        elseif strcmpi(event.Key, 'n') && flagYesNo
+            % if click n ==> then no
+            clc
+            fprintf('\nDefinitive selection: No\n')            
+            buttonCallback(2);
+        else
+            % Reset the sequence number with any else button
+            numericInput = '';
+        end
+    end
+
+    function closeRequestCallback(~, ~)
+        % Handle the window being closed without a selection
+        uiresume(dialog_fig);
+        delete(dialog_fig);
+        user_choice = NaN;        
+    end
 end
