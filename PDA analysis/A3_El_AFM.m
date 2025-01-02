@@ -171,6 +171,10 @@ function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,sec
     Bk_poly_filt_data=poly_filt_data;
     Bk_poly_filt_data(Bk_poly_filt_data>backgrownd_th)=NaN;
     
+    % suppress warning about removing NaN values
+    id='curvefit:prepareFittingData:removingNaNAndInf';
+    warning('off',id)
+    
     x_Bk=1:size(Bk_poly_filt_data,2);
     y_Bk=1:size(Bk_poly_filt_data,1);
     [xData, yData, zData] = prepareSurfaceData( x_Bk, y_Bk, Bk_poly_filt_data );
