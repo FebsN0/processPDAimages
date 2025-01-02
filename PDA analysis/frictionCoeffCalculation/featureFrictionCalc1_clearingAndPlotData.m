@@ -1,4 +1,4 @@
-function [vertForce_secondClearing,force_secondClearing]=featureFrictionCalc1_clearingAndPlotData(vertical_Trace,vertical_ReTrace,force,idxRemovedPortion,mask,newFolder,nameScan,secondMonitorMain,method)
+function [vertForce_secondClearing,force_secondClearing]=featureFrictionCalc1_clearingAndPlotData(vertical_Trace,vertical_ReTrace,force,idxRemovedPortion,newFolder,nameScan,secondMonitorMain,method)
   
     %%%%%%% FIRST CLEARING %%%%%%%
     % Remove outliers among Vertical Deflection data using a defined threshold of 4nN 
@@ -40,32 +40,32 @@ function [vertForce_secondClearing,force_secondClearing]=featureFrictionCalc1_cl
     force_secondClearing(:,array01RemovedRegion==0)=0;
        
     % plot lateral (masked force, N) and vertical data (masked force, N). Not show up but save fig        
-    plotClearedImages(vertForce_secondClearing,force_secondClearing,mask,newFolder,nameScan,secondMonitorMain,method)
+    plotClearedImages(vertForce_secondClearing,force_secondClearing,newFolder,nameScan,secondMonitorMain,method)
 end
 
-function plotClearedImages(x,y,mask,path,name,secondMonitorMain,method)   
+function plotClearedImages(x,y,path,name,secondMonitorMain,method)   
     if method==1
-        titleText='(BackgroundOnly Scan)';
+        titleText='(Mask not applied)';
     else
-        titleText='(PDA masked out)';
+        titleText='(Mask applied)';
     end
     f1=figure('Visible','off');
     subplot(121)
+    % show the lateral data
     imagesc(y)
     c= colorbar; c.Label.String = 'Force [nN]'; c.FontSize = 15;
     title({'Lateral Force in BK regions';titleText},'FontSize',20)
     ylabel(' fast direction - scan line','FontSize',15), xlabel('slow direction','FontSize',15)
     axis equal, xlim([0 size(y,2)]), ylim([0 size(y,1)])
     subplot(122)
-    % show the masked vertical data, force is already masked
+    % show the vertical data. If method is 2 or 3, the data is already masked
     imagesc(x)
-    %imagesc(x.*(~mask))
     c= colorbar; c.Label.String = 'Force [nN]'; c.FontSize = 15;
     title({'Vertical Force in BK regions';titleText},'FontSize',20)
     sgtitle(sprintf('Background of %s',name),'Fontsize',20,'interpreter','none')
     ylabel(' fast direction - scan line','FontSize',15), xlabel('slow direction','FontSize',15)
     axis equal, xlim([0 size(x,2)]), ylim([0 size(x,1)])
     if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
-    saveas(f1,fullfile(path,sprintf('lateralVerticalData_cleared_scanName_%s.tif',name)))
+    saveas(f1,fullfile(path,sprintf('lateralVerticalData_cleared_scanName_%s_method%d.tif',name,method)))
     close(f1)
 end
