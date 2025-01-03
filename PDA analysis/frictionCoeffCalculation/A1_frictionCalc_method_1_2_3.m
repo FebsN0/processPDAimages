@@ -90,19 +90,20 @@ function resFrictionAllExp=A1_frictionCalc_method_1_2_3(AFM_AllScanImages,metada
         [vertForce_clear,force_clear]=featureFrictionCalc1_clearingAndPlotData(vertical_Trace,vertical_ReTrace,force,idxRemovedPortion,newFolder,nameScan,secondMonitorMain,method);
         clear vertical_ReTrace vertical_Trace force alpha W Delta mask AFM_height_IO Lateral_Trace Lateral_ReTrace
         figure(f_fcAll)
+        f_pixelsVSfc=figure;
         % calc the friction coefficient depending on the method
         % method 1 and 2 are technically identical. Only the AFM data change (method 2 use masked images)
         if method == 1 || method == 2
             % clean and obtain the averaged vector
             [vertForce_avg,force_avg]=featureFrictionCalc2_avgLatForce(vertForce_clear,force_clear);
-            %%%%%%% check NaN elements %%%%%%%
-            flag=checkNaNelements(vertForce_avg,idxSection,minElements);
+            %%%%%%% check NaN elements - at least 10 elements for section %%%%%%%
+            flag=checkNaNelements(vertForce_avg,idxSection,10);
             if flag
                 uiwait(msgbox('Aware! In some section there are few elements left necessary for the fitting. Try to change the mask (maybe too "brutal") or use smaller manually removed portion.',''));
             end
             % remove NaN elements 
-            force_avg_clear=y_avg(~isnan(force_avg));
-            vertForce_avg_clear=x_avg(~isnan(vertForce_avg));
+            force_avg_clear=force_avg(~isnan(force_avg));
+            vertForce_avg_clear=vertForce_avg(~isnan(vertForce_avg));
             % plot the experimental data
             limitsXYdata(:,:,j)=featureFrictionCalc3_plotErrorBar(vertForce_avg_clear,force_avg_clear,j,nameScan);
             % fit the data and plot the fitted curve. By default: yes fitting and image
@@ -137,9 +138,13 @@ function resFrictionAllExp=A1_frictionCalc_method_1_2_3(AFM_AllScanImages,metada
             minElements=pixData(3);
             % init
             fitResults_fc=zeros(length(arrayPixSizes),2);
-            xDataAllPixelSizes=cell(length(arrayPixSizes),1);
-            yDataAllPixelSizes=cell(length(arrayPixSizes),1);
+            vertForce_avg_clear_AllPixelSize=cell(length(arrayPixSizes),1);
+            force_avg_clear_AllPixelSizes=cell(length(arrayPixSizes),1);
+            vertForce_thirdClearing_AllPixelSizes=cell(length(arrayPixSizes),1);
+            force_thirdClearing_AllPixelSizes=cell(length(arrayPixSizes),1);
             avg_fc_pix=zeros(1,length(arrayPixSizes));
+            % track changes when increasing pixel and more sections have less elements than minimum
+            prevNumElemSections=zeros(1,length(idxSection));            
             for pix = arrayPixSizes
                 % init matrix.
                 force_thirdClearing = zeros(size(force_clear));
@@ -221,10 +226,18 @@ function resFrictionAllExp=A1_frictionCalc_method_1_2_3(AFM_AllScanImages,metada
                 % of the pix removal (very common for large pix size), stop the execution because few data make
                 % the fitting not reliable anymore. Moreover, when few values are left, there could be a shift in vertical
                 % data from the original setpoint: if so, stop the process. Ignore the NaN
-                flag=checkNaNelements(vertForce_avg,idxSection,minElements);
-                if flag
-                    uiwait(msgbox(sprintf('Not enough elements (lower than %d elements) in some section for the fitting \x2192 stopped calculation!',minElements),''));
-                    break
+                
+                [flagChange,numElemXsection]=checkNaNelements(force_avg,idxSection,minElements,prevNumElemSections);
+                if flagChange
+                    figure(f_pixelsVSfc), hold on
+                    arrayText=sprintf('%d ',flip(numElemXsection));
+                    displayName=sprintf('pixel size: %d\n#Elements: %s',pix,arrayText);       % flip because originally high setpoint from left
+                    xline(pix,LineWidth=2,Color='red',DisplayName=displayName)
+                    prevNumElemSections= (numElemXsection < minElements);
+                    if length(find(numElemXsection < minElements))>=4
+                        uiwait(msgbox(sprintf('Not enough elements for the fitting \x2192 stopped calculation!'),''));
+                        break
+                    end
                 end
                 % Prepare the data for the fitting and remove any possible NaN elements
                 force_avg_clear=force_avg(~isnan(force_avg));
@@ -245,36 +258,48 @@ function resFrictionAllExp=A1_frictionCalc_method_1_2_3(AFM_AllScanImages,metada
                 
                 % store the results of every pix size if no break occurred
                 fitResults_fc(Cnt,:)=fitResults;
-                xDataAllPixelSizes{Cnt}=xData;
-                yDataAllPixelSizes{Cnt}=yData;
+                vertForce_avg_clear_AllPixelSize{Cnt}=xData;
+                force_avg_clear_AllPixelSizes{Cnt}=yData;
+                vertForce_thirdClearing_AllPixelSizes{Cnt}=vertForce_thirdClearing;
+                force_thirdClearing_AllPixelSizes{Cnt}=force_thirdClearing;
                 avg_fc_pix(Cnt) = fitResults(1);                
                 Cnt = Cnt+1;
             end
             % prepare the end data
             pix=arrayPixSizes(1:Cnt-1);
             avg_fc_pix=avg_fc_pix(1:Cnt-1);
-            % plot all the frictions coefficient in function of pixel size          
-            f2=figure;         
-            plot(pix, avg_fc_pix, 'x-','LineWidth',2,'MarkerSize',10,'Color','blue'); grid on
+            % plot all the frictions coefficient in function of pixel size and show also the point in
+            % which some sections has less elements than the minimum       
+            figure(f_pixelsVSfc);         
+            h1=plot(pix, avg_fc_pix, 'x-','LineWidth',2,'MarkerSize',10,'Color','blue'); grid on
+            h1.Annotation.LegendInformation.IconDisplayStyle = 'off'; % dont show name in the legend
             xlabel('Pixel size','fontsize',15); ylabel('Glass friction coefficient','fontsize',15);
-            title(sprintf('Result Method 3 (Mask + Outliers Removal - %s)',fOutlierRemoval_text(2:end)),'FontSize',20);
-            if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2); end
+            title(sprintf('Result Method 3 (Mask + Outliers Removal - %s)',fOutlierRemoval_text),'FontSize',20);
+            leg=legend('show');
+            leg.FontSize=12; leg.Location="bestoutside";
+            if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f_pixelsVSfc); end
             % select the right friction coefficient
             uiwait(msgbox('Click on the plot'));
             idx_x=selectRangeGInput(1,1,0:pixData(2):pixData(1),avg_fc_pix);
             hold on
-            scatter(pixData(2)*idx_x-pixData(2),avg_fc_pix(idx_x),400,'pentagram','filled', 'MarkerFaceColor', 'red');
-            
+            h2=scatter(pixData(2)*idx_x-pixData(2),avg_fc_pix(idx_x),400,'pentagram','filled', 'MarkerFaceColor', 'red','DisplayName','Selected pix size');
+            pixFinal=pix(idx_x);
             % extract the correct　data depending on the chosen idx              
             resFit=fitResults_fc(idx_x,:);
-            vertForce_avg_best=xDataAllPixelSizes{idx_x};
-            force_avg_best=yDataAllPixelSizes{idx_x};
+            vertForce_thirdClearing_best=vertForce_thirdClearing_AllPixelSizes{idx_x};
+            force_thirdClearing_best=force_thirdClearing_AllPixelSizes{idx_x};
+            vertForce_avg_best=vertForce_avg_clear_AllPixelSize{idx_x};
+            force_avg_best=force_avg_clear_AllPixelSizes{idx_x};
+
+            % plot the data after cleared
+            featureFrictionCalc6_plotClearedImages(vertForce_thirdClearing_best,force_thirdClearing_best,newFolder,nameScan,secondMonitorMain,method,pixFinal,fOutlierRemoval_text)  
+            
             % finish the plot and save
-            mainText=sprintf('Result Method 3 (Mask + Outliers Removal - %s) - %s',fOutlierRemoval_text(2:end),nameScan);
+            mainText=sprintf('Result Method 3 (Mask + Outliers Removal - %s) - %s',fOutlierRemoval_text,nameScan);
             resultChoice= sprintf('Friction coefficient: %0.3g',avg_fc_pix(idx_x));
             title({mainText; resultChoice},'FontSize',20,'interpreter','none');            
-            saveas(f2,sprintf('%s/resultMethod3_1_pixelVSfrictionCoeffs_%s%s.tif',newFolder,nameScan,fOutlierRemoval_text))
-            close(f2)
+            saveas(f_pixelsVSfc,sprintf('%s/resultMethod3_1_pixelVSfrictionCoeffs_%s_%s.tif',newFolder,nameScan,fOutlierRemoval_text))
+            close(f_pixelsVSfc)
             % return to the main general figure where compare all the scans.
             % Plot the errorbar and the fitted curve and take the min max XY values to better figure limits
             figure(f_fcAll)
@@ -296,7 +321,7 @@ function resFrictionAllExp=A1_frictionCalc_method_1_2_3(AFM_AllScanImages,metada
     xlim([absMinX*0.7 absMaxX*1.1]), ylim([absMinY*0.7 absMaxY*1.1])
     xlabel('Setpoint (nN)','Fontsize',15); ylabel('Delta Offset (nN)','Fontsize',15); grid on, grid minor
     legend('Location','northwest','FontSize',15,'Interpreter','none')
-    title(sprintf('Delta Offset vs Vertical Force - Method %d %s',method,fOutlierRemoval_text(2:end)),'FontSize',20);
+    title(sprintf('Delta Offset vs Vertical Force - Method %d %s',method,fOutlierRemoval_text),'FontSize',20);
     if ~isempty(secondMonitorMain); objInSecondMonitor(secondMonitorMain,f_fcAll); end
     saveas(f_fcAll,sprintf('%s/resultMethod_%d_DeltaOffsetVSsetpoint%s.tif',newFolder,method,fOutlierRemoval_text))
     uiwait(msgbox('Click to conclude'));
@@ -306,21 +331,19 @@ function resFrictionAllExp=A1_frictionCalc_method_1_2_3(AFM_AllScanImages,metada
     end     
 end
 
-
-
-function flag=checkNaNelements(vectorAvg,idxSection,minElements)
+function [flag,numElemSections]=checkNaNelements(vectorAvg,idxSection,minElements,prevLenghtMinElements)
     % In case an entire fast scan line is 0, the resulting averaged element for that fast scan line will 
     % be NaN. Therefore, easy to find and understand how many elements are left for a specific section
-    numElem=zeros(1,length(idxSection));
+    numElemSections=zeros(1,length(idxSection));
     for i=1:length(idxSection)
         if i==5
-            numElem(i)=length(find(~isnan(vectorAvg(idxSection(i):end))));
+            numElemSections(i)=length(find(~isnan(vectorAvg(idxSection(i):end))));
         else
-            numElem(i)=length(find(~isnan(vectorAvg(idxSection(i):idxSection(i+1)-1))));
+            numElemSections(i)=length(find(~isnan(vectorAvg(idxSection(i):idxSection(i+1)-1))));
         end                
     end
-    % if a section has number of nan elements higher than the allowed 
-    if any(numElem < minElements)
+    % if a section has number of nan elements higher than the previous updated array
+    if ~isequal((numElemSections < minElements), prevLenghtMinElements)
         flag=true;
     else
         flag=false;
@@ -336,11 +359,11 @@ function [pixData,fOutlierRemoval,fOutlierRemoval_text]=prepareSettingsPixel
     sprintf('3) Apply outlier removal to entire same-setpoint section.')};                
     fOutlierRemoval = getValidAnswer(question, '', options);
     if fOutlierRemoval==1
-        fOutlierRemoval_text='_SingleSegmentsProcess';
+        fOutlierRemoval_text='SingleSegmentsProcess';
     elseif fOutlierRemoval==2
-        fOutlierRemoval_text='_ConnectedSegmentProcess';                                   
+        fOutlierRemoval_text='ConnectedSegmentProcess';                                   
     else
-        fOutlierRemoval_text='_EntireSectionProcess';
+        fOutlierRemoval_text='EntireSectionProcess';
     end
     % define the size of the pixel
     pixData=zeros(3,1);
