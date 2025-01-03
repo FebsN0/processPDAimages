@@ -20,14 +20,25 @@ switch method
         nameOperation = "backgroundCrystal_maskOnly";
     case 3
         nameOperation = "backgroundCrystal_maskAndOutlierRemoval";
+        [pixData,fOutlierRemoval,fOutlierRemoval_text]=prepareSettingsPixel;
 end
 
 [AFM_onlyBK,metadata_onlyBK,AFM_heightIO_onlyBK,filePath,nameScan,idxRemovedPortion_onlyBK]=prepareData(nameOperation,secondMonitorMain,filePath);        
-fileResultPath=prepareDirResults(filePath);  
-resFit_friction=A1_frictionCalc_method_1_2_3(AFM_onlyBK,metadata_onlyBK,AFM_heightIO_onlyBK,secondMonitorMain,fileResultPath,method,nameScan,idxRemovedPortion_onlyBK);
+  
+if method == 3
+    fileResultPath=prepareDirResults(filePath,method,fOutlierRemoval,fOutlierRemoval_text);
+    [resFit_friction,definitiveFrictionCoeff]=A1_frictionCalc_method_1_2_3(AFM_onlyBK,metadata_onlyBK,AFM_heightIO_onlyBK,secondMonitorMain,fileResultPath,method,nameScan,idxRemovedPortion_onlyBK,pixData,fOutlierRemoval,fOutlierRemoval_text);
+    fOutlierRemovalXfile=sprintf('_%d',fOutlierRemoval);
+else    
+    fileResultPath=prepareDirResults(filePath,method);
+    resFit_friction=A1_frictionCalc_method_1_2_3(AFM_onlyBK,metadata_onlyBK,AFM_heightIO_onlyBK,secondMonitorMain,fileResultPath,method,nameScan,idxRemovedPortion_onlyBK);
+    fOutlierRemovalXfile='';
+end
 close all
 
-clear AFM_onlyBK metadata_onlyBK AFM_heightIO_onlyBK secondMonitorMain fileResultPath method nameScan idxRemovedPortion_onlyBK filePath nameOperation
+nameFiledata=fullfile(fileResultPath,sprintf('dataResults_method%d%s',method,fOutlierRemovalXfile));
+save(nameFiledata,"resFit_friction",'-v7.3')
+clear AFM_onlyBK metadata_onlyBK AFM_heightIO_onlyBK nameScan secondMonitorMain fileResultPath method fOutlierRemoval* pixData idxRemovedPortion_onlyBK filePath nameOperation nameFiledata
 
 function varargout=prepareData(nameOperation,secondMonitorMain,filePath)
     % prepare the data to calculate the friction, regardless the method.
@@ -114,9 +125,15 @@ function varargout=prepareData(nameOperation,secondMonitorMain,filePath)
     varargout{6}=idxRemovedPortion_onlyBK;
 end
 
-function newFolder=prepareDirResults(filePath)
+function newFolder=prepareDirResults(filePath,method,fOutlierRemoval,fOutlierRemoval_text)
     % create a new directory where store the BK results of every processes scan
-    newFolder=fullfile(filePath,"Results of All background scans");
+    if method == 3
+        details=sprintf(' - option %d - %s',fOutlierRemoval,fOutlierRemoval_text);
+    else
+        details='';
+    end
+    nameNewDir=sprintf('Results of All background scans - method %d%s',method,details);
+    newFolder=fullfile(filePath,nameNewDir);
     if exist(newFolder, 'dir')
         question= sprintf('Directory already exists and it may already contain previous results.\nDo you want to overwrite it or create new directory?');
         options= {'Keep the dir','Overwrite the existing dir','Create a new dir','Select another existing dir'};
@@ -135,5 +152,34 @@ function newFolder=prepareDirResults(filePath)
         end
     else
         mkdir(newFolder);
+    end
+end
+
+function [pixData,fOutlierRemoval,fOutlierRemoval_text]=prepareSettingsPixel
+    % choose the removal modality    
+    question= 'Choose the modality of removal outliers';
+    options={ ...
+    sprintf('1) Apply outlier removal to each segment after pixel reduction.'), ...
+    sprintf('2) Apply outlier removal to one large connected segment after pixel reduction.'),...
+    sprintf('3) Apply outlier removal to entire same-setpoint section.')};                
+    fOutlierRemoval = getValidAnswer(question, '', options);
+    if fOutlierRemoval==1
+        fOutlierRemoval_text='SingleSegmentsProcess';
+    elseif fOutlierRemoval==2
+        fOutlierRemoval_text='ConnectedSegmentProcess';                                   
+    else
+        fOutlierRemoval_text='EntireSectionProcess';
+    end
+    % define the size of the pixel
+    pixData=zeros(3,1);
+    question ={'Maximum pixels to remove from both edges of a segment:' ...
+        'Enter the step size of pixel loop:'...
+        'Minimum number of elements in a section required for the fitting:'};
+    defValues={'50' '2' '20'};
+    while true
+        pixData = str2double(inputdlg(question,'SETTING PARAMETERS FOR THE EDGE REMOVAL',[1 90],defValues));
+        if any(isnan(pixData)), questdlg('Invalid input! Please enter a numeric value','','OK','OK');
+        else, break
+        end
     end
 end
