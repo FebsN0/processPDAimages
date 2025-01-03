@@ -78,10 +78,10 @@ function LineDataFilt = featureFrictionCalc5_DeleteEdgeDataAndOutlierRemoval(Lin
             % skip to find the next segment
             i=EndPos+1;
         else
+            % if the last element is zero, break the while loop 
+            if i==length(LineData), break, end    
             % if the element is zero, do nothing and move to the next element
             i=i+1;
-            % if the last element is zero, break the while loop 
-            if i==length(LineData), break, end            
         end
     end
     
