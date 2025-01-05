@@ -34,6 +34,8 @@ function definitiveFc=featureFrictionCalc7_distributionFc_allScansAllPixels(fric
     end
     title(mainTitle,'Fontsize',20)
     if ~isempty(secondMonitorMain); objInSecondMonitor(secondMonitorMain,f_fcAll); end
+    legend('Interpreter','none','FontSize',15,'Location','northeast')
+    uiwait(msgbox('Click twice on the distribution to select the range to consider the friction coefficients required for the averaging.'));
     idx_x=selectRangeGInput(2,1,edges);
     range=[edges(idx_x(1)),edges(idx_x(2))];
     range=sort(range);
@@ -42,9 +44,8 @@ function definitiveFc=featureFrictionCalc7_distributionFc_allScansAllPixels(fric
     selectedRangeFc= allFcVsPix_Array(allFcVsPix_Array > range(1) & allFcVsPix_Array < range(2));
     definitiveFc=round(mean(selectedRangeFc),3);
     definitiveFc_std=round(std(selectedRangeFc),3);
-    resultChoice= sprintf('Friction Coefficient in the selected range: %0.3g ± %0.2g',definitiveFc,definitiveFc_std);
+    resultChoice= sprintf('Friction Coefficient in the selected range: %0.3f ± %0.3f',definitiveFc,definitiveFc_std);
     title({mainTitle; resultChoice},'FontSize',18,'interpreter','none');            
-    legend('Interpreter','none','FontSize',15,'Location','northeast')
     saveas(f_fcAll,sprintf('%s/resultMethod3_frictionCoeffsDistribution_option%d.tif',newFolder,fOutlierRemoval))           
     uiwait(msgbox('Click to conclude'));
     close(f_fcAll)

@@ -47,7 +47,7 @@ function [resFrictionAllExp,varargout]=A1_frictionCalc_method_1_2_3(AFM_AllScanI
     maxSetpointAllFile=max(maxSetpointFile); clear maxSetpointFile
     % init the var where store the different coefficient frictions of any scan image and the cleared images
     % and averaged cleared vector
-    resFrictionAllExp=struct('nameScan',[],'slope',[],'offset',[],'forceCleared',[],'vertCleared',[],'forceCleared_avg',[],'vertCleared_avg',[]);
+    resFrictionAllExp=struct('nameScan',[],'slope',[],'offset',[],'metadata',[],'forceCleared',[],'vertCleared',[],'forceCleared_avg',[],'vertCleared_avg',[],'statsErrorPlot',[]);
 
     if method~=3
         % open a new figure where plot the fitting curves of all the uploaded friction experiments.
@@ -66,6 +66,7 @@ function [resFrictionAllExp,varargout]=A1_frictionCalc_method_1_2_3(AFM_AllScanI
         AFM_height_IO=AFM_AllScan_height_IO{j};
         nameScan=nameScan_AllScan{j};
         resFrictionAllExp(j).nameScan = nameScan;
+        resFrictionAllExp(j).metadata= metadataSingle;
         idxRemovedPortion=idxRemovedPortion_onlyBK{j};      
         % prepare the idx for each section depending on the size of each section stored in the metadata
         sectionSize=metadataSingle.y_scan_pixels;
@@ -125,7 +126,7 @@ function [resFrictionAllExp,varargout]=A1_frictionCalc_method_1_2_3(AFM_AllScanI
             force_avg_clear=force_avg(~isnan(force_avg));
             vertForce_avg_clear=vertForce_avg(~isnan(vertForce_avg));
             % plot the experimental data
-            limitsXYdata(:,:,j)=featureFrictionCalc3_plotErrorBar(vertForce_avg_clear,force_avg_clear,j,nameScan);
+            [limitsXYdata(:,:,j),stats]=featureFrictionCalc3_plotErrorBar(vertForce_avg_clear,force_avg_clear,j,nameScan);
             % fit the data and plot the fitted curve. By default: yes fitting and image
             resFit=featureFrictionCalc4_fittingForceSetpoint(vertForce_avg_clear,force_avg_clear,j);
             fOutlierRemoval_text='';
@@ -136,14 +137,11 @@ function [resFrictionAllExp,varargout]=A1_frictionCalc_method_1_2_3(AFM_AllScanI
             resFrictionAllExp(j).vertCleared=vertForce_clear;
             resFrictionAllExp(j).forceCleared_avg=force_avg_clear;
             resFrictionAllExp(j).vertCleared_avg=vertForce_avg_clear;
+            resFrictionAllExp(j).statsErrorPlot=stats;
         else
-            %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            %%%%%% FORTH CLEARING %%%%%%
-            %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%%%%------- SETTING PARAMETERS FOR THE EDGE REMOVAL -------%%%%%%%%%%%
-            % the user has to choose:
-            % 1) the number of points to remove in from a single edge BK-crystal, which contains the spike values
-            % 2) the step size (i.e. in each iteration, the size pixel increases until the desired number of point
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%%%%% THIRD METHOD  %%%%%%
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%
             f_pixelsVSfc=figure('Visible','off');
             % ask modalities only once, at the first iterated file
             if j==1  
@@ -348,9 +346,8 @@ function [resFrictionAllExp,varargout]=A1_frictionCalc_method_1_2_3(AFM_AllScanI
             resFrictionAllExp(j).forceCleared=force_thirdClearing_AllPixelSizes;
             resFrictionAllExp(j).vertCleared=vertForce_thirdClearing_AllPixelSizes;
             resFrictionAllExp(j).forceCleared_avg=force_avg_clear_AllPixelSizes;
-            resFrictionAllExp(j).vertCleared_avg=vertForce_avg_clear_AllPixelSize;
+            resFrictionAllExp(j).vertCleared_avg=vertForce_avg_clear_AllPixelSize;            
         end
-
     end    
     
     if method == 1 || method == 2
@@ -381,7 +378,8 @@ function [flag,numElemSections]=checkNaNelements(vectorAvg,idxSection,minElement
     % be NaN. Therefore, easy to find and understand how many elements are left for a specific section
     numElemSections=zeros(1,length(idxSection));
     for i=1:length(idxSection)
-        if i==5
+        % last section
+        if i==length(idxSection)
             numElemSections(i)=length(find(~isnan(vectorAvg(idxSection(i):end))));
         else
             numElemSections(i)=length(find(~isnan(vectorAvg(idxSection(i):idxSection(i+1)-1))));

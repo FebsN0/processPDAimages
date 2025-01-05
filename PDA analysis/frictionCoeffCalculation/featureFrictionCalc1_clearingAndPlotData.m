@@ -45,20 +45,26 @@ function [vertForce_thirdClearing,force_thirdClearing]=featureFrictionCalc1_clea
     
     %%%%%% THIRD CLEARING %%%%%%%
     % build 1-dimensional array which contain 0 or 1 according to the idx of regions manually removed 
-    % (0 = removed slow line)
-    array01RemovedRegion=ones(1,size(force_firstClearing,2));
+    % ( 0 = removed slow line)
+    vertForce_thirdClearing=vertForce_secondClearing;
+    force_thirdClearing=force_secondClearing;
     if ~isempty(idxRemovedPortion)
+    %array01RemovedRegion=ones(1,size(force_firstClearing,2));
         for n=1:size(idxRemovedPortion,1)
-            array01RemovedRegion(idxRemovedPortion(n,1):idxRemovedPortion(n,2))=0;         
+            if isnan(idxRemovedPortion(n,3)) 
+                % remove entire fast scan lines
+                vertForce_thirdClearing(:,idxRemovedPortion(1):idxRemovedPortion(2))=0;
+                force_thirdClearing(:,idxRemovedPortion(1):idxRemovedPortion(2))=0;
+            else
+                % remove portions
+                vertForce_thirdClearing(idxRemovedPortion(3):idxRemovedPortion(4),idxRemovedPortion(1):idxRemovedPortion(2))=0;
+                force_thirdClearing(idxRemovedPortion(3):idxRemovedPortion(4),idxRemovedPortion(1):idxRemovedPortion(2))=0;
+            end
         end
     end
     % using this array (1 ok, 0 not ok), substitute entire lines in the lateral and vertical 
     % data with zero in corrispondence of removed regions
-    vertForce_thirdClearing=vertForce_secondClearing;
-    vertForce_thirdClearing(:,array01RemovedRegion==0)=0;
-    force_thirdClearing=force_secondClearing;
-    force_thirdClearing(:,array01RemovedRegion==0)=0;
-       
+
     % plot lateral (masked force, N) and vertical data (masked force, N). Not show up but save fig
     featureFrictionCalc6_plotClearedImages(vertForce_thirdClearing,force_thirdClearing,maxSetpointsAllFile,newFolder,nameScan,secondMonitorMain,method)
 end

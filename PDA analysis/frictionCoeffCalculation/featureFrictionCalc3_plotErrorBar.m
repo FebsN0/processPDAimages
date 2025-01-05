@@ -2,7 +2,7 @@
 % therefore, the best approach is to find the variation point in verticalData.
 
 % NOTE: the input must be a vector of elements as average of entire fast scan line
-function limsXY=featureFrictionCalc3_plotErrorBar(vertForce,latForce,idxFile,nameScan)
+function [limsXY,stats]=featureFrictionCalc3_plotErrorBar(vertForce,latForce,idxFile,nameScan)
     if ~isvector(vertForce) || ~isvector(latForce)
         error('The input data are not vector. Each element represents the average of a i-th fast scan line, therefore the vector lenght represents the slow lines')
     end
@@ -36,7 +36,8 @@ function limsXY=featureFrictionCalc3_plotErrorBar(vertForce,latForce,idxFile,nam
     x=flip(vertForce_Blocks_avg);
     y=flip(latForce_Blocks_avg);
     err=flip(latForce_Blocks_std);
-
+    % save the stats
+    stats.vertAvgX=x; stats.forceAvgY=y; stats.forceErr=err;
     errorbar(x,y,err,'s','Linewidth',1.3,'capsize',15,'Color',globalColor(idxFile),...
         'markerFaceColor',globalColor(idxFile),'markerEdgeColor',globalColor(idxFile),'MarkerSize',10,...
         'DisplayName',sprintf('Experiment %s',nameScan));
