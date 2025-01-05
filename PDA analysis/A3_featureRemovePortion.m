@@ -22,6 +22,7 @@ function [rawH,idxPortionRemoved] = A3_featureRemovePortion(rawH,secondMonitorMa
     while true
         figure(f1)
         imagesc(rawH*1e9)
+        xlim([0 size(rawH,2)]), ylim([0 size(rawH,1)])
         ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
         colormap parula, c = colorbar; c.Label.String = 'Height [nm]'; c.Label.FontSize=15;
         title(sprintf('%s Raw Height (measured) channel',text),'FontSize',17)
@@ -29,12 +30,7 @@ function [rawH,idxPortionRemoved] = A3_featureRemovePortion(rawH,secondMonitorMa
         if strcmp(answer,'No')
             break
         else
-            hold on  
-            pan on; zoom on;
-            % show dialog box before continue. Select the thresholding
-            uiwait(msgbox('Before click to continue the binarization, zoom or pan on the image for a better view',''));
-            zoom off; pan off;
-          
+            hold on            
             title('Select area to remove every fast scan line corresponding to the selected area.','FontSize',17)
             roi=drawrectangle('Label','Removed');
             uiwait(msgbox('Click to continue'))
@@ -49,7 +45,7 @@ function [rawH,idxPortionRemoved] = A3_featureRemovePortion(rawH,secondMonitorMa
             % ignored. But in case of friction data, it may be a problem and provide false results
             % i.e. in correspondence of the PDA regions, the mask "says" they are background, therefore, the
             % lateral deflection values are actually corresponding with the PDA and not with the background            
-            idxPortionRemoved=[idxPortionRemoved; xstart xend];
+            idxPortionRemoved=[idxPortionRemoved; xstart xend]; %#ok<AGROW>
 
             % sol 1: the removed values became NaN
             % problem: during the next fitting, preparecurve function remove all NaN values so the

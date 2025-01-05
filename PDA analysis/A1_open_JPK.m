@@ -85,7 +85,7 @@ function [varargout]=A1_open_JPK(pathJpk,varargin)
         else
             complete_path_to_afm_file=sprintf('%c%c',AFM_file_path,afm_file_name);
             %check the extension of uploaded file
-            if ~endsWith(complete_path_to_afm_file, valid_extensions, 'IgnoreCase', true);
+            if ~endsWith(complete_path_to_afm_file, valid_extensions, 'IgnoreCase', true)
                 error('Invalid format file')
             end
         end
@@ -283,7 +283,7 @@ function [varargout]=A1_open_JPK(pathJpk,varargin)
         header_metadata_raw=header_metadata_raw{1,1};
         fclose(fid);
         
-        j=1;f=0;g=1;Conversion_Set_Id=0;Encoder_Id=0;
+        j=1;f=0;Conversion_Set_Id=0;Encoder_Id=0;
         for i=1:size(header_metadata_raw,1)
             %exclude some rows which doesnt have = delimiter
             % this part aims to re-organize metadata in cell matrix
@@ -426,10 +426,8 @@ function [varargout]=A1_open_JPK(pathJpk,varargin)
             clear segment_metadata_raw Temp_InfoDir_Segments
         end
         % OUTPUT data of force curves
-        varargout{1}=FC_Data;
-    
-    end
-    
+        varargout{1}=FC_Data;    
+    end    
     if(exist('wb','var'))
         delete (wb)
     end

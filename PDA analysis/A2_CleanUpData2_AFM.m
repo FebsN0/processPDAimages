@@ -15,7 +15,6 @@ function [varargout]=A2_CleanUpData2_AFM(data,setpoints,secondMonitorMain,newFol
     addRequired(p, 'data', @(x) isstruct(x));
     argName = 'cleanOnly';      defaultVal = 'No';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     argName = 'Silent';         defaultVal = 'Yes';     addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
-    argName = 'phaseProcess';   defaultVal = 'Raw';     addParameter(p,argName,defaultVal, @(x) ismember(x,{'Raw','PostProcessed'}));
     argName = 'imageType';      defaultVal = 'Entire';  addParameter(p,argName,defaultVal, @(x) ismember(x,{'Entire','SingleSection','Assembled'}));
     argName = 'Normalization';  defaultVal = 'No';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     argName = 'sectionSize';    defaultVal = [];        addParameter(p,argName,defaultVal);
@@ -29,9 +28,7 @@ function [varargout]=A2_CleanUpData2_AFM(data,setpoints,secondMonitorMain,newFol
         cleanOnly=1;
     else
         cleanOnly=0;
-        if(strcmp(p.Results.Silent,'Yes'));     SeeMe=0; else, SeeMe=1; end
-        phaseProc=p.Results.phaseProcess;
-        if(strcmp(phaseProc,'Raw'));  step=2; else, step=4; end
+        if(strcmp(p.Results.Silent,'Yes'));     SeeMe=0; else, SeeMe=1; end                    
         imageTyp=p.Results.imageType;
         if(strcmp(p.Results.Normalization,'Yes')); norm=1; else, norm=0; end
     end
@@ -64,45 +61,41 @@ function [varargout]=A2_CleanUpData2_AFM(data,setpoints,secondMonitorMain,newFol
         data_LD_trace=  data(strcmp([data.Channel_name],'Lateral Deflection') & strcmp([data.Trace_type],'Trace')).AFM_image;
         data_LD_retrace=data(strcmp([data.Channel_name],'Lateral Deflection') & strcmp([data.Trace_type],'ReTrace')).AFM_image;
         data_VD_retrace=data(strcmp([data.Channel_name],'Vertical Deflection') & strcmp([data.Trace_type],'ReTrace')).AFM_image;
-        % rotate so the image is aligned with BF\fluorescence images
-        if step==2
-            data_Height= flip(rot90(data_Height),2);
-            data_LD_trace= flip(rot90(data_LD_trace),2);
-            data_LD_retrace=flip(rot90(data_LD_retrace),2);
-            data_VD_trace= flip(rot90(data_VD_trace),2);
-            data_VD_retrace=flip(rot90(data_VD_retrace),2);
-        end
-
+        % rotate so the image is aligned with BF\fluorescence images        
+        data_Height= flip(rot90(data_Height),2);
+        data_LD_trace= flip(rot90(data_LD_trace),2);
+        data_LD_retrace=flip(rot90(data_LD_retrace),2);
+        data_VD_trace= flip(rot90(data_VD_trace),2);
+        data_VD_retrace=flip(rot90(data_VD_retrace),2);
+        % start to show the data
         data=data_Height*1e9;
-        titleData=sprintf('Height (measured) channel (%s - %s)',phaseProc,imageTyp);
-        if step==2, idimg=2; else, idimg=4; end
-        nameFig=sprintf('%s/resultA%d_%d_%s_HeightChannel_%s.tif',newFolder,step,idimg,phaseProc,imageTyp);
+        titleData=sprintf('Height (measured) channel (Raw - %s)',imageTyp);
+        idimg=2;
+        nameFig=sprintf('%s/resultA2_%d_HeightChannel_%s.tif',newFolder,idimg,imageTyp);
         labelBar=sprintf('height (nm)');
         showData(secondMonitorMain,SeeMe,1,data,norm,titleData,labelBar,nameFig)
-        % no need to plot and save the others channels since they have not changed
-        if step == 2
-            data=data_LD_trace;
-            titleData=sprintf('Lateral Deflection Trace channel (%s - %s)',phaseProc,imageTyp);
-            nameFig=sprintf('%s/resultA2_3_%s_LDChannel_trace_%s.tif',newFolder,phaseProc,imageTyp);
-            labelBar='Voltage [V]';
-            showData(secondMonitorMain,SeeMe,2,data,norm,titleData,labelBar,nameFig)
-    
-            data=data_LD_retrace;
-            titleData=sprintf('Lateral Deflection Retrace channel (%s - %s)',phaseProc,imageTyp);
-            nameFig=sprintf('%s/resultA2_4_%s_LDChannel_retrace_%s.tif',newFolder,phaseProc,imageTyp);
-            showData(secondMonitorMain,SeeMe,3,data,norm,titleData,labelBar,nameFig)
-    
-            data=data_VD_trace*1e9;
-            titleData=sprintf('Vertical Deflection trace channel (%s - %s)',phaseProc,imageTyp);
-            nameFig=sprintf('%s/resultA2_5_%s_VDChannel_trace_%s.tif',newFolder,phaseProc,imageTyp);
-            labelBar='Force [nN]';
-            showData(secondMonitorMain,SeeMe,4,data,norm,titleData,labelBar,nameFig)
-
-            data=data_VD_retrace*1e9;
-            titleData=sprintf('Vertical Deflection retrace channel (%s - %s)',phaseProc,imageTyp);
-            nameFig=sprintf('%s/resultA2_6_%s_VDChannel_retrace_%s.tif',newFolder,phaseProc,imageTyp);
-            showData(secondMonitorMain,SeeMe,5,data,norm,titleData,labelBar,nameFig)           
-        end       
+        % Lateral Deflection Trace
+        data=data_LD_trace;
+        titleData=sprintf('Lateral Deflection Trace channel (Raw - %s)',imageTyp);
+        nameFig=sprintf('%s/resultA2_3_Raw_LDChannel_trace_%s.tif',newFolder,imageTyp);
+        labelBar='Voltage [V]';
+        showData(secondMonitorMain,SeeMe,2,data,norm,titleData,labelBar,nameFig)
+        % Lateral Deflection ReTrace
+        data=data_LD_retrace;
+        titleData=sprintf('Lateral Deflection Retrace channel (Raw - %s)',imageTyp);
+        nameFig=sprintf('%s/resultA2_4_Raw_LDChannel_retrace_%s.tif',newFolder,imageTyp);
+        showData(secondMonitorMain,SeeMe,3,data,norm,titleData,labelBar,nameFig)
+        % Vertical Deflection trace
+        data=data_VD_trace*1e9;
+        titleData=sprintf('Vertical Deflection trace channel (Raw - %s)',imageTyp);
+        nameFig=sprintf('%s/resultA2_5_Raw_VDChannel_trace_%s.tif',newFolder,imageTyp);
+        labelBar='Force [nN]';
+        showData(secondMonitorMain,SeeMe,4,data,norm,titleData,labelBar,nameFig)
+        % Vertical Deflection Retrace
+        data=data_VD_retrace*1e9;
+        titleData=sprintf('Vertical Deflection retrace channel (Raw - %s)',imageTyp);
+        nameFig=sprintf('%s/resultA2_6_Raw_VDChannel_retrace_%s.tif',newFolder,imageTyp);
+        showData(secondMonitorMain,SeeMe,5,data,norm,titleData,labelBar,nameFig)           
         
         % show distribution of vertical forces (data_VD_trace). If good, it should coincide approximately with the setpoint
         data=data_VD_trace*1e9;

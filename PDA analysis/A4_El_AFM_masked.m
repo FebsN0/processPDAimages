@@ -1,4 +1,4 @@
-function [AFM_Images_Bk,idxRemovedPortion]=A4_El_AFM_masked(AFM_Images,AFM_height_IO,idxRemovedPortion,secondMonitorMain,filepath,varargin)
+function [AFM_Images_Bk,AFM_height_IO,idxRemovedPortion]=A4_El_AFM_masked(AFM_Images,AFM_height_IO,idxRemovedPortion,iterationMain,secondMonitorMain,filepath,varargin)
 %%
 % The function extracts the original Height Images from the experiments.
 % It removes baseline and extracts foreground from the AFM image.
@@ -40,22 +40,18 @@ function [AFM_Images_Bk,idxRemovedPortion]=A4_El_AFM_masked(AFM_Images,AFM_heigh
     % which correspond to the PDA crystals. Put value 5 to exclude in corrispondence
     % of crystal
     image_height=AFM_Images(1).AFM_image;
-    % if portions of the height have been previously removed, then use the same idxs to remove the 
-    % data from height the second time.
-    if ~isempty(idxRemovedPortion)
-        for i=1:length(idxRemovedPortion)
-            image_height(:,idxRemovedPortion(i,1):idxRemovedPortion(i,2))=min(image_height(:));
-        end
-    end
-    % original raw image
+
+    % original raw image    
     image_height_glass=image_height;
-    f1=figure('Visible','off'); 
-    imshow(imadjust(image_height_glass/max(image_height_glass(:))));
-    title('Height (measured) channel - Raw', 'FontSize',16), colormap parula
-    objInSecondMonitor(secondMonitorMain,f1);
-    saveas(f1,sprintf('%s\\resultA4_1_heightOriginal.tif',filepath))
-    close(f1)
-    
+    if iterationMain==1
+        textTitle='Height (measured) channel - Pre-Optimization';
+        idImg=1;
+        textColorLabel='Height (nm)';
+        textNameFile=sprintf('%s/resultA4_1_height_preOptimization.tif',filepath);
+        showData(secondMonitorMain,false,idImg,image_height_glass,true,textTitle,textColorLabel,textNameFile)
+        % fig is invisible
+        close gcf
+    end
     % no create figure of the masked height because it is very close to the mask, since the max value is 5
     % wherease the background has a magnitude of nanometer
     image_height_glass(AFM_height_IO==1)=5;
@@ -82,28 +78,55 @@ function [AFM_Images_Bk,idxRemovedPortion]=A4_El_AFM_masked(AFM_Images,AFM_heigh
   
     AFM_noBk=poly_filt_data;
     AFM_noBk=AFM_noBk-min(min(AFM_noBk));
-
-    if SeeMe
-        f3=figure('Visible','on');
-    else
-        f3=figure('Visible','off');
-    end
-    imshow(imadjust(AFM_noBk/max(AFM_noBk(:)))),colormap parula,
-    title('Height (measured) channel - Masked and Fitted', 'FontSize',16)        
-    objInSecondMonitor(secondMonitorMain,f3);
-    c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
-    ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)      
-    saveas(f3,sprintf('%s/resultA4_2_OptFittedHeightChannel.tif',filepath))
+    
+    textTitle='Height (measured) channel - Masked, Fitted, Optimized';
+    idImg=3;
+    textColorLabel='Normalized Height';
+    textNameFile=sprintf('%s/resultA4_2_OptFittedHeightChannel_Norm_iteration%d.tif',filepath,iterationMain);
+    showData(secondMonitorMain,SeeMe,idImg,AFM_noBk,true,textTitle,textColorLabel,textNameFile)
     if SeeMe
         uiwait(msgbox('Click to continue'))
     end
-    close(f3)
+    close gcf
+
+    textTitle='Height (measured) channel - Masked, Fitted, Optimized';
+    idImg=4;
+    textColorLabel='Height (nm)';
+    textNameFile=sprintf('%s/resultA4_3_OptFittedHeightChannel_iteration%d.tif',filepath,iterationMain);
+    showData(secondMonitorMain,false,idImg,AFM_noBk,false,textTitle,textColorLabel,textNameFile)
+    % fig is invisible
+    close gcf
+    
+    % remove regions manually considered outliers by substuting the values with the minimum. Not good entire remotion.
+    % for better details, see the documentation of the function
     [AFM_noBk,idxRemovedPortion]=A3_featureRemovePortion(AFM_noBk,secondMonitorMain,filepath,4,4,idxRemovedPortion);
+    textTitle='Height (measured) channel - Masked, Fitted, Optimized, portions removed';
+    idImg=4;
+    textColorLabel='Height (nm)'; 
+    textNameFile=sprintf('%s/resultA4_4_OptFittedHeightChannel_PortionRemoved_iteration%d.tif',filepath,iterationMain);
+    showData(secondMonitorMain,false,idImg,AFM_noBk,true,textTitle,textColorLabel,textNameFile)
+    % fig is invisible
+    close gcf
+    % if portions of the height have been previously removed, then use the same idxs to remove the 
+    % data from the mask.
+    if ~isempty(idxRemovedPortion)
+        for i=1:length(idxRemovedPortion)
+            AFM_height_IO(:,idxRemovedPortion(i,1):idxRemovedPortion(i,2))=min(AFM_height_IO(:));
+        end
+    end
+
+    textTitle='Baseline and foreground processed - portions removed';
+    idImg=5;
+    textNameFile=sprintf('%s/resultA4_5_BaselineForeground_PortionRemoved_iteration%d.tif',filepath,iterationMain);
+    showData(secondMonitorMain,false,idImg,AFM_height_IO,false,textTitle,'',textNameFile,true)
+    % fig is invisible
+    close gcf
+
 
     if(exist('wb','var'))
         delete(wb)
     end
-
+    
     % show the definitive height distribution
     if SeeMe
         f4=figure('Visible','on');
@@ -114,9 +137,10 @@ function [AFM_Images_Bk,idxRemovedPortion]=A4_El_AFM_masked(AFM_Images,AFM_heigh
     xlabel(sprintf('Feature height (nm)'),'FontSize',15)
     title('Distribution Height','FontSize',20)
     objInSecondMonitor(secondMonitorMain,f4);
-    saveas(f4,sprintf('%s/resultA4_3_OptHeightDistribution.tif',filepath))
+    saveas(f4,sprintf('%s/resultA4_4_OptHeightDistribution_iteration%d.tif',filepath,iterationMain))
     close(f4)
-    % substitutes to the raw cropped date the Height with no BK
+
+    % substitutes to the original height image with the new opt fitted heigh
     AFM_Images_Bk=AFM_Images;
     AFM_Images_Bk(strcmp([AFM_Images_Bk.Channel_name],'Height (measured)')).AFM_image=AFM_noBk;
 end

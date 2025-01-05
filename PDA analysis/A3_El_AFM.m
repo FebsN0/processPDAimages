@@ -1,4 +1,4 @@
-function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,secondMonitorMain,filepath,varargin)
+function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,iterationMain,secondMonitorMain,filepath,varargin)
 
 % The function extracts Images from the experiments.
 % It removes baseline and extracts foreground from the AFM image.
@@ -37,8 +37,9 @@ function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,sec
     % all Trace
     addRequired(p, 'filtData', @(x) isstruct(x));
     %Add default parameters. When call the function, use 'argName' as well you use 'LineStyle' in plot! And
-    %then the values
-    argName = 'fitOrder';   defaultVal = '';        addParameter(p,argName,defaultVal, @(x) ismember(x,{'','Low','Medium','High'}));
+
+    %then the values                                
+    argName = 'fitOrder';   defaultVal = '';        addParameter(p, argName, defaultVal, @(x) ismember(x, {'', 'Low', 'Medium', 'High'}));
     argName = 'AutoElab';   defaultVal = 'No';      addParameter(p, argName, defaultVal,@(x) ismember(x,{'No','Yes'}));
     argName = 'Silent';     defaultVal = 'Yes';     addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     % validate and parse the inputs
@@ -59,7 +60,10 @@ function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,sec
     % Extract the height channel
     raw_data_Height=filtData(strcmp([filtData.Channel_name],'Height (measured)')).AFM_image;
     % Orient the image by counterclockwise 180° and flip to coencide with the Microscopy image through rotations
-    raw_data_Height=flip(rot90(raw_data_Height),2);
+    % if the process is the first time, dont rotate again because the pre processed image is already rotated
+    if iterationMain==1
+        raw_data_Height=flip(rot90(raw_data_Height),2);
+    end
     rawH=raw_data_Height;
     
     for i=1:size(filtData,2)
@@ -69,7 +73,11 @@ function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,sec
                 'Trace_type', filtData(i).Trace_type, ...
                 'AFM_image', rawH); %#ok<AGROW>
         else
-            temp_img=flip(rot90(filtData(i).AFM_image),2);
+            if iterationMain==1
+                temp_img=flip(rot90(filtData(i).AFM_image),2);
+            else
+                temp_img=filtData(i).AFM_image;
+            end
             AFM_Images(i)=struct(...
                     'Channel_name', filtData(i).Channel_name,...
                     'Trace_type', filtData(i).Trace_type, ...
@@ -114,27 +122,15 @@ function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,sec
         poly_filt_data(:,i)=flag_poly_filt_data-min(min(flag_poly_filt_data));
     end
     
-    if SeeMe
-        f1=figure('Visible','on');
-    else
-        f1=figure('Visible','off');
-    end
-
-    imshow(poly_filt_data/max(poly_filt_data(:)));
-    title('Height (measured) channel - Line Tilted effect removed', 'FontSize',16), 
-    colormap parula; c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
-    objInSecondMonitor(secondMonitorMain,f1);
-    saveas(f1,sprintf('%s\\resultA3_1_HeightRemovedTiltLine.tif',filepath))
-    
+    titleData='Height (measured) channel - Line Tilted effect removed';
+    labelBar = 'Normalized Height';
+    idImg=1;
+    nameFile=fullfile(filepath,'resultA3_1_HeightRemovedTiltLine.tif');
+    showData(secondMonitorMain,SeeMe,idImg,poly_filt_data,true,titleData,labelBar,nameFile)
     if SeeMe
         uiwait(msgbox('Click to continue'))
     end
-    close(f1)
-
-    % remove regions manually considered outliers by substuting the values with NaN. Not good entire remotion.
-    % for better details, see the documentation of the function
-    % 3 because it A3 and 2 because it generates the 2nd image during the A3 running
-    [poly_filt_data,idxPortionRemoved]=A3_featureRemovePortion(poly_filt_data,secondMonitorMain,filepath,3,2);
+    close gcf
 
     waitbar(0/N_Cycluse_waitbar,wb,sprintf('Optimizing Butterworth Filter...'));
     % distribute the fitted data among bins using N bins. OUTUPUT: Y=bin counts; E= bin edges
@@ -191,21 +187,16 @@ function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,sec
     % Subtraction of fitted polynomial background
     filt_data_no_Bk=minus(poly_filt_data,fit_surf);
     filt_data_no_Bk=filt_data_no_Bk-min(min(filt_data_no_Bk));
-
-    if SeeMe
-        f2=figure('Visible','on');
-    else
-        f2=figure('Visible','off');
-    end
-    imshow(filt_data_no_Bk/max(filt_data_no_Bk(:)));
-    title('Height (measured) channel - Surface Tilted effect removed', 'FontSize',16), 
-    colormap parula; c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
-    objInSecondMonitor(secondMonitorMain,f2);
-    saveas(f2,sprintf('%s\\resultA3_2_HeightRemovedTiltSurface.tif',filepath))
+    % show the results
+    titleData='Height (measured) channel - Surface Tilted effect removed';
+    labelBar = 'Normalized Height';
+    idImg=1;
+    nameFile=fullfile(filepath,'resultA3_2_HeightRemovedTiltSurface.tif');
+    showData(secondMonitorMain,SeeMe,idImg,filt_data_no_Bk,true,titleData,labelBar,nameFile)
     if SeeMe
         uiwait(msgbox('Click to continue'))
     end
-    close(f2)
+    close gcf
 
     warning ('off','all');
     % For each different fitting depending on the accuracy (poly1 to poly9), extract 3 information:
@@ -262,21 +253,10 @@ function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,sec
                 flag_signal_x(pos_outliner==1)=nan;
                 [pos_outliner]=isoutlier(flag_signal_y,'gesd');
             end
-            flagRemovedPortion=false;
             [xData, yData] = prepareCurveData(flag_signal_x,flag_signal_y);
-            % when the fast scan line correspond to those of removed portion, skip the fitting
-            if ~isempty(idxPortionRemoved)
-                for j=1:size(idxPortionRemoved,1)
-                    if i >= idxPortionRemoved(j,1) && i <= idxPortionRemoved(j,2)
-                        flagRemovedPortion = true;
-                        break
-                    end
-                end
-            end          
-            if flagRemovedPortion 
-                continue
+            
             % check in case of strange issue. Theoretically it may not happen anymore
-            elseif length(xData) <= 2 || length(yData) <= 2
+            if length(xData) <= 2 || length(yData) <= 2
                 error('something is wrong in the data. Too few values in the %d-th line not involved by manual removal\n',i)
             else
                 opts = fitoptions( 'Method', 'LinearLeastSquares' );
@@ -338,7 +318,7 @@ function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,sec
         AFM_noBk_visible_data=imadjust(AFM_noBk/max(AFM_noBk(:)));
         
         f3=figure;
-        imshow(AFM_noBk_visible_data),colormap parula,
+        imshow(AFM_noBk_visible_data),colormap parula, axis on, axis equal
         title('Height (measured) channel - Single Line Fitted', 'FontSize',16)
         objInSecondMonitor(secondMonitorMain,f3);
         c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
@@ -351,13 +331,11 @@ function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,sec
             flagAccuracy=false;
         end
     end
-    % remove portions: 3 because it A3 and 5 because it generates the 5th image during the A3 running
-    [AFM_noBk,idxPortionRemoved]=A3_featureRemovePortion(AFM_noBk,secondMonitorMain,filepath,3,5,idxPortionRemoved);
 
     % start the binarization to create the 0/1 height image. At the same time show normal and logical image
     % for better comparison
     f4=figure;
-    subplot(121), imshow(AFM_noBk_visible_data),colormap parula,
+    subplot(121), imshow(AFM_noBk_visible_data),colormap parula, axis on
     title('Height (measured) channel - Single Line Fitted', 'FontSize',16)
     objInSecondMonitor(secondMonitorMain,f4);
     c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
@@ -412,21 +390,16 @@ function [AFM_Images,IO_Image,accuracy,idxPortionRemoved]=A3_El_AFM(filtData,sec
     end
     close(f4)
     
-    if SeeMe
-        f5=figure('Visible','on');
-    else
-        f5=figure('Visible','off');
-    end
-
-    imshow(seg_dial); title('Baseline and foreground processed', 'FontSize',16), colormap parula
-    colorbar('Ticks',[0 1],'TickLabels',{'Background','Foreground'},'FontSize',13)
-    objInSecondMonitor(secondMonitorMain,f5);
-    saveas(f5,sprintf('%s\\resultA3_4_BaselineForeground.tif',filepath))
+    % show data
+    titleData=sprintf('Baseline and foreground processed - Iteration %d',iterationMain);
+    idImg=5;
+    nameFile=fullfile(filepath,sprintf('resultA3_4_BaselineForeground_iteration%d.tif',iterationMain));
+    showData(secondMonitorMain,SeeMe,idImg,seg_dial,false,titleData,labelBar,nameFile,true)
     if SeeMe
         uiwait(msgbox('Click to continue'))
     end
-    close(f5)
-    % converts any nonzero element of the yellow/blue image into a logical image.
+    close gcf
+    
     IO_Image=logical(seg_dial);
     if(exist('wb','var'))
         delete (wb)

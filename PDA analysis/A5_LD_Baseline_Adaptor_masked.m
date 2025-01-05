@@ -25,7 +25,7 @@ function [AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Image
     % extract data (lateral deflection Trace and Retrace, vertical deflection) and then mask (glass-PDA) elementXelement
     % ONLY in correspondence with the glass!
     Lateral_Trace   = (AFM_cropped_Images(strcmpi([AFM_cropped_Images.Channel_name],'Lateral Deflection') & strcmpi([AFM_cropped_Images.Trace_type],'Trace')).AFM_image);
-    Lateral_ReTrace = (AFM_cropped_Images(strcmpi([AFM_cropped_Images.Channel_name],'Lateral Deflection') & strcmpi([AFM_cropped_Images.Trace_type],'ReTrace')).AFM_image);
+    %Lateral_ReTrace = (AFM_cropped_Images(strcmpi([AFM_cropped_Images.Channel_name],'Lateral Deflection') & strcmpi([AFM_cropped_Images.Trace_type],'ReTrace')).AFM_image);
     vertical_Trace  = (AFM_cropped_Images(strcmpi([AFM_cropped_Images.Channel_name],'Vertical Deflection') & strcmpi([AFM_cropped_Images.Trace_type],'Trace')).AFM_image);
 
     
@@ -124,52 +124,52 @@ function [AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Image
         %     continue
         % else
 
-            if(size(xData,1)>2)
-                opts = fitoptions( 'Method', 'LinearLeastSquares' );
-                opts.Robust = 'LAR';
-                fit_decision=zeros(3,limit);
-                for z=1:limit
-                    % based on the choosen accuracy, run the fitting using different curves to find the best fit
-                    % before returning the definitive fitted single fast scan line
-                    ft = fittype(sprintf('poly%d',z));
-                    % returns goodness-of-fit statistics in the structure gof. Exclude data corresponding to PDA,
-                    % which is previously converted to 5       
-                        [~, gof] = fit(xData, yData, ft,'Exclude', yData >= 5 ); % MODIFICATO. prima era 1 e dava problemi
-                        if(gof.adjrsquare<0)
-                            gof.adjrsquare=0.001;
-                        end
-                        fit_decision(1,z)=abs(gof.sse)/gof.adjrsquare;
-                        fit_decision(2,z)=gof.sse;
-                        fit_decision(3,z)=gof.adjrsquare;
+        if(size(xData,1)>2)
+            opts = fitoptions( 'Method', 'LinearLeastSquares' );
+            opts.Robust = 'LAR';
+            fit_decision=zeros(3,limit);
+            for z=1:limit
+                % based on the choosen accuracy, run the fitting using different curves to find the best fit
+                % before returning the definitive fitted single fast scan line
+                ft = fittype(sprintf('poly%d',z));
+                % returns goodness-of-fit statistics in the structure gof. Exclude data corresponding to PDA,
+                % which is previously converted to 5       
+                [~, gof] = fit(xData, yData, ft,'Exclude', yData >= 5 ); % MODIFICATO. prima era 1 e dava problemi
+                if(gof.adjrsquare<0)
+                    gof.adjrsquare=0.001;
                 end
+                fit_decision(1,z)=abs(gof.sse)/gof.adjrsquare;
+                fit_decision(2,z)=gof.sse;
+                fit_decision(3,z)=gof.adjrsquare;
+            end
                 
-                %prepare type fitting. Choose the one with the best statistics. Ind represent the polynomial grade
-                clearvars Ind
-                [~,Ind]=min(fit_decision(1,:));
-    
-                ft = fittype(sprintf('poly%d',Ind));
-                waitbar(i/N_Cycluse_waitbar,wb,sprintf('Processing %d° Ord Pol fit ... Line %.0f Completeted  %2.1f %%',Ind,i,i/N_Cycluse_waitbar*100));
-                % save the fitting decisions
-                fit_decision_final(i,1)=Ind;
-                fit_decision_final(i,2)=fit_decision(2,Ind);
-                fit_decision_final(i,3)=fit_decision(3,Ind);
-                % start the fitting. Ignore the data in corrispondence of PDA.
-                [fitresult, ~] = fit( xData, yData, ft, 'Exclude', yData >= 5 ); %#ok<ASGLU> ignore warning
-            else
-                error('The extracted fast scan line is too short. Something is wrong');
-            end
-        
-            % build the y value using the polynomial coefficients and x value (1 ==> 512)
-            % save polynomial coefficients (p1, p2, p3, ...) into fit_decision_final
-            commPart =[];
-            j=1;
-            for n=Ind:-1:0
-                commPart = sprintf('%s + %s', commPart,sprintf('fitresult.p%d*(x).^%d',j,n));
-                eval(sprintf('fit_decision_final(i,%d)= fitresult.p%d;',j+3,j))
-                j=j+1;
-            end
-            Bk_iterative(:,i)= eval(commPart);
+            %prepare type fitting. Choose the one with the best statistics. Ind represent the polynomial grade
+            clearvars Ind
+            [~,Ind]=min(fit_decision(1,:));
+
+            ft = fittype(sprintf('poly%d',Ind));
+            waitbar(i/N_Cycluse_waitbar,wb,sprintf('Processing %d° Ord Pol fit ... Line %.0f Completeted  %2.1f %%',Ind,i,i/N_Cycluse_waitbar*100));
+            % save the fitting decisions
+            fit_decision_final(i,1)=Ind;
+            fit_decision_final(i,2)=fit_decision(2,Ind);
+            fit_decision_final(i,3)=fit_decision(3,Ind);
+            % start the fitting. Ignore the data in corrispondence of PDA.
+            [fitresult, ~] = fit( xData, yData, ft, 'Exclude', yData >= 5 ); %#ok<ASGLU> ignore warning
+        else
+            error('The extracted fast scan line is too short. Something is wrong');
         end
+        
+        % build the y value using the polynomial coefficients and x value (1 ==> 512)
+        % save polynomial coefficients (p1, p2, p3, ...) into fit_decision_final
+        commPart =[];
+        j=1;
+        for n=Ind:-1:0
+            commPart = sprintf('%s + %s', commPart,sprintf('fitresult.p%d*(x).^%d',j,n));
+            eval(sprintf('fit_decision_final(i,%d)= fitresult.p%d;',j+3,j))
+            j=j+1;
+        end
+        Bk_iterative(:,i)= eval(commPart);
+    end
     %end
     % processed every fast scan line
     delete(wb)

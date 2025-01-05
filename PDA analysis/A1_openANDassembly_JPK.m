@@ -325,11 +325,9 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     end
     
     % show and save figures post assembly
-    A2_CleanUpData2_AFM(dataOrderedSTART,setpointN,secondMonitorMain,newFolder,'metadata',metaDataOrdered,'imageType',imgTyp,'phaseProcess','Raw','Silent',silent,'Normalization',norm,'sectionSize',sizeSections);
+    A2_CleanUpData2_AFM(dataOrderedSTART,setpointN,secondMonitorMain,newFolder,'metadata',metaDataOrdered,'imageType',imgTyp,'Silent',silent,'Normalization',norm,'sectionSize',sizeSections);
     % process the data (A3 and A4 to create optimized and 0\1 height images
     [AFM_HeightFittedMasked,AFM_height_IO,~,idxRemovedPortion]=processData(dataOrderedSTART,secondMonitorMain,newFolder,accuracy,silent);
-    % show and save figures post height image processing without normalization
-    A2_CleanUpData2_AFM(AFM_HeightFittedMasked,setpointN,secondMonitorMain,newFolder,'imageType',imgTyp,'phaseProcess','PostProcessed','Silent',silent,'Normalization','No');
     % save the outputs
     varargout{1}=AFM_HeightFittedMasked;
     varargout{2}=AFM_height_IO;
@@ -340,8 +338,19 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
 end
 
 function [AFM_HeightFittedMasked,AFM_height_IO,accuracy,idxRemovedPortion]=processData(data,secondMonitorMain,newFolder,accuracy,silent)
-    [AFM_HeightFitted,AFM_height_IO,accuracy,idxRemovedPortion]=A3_El_AFM(data,secondMonitorMain,newFolder,'fitOrder',accuracy,'Silent',silent);
-    % Using the AFM_height_IO, fit the background again, yielding a more accurate height image by using the
-    % 0\1 height image
-    [AFM_HeightFittedMasked,idxRemovedPortion]=A4_El_AFM_masked(AFM_HeightFitted,AFM_height_IO,idxRemovedPortion,secondMonitorMain,newFolder,'Silent',silent);
+    iterationMain=1;
+    idxRemovedPortion=[];
+    while true
+        [AFM_HeightFitted,AFM_height_IO,accuracy]=A3_El_AFM(data,iterationMain,secondMonitorMain,newFolder,'fitOrder',accuracy,'Silent',silent);
+        % Using the AFM_height_IO, fit the background again, yielding a more accurate height image by using the
+        % 0\1 height image
+        [AFM_HeightFittedMasked,AFM_height_IO,idxRemovedPortion]=A4_El_AFM_masked(AFM_HeightFitted,AFM_height_IO,idxRemovedPortion,iterationMain,secondMonitorMain,newFolder,'Silent',silent);
+        % ask if re-run the process to obtain better AFM height image 0/1
+        if getValidAnswer('Run again A3 and A4 to create better optimized mask and height AFM image?','',{'y','n'},2)==2
+            break
+        else
+            iterationMain=iterationMain+1;
+            data=AFM_HeightFittedMasked;
+        end
+    end
 end
