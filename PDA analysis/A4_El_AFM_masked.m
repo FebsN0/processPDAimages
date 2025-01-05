@@ -1,4 +1,4 @@
-function [AFM_Images_Bk,AFM_height_IO,idxRemovedPortion]=A4_El_AFM_masked(AFM_Images,AFM_height_IO,idxRemovedPortion,iterationMain,secondMonitorMain,filepath,varargin)
+function [AFM_Images_Bk,AFM_height_IO]=A4_El_AFM_masked(AFM_Images,AFM_height_IO,iterationMain,secondMonitorMain,filepath,varargin)
 %%
 % The function extracts the original Height Images from the experiments.
 % It removes baseline and extracts foreground from the AFM image.
@@ -95,33 +95,7 @@ function [AFM_Images_Bk,AFM_height_IO,idxRemovedPortion]=A4_El_AFM_masked(AFM_Im
     textNameFile=sprintf('%s/resultA4_3_OptFittedHeightChannel_iteration%d.tif',filepath,iterationMain);
     showData(secondMonitorMain,false,idImg,AFM_noBk,false,textTitle,textColorLabel,textNameFile)
     % fig is invisible
-    close gcf
-    
-    % remove regions manually considered outliers by substuting the values with the minimum. Not good entire remotion.
-    % for better details, see the documentation of the function
-    [AFM_noBk,idxRemovedPortion]=A3_featureRemovePortion(AFM_noBk,secondMonitorMain,filepath,4,4,idxRemovedPortion);
-    textTitle='Height (measured) channel - Masked, Fitted, Optimized, portions removed';
-    idImg=4;
-    textColorLabel='Height (nm)'; 
-    textNameFile=sprintf('%s/resultA4_4_OptFittedHeightChannel_PortionRemoved_iteration%d.tif',filepath,iterationMain);
-    showData(secondMonitorMain,false,idImg,AFM_noBk,true,textTitle,textColorLabel,textNameFile)
-    % fig is invisible
-    close gcf
-    % if portions of the height have been previously removed, then use the same idxs to remove the 
-    % data from the mask.
-    if ~isempty(idxRemovedPortion)
-        for i=1:length(idxRemovedPortion)
-            AFM_height_IO(:,idxRemovedPortion(i,1):idxRemovedPortion(i,2))=min(AFM_height_IO(:));
-        end
-    end
-
-    textTitle='Baseline and foreground processed - portions removed';
-    idImg=5;
-    textNameFile=sprintf('%s/resultA4_5_BaselineForeground_PortionRemoved_iteration%d.tif',filepath,iterationMain);
-    showData(secondMonitorMain,false,idImg,AFM_height_IO,false,textTitle,'',textNameFile,true)
-    % fig is invisible
-    close gcf
-
+    close gcf   
 
     if(exist('wb','var'))
         delete(wb)

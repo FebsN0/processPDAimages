@@ -144,7 +144,7 @@ function [varargout]=A2_CleanUpData2_AFM(data,setpoints,secondMonitorMain,newFol
         if length(vertForceAVG)~=numSetpoints
             warndlg('Number of rounded vertical forces is less than number of setpoint!')
         end
-
+        close(f0)
         % plot the baseline trend
         if ~isempty(p.Results.metadata)
             metadata=p.Results.metadata;
@@ -165,11 +165,12 @@ function [varargout]=A2_CleanUpData2_AFM(data,setpoints,secondMonitorMain,newFol
                 plot(arrayTime,metadata.Baseline_N*1e9,'-*','LineWidth',2,'MarkerSize',15,'MarkerEdgeColor','red')
                 title('Baseline Trend among the sections','FontSize',18)
                 ylabel('Baseline shift [nN]','FontSize',15), xlabel('Time [min]','FontSize',15), grid on, grid minor
-                objInSecondMonitor(secondMonitorMain,f0);
+                objInSecondMonitor(secondMonitorMain,f1);
                 saveas(f1,sprintf('%s/resultA2_0_baselineTrend.tif',newFolder))
             else
                 warning('\n\tPlotting the baseline trend is not possible because only one baseline value is stored in the metadata (Scan = Section)')
             end
+            close(f1)
         end
     end
 end
