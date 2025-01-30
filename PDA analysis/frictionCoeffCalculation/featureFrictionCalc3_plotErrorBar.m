@@ -7,14 +7,14 @@ function [limsXY,stats]=featureFrictionCalc3_plotErrorBar(vertForce,latForce,idx
         error('The input data are not vector. Each element represents the average of a i-th fast scan line, therefore the vector lenght represents the slow lines')
     end
     % find the idx of single blocks by setpoint
-    [~,idx]=unique(round(vertForce,-1));
+    [~,idx]=unique(round(vertForce,-1),'stable');
     % init
     latForce_Blocks_avg=zeros(1,length(idx));
     latForce_Blocks_std=zeros(1,length(idx));
     vertForce_Blocks_avg=zeros(1,length(idx));
     vertForce_Blocks_std=zeros(1,length(idx));
     % flip because the high setpoint is on the left
-    idx=flip(idx);   
+    %idx=flip(idx);   
     for i=1:length(idx)-1
         % extract the lateral and vertical deflection of the single box
         latForce_Block=latForce(idx(i):(idx(i+1)-1));
@@ -22,7 +22,7 @@ function [limsXY,stats]=featureFrictionCalc3_plotErrorBar(vertForce,latForce,idx
         % calc the avg an std of the entire block (vector portion that represent the original matrix)
         latForce_Blocks_avg(i)=mean(latForce_Block); 
         latForce_Blocks_std(i)=std(latForce_Block);
-        vertForce_Blocks_avg(i)=mean(vertForce_Block); 
+        vertForce_Blocks_avg(i)=mean(vertForce_Block)
         vertForce_Blocks_std(i)=std(vertForce_Block);
     end
     %last block

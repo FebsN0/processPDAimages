@@ -63,9 +63,9 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
         newFolder = fullfile(filePathData, sprintf('Results Processing AFM-background only _ %s',nameFile));
     else % in case normal scans
         if numFiles==1
-        [~,nameFile]=fileparts(fileName);
+            [~,nameFile]=fileparts(fileName);
         else
-            nameFile='Entire Section';
+            nameFile='Entire Section Assembled';
         end
         [upperFolder,~,~]=fileparts(fileparts(filePathData));
         newFolder = fullfile(upperFolder, sprintf('Results Processing AFM and fluorescence images - %s',nameFile));
@@ -205,9 +205,11 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
         if numFiles> 1
             setpointN(i)=metaData.SetP_N;
         else
-        % use the only available setpoint in metadata of the section-scan file as default. Then increase by 20
-            firstSetpoint=metaData.SetP_N;
-            valueDefault = {string(firstSetpoint)}; j=1; setpointN = [];
+            % PREVIOUS VERSION: MANUAL. ==> not necessary anymore since the issue about the shifted vertical force has been solved
+            %{
+            %use the only available setpoint in metadata of the section-scan file as default. Then increase by 20
+            firstSetpoint=metaData.SetP_N*1e9;
+            valueDefault = string(firstSetpoint); j=1; setpointN = [];
             while true
                 question = sprintf('Enter the used setpoint [nN] for the section %d. Click ''Cancel'' to terminate.',j);    
                 v_num = str2double(inputdlg(question,'',[1 40],valueDefault));
@@ -215,14 +217,28 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
                     break
                 elseif ~isnan(v_num)
                     setpointN = [setpointN, v_num]; %#ok<AGROW>
-                    valueDefault= string(str2double(valueDefault)+20);
+                    valueDefault= string(v_num+20);
                 else
                     uiwait(msgbox(sprintf('Invalid input! Please enter a numeric value or terminate. '),''));
                 end
+                j=j+1;
             end
-            % express in Newton from nanoNewton
             setpointN=setpointN*1e-9;
+            %} 
+            % extract the applied setpoint of each section as average of fast lines. Also, extract the idx of
+            % each section
+            data_VD_trace=  data(strcmp([data.Channel_name],'Vertical Deflection') & strcmp([data.Trace_type],'ReTrace')).AFM_image;
+            [setpointN,idxSet]=unique(round(mean(data_VD_trace,2),9),'stable'); %expressed in nanoNewton. Dont sort
+            % store the setpoint
             metaData.SetP_N=setpointN;
+            % store the position and size of each found sections. They will be likely not regular
+            yScanPixel=zeros(1,length(idxSet));
+            for j=1:length(idxSet)-1
+                yScanPixel(j)=idxSet(j+1)-idxSet(j);
+            end
+            yScanPixel(end)=size(data_VD_trace,2)-idxSet(end);
+            metaData.y_scan_pixels=yScanPixel;
+
             clear v_num question v valueDefault
         end
             
@@ -244,10 +260,18 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
         y_OriginAllScans(i)=allScansMetadata{i}.y_Origin_m;
         y_scan_lengthAllScans(i)=allScansMetadata{i}.y_scan_length_m;
         x_scan_lengthAllScans(i)=allScansMetadata{i}.x_scan_length_m;
-        y_scan_pixelsAllScans(i)=allScansMetadata{i}.y_scan_pixels;
+        if numFiles==1
+            y_scan_pixelsAllScans=allScansMetadata{i}.y_scan_pixels;
+        else
+            y_scan_pixelsAllScans(i)=allScansMetadata{i}.y_scan_pixels;
+        end
         x_scan_pixelsAllScans(i)=allScansMetadata{i}.x_scan_pixels;
         SetP_V_AllScans(i)=allScansMetadata{i}.SetP_V;
-        SetP_N_AllScans(i)=allScansMetadata{i}.SetP_N;
+        if numFiles==1
+            SetP_N_AllScans=allScansMetadata{i}.SetP_N;
+        else
+            SetP_N_AllScans(i)=allScansMetadata{i}.SetP_N;
+        end
         Baseline_V_AllScans(i)=allScansMetadata{i}.Baseline_V;
         Baseline_N_AllScans(i)=allScansMetadata{i}.Baseline_N;
     end
@@ -268,9 +292,9 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     %   Trace_type
     %   AFM data
     dataOrderedSTART=allScansImageOrderedSTART{1};
- 
     clear allScansMetadata allScansImageSTART allScansImageEND metaData data alphaAllScans x_scan_pixelsAllScans x_scan_lengthAllScans
-    
+    metaDataOrdered= allScansMetadataOrdered{1};
+    if numFiles>1
     % adjust the metaData, in particular:
     %       y_Origin
     %       y_scan_length
@@ -281,19 +305,18 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     %       SetP_m
     %       SetP_N
     % the others don't change. 
-    % since it is ordered, the first element already contains the true y_Origin
-    metaDataOrdered= allScansMetadataOrdered{1};
-    % in case of y lenght, just sum single y lenght of each section to have entire scan size
-    metaDataOrdered.y_scan_length_m= sum(y_scan_lengthAllScans);
-    % in case of y pixel, keep the pixel value of each section. This information is valuable especially for
-    % friction experiment method 1 which it needs to separate the section depending on setpoint
-    metaDataOrdered.y_scan_pixels= y_scan_pixelsAllScans;
-    % in case of setpoints and baseline, create an array if more sections. For newton values, round a little a bit the values
-    metaDataOrdered.SetP_V=SetP_V_AllScans(idx);
-    metaDataOrdered.SetP_N=round(SetP_N_AllScans(idx),9);
-    metaDataOrdered.Baseline_V=Baseline_V_AllScans(idx);
-    metaDataOrdered.Baseline_N=round(Baseline_N_AllScans(idx),12);
-
+    % since it is ordered, the first element already contains the true y_Origin        
+        % in case of y lenght, just sum single y lenght of each section to have entire scan size
+        metaDataOrdered.y_scan_length_m= sum(y_scan_lengthAllScans);
+        % in case of y pixel, keep the pixel value of each section. This information is valuable especially for
+        % friction experiment method 1 which it needs to separate the section depending on setpoint
+        metaDataOrdered.y_scan_pixels= y_scan_pixelsAllScans(idx);
+        % in case of setpoints and baseline, create an array if more sections. For newton values, round a little a bit the values
+        metaDataOrdered.SetP_V=SetP_V_AllScans(idx);
+        metaDataOrdered.SetP_N=round(SetP_N_AllScans(idx),9);
+        metaDataOrdered.Baseline_V=Baseline_V_AllScans(idx);
+        metaDataOrdered.Baseline_N=round(Baseline_N_AllScans(idx),12);
+    end
     % Further checks: the total scan area should be a square in term of um and pixels
     ratioLength=metaDataOrdered.x_scan_length_m\metaDataOrdered.y_scan_length_m;
     if round(ratioLength,4) ~= 1.0
