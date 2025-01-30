@@ -53,12 +53,12 @@ function [vertForce_thirdClearing,force_thirdClearing]=featureFrictionCalc1_clea
         for n=1:size(idxRemovedPortion,1)
             if isnan(idxRemovedPortion(n,3)) 
                 % remove entire fast scan lines
-                vertForce_thirdClearing(:,idxRemovedPortion(1):idxRemovedPortion(2))=0;
-                force_thirdClearing(:,idxRemovedPortion(1):idxRemovedPortion(2))=0;
+                vertForce_thirdClearing(:,idxRemovedPortion(n,1):idxRemovedPortion(n,2))=0;
+                force_thirdClearing(:,idxRemovedPortion(n,1):idxRemovedPortion(n,2))=0;
             else
                 % remove portions
-                vertForce_thirdClearing(idxRemovedPortion(3):idxRemovedPortion(4),idxRemovedPortion(1):idxRemovedPortion(2))=0;
-                force_thirdClearing(idxRemovedPortion(3):idxRemovedPortion(4),idxRemovedPortion(1):idxRemovedPortion(2))=0;
+                vertForce_thirdClearing(idxRemovedPortion(n,3):idxRemovedPortion(n,4),idxRemovedPortion(n,1):idxRemovedPortion(n,2))=0;
+                force_thirdClearing(idxRemovedPortion(n,3):idxRemovedPortion(n,4),idxRemovedPortion(n,1):idxRemovedPortion(n,2))=0;
             end
         end
     end

@@ -70,23 +70,27 @@ end
 function [AFM_data_cleared,AFM_heightIO_cleared,idxRemovedPortion]=removePortions(AFM_data,AFM_heightIO,secondMonitorMain,filepath)
 % before start pre-process the lateral data, it may be necessary to manually remove portions which contains 
 % outliers by substuting the values with the minimum. For better details, see the documentation of the function
+    idxRemovedPortionOld=[];
     [AFM_data_cleared,AFM_heightIO_cleared,idxRemovedPortion]=A3_featureRemovePortion(AFM_data,AFM_heightIO,secondMonitorMain);
-    % show the results  
-    AFM_height_cleared=AFM_data_cleared(1).AFM_image;
-    textTitle='Height (measured) channel - Masked, Fitted, Optimized, portions removed';
-    idImg=4;
-    textColorLabel='Height (nm)'; 
-    textNameFile=sprintf('%s/resultA4_4_OptFittedHeightChannel_PortionRemoved.tif',filepath);
-    showData(secondMonitorMain,false,idImg,AFM_height_cleared,true,textTitle,textColorLabel,textNameFile)
-    % fig is invisible
-    close gcf
-
-    textTitle='Baseline and foreground processed - portions removed';
-    idImg=5;
-    textNameFile=sprintf('%s/resultA4_5_BaselineForeground_PortionRemoved.tif',filepath);
-    showData(secondMonitorMain,false,idImg,AFM_heightIO_cleared,false,textTitle,'',textNameFile,true)
-    % fig is invisible
-    close gcf
+    % in case of removal, save the final images
+    if ~isequal(idxRemovedPortionOld,idxRemovedPortion)
+        % show the results  
+        AFM_height_cleared=AFM_data_cleared(1).AFM_image;
+        textTitle='Height (measured) channel - Masked, Fitted, Optimized, portions removed';
+        idImg=4;
+        textColorLabel='Height (nm)'; 
+        textNameFile=sprintf('%s/resultA4_5_OptFittedHeightChannel_PortionRemoved.tif',filepath);
+        showData(secondMonitorMain,false,idImg,AFM_height_cleared,true,textTitle,textColorLabel,textNameFile)
+        % fig is invisible
+        close gcf
+    
+        textTitle='Baseline and foreground processed - portions removed';
+        idImg=5;
+        textNameFile=sprintf('%s/resultA4_6_BaselineForeground_PortionRemoved.tif',filepath);
+        showData(secondMonitorMain,false,idImg,AFM_heightIO_cleared,false,textTitle,'',textNameFile,true)
+        % fig is invisible
+        close gcf
+    end
 end
 
 %%%%%%%%%%%------- PREPARE THE AFM DATA -------%%%%%%%%%%%
