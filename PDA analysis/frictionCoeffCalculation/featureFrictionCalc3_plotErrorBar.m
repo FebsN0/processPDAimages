@@ -22,7 +22,7 @@ function [limsXY,stats]=featureFrictionCalc3_plotErrorBar(vertForce,latForce,idx
         % calc the avg an std of the entire block (vector portion that represent the original matrix)
         latForce_Blocks_avg(i)=mean(latForce_Block); 
         latForce_Blocks_std(i)=std(latForce_Block);
-        vertForce_Blocks_avg(i)=mean(vertForce_Block)
+        vertForce_Blocks_avg(i)=mean(vertForce_Block);
         vertForce_Blocks_std(i)=std(vertForce_Block);
     end
     %last block
