@@ -4,7 +4,7 @@
 % Check manually the processed image afterwards and compare with the AFM VD
 % image!
 
-function [AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,alpha,idxPortionRemoved,secondMonitorMain,newFolder,varargin)
+function [AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,alpha,secondMonitorMain,newFolder,mainPath,varargin)
     % in case of code error, the waitbar won't be removed. So the following command force its closure
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)
@@ -14,13 +14,10 @@ function [AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Image
     %then the values
     argName = 'Accuracy';   defaultVal = 'Low';     addOptional(p,argName,defaultVal, @(x) ismember(x,{'Low','Medium','High'}));
     argName = 'Silent';     defaultVal = 'Yes';     addOptional(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
-    argName = 'SaveFig';    defaultVal = 'Yes';     addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
 
     parse(p,varargin{:});
     clearvars argName defaultVal
-
     if(strcmp(p.Results.Silent,'Yes')); SeeMe=0; else, SeeMe=1; end
-    if(strcmp(p.Results.SaveFig,'Yes')); SavFg=1; else, SavFg=0; end
 
     % extract data (lateral deflection Trace and Retrace, vertical deflection) and then mask (glass-PDA) elementXelement
     % ONLY in correspondence with the glass!
@@ -28,18 +25,7 @@ function [AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Image
     %Lateral_ReTrace = (AFM_cropped_Images(strcmpi([AFM_cropped_Images.Channel_name],'Lateral Deflection') & strcmpi([AFM_cropped_Images.Trace_type],'ReTrace')).AFM_image);
     vertical_Trace  = (AFM_cropped_Images(strcmpi([AFM_cropped_Images.Channel_name],'Vertical Deflection') & strcmpi([AFM_cropped_Images.Trace_type],'Trace')).AFM_image);
 
-    
-    % the code assumes the experiment was done in hover mode (no retrace data) ==> add automatically something
-    % to check from metadata in hover mode was enabled
-    % if getValidAnswer('Was the HOVER MODE ON?','',{'y','n'})==2
-    % % substract lateral deflection trace from retrace if HOVER MODE UNACTIVATED,
-    %     Lateral_Trace_clean =Lateral_Trace - Lateral_ReTrace;
-    % else
-    %     Lateral_Trace_clean =Lateral_Trace;
-    % end
-
     Lateral_Trace_clean =Lateral_Trace;
-
     %Subtract the minimum of the image
     Lateral_Trace_clean_shift= Lateral_Trace_clean - min(min(Lateral_Trace_clean));
     % Mask W to cut the PDA from the baseline fitting. Where there is PDA in corrispondece of the mask, then mask the
@@ -57,36 +43,17 @@ function [AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Image
     xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
     axis equal, xlim([0 size(Lateral_Trace,2)]), ylim([0 size(Lateral_Trace,1)])
 
-
     subplot(122)
     imshow((imadjust(Lateral_Trace_clean_shift/max(max(Lateral_Trace_clean_shift))))), colormap parula; colorbar,
     c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize = 15;
     title({'Lateral Deflection - Trace [V]'; '(shifted toward minimum)'},'FontSize',18)
     xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
-    axis equal, xlim([0 size(Lateral_Trace,2)]), ylim([0 size(Lateral_Trace,1)])
-    
+    axis equal, xlim([0 size(Lateral_Trace,2)]), ylim([0 size(Lateral_Trace,1)])    
     objInSecondMonitor(secondMonitorMain,f1);
-    if SavFg
-        saveas(f1,sprintf('%s/resultA5_1_RawAndShiftedLateralDeflection.tif',newFolder))
-    end
-    
-    [Lateral_Trace_clean_shift,idxPortionRemoved] = A3_featureRemovePortion(Lateral_Trace_clean_shift,secondMonitorMain,filepath,idxPortionRemoved);
+    saveas(f1,sprintf('%s/resultA5_1_RawAndShiftedLateralDeflection.tif',newFolder))
+    close(f1)
 
-
-    % apply the PDA mask
-    Lateral_Trace_shift_masked= Lateral_Trace_clean_shift;
-    Lateral_Trace_shift_masked(AFM_height_IO==1)=5;
-
-    %show dialog box
-    wb=waitbar(0/size(Lateral_Trace_shift_masked,1),sprintf('Removing Polynomial Baseline %.0f of %.0f',0,size(Lateral_Trace_shift_masked,1)),...
-        'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
-    setappdata(wb,'canceling',0);
-    
-    warning ('off','all');
-    % For each different fitting depending on the accuracy (poly1 to poly9), extract 3 information:
-    %   - Sum of squares due to error / Degree-of-freedom adjusted coefficient of determination
-    %   - Sum of squares due to error
-    %   - Degree-of-freedom adjusted coefficient of determination
+    % selection of the polynomial order
     if strcmp(p.Results.Accuracy,'Low')
         limit=3;
     elseif strcmp(p.Results.Accuracy,'Medium')
@@ -94,119 +61,96 @@ function [AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Image
     else
         limit=9;
     end
-    % init var with same size as well as W 
-    % the fit_decision_final will contain the best fit_decision and the polynomial parameters (if grade = 3
-    % ==> # parameters = 4)
-    fit_decision_final=nan(size(Lateral_Trace_shift_masked,2),3+limit+1);
-    Bk_iterative=zeros(size(Lateral_Trace_shift_masked,1),size(Lateral_Trace_shift_masked,2));
-    N_Cycluse_waitbar=size(Lateral_Trace_shift_masked,2);
-    % build x array for the fitting
-    x=1:size(Lateral_Trace_shift_masked,1); %#ok<NASGU> ignore error
-    % perform the fitting fast scan line by fast scan line 
-    for i=1:size(Lateral_Trace_shift_masked,2)
-        if(exist('wb','var'))
-            %if cancel is clicked, stop
-            if getappdata(wb,'canceling')
-               error('Process cancelled')
+    % apply the PDA mask, so the PDA data  will be ignored. Use now the background
+    Lateral_Trace_shift_masked= Lateral_Trace_clean_shift;
+    Lateral_Trace_shift_masked(AFM_height_IO==1)=5;
+    %show dialog box
+    wb=waitbar(0/size(Lateral_Trace_shift_masked,1),sprintf('Removing Polynomial Baseline %.0f of %.0f',0,size(Lateral_Trace_shift_masked,1)),...
+        'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
+    setappdata(wb,'canceling',0);
+    warning ('off','all');    
+    % Init
+    Bk_iterative = zeros(size(Lateral_Trace_shift_masked));
+    num_lines = size(Lateral_Trace_shift_masked, 2);
+    for i = 1:num_lines
+        % Check for cancellation
+        if getappdata(wb, 'canceling')
+            delete(wb);
+            error('Process cancelled');
+        end        
+        % Extract the current scan line
+        yData = Lateral_Trace_shift_masked(:, i);
+        xData = (1:length(yData))';        
+        % Remove masked values (set to 5)
+        valid_idx = yData < 5;
+        xValid = xData(valid_idx);
+        yValid = yData(valid_idx);        
+        % Handle insufficient data points
+        if length(yValid) < 4
+            Bk_iterative(:, i) = NaN; % Mark for interpolation later
+            continue;
+        end        
+        % Try polynomial fits from degree 1 to max polynomial order (limit)
+        best_aic = inf;
+        best_fit = zeros(size(yData));        
+        for p = 1:limit
+            % Fit polynomial of degree p
+            poly_coeffs = polyfit(xValid, yValid, p);
+            y_fit = polyval(poly_coeffs, xData);            
+            % Compute residuals and AIC
+            residuals = yValid - polyval(poly_coeffs, xValid);
+            SSE = sum(residuals.^2);
+            n = length(yValid);
+            AIC = n * log(SSE / n) + 2 * (p + 1);            
+            % Update best fit if AIC is lower
+            if AIC < best_aic
+                best_aic = AIC;
+                best_fit = y_fit;
             end
-        end           
-
-        % extract the single fast scan line
-        flag_signal_y=Lateral_Trace_shift_masked(:,i);
-        flag_signal_x=(1:size(flag_signal_y,1));
-
-        % prepareCurveData function clean the data like Removing NaN or Inf, converting nondouble to double, converting complex to 
-        % real and returning data as columns regardless of the input shapes.
-        [xData, yData] = prepareCurveData(flag_signal_x,flag_signal_y);
-        
-        %PDA=excludedata(xData, yData,'range',[-1 1]);
-        % if sum(PDA ~= 1) < 5
-        %     continue
-        % else
-
-        if(size(xData,1)>2)
-            opts = fitoptions( 'Method', 'LinearLeastSquares' );
-            opts.Robust = 'LAR';
-            fit_decision=zeros(3,limit);
-            for z=1:limit
-                % based on the choosen accuracy, run the fitting using different curves to find the best fit
-                % before returning the definitive fitted single fast scan line
-                ft = fittype(sprintf('poly%d',z));
-                % returns goodness-of-fit statistics in the structure gof. Exclude data corresponding to PDA,
-                % which is previously converted to 5       
-                [~, gof] = fit(xData, yData, ft,'Exclude', yData >= 5 ); % MODIFICATO. prima era 1 e dava problemi
-                if(gof.adjrsquare<0)
-                    gof.adjrsquare=0.001;
-                end
-                fit_decision(1,z)=abs(gof.sse)/gof.adjrsquare;
-                fit_decision(2,z)=gof.sse;
-                fit_decision(3,z)=gof.adjrsquare;
-            end
-                
-            %prepare type fitting. Choose the one with the best statistics. Ind represent the polynomial grade
-            clearvars Ind
-            [~,Ind]=min(fit_decision(1,:));
-
-            ft = fittype(sprintf('poly%d',Ind));
-            waitbar(i/N_Cycluse_waitbar,wb,sprintf('Processing %d° Ord Pol fit ... Line %.0f Completeted  %2.1f %%',Ind,i,i/N_Cycluse_waitbar*100));
-            % save the fitting decisions
-            fit_decision_final(i,1)=Ind;
-            fit_decision_final(i,2)=fit_decision(2,Ind);
-            fit_decision_final(i,3)=fit_decision(3,Ind);
-            % start the fitting. Ignore the data in corrispondence of PDA.
-            [fitresult, ~] = fit( xData, yData, ft, 'Exclude', yData >= 5 ); %#ok<ASGLU> ignore warning
-        else
-            error('The extracted fast scan line is too short. Something is wrong');
-        end
-        
-        % build the y value using the polynomial coefficients and x value (1 ==> 512)
-        % save polynomial coefficients (p1, p2, p3, ...) into fit_decision_final
-        commPart =[];
-        j=1;
-        for n=Ind:-1:0
-            commPart = sprintf('%s + %s', commPart,sprintf('fitresult.p%d*(x).^%d',j,n));
-            eval(sprintf('fit_decision_final(i,%d)= fitresult.p%d;',j+3,j))
-            j=j+1;
-        end
-        Bk_iterative(:,i)= eval(commPart);
+        end        
+        % Store best-fit baseline
+        Bk_iterative(:, i) = best_fit;        
+        % Update progress bar
+        waitbar(i / num_lines, wb, sprintf('Fitting on the line %d...', i));
     end
-    %end
-    % processed every fast scan line
-    delete(wb)
-
-    % find idx having adjrsquare < 0.95. Averaging using taking adjacent lines.
-    to_avg=find(fit_decision_final(:,3)<0.95);
-    if(exist('to_avg','var'))
-        for i=1:size(to_avg,1)-1
-            if(to_avg(i,1)~=1)
-                Bk_iterative(:,to_avg(i,1))=(Bk_iterative(:,to_avg(i,1)-1)+Bk_iterative(:,to_avg(i,1)+1))/2;
-            elseif(to_avg(i,1)==1)
-                Bk_iterative(:,to_avg(i,1))=Bk_iterative(:,to_avg(i,1)+1);
-            elseif(to_avg(i,1)==size(Bk_iterative,2))
-                Bk_iterative(:,to_avg(i,1))=Bk_iterative(:,to_avg(i,1)-1);
-            end
+    delete(wb);    
+    % Handle missing lines by interpolating from neighbors, also when more consecutive lines are totally NaN
+    % If that happens, then take the closest non NaN vectors and interpolate
+    nan_lines = find(isnan(Bk_iterative(1, :)));
+    for i = nan_lines
+        left_idx = find(~isnan(Bk_iterative(1, 1:i-1)), 1, 'last');
+        right_idx = find(~isnan(Bk_iterative(1, i+1:end)), 1, 'first') + i;
+        % adiacent interpolation
+        if ~isempty(left_idx) && ~isempty(right_idx)
+            Bk_iterative(:, i) = (Bk_iterative(:, left_idx) + Bk_iterative(:, right_idx)) / 2;
+        elseif ~isempty(left_idx)
+            Bk_iterative(:, i) = Bk_iterative(:, left_idx);
+        elseif ~isempty(right_idx)
+            Bk_iterative(:, i) = Bk_iterative(:, right_idx);
         end
-    end
-    Lateral_Trace_shift_noBK= Lateral_Trace_clean_shift - Bk_iterative;
-
+    end    
+    % Remove background
+    Lateral_Trace_shift_noBK = Lateral_Trace_clean_shift - Bk_iterative;
+    
     % choose friction coefficients depending on the case (experimental results done in another moment),
     % or manually put the value
     question=sprintf('Which background friction coefficient use?');
     options={ ...
-        sprintf('1) TRCDA (air) = 0.3405'), ...
+        sprintf('1) TRCDA (air) = 0.3040'), ...
         sprintf('2) PCDA  (air)  = 0.2626'), ... 
-        sprintf('3) TRCDA-DMPC (air) = 0.2693'), ...
-        sprintf('4) TRCDA-DOPC (air) = 0.3316 (only 3_3_1)'), ...
-        sprintf('5) TRCDA-POPC (air) = 0.2090'), ...
-        sprintf('6) Enter manually a value')};
+        sprintf('3) TRCDA-DMPC (air) = 0.1455'), ...
+        sprintf('4) TRCDA-DOPC (air) = 0.1650'), ...
+        sprintf('5) TRCDA-POPC (air) = 0.1250'), ...
+        sprintf('6) Enter manually a value'),...
+        sprintf('7) Extract the fc from the same scan area with HV mode off')};
     choice = getValidAnswer(question, '', options);
     
     switch choice
-        case 1, avg_fc = 0.3405;
+        case 1, avg_fc = 0.3040;
         case 2, avg_fc = 0.2626;
-        case 3, avg_fc = 0.2693;
-        case 4, avg_fc = 0.3316; % from 0.3070; updated using only 3_3_1 NOTE: issues wth the experiments in which only two setpoints have been used
-        case 5, avg_fc = 0.2090;                     
+        case 3, avg_fc = 0.1455;
+        case 4, avg_fc = 0.1650;
+        case 5, avg_fc = 0.1250;                     
         case 6
             while true
                 avg_fc = str2double(inputdlg('Enter a value for the glass fricction coefficient','',[1 50]));
@@ -216,9 +160,10 @@ function [AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Image
                     break
                 end
             end
+        case 7
+            avg_fc = A5_featureFrictionCalc(secondMonitorMain,newFolder,SeeMe);
     end
     clear choice question options wb
-
 
     % Friction force = friction coefficient * Normal Force
     Baseline_Friction_Force= vertical_Trace*avg_fc;
@@ -246,20 +191,16 @@ function [AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Image
     xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
     title('Fitted Lateral Deflection channel [V] - Trace ','FontSize',15)
     objInSecondMonitor(secondMonitorMain,f2);
-    if SavFg
-        saveas(f2,sprintf('%s/resultA5_2_ResultsFittingOnLateralDeflections.tif',newFolder))
-    end
-
+    saveas(f2,sprintf('%s/resultA5_2_ResultsFittingOnLateralDeflections.tif',newFolder))
+    close(f2)
     f3=figure;
     imshow(imadjust(Corrected_LD_Trace/max(max(Corrected_LD_Trace)))), colormap parula
     c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize =15;
     title('Fitted and corrected Lateral Force [N]','FontSize',17)
     xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
     objInSecondMonitor(secondMonitorMain,f3);
-    if SavFg
-        saveas(f3,sprintf('%s/resultA5_3_ResultsDefinitiveLateralDeflectionsNewton.tif',newFolder))
-    end
-
+    saveas(f3,sprintf('%s/resultA5_3_ResultsDefinitiveLateralDeflectionsNewton.tif',newFolder))
+    close(f3)
     AFM_Elab=AFM_cropped_Images;
     % save the corrected lateral force into cropped AFM image
     AFM_Elab(strcmpi([AFM_cropped_Images.Channel_name],'Lateral Deflection') & strcmpi([AFM_cropped_Images.Trace_type],'Trace')).AFM_image=Corrected_LD_Trace;
