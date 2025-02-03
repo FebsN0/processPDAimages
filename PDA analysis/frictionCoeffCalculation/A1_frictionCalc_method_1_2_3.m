@@ -40,6 +40,7 @@ function [resFrictionAllExp,varargout]=A1_frictionCalc_method_1_2_3(AFM_AllScanI
     delete(allWaitBars)
     numFiles=length(AFM_AllScanImages);
     limitsXYdata=zeros(2,2,numFiles);
+    flagWrongImage=zeros(1,numFiles);
     % find the maximum setpoint among the files
     for i=1:length(metadata_AllScan)
         maxSetpointFile(i)=max(metadata_AllScan{i}.SetP_N*1e9); %#ok<AGROW>
@@ -294,62 +295,55 @@ function [resFrictionAllExp,varargout]=A1_frictionCalc_method_1_2_3(AFM_AllScanI
                 offset_pix(Cnt) = fitResults(2);
                 Cnt = Cnt+1;
             end
-            % prepare the end data
-            pix=arrayPixSizes(1:Cnt-1);
-            fc_pix=fc_pix(1:Cnt-1);
-            offset_pix=offset_pix(1:Cnt-1);
-            hold on
-            %% IT CAN BE IGNORED ID THE CHOICE IS MADE IN END
-            % plot all the frictions coefficient in function of pixel size and show also the point in
-            % which some sections has less elements than the minimum       
-            h1=plot(pix, fc_pix, 'x-','LineWidth',2,'MarkerSize',10,'Color','blue'); grid on
-            h1.Annotation.LegendInformation.IconDisplayStyle = 'off'; % dont show name in the legend
-            xlabel('Pixel size','fontsize',15); ylabel('Glass friction coefficient','fontsize',15);
-            title(sprintf('Result Method 3 (Mask + Outliers Removal - %s)',fOutlierRemoval_text),'FontSize',20);
-            leg=legend('show');
-            leg.FontSize=12; leg.Location="bestoutside";
-            if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f_pixelsVSfc); end
-            % select the right friction coefficient
-            % uiwait(msgbox('Click on the plot'));
-            % idx_x=selectRangeGInput(1,1,0:pixData(2):pixData(1),avg_fc_pix);
-            % hold on
-            % scatter(pixData(2)*idx_x-pixData(2),avg_fc_pix(idx_x),400,'pentagram','filled', 'MarkerFaceColor', 'red','DisplayName','Selected pix size');
-            % pixFinal=pix(idx_x);
-            % % extract the correct　data depending on the chosen idx              
-            % resFit=fitResults_fc(idx_x,:);
-            % vertForce_thirdClearing_best=vertForce_thirdClearing_AllPixelSizes{idx_x};
-            % force_thirdClearing_best=force_thirdClearing_AllPixelSizes{idx_x};
-            % vertForce_avg_best=vertForce_avg_clear_AllPixelSize{idx_x};
-            % force_avg_best=force_avg_clear_AllPixelSizes{idx_x};
-
-            % plot the data after cleared
-            %featureFrictionCalc6_plotClearedImages(vertForce_thirdClearing_best,maxSetpointAllFile,force_thirdClearing_best,newFolder,nameScan,secondMonitorMain,method,pixFinal,fOutlierRemoval_text)  
-
-            % finish the plot and save
-            % mainText=sprintf('Result Method 3 (Mask + Outliers Removal - %s) - %s',fOutlierRemoval_text,nameScan);
-            % resultChoice= sprintf('Friction coefficient: %0.3g',avg_fc_pix(idx_x));
-            % title({mainText; resultChoice},'FontSize',20,'interpreter','none');            
-            saveas(f_pixelsVSfc,sprintf('%s/resultMethod3_1_pixelVSfrictionCoeffs_%s_%s.tif',newFolder,nameScan,fOutlierRemoval_text))
-            close(f_pixelsVSfc)
+            % sometime it may happens that the image scan get totally wrong to the point that the entire image
+            % is useless, so track such cases and completely ignore.
+            if ~all(fc_pix)
+                flagWrongImage(j)=1;
+            else          
+                % prepare the end data            
+                pix=arrayPixSizes(1:Cnt-1);
+                fc_pix=fc_pix(1:Cnt-1);
+                offset_pix=offset_pix(1:Cnt-1);
+                hold on
+                %% IT CAN BE IGNORED ID THE CHOICE IS MADE IN END
+                % plot all the frictions coefficient in function of pixel size and show also the point in
+                % which some sections has less elements than the minimum       
+                h1=plot(pix, fc_pix, 'x-','LineWidth',2,'MarkerSize',10,'Color','blue'); grid on
+                h1.Annotation.LegendInformation.IconDisplayStyle = 'off'; % dont show name in the legend
+                xlabel('Pixel size','fontsize',15); ylabel('Glass friction coefficient','fontsize',15);
+                title(sprintf('Result Method 3 (Mask + Outliers Removal - %s)',fOutlierRemoval_text),'FontSize',20);
+                if flagChange
+                    leg=legend('show');
+                    leg.FontSize=12; leg.Location="bestoutside";
+                end
+                if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f_pixelsVSfc); end
+                      
+                saveas(f_pixelsVSfc,sprintf('%s/resultMethod3_1_pixelVSfrictionCoeffs_%s_%s.tif',newFolder,nameScan,fOutlierRemoval_text))
+            end
+            close(f_pixelsVSfc) % if fail happen, at least close the figure
             % return to the main general figure where compare all the scans.
             % Plot the errorbar and the fitted curve and take the min max XY values to better figure limits
-            %figure(f_fcAll)
-            %limitsXYdata(:,:,j)=featureFrictionCalc3_plotErrorBar(vertForce_avg_best,force_avg_best,j,nameScan);
-            %featureFrictionCalc4_fittingForceSetpoint(vertForce_avg_best,force_avg_best,j,'fitting','No','imageProcessing','Yes','fitResults',resFit);
-
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%%% END METHOD PROCESSING %%%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            % store the results and cleared images         
-            resFrictionAllExp(j).slope=fc_pix;
-            resFrictionAllExp(j).offset=offset_pix;
-            resFrictionAllExp(j).forceCleared=force_thirdClearing_AllPixelSizes;
-            resFrictionAllExp(j).vertCleared=vertForce_thirdClearing_AllPixelSizes;
-            resFrictionAllExp(j).forceCleared_avg=force_avg_clear_AllPixelSizes;
-            resFrictionAllExp(j).vertCleared_avg=vertForce_avg_clear_AllPixelSize;            
+            % store the results and cleared images if all okay
+            if ~flagWrongImage(j)
+                resFrictionAllExp(j).slope=fc_pix;
+                resFrictionAllExp(j).offset=offset_pix;
+                resFrictionAllExp(j).forceCleared=force_thirdClearing_AllPixelSizes;
+                resFrictionAllExp(j).vertCleared=vertForce_thirdClearing_AllPixelSizes;
+                resFrictionAllExp(j).forceCleared_avg=force_avg_clear_AllPixelSizes;
+                resFrictionAllExp(j).vertCleared_avg=vertForce_avg_clear_AllPixelSize;   
+            else
+                fileNotes=sprintf('%s/NOTES_resultMethod3_1_pixelVSfrictionCoeffs_%s.txt',newFolder,fOutlierRemoval_text);
+                fID=fopen(fileNotes,'a');
+                text=sprintf('Experiment %s is entirely wrong: the friction coefficient of any pixel reduction size is outside the acceptable range\n',nameScan);
+                fwrite(fID,text)
+                fclose(fID);
+            end
         end
     end    
-    
+        
     if method == 1 || method == 2
         % find the absolute minimum and maximum in all the data to better show the final results
         absMinX=min(limitsXYdata(1,1,:)); absMaxX=max(limitsXYdata(1,2,:));
@@ -364,6 +358,9 @@ function [resFrictionAllExp,varargout]=A1_frictionCalc_method_1_2_3(AFM_AllScanI
         uiwait(msgbox('Click to conclude'));
         close(f_fcAll)
     else
+        % ignore the data of wrong image
+        resFrictionAllExp=resFrictionAllExp(~flagWrongImage);
+        nameScan_AllScan=nameScan_AllScan(~flagWrongImage);
         % plot the distribution of all the calculated friction coefficients        
         definitiveFc=featureFrictionCalc7_distributionFc_allScansAllPixels({resFrictionAllExp(:).slope},nameScan_AllScan,secondMonitorMain,newFolder,pixData,fOutlierRemoval);
         varargout{1}=definitiveFc;
