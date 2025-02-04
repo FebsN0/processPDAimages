@@ -210,12 +210,7 @@ function AFM_Elab=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO
     xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
     objInSecondMonitor(secondMonitorMain,f3);
     saveas(f3,sprintf('%s/resultA5_3_ResultsDefinitiveLateralDeflectionsNewton.tif',newFolder))
-    close(f3)
     AFM_Elab=AFM_cropped_Images;
     % save the corrected lateral force into cropped AFM image
     AFM_Elab(strcmpi([AFM_cropped_Images.Channel_name],'Lateral Deflection') & strcmpi([AFM_cropped_Images.Trace_type],'Trace')).AFM_image=Corrected_LD_Trace;
-
-    if SeeMe
-        uiwait(msgbox('Click to continue'))
-    end
 end
