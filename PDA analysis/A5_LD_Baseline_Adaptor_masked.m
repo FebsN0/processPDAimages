@@ -4,7 +4,7 @@
 % Check manually the processed image afterwards and compare with the AFM VD
 % image!
 
-function [AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,alpha,secondMonitorMain,newFolder,mainPath,varargin)
+function AFM_Elab=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,alpha,secondMonitorMain,newFolder,mainPath,varargin)
     % in case of code error, the waitbar won't be removed. So the following command force its closure
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)
@@ -145,23 +145,33 @@ function [AFM_Elab,Bk_iterative]=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Image
         sprintf('7) Extract the fc from the same scan area with HV mode off')};
     choice = getValidAnswer(question, '', options);
     
-    switch choice
-        case 1, avg_fc = 0.3040;
-        case 2, avg_fc = 0.2626;
-        case 3, avg_fc = 0.1455;
-        case 4, avg_fc = 0.1650;
-        case 5, avg_fc = 0.1250;                     
-        case 6
-            while true
-                avg_fc = str2double(inputdlg('Enter a value for the glass fricction coefficient','',[1 50]));
-                if any(isnan(avg_fc)) || avg_fc <= 0 || avg_fc >= 1
-                    questdlg('Invalid input! Please enter a numeric value','','OK','OK');
-                else
-                    break
+    while true
+        switch choice
+            case 1, avg_fc = 0.3040;
+            case 2, avg_fc = 0.2626;
+            case 3, avg_fc = 0.1455;
+            case 4, avg_fc = 0.1650;
+            case 5, avg_fc = 0.1250;                     
+            case 6
+                while true
+                    avg_fc = str2double(inputdlg('Enter a value for the glass fricction coefficient','',[1 50]));
+                    if any(isnan(avg_fc)) || avg_fc <= 0 || avg_fc >= 1
+                        questdlg('Invalid input! Please enter a numeric value','','OK','OK');
+                    else
+                        break
+                    end
                 end
-            end
-        case 7
-            avg_fc = A5_featureFrictionCalc(secondMonitorMain,newFolder,SeeMe);
+            case 7
+                if ~exist(fullfile(mainPath,'HoverMode_OFF'),"dir")
+                    error('The directory HoverMode_OFF doesn''t exist. Select another option')
+                end
+                avg_fc = A5_featureFrictionCalcFromSameScanHVOFF(secondMonitorMain,mainPath);
+                if isempty(avg_fc)
+                    fprintf('For some reasons, the scan in HoverMode OFF is messed up. Choose a standard value if possible')
+                    continue
+                end
+        end
+        break
     end
     clear choice question options wb
 
