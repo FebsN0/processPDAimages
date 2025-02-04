@@ -43,7 +43,12 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A9
     metaData_AFM.x_scan_length=metaData_AFM.x_scan_length_m*1e6;
     metaData_AFM.y_scan_length=metaData_AFM.y_scan_length_m*1e6;
     % Optical microscopy and AFM image resolution can be entered here
-    
+    if length(metaData_AFM.y_scan_pixels)~=1
+        y_scan_pixelsCorrected=sum(metaData_AFM.y_scan_pixels);
+    else
+        y_scan_pixelsCorrected=metaData_AFM.y_scan_pixels;
+    end
+
     if SeeMe
         [settings, ~] = settingsdlg(...
             'Description'                        , 'Setting the parameters that will be used in the elaboration', ...
@@ -57,7 +62,7 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A9
             {'Image Width (um):';'AFMW'}          , metaData_AFM.x_scan_length, ...
             {'Image Height (um):';'AFMH'}         , metaData_AFM.y_scan_length, ...
             {'Image Pixel Width (Px):';'AFMPxW'}  , metaData_AFM.x_scan_pixels, ...
-            {'Image Pixel Height (Px):';'AFMPxH'} , metaData_AFM.y_scan_pixels);
+            {'Image Pixel Height (Px):';'AFMPxH'} , y_scan_pixelsCorrected);
     else
         settings.MW= metaData_BF.ImageWidthPixels*metaData_BF.ImageWidthMeter;
         settings.MH= metaData_BF.ImageHeightPixels*metaData_BF.ImageHeightMeter;
@@ -66,7 +71,7 @@ function [AFM_IO_padded_sizeOpt,AFM_IO_padded_sizeBF,AFM_Elab,pos_allignment]=A9
         settings.AFMW=metaData_AFM.x_scan_length;
         settings.AFMPxW=metaData_AFM.x_scan_pixels;
         settings.AFMH=metaData_AFM.y_scan_length;
-        settings.AFMPxH=metaData_AFM.y_scan_pixels;
+        settings.AFMPxH=y_scan_pixelsCorrected;
     end
     
     BFRatioHorizontal=settings.MW/settings.MicPxW;              % size in um of single pixel based on entire image (horizontal - BF  image)
