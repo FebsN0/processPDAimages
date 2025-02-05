@@ -150,7 +150,15 @@ function user_choice = getValidAnswer(question, title, options, default_choice)
 
     % create the Button Callback function
     function buttonCallback(choice)
-        user_choice = choice;
+        if flagYesNo
+            if choice == 2
+                user_choice = false;
+            else
+                user_choice = true;
+            end
+        else
+            user_choice = choice;
+        end
         uiresume(dialog_fig);
         delete(dialog_fig);
     end    

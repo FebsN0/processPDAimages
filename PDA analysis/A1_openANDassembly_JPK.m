@@ -26,6 +26,7 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     argName = 'Normalization';          defaultVal = 'No';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     argName = 'filePath';               defaultVal = '';        addParameter(p,argName,defaultVal, @(x) ischar(x));
     argName = 'backgroundOnly';         defaultVal = 'No';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+    argName = 'FitOrder';               defaultVal = 'Low';     addOptional(p,argName,defaultVal, @(x) ismember(x,{'Low','Medium','High'}));
     % validate and parse the inputs
     parse(p,varargin{:});
     silent=p.Results.Silent;
@@ -41,6 +42,7 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     else
         [fileName, filePathData] = uigetfile({'*.jpk'},'Select a .jpk AFM image',filePath,'MultiSelect', 'on');       
     end
+    accuracy=p.Results.FitOrder;
 
     if isequal(fileName,0)
         error('No File Selected');
@@ -57,10 +59,10 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
     % save the useful figures into a directory
     if strcmp(p.Results.backgroundOnly,'Yes') && numFiles~=1
         [upperFolder,~,~]=fileparts(fileparts(filePathData));
-        newFolder = fullfile(upperFolder, 'Results Processing AFM-background only');
+        newFolder = fullfile(upperFolder, 'Results Processing AFM-background for friction coefficient');
     elseif strcmp(p.Results.backgroundOnly,'Yes') && numFiles==1
         [~,nameFile,~]=fileparts(fileName);
-        newFolder = fullfile(filePathData, sprintf('Results Processing AFM-background only _ %s',nameFile));
+        newFolder = fullfile(filePathData, sprintf('Results Processing AFM-background for friction coefficient - %s',nameFile));
     else % in case normal scans
         if numFiles==1
             [~,nameFile]=fileparts(fileName);
@@ -115,9 +117,7 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
             % if only one file, the var is not a cell
             fullName=fullfile(filePathData,fileName);
             imgTyp = 'Entire';
-        end
-        if i==1, accuracy=''; end
-       
+        end      
         % open jpk, it returns the AFM file, the details (position of tip, IGain, Pgain, Sn, Kn and
         % calculates alpha, based on the pub), it returns the location of the file.
         [data,metaData]=A1_open_JPK(fullName);
@@ -177,8 +177,7 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
                     question=sprintf(['Since the anomaly occurred, double-check the vertical deflection expressed in newton.\n' ...
                         'Averaged vertical deflection = %.2f\n' ...
                         'Convert the vertical deflection from Volt into Newton using the corrected vertical parameters?'],avgData_VD_forceAnomaly);
-                    answ=getValidAnswer(question,'',{'yes','no'});
-                    if answ==1
+                    if getValidAnswer(question,'',{'yes','no'})
                         corr_data_VD_force = data(j).AFM_image*factor;
                         data(j).AFM_image = corr_data_VD_force;
                     end
@@ -361,12 +360,12 @@ end
 function [AFM_HeightFittedMasked,AFM_height_IO,accuracy]=processData(data,secondMonitorMain,newFolder,accuracy,silent)
     iterationMain=1;
     while true
-        [AFM_HeightFitted,AFM_height_IO,accuracy]=A3_El_AFM(data,iterationMain,secondMonitorMain,newFolder,'fitOrder',accuracy,'Silent',silent);
+        [AFM_HeightFitted,AFM_height_IO]=A3_El_AFM(data,iterationMain,secondMonitorMain,newFolder,'fitOrder',accuracy,'Silent',silent);
         % Using the AFM_height_IO, fit the background again, yielding a more accurate height image by using the
         % 0\1 height image
         [AFM_HeightFittedMasked,AFM_height_IO]=A4_El_AFM_masked(AFM_HeightFitted,AFM_height_IO,iterationMain,secondMonitorMain,newFolder,'Silent',silent);
         % ask if re-run the process to obtain better AFM height image 0/1
-        if getValidAnswer('Run again A3 and A4 to create better optimized mask and height AFM image?','',{'y','n'},2)==2
+        if ~getValidAnswer('Run again A3 and A4 to create better optimized mask and height AFM image?','',{'y','n'},2)
             break
         else
             iterationMain=iterationMain+1;

@@ -28,10 +28,10 @@ function varargout=A8_Mic_to_Binary(imageBF_aligned,secondMonitorMain,newFolder,
     if ~isempty(p.Results.TRITIC_after)
         reduced_Tritic_after=p.Results.TRITIC_after;
     end
-
+    flagCrop=false;
     % decide if crop the image. If not, leave as original size
-    Crop_image = getValidAnswer('The image is not cropped yet, would Like to Crop the Image?', '', {'Yes','No'});
-    if Crop_image == 1
+    if getValidAnswer('The image is not cropped yet, would Like to Crop the Image?', '', {'Yes','No'})
+        flagCrop=true;
         ftmp=figure;
         figure_image=imshow(imadjust(imageBF_aligned));
         title('BrightField image post alignment')
@@ -61,8 +61,7 @@ function varargout=A8_Mic_to_Binary(imageBF_aligned,secondMonitorMain,newFolder,
     
 
     question=sprintf('Performs morphological opening operation?\n(In original code it is always yes, whereas commented in case of the PDCA code');
-    answer=getValidAnswer(question,'',{'Yes','No'},2);
-    if answer == 1
+    if getValidAnswer(question,'',{'Yes','No'},2)
         % init a matrix with same imageBF's size
         Im_Neg = zeros(size(reduced_imageBF));
         % find the highest value in the imageBF's matrix 
@@ -172,7 +171,7 @@ function varargout=A8_Mic_to_Binary(imageBF_aligned,secondMonitorMain,newFolder,
         close(f2)
     end
 
-    if Crop_image == 1
+    if flagCrop == 1
         FurtherDetails=struct(...
             'Threshold',    threshold,...
             'Cropped',      'Yes',...

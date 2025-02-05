@@ -75,16 +75,15 @@ function [moving_tr]=A7_limited_registration(moved,fixed,newFolder,secondMonitor
         if saveFig
             saveas(f1,sprintf('%s/resultA7_%d_1_comparisonOriginalAndBackgroundSubstracted.tif',newFolder,textResultName))   
         end
-        question=sprintf('Use the Backgrownd Subtracted Image?\nIf not, it will be used the original BF data');
-        awnser=getValidAnswer(question,'',{'Yes','No'});
-        close(f1)
-        if awnser == 1
+        question=sprintf('Use the Backgrownd Subtracted Image?\nIf not, it will be used the original BF data');        
+        if getValidAnswer(question,'',{'Yes','No'})
             if strcmpi(p.Results.Moving,'Yes')
                 moved=el_image;
             else
                 fixed=el_image;
             end
         end
+        close(f1)
     end
    
 
