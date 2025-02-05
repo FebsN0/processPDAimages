@@ -6,7 +6,9 @@ function closest_indices = selectRangeGInput(n_points,dimension,x,y)
 %               orders of magnitude!
 % x         : example height 
 % y         : example force 
-
+    if dimension == 2 && ~exist('y','var')
+        error('The selected dimension is two, but the second input data is missing!')
+    end
     % save x and y coordinates for each point
     pointSelected_all=zeros(n_points,2);
     point_selected=zeros(1,2);   

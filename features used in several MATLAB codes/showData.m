@@ -1,4 +1,4 @@
-function showData(secondMonitorMain,SeeMe,i,data,norm,titleData,labelBar,nameFig)
+function showData(secondMonitorMain,SeeMe,i,data,norm,titleData,labelBar,nameFig,varargin)
     if SeeMe
         eval(sprintf('f%d=figure(''Visible'',''on'');',i)) 
     else
@@ -7,15 +7,29 @@ function showData(secondMonitorMain,SeeMe,i,data,norm,titleData,labelBar,nameFig
 
     if norm
         imshow(imadjust(data/max(max(data))))
-        c = colorbar; c.Label.String = 'normalized'; 
+        c = colorbar; c.Label.String = 'Normalized'; c.Label.FontSize=15;
     else
         imagesc(data)
-        c = colorbar; c.Label.String = labelBar; 
+        if ~isempty(varargin) && varargin{1}==true            
+            c=colorbar;
+            set(c,'YTickLabel',[]);
+            if secondMonitorMain==1
+                cLabel = ylabel(c,'Background                                                                                Foreground');
+                c.FontSize=16;
+            else
+                cLabel = ylabel(c,'Background                                    Foreground');
+                c.FontSize=16;
+            end
+            set(cLabel,'Rotation',90);
+        else
+            c=colorbar; c.Label.String=labelBar; c.Label.FontSize=15; 
+        end
     end
-    colormap parula, title(titleData,'FontSize',17),
-    c.Label.FontSize=15;
+    colormap parula,
+    title(titleData,'FontSize',16),
     xlabel('slow scan line direction','FontSize',12), ylabel('fast scan line direction','FontSize',12)
-    axis equal, xlim([0 size(data,2)]), ylim([0 size(data,1)])
+    axis on, axis equal, xlim([0 size(data,2)]), ylim([0 size(data,1)])
     objInSecondMonitor(secondMonitorMain,eval(sprintf('f%d',i)));
     saveas(eval(sprintf('f%d',i)),nameFig)
+    eval(sprintf('close(f%d)',i))
 end
