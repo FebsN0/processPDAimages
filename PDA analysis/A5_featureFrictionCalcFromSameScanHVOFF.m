@@ -62,9 +62,7 @@ function varargout=prepareData(secondMonitorMain,pathSingleScan)
         tmp=strsplit(pathSingleScan,'\');
         nameScan=tmp{end-1}; clear tmp        
         question=sprintf('Results of the scan %s HoverModeOFF already exists. Take it? If not, remove the previous one.',nameScan);
-        options={'Yes','No'};
-        answer=getValidAnswer(question,'',options);
-        if answer == 1
+        if getValidAnswer(question,'',{'Yes','No'})
             load(pathResultsData,"metaData","AFM_data","AFM_heightIO","idxRemovedPortion","filepathResults")
             flag_exeA1=false;               
         else

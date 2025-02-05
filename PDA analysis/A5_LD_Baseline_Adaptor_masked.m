@@ -12,7 +12,7 @@ function AFM_Elab=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO
     p=inputParser();    %init instance of inputParser
     %Add default parameters. When call the function, use 'argName' as well you use 'LineStyle' in plot! And
     %then the values
-    argName = 'Accuracy';   defaultVal = 'Low';     addOptional(p,argName,defaultVal, @(x) ismember(x,{'Low','Medium','High'}));
+    argName = 'FitOrder';   defaultVal = 'Low';     addOptional(p,argName,defaultVal, @(x) ismember(x,{'Low','Medium','High'}));
     argName = 'Silent';     defaultVal = 'Yes';     addOptional(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
 
     parse(p,varargin{:});
@@ -54,9 +54,9 @@ function AFM_Elab=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO
     close(f1)
 
     % selection of the polynomial order
-    if strcmp(p.Results.Accuracy,'Low')
+    if strcmp(p.Results.FitOrder,'Low')
         limit=3;
-    elseif strcmp(p.Results.Accuracy,'Medium')
+    elseif strcmp(p.Results.FitOrder,'Medium')
         limit=6;
     else
         limit=9;
@@ -70,8 +70,11 @@ function AFM_Elab=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO
     setappdata(wb,'canceling',0);
     warning ('off','all');    
     % Init
+    fit_decision_final = nan(size(Lateral_Trace_shift_masked, 2), 4 + limit);
     Bk_iterative = zeros(size(Lateral_Trace_shift_masked));
     num_lines = size(Lateral_Trace_shift_masked, 2);
+    % build array abscissas for the fitting
+    x = (1:size(Lateral_Trace_shift_masked,1))';
     for i = 1:num_lines
         % Check for cancellation
         if getappdata(wb, 'canceling')
@@ -90,26 +93,30 @@ function AFM_Elab=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO
             Bk_iterative(:, i) = NaN; % Mark for interpolation later
             continue;
         end        
-        % Try polynomial fits from degree 1 to max polynomial order (limit)
-        best_aic = inf;
-        best_fit = zeros(size(yData));        
+        % Initialize AIC results
+        aic_values = nan(1, limit);
+        models = cell(1, limit);
+        % Test polynomial fits up to the limit
         for p = 1:limit
-            % Fit polynomial of degree p
-            poly_coeffs = polyfit(xValid, yValid, p);
-            y_fit = polyval(poly_coeffs, xData);            
-            % Compute residuals and AIC
-            residuals = yValid - polyval(poly_coeffs, xValid);
+            poly_coeffs = polyfitn(xValid, yValid, p);                
+            models{p} = poly_coeffs;                  
+            % Compute AIC
+            residuals= yValid - polyval(poly_coeffs.Coefficients, xValid);
             SSE = sum(residuals.^2);
             n = length(yValid);
-            AIC = n * log(SSE / n) + 2 * (p + 1);            
-            % Update best fit if AIC is lower
-            if AIC < best_aic
-                best_aic = AIC;
-                best_fit = y_fit;
-            end
-        end        
-        % Store best-fit baseline
-        Bk_iterative(:, i) = best_fit;        
+            k = length(poly_coeffs.Coefficients); % Number of parameters
+            aic_values(p) = n * log(SSE / n) + 2 * k;
+        end  
+        % Select best model using AIC
+        [~, bestIdx] = min(aic_values);
+        bestModel = models{bestIdx};            
+        % Save fitting decisions
+        fit_decision_final(i, 1) = bestIdx;
+        fit_decision_final(i, 2) = aic_values(bestIdx);
+        fit_decision_final(i, 3) = sum((yData - polyval(bestModel.Coefficients, xData)).^2); % SSE
+        fit_decision_final(i, 4:4 + bestIdx) = bestModel.Coefficients;            
+        % Generate baseline using the best polynomial fit
+        Bk_iterative(:, i) = polyval(bestModel.Coefficients, x);     
         % Update progress bar
         waitbar(i / num_lines, wb, sprintf('Fitting on the line %d...', i));
     end

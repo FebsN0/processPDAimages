@@ -1,4 +1,4 @@
-function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,iterationMain,secondMonitorMain,filepath,varargin)
+function [AFM_Images,IO_Image]=A3_El_AFM(filtData,iterationMain,secondMonitorMain,filepath,varargin)
 
 % The function extracts Images from the experiments.
 % It removes baseline and extracts foreground from the AFM image.
@@ -7,8 +7,6 @@ function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,iterationMain,secondM
 %                      Deflection and Vertical Deflection, all in TRACE
 %           2) optional input:
 %               A) Accuracy: Low (default)  | Medium | High
-%               B) AutoElab: No (default)   | other                 ==> keep the first result. Not recommended
-%                                                                       when low accuracy is used
 %
 % The function uses a series a total of three parts to remove the baseline from the Height Image.
 %   1) first order linear polinomial curve fitting for correct the height imahe by this baseline 
@@ -39,8 +37,7 @@ function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,iterationMain,secondM
     %Add default parameters. When call the function, use 'argName' as well you use 'LineStyle' in plot! And
 
     %then the values                                
-    argName = 'fitOrder';   defaultVal = '';        addParameter(p, argName, defaultVal, @(x) ismember(x, {'', 'Low', 'Medium', 'High'}));
-    argName = 'AutoElab';   defaultVal = 'No';      addParameter(p, argName, defaultVal,@(x) ismember(x,{'No','Yes'}));
+    argName = 'fitOrder';   defaultVal = 'Low';        addParameter(p, argName, defaultVal, @(x) ismember(x, {'Low', 'Medium', 'High'}));
     argName = 'Silent';     defaultVal = 'Yes';     addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     % validate and parse the inputs
     parse(p,filtData,varargin{:});
@@ -48,12 +45,7 @@ function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,iterationMain,secondM
     
     % if this is seconf time that the A3 is called, like for the second AFM section, keep the accuracy of
     % first section
-    if p.Results.fitOrder ~= ""
-        flagAccuracy = true;
-        accuracy=p.Results.fitOrder;
-    else
-        flagAccuracy = false;
-    end
+    accuracy=p.Results.fitOrder;
 
     if(strcmp(p.Results.Silent,'Yes'));  SeeMe=0; else, SeeMe=1; end
     
@@ -90,6 +82,7 @@ function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,iterationMain,secondM
         'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
     setappdata(wb,'canceling',0);
     N_Cycluse_waitbar=size(height_image,2);    
+    
     % Polynomial baseline fitting (line by line) ==> remove the "tilted" effect, which is order 1
     poly_filt_data=zeros(size(height_image,1),size(height_image,2));
     for i=1:size(height_image,2)
@@ -203,21 +196,7 @@ function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,iterationMain,secondM
     %   - Sum of squares due to error / Degree-of-freedom adjusted coefficient of determination
     %   - Sum of squares due to error
     %   - Degree-of-freedom adjusted coefficient of determination
-    while true
-        if ~flagAccuracy
-            question='Fitting AFM Height channel data: which fitting order range use?';
-            options={'Low (1-3)','Medium (1-6)','High (1-9)'};
-            answer=getValidAnswer(question,'',options);
-            switch answer
-                case 1
-                    accuracy= 'Low';
-                case 2
-                    accuracy= 'Medium';
-                case 3
-                    accuracy= 'High';
-            end      
-        end
-        
+    while true      
         if strcmp(accuracy,'Low')
             limit=3;
         elseif strcmp(accuracy,'Medium')
@@ -225,98 +204,102 @@ function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,iterationMain,secondM
         else
             limit=9;
         end
-        %init vars
-        % the fit_decision_final will contain the best fit_decision and the polynomial parameters (if grade = 3
-        % ==> # parameters = 4)
-        fit_decision_final=nan(size(filt_data_no_Bk,2),3+limit+1);
-        Bk_iterative=zeros(size(filt_data_no_Bk,1),size(filt_data_no_Bk,2));
-        N_Cycluse_waitbar=size(filt_data_no_Bk,2);
+        % Initialize variables
+        fit_decision_final = nan(size(filt_data_no_Bk, 2), 4 + limit);
+        % create a zero matrix with the same size of the original data
+        Bk_iterative = zeros(size(filt_data_no_Bk));
+        N_Cycluse_waitbar = size(filt_data_no_Bk,2);
         % build array abscissas for the fitting
-        x=1:size(filt_data_no_Bk,1); %#ok<NASGU>
-        clear Ind fitresult
-        
-        % Polynomial baseline fitting (line by line) - Linear least squares fitting to the results
+        x = (1:size(filt_data_no_Bk,1))';
+        % Polynomial baseline fitting (line by line) - Linear least squares fitting to the results. GOAL:
+        % extract the background to remove from the data
         for i=1:size(filt_data_no_Bk,2)
-            if(exist('wb','var'))
-                if getappdata(wb,'canceling')
+            if(exist('wb','var')) && getappdata(wb, 'canceling')
                    error('Process cancelled')
-                end
             end
-            flag_signal_y=filt_data_no_Bk(:,i);
-            flag_signal_x=(1:size(flag_signal_y,1))';
-            flag_signal_y(flag_signal_y>=median(filt_data_no_Bk(:,i)))=nan;
-            flag_signal_x(flag_signal_y>=median(filt_data_no_Bk(:,i)))=nan;
-            [pos_outliner]=isoutlier(flag_signal_y);
-            
-            while(any(pos_outliner))
-                flag_signal_y(pos_outliner==1)=nan;
-                flag_signal_x(pos_outliner==1)=nan;
-                [pos_outliner]=isoutlier(flag_signal_y,'gesd');
+            % First remove outliers (i.e. exclude the true data which represents the features of interest of
+            % PDA). Indeed, baseline fitting should only use low-intensity (i.e. background) values. The
+            % presence of such outliers create wrong bias during the fitting and can distort polynomial fitting. 
+            % Removing them ensures a smoother and more reliable baseline correction!           
+            flag_signal_y = filt_data_no_Bk(:,i); % Take the i-th fast scan line           
+            % STEP 1: Initial Low-Order Polynomial Fit (e.g., Quadratic)
+            % this is new and another way to use a dynamic threshold instead of a fixed value.
+            % The initial polynomial fit provides a better guess for outlier removal, preventing extreme peaks from affecting the final polynomial fit.
+            % It makes the baseline correction more stable and less affected by noise.
+            xData = (1:length(flag_signal_y))';
+            validIdx = ~isnan(flag_signal_y);
+            polyInit = polyfit(xData(validIdx), flag_signal_y(validIdx), 2);
+            baselineInit = polyval(polyInit, xData); % Estimated baseline
+            % Step 2: Remove Points Above This Estimated Baseline
+            threshold = baselineInit + std(flag_signal_y(validIdx)); % 1 standard deviation above baseline                   
+            % The baseline usually lies below the median, so this step removes higher values that may belong to the real signal rather than the baseline.
+            %%%%    threshold = median(flag_signal_y);
+            % Exclude top 20% instead of median  
+            %%%%    threshold = prctile(flag_signal_y, 80);   
+            % first round of outliers removal
+            flag_signal_y(flag_signal_y >= threshold) = NaN;                      
+            % STEP 3: Remove remaining outliers Iteratively, not just the most extreme one.
+            % GESD test is useful when the number of outliers is unknown
+            [pos_outlier] = isoutlier(flag_signal_y, 'gesd');
+            while any(pos_outlier)
+                flag_signal_y(pos_outlier) = NaN;
+                [pos_outlier] = isoutlier(flag_signal_y, 'gesd');
             end
-            [xData, yData] = prepareCurveData(flag_signal_x,flag_signal_y);
-            
-            % check in case of strange issue. Theoretically it may not happen anymore
-            if length(xData) <= 2 || length(yData) <= 2
-                error('something is wrong in the data. Too few values in the %d-th line not involved by manual removal\n',i)
-            else
-                opts = fitoptions( 'Method', 'LinearLeastSquares' );
-                opts.Robust = 'LAR';
-                fit_decision=NaN(3,limit);                
-                for z=1:limit
-                    % based on the choosen accuracy, run the fitting using different curves to find the best fit
-                    % before returning the definitive fitted single fast scan line
-                    ft = fittype(sprintf('poly%d',z));
-                    % returns goodness-of-fit statistics in the structure gof. Exclude data corresponding to PDA,
-                    % which is previously converted to 5 
-                    [~, gof] = fit( xData, yData, ft,opts);
-                    if(gof.adjrsquare<0)
-                        gof.adjrsquare=0.001;
-                    end
-                    fit_decision(1,z)=abs(gof.sse)/gof.adjrsquare;
-                    fit_decision(2,z)=gof.sse;
-                    fit_decision(3,z)=gof.adjrsquare;
-                end 
-                [~,Ind]=min(fit_decision(2,:));               
-                ft = fittype(sprintf('poly%d',Ind));
-                waitbar(i/N_Cycluse_waitbar,wb,sprintf('Processing %d° Ord Pol fit ... Line %.0f Completeted  %2.1f %%',Ind,i,i/N_Cycluse_waitbar*100));
-              
-                % save the fitting decisions
-                fit_decision_final(i,1)=Ind;
-                fit_decision_final(i,2)=fit_decision(2,Ind);
-                fit_decision_final(i,3)=fit_decision(3,Ind);
-                % start the fitting.
-                % Although the fitresult seems to be unused, it is actually evaluated with eval function.
-                fitresult= fit( xData, yData, ft, opts ); %#ok<NASGU>              
-                % build the y value using the polynomial coefficients and x value (1 ==> 512)
-                % save polynomial coefficients (p1, p2, p3, ...) into fit_decision_final
-                commPart =[];
-                j=1;
-                for n=Ind:-1:0
-                    commPart = sprintf('%s + %s', commPart,sprintf('fitresult.p%d*(x).^%d',j,n));
-                    eval(sprintf('fit_decision_final(i,%d)= fitresult.p%d;',j+3,j))
-                    j=j+1;
-                end
-                Bk_iterative(:,i)= eval(commPart);
-            end
-        end
-                
-        to_avg=find(fit_decision_final(:,3)<0.95);
-        if(exist('to_avg','var'))
-            for i=1:size(to_avg,1)-1
-                if(to_avg(i,1)~=1)
-                    Bk_iterative(:,to_avg(i,1))=(Bk_iterative(:,to_avg(i,1)-1)+Bk_iterative(:,to_avg(i,1)+1))/2;
-                elseif(to_avg(i,1)==1)
-                    Bk_iterative(:,to_avg(i,1))=Bk_iterative(:,to_avg(i,1)+1);
-                elseif(to_avg(i,1)==size(Bk_iterative,2))
-                    Bk_iterative(:,to_avg(i,1))=Bk_iterative(:,to_avg(i,1)-1);
-                end
-            end
+            % Step 4: Fit Final Polynomial Using AIC-Optimized Degree
+            % Prepare valid data for fitting            
+            xData = x(~isnan(flag_signal_y));
+            yData = flag_signal_y(~isnan(flag_signal_y));
+            % Handle insufficient data. Leave empty the i-th bk fast scan line (maybe because the line is
+            % entirely made of crystal PDA)
+            if length(xData) <= 3
+                Bk_iterative(:,i) = NaN;
+                continue;
+            end            
+            % Initialize AIC results
+            aic_values = nan(1, limit);
+            models = cell(1, limit);            
+            % Test polynomial fits up to the limit
+            for z = 1:limit
+                polyModel = polyfitn(xData, yData, z);
+                models{z} = polyModel;            
+                % Compute AIC
+                n = length(yData);
+                sse = sum((yData - polyval(polyModel.Coefficients, xData)).^2);
+                k = length(polyModel.Coefficients); % Number of parameters
+                aic_values(z) = n * log(sse / n) + 2 * k;
+            end            
+            % Select best model using AIC
+            [~, bestIdx] = min(aic_values);
+            bestModel = models{bestIdx};            
+            % Save fitting decisions
+            fit_decision_final(i, 1) = bestIdx;
+            fit_decision_final(i, 2) = aic_values(bestIdx);
+            fit_decision_final(i, 3) = sum((yData - polyval(bestModel.Coefficients, xData)).^2); % SSE
+            fit_decision_final(i, 4:4 + bestIdx) = bestModel.Coefficients;            
+            % Generate baseline using the best polynomial fit
+            Bk_iterative(:, i) = polyval(bestModel.Coefficients, x);
+            % Progress update
+            waitbar(i/N_Cycluse_waitbar, wb, sprintf('AIC-based background fitting - Line %.0f completed %.1f%%', i, i/N_Cycluse_waitbar*100));
         end
 
-        AFM_noBk=minus(filt_data_no_Bk,Bk_iterative);
+        % Handle NaN lines by interpolation. In case of those lines entirely made of NaN
+        nan_lines = find(isnan(Bk_iterative(1, :)));
+        for i = nan_lines
+            left_idx = find(~isnan(Bk_iterative(1, 1:i-1)), 1, 'last');
+            right_idx = find(~isnan(Bk_iterative(1, i+1:end)), 1, 'first') + i;
+            % adiacent interpolation
+            if ~isempty(left_idx) && ~isempty(right_idx)
+                Bk_iterative(:, i) = (Bk_iterative(:, left_idx) + Bk_iterative(:, right_idx)) / 2;
+            elseif ~isempty(left_idx)
+                Bk_iterative(:, i) = Bk_iterative(:, left_idx);
+            elseif ~isempty(right_idx)
+                Bk_iterative(:, i) = Bk_iterative(:, right_idx);
+            end
+        end 
+        AFM_noBk=filt_data_no_Bk-Bk_iterative;
         AFM_noBk=AFM_noBk-min(AFM_noBk(:));
         AFM_noBk_visible_data=imadjust(AFM_noBk/max(AFM_noBk(:)));
-        
+        % plot the resulting corrected data
         f3=figure;
         imshow(AFM_noBk_visible_data),colormap parula, axis on, axis equal
         title('Height (measured) channel - Single Line Fitted', 'FontSize',16)
@@ -327,11 +310,8 @@ function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,iterationMain,secondM
         if getValidAnswer('Satisfied of the fitting?','',{'y','n'}) == 1
             saveas(f3,sprintf('%s\\resultA3_3_HeightLineFitted.tif',filepath))
             close(f3), break
-        else
-            flagAccuracy=false;
         end
     end
-
     % start the binarization to create the 0/1 height image. At the same time show normal and logical image
     % for better comparison
     f4=figure;
@@ -341,18 +321,18 @@ function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,iterationMain,secondM
     c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
     ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
 
-    satisfied='Manual Selection';
     first_In=1;
     closest_indices=[];
     no_sub_div=1000;
     % Binarisation of the bg-subtracted image
-    while(strcmp(satisfied,'Manual Selection'))
+    while true
         kernel=strel('square',3); % can be modified
         if(first_In==1)
+            % original
             T = adaptthresh(mat2gray(AFM_noBk));
             seg_AFM = imbinarize(mat2gray(AFM_noBk),T);
         else
-            clearvars seg_AFM th_segmentation seg_dial           
+            clearvars seg_AFM th_segmentation seg_binarized           
             imhistfig=figure('visible','on');hold on,plot(Y)
             if any(closest_indices)
                 scatter(closest_indices,Y(closest_indices),40,'r*')
@@ -368,39 +348,71 @@ function [AFM_Images,IO_Image,accuracy]=A3_El_AFM(filtData,iterationMain,secondM
             seg_AFM(seg_AFM<th_segmentation)=0;
             seg_AFM(seg_AFM>=th_segmentation)=1;
         end       
-        seg_dial=imerode(seg_AFM,kernel);
-        seg_dial=imdilate(seg_dial,kernel);
+        seg_binarized=imerode(seg_AFM,kernel);
+        seg_binarized=imdilate(seg_binarized,kernel);
         if exist('h1', 'var') && ishandle(h1)
             delete(h1);
         end
         h1=subplot(122);
-        imshow(seg_dial); title('Baseline and foreground processed', 'FontSize',16), colormap parula
+        imshow(seg_binarized); title('Baseline and foreground processed', 'FontSize',16), colormap parula
         colorbar('Ticks',[0 1],...
          'TickLabels',{'Background','Foreground'},'FontSize',13)
 
-        if(strcmp(p.Results.AutoElab,'No'))
-            satisfied=questdlg('Keep automatic threshold selection or turn to Manual?', 'Manual Selection', 'Keep Current','Manual Selection','Keep Current');
-            if(first_In==1)
-                if(strcmp(satisfied,'Manual Selection'))
-                    [Y,E] = histcounts(AFM_noBk,no_sub_div);
-                    first_In=0;
-                end
+        
+        satisfied=questdlg('Keep automatic threshold selection or turn to Manual?', 'Manual Selection', 'Keep Current','Manual Selection','Keep Current');
+        if(first_In==1)
+            if(strcmp(satisfied,'Manual Selection'))
+                [Y,E] = histcounts(AFM_noBk,no_sub_div);
+                first_In=0;
             end
         end
+        if strcmp(satisfied,'Keep Current')
+            break
+        end
     end
-    close(f4)
-    
+    % often the 
+    question='Satisfied of the effective binarization? If not, run ImageSegmenter ToolBox for better manual binarization';
+    options={'Yes','No'};
+    if ~getValidAnswer(question,'',options)
+        close(f4)
+        f5=figure;
+        imshow(AFM_noBk_visible_data),colormap parula, axis on
+        title('Height (measured) channel - CLOSE THIS WINDOW WHEN SEGMENTATION TERMINATED', 'FontSize',16)
+        objInSecondMonitor(secondMonitorMain,f5);
+        c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
+        ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
+        % for some reasons, the exported variable is stored in the base workspace, outside the current
+        % function. So take it from there. Save the workspace of before and after and take the new variables.
+        tmp1=evalin('base', 'who');
+        imageSegmenter(AFM_noBk_visible_data), colormap parula
+        waitfor(f5)
+        tmp2=evalin('base', 'who');
+        varBase=setdiff(tmp2,tmp1);
+        for i=1:length(varBase)            
+            text=sprintf('%s',varBase{i});
+            var = evalin('base', text);
+            figure
+            imshow(var), colormap parula            
+            if getValidAnswer('Is the current figure the right binarized AFM?','',{'Yes','No'})
+                close gcf
+                seg_binarized=var;
+                break
+            end
+            close gcf
+        end
+        clear tmp* vtmp var
+    end
+     
     % show data
     titleData=sprintf('Baseline and foreground processed - Iteration %d',iterationMain);
     idImg=5;
     nameFile=fullfile(filepath,sprintf('resultA3_4_BaselineForeground_iteration%d.tif',iterationMain));
-    showData(secondMonitorMain,SeeMe,idImg,seg_dial,false,titleData,labelBar,nameFile,true)
+    showData(secondMonitorMain,SeeMe,idImg,seg_binarized,false,titleData,labelBar,nameFile,true)
     if SeeMe
         uiwait(msgbox('Click to continue'))
     end
-    close gcf
-    
-    IO_Image=logical(seg_dial);
+    close gcf    
+    IO_Image=logical(seg_binarized);
     if(exist('wb','var'))
         delete (wb)
     end
