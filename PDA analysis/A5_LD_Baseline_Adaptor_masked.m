@@ -30,32 +30,17 @@ function AFM_Elab=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO
     Lateral_Trace_clean_shift= Lateral_Trace_clean - min(min(Lateral_Trace_clean));
     % Mask W to cut the PDA from the baseline fitting. Where there is PDA in corrispondece of the mask, then mask the
     % lateral deflection data. Basically, the goal is fitting using the glass which is know to be flat. 
-    if SeeMe
-        f1=figure('Visible','on');
-    else
-        f1=figure('Visible','off');
-    end
-           
-    subplot(121)
-    imshow((imadjust(Lateral_Trace/max(max(Lateral_Trace))))), colormap parula; colorbar,
-    c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize = 15;
-    title('Raw Lateral Deflection [V] - Trace','FontSize',18)
-    xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
-    axis equal, xlim([0 size(Lateral_Trace,2)]), ylim([0 size(Lateral_Trace,1)])
+    
+    % plot the original data
+    titleData1='Raw Lateral Deflection [V] - Trace'; titleData2={'Lateral Deflection - Trace [V]'; '(shifted toward minimum)'};
+    labelBar='Normalized';
+    nameFig=fullfile(newFolder,'resultA5_1_RawAndShiftedLateralDeflection.tif');
+    showData(secondMonitorMain,SeeMe,1,Lateral_Trace,true,titleData1,labelBar,nameFig,'data2',Lateral_Trace_clean_shift,'titleData2',titleData2)
 
-    subplot(122)
-    imshow((imadjust(Lateral_Trace_clean_shift/max(max(Lateral_Trace_clean_shift))))), colormap parula; colorbar,
-    c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize = 15;
-    title({'Lateral Deflection - Trace [V]'; '(shifted toward minimum)'},'FontSize',18)
-    xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
-    axis equal, xlim([0 size(Lateral_Trace,2)]), ylim([0 size(Lateral_Trace,1)])    
-    objInSecondMonitor(secondMonitorMain,f1);
-    saveas(f1,sprintf('%s/resultA5_1_RawAndShiftedLateralDeflection.tif',newFolder))
-    close(f1)
 
     % selection of the polynomial order
     if strcmp(p.Results.FitOrder,'Low')
-        limit=3;
+        limit=2;
     elseif strcmp(p.Results.FitOrder,'Medium')
         limit=6;
     else
@@ -75,7 +60,7 @@ function AFM_Elab=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO
     num_lines = size(Lateral_Trace_shift_masked, 2);
     % build array abscissas for the fitting
     x = (1:size(Lateral_Trace_shift_masked,1))';
-    for i = 1:num_lines
+    for i = 1:num_lines        
         % Check for cancellation
         if getappdata(wb, 'canceling')
             delete(wb);
@@ -87,7 +72,25 @@ function AFM_Elab=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO
         % Remove masked values (set to 5)
         valid_idx = yData < 5;
         xValid = xData(valid_idx);
-        yValid = yData(valid_idx);        
+        yValid = yData(valid_idx);
+        % Exclude top 1% which represents the edges
+        threshold = prctile(yValid, 99);   
+        % first round of outliers removal
+        yValid(yValid >= threshold) = NaN;   
+        xValid(yValid >= threshold) = NaN;  
+
+        [pos_outlier] = isoutlier(yValid, 'gesd');
+        while any(pos_outlier)
+            yValid(pos_outlier) = NaN;
+            [pos_outlier] = isoutlier(yValid, 'gesd');
+        end
+        xValid = xValid(~isnan(yValid));
+        yValid = yValid(~isnan(yValid));
+
+        if ismember(i,300:1:320)
+            curveFitter(xValid,yValid)
+        end
+
         % Handle insufficient data points
         if length(yValid) < 4
             Bk_iterative(:, i) = NaN; % Mark for interpolation later
@@ -138,7 +141,11 @@ function AFM_Elab=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO
     end    
     % Remove background
     Lateral_Trace_shift_noBK = Lateral_Trace_clean_shift - Bk_iterative;
-    
+    % Plot the fitted backround:
+    titleData1='Fitted Background'; titleData2='Fitted Lateral Deflection channel [V] - Trace';
+    nameFig=fullfile(newFolder,'resultA5_2_ResultsFittingOnLateralDeflections.tif');
+    showData(secondMonitorMain,SeeMe,2,Bk_iterative,true,titleData1,'',nameFig,'data2',Lateral_Trace_shift_noBK,'titleData2',titleData2)
+
     % choose friction coefficients depending on the case (experimental results done in another moment),
     % or manually put the value
     question=sprintf('Which background friction coefficient use?');
@@ -189,35 +196,11 @@ function AFM_Elab=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO
     % To read the baseline friction, to obtain the processed image:
     Corrected_LD_Trace= Lateral_Trace_Force + Baseline_Friction_Force;
     
-    % Plot the fitted backround:
-    if SeeMe
-        f2=figure('Visible','on');       
-    else
-        f2=figure('Visible','off');      
-    end
-   
-    subplot(121)
-    imshow((imadjust(Bk_iterative/max(max(Bk_iterative))))), colormap parula
-    c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize =15;
-    title('Fitted Background','FontSize',15)
-    xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
-    % remove the background from the image (friction on glass should be zero afterwards):
-    subplot(122)
-    imshow((imadjust(Lateral_Trace_shift_noBK/max(max(Lateral_Trace_shift_noBK))))), colormap parula
-    c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize =15;
-    xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
-    title('Fitted Lateral Deflection channel [V] - Trace ','FontSize',15)
-    objInSecondMonitor(secondMonitorMain,f2);
-    saveas(f2,sprintf('%s/resultA5_2_ResultsFittingOnLateralDeflections.tif',newFolder))
-    close(f2)
-    f3=figure;
-    imshow(imadjust(Corrected_LD_Trace/max(max(Corrected_LD_Trace)))), colormap parula
-    c=colorbar; c.Label.String = 'normalized to max value'; c.FontSize =15;
-    title('Fitted and corrected Lateral Force [N]','FontSize',17)
-    xlabel(' slow direction','FontSize',15), ylabel('fast direction - scan line','FontSize',15)
-    objInSecondMonitor(secondMonitorMain,f3);
-    saveas(f3,sprintf('%s/resultA5_3_ResultsDefinitiveLateralDeflectionsNewton.tif',newFolder))
-    AFM_Elab=AFM_cropped_Images;
+    % plot the definitive corrected lateral force
+    titleData='Fitted and corrected Lateral Force [N]';
+    nameFig=fullfile(newFolder,'resultA5_3_ResultsDefinitiveLateralDeflectionsNewton.tif');
+    showData(secondMonitorMain,1,3,Corrected_LD_Trace,true,titleData,'',nameFig,'closeImmediately',false)
     % save the corrected lateral force into cropped AFM image
+    AFM_Elab=AFM_cropped_Images;    
     AFM_Elab(strcmpi([AFM_cropped_Images.Channel_name],'Lateral Deflection') & strcmpi([AFM_cropped_Images.Trace_type],'Trace')).AFM_image=Corrected_LD_Trace;
 end

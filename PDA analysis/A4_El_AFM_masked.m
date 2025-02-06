@@ -101,19 +101,33 @@ function [AFM_Images_Bk,AFM_height_IO]=A4_El_AFM_masked(AFM_Images,AFM_height_IO
         delete(wb)
     end
     
-    % show the definitive height distribution
+    % show the definitive height distribution. Better distinction between PDA and BK by using the mask
     if SeeMe
         f4=figure('Visible','on');
     else
         f4=figure('Visible','off');
     end
-    histogram(AFM_noBk*1e9,100,'DisplayName','Distribution height');
-    xlabel(sprintf('Feature height (nm)'),'FontSize',15)
-    title('Distribution Height','FontSize',20)
+    percentile=99;
+    AFM_noBk_dataBKonly=AFM_noBk(AFM_height_IO==0);
+    AFM_noBk_dataPDAonly=AFM_noBk(AFM_height_IO==1);    
+    thresholdBK = prctile(AFM_noBk_dataBKonly(:), percentile);
+    thresholdPDA = prctile(AFM_noBk_dataPDAonly(:), percentile);
+    % outliers removal
+    AFM_noBk_dataBKonly(AFM_noBk_dataBKonly >= thresholdBK) = NaN; 
+    AFM_noBk_dataPDAonly(AFM_noBk_dataPDAonly >= thresholdPDA) = NaN; 
+    AFM_noBk_dataBKonly = AFM_noBk_dataBKonly(~isnan(AFM_noBk_dataBKonly))*1e9;
+    AFM_noBk_dataPDAonly = AFM_noBk_dataPDAonly(~isnan(AFM_noBk_dataPDAonly))*1e9;
+    edgesBK=min(AFM_noBk_dataBKonly):1:max(AFM_noBk_dataBKonly);
+    edgesPDA=min(AFM_noBk_dataPDAonly):1:max(AFM_noBk_dataPDAonly);
+    hold on    
+    histogram(AFM_noBk_dataBKonly,edgesBK,'DisplayName','Distribution height','Normalization','percentage');
+    histogram(AFM_noBk_dataPDAonly,edgesPDA,'DisplayName','Distribution height','Normalization','percentage');
+    legend({'Background','Foreground'},'FontSize',15)
+    xlabel(sprintf('Feature height (nm)'),'FontSize',15), ylabel('Percentage %','FontSize',15), grid minor, grid on
+    title(sprintf('Distribution Height (Percentile %d°)',percentile),'FontSize',20)
     objInSecondMonitor(secondMonitorMain,f4);
     saveas(f4,sprintf('%s/resultA4_4_OptHeightDistribution_iteration%d.tif',filepath,iterationMain))
     close(f4)
-
     % substitutes to the original height image with the new opt fitted heigh
     AFM_Images_Bk=AFM_Images;
     AFM_Images_Bk(strcmp([AFM_Images_Bk.Channel_name],'Height (measured)')).AFM_image=AFM_noBk;

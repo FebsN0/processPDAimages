@@ -116,10 +116,9 @@ function [AFM_Images,IO_Image]=A3_El_AFM(filtData,iterationMain,secondMonitorMai
     end
     
     titleData='Height (measured) channel - Line Tilted effect removed';
-    labelBar = 'Normalized Height';
     idImg=1;
     nameFile=fullfile(filepath,'resultA3_1_HeightRemovedTiltLine.tif');
-    showData(secondMonitorMain,SeeMe,idImg,poly_filt_data,true,titleData,labelBar,nameFile)
+    showData(secondMonitorMain,SeeMe,idImg,poly_filt_data,true,titleData,'',nameFile)
     if SeeMe
         uiwait(msgbox('Click to continue'))
     end
@@ -182,10 +181,9 @@ function [AFM_Images,IO_Image]=A3_El_AFM(filtData,iterationMain,secondMonitorMai
     filt_data_no_Bk=filt_data_no_Bk-min(min(filt_data_no_Bk));
     % show the results
     titleData='Height (measured) channel - Surface Tilted effect removed';
-    labelBar = 'Normalized Height';
     idImg=1;
     nameFile=fullfile(filepath,'resultA3_2_HeightRemovedTiltSurface.tif');
-    showData(secondMonitorMain,SeeMe,idImg,filt_data_no_Bk,true,titleData,labelBar,nameFile)
+    showData(secondMonitorMain,SeeMe,idImg,filt_data_no_Bk,true,titleData,'',nameFile)
     if SeeMe
         uiwait(msgbox('Click to continue'))
     end
@@ -407,7 +405,7 @@ function [AFM_Images,IO_Image]=A3_El_AFM(filtData,iterationMain,secondMonitorMai
     titleData=sprintf('Baseline and foreground processed - Iteration %d',iterationMain);
     idImg=5;
     nameFile=fullfile(filepath,sprintf('resultA3_4_BaselineForeground_iteration%d.tif',iterationMain));
-    showData(secondMonitorMain,SeeMe,idImg,seg_binarized,false,titleData,labelBar,nameFile,true)
+    showData(secondMonitorMain,SeeMe,idImg,seg_binarized,false,titleData,'',nameFile,'Binarized','Yes')
     if SeeMe
         uiwait(msgbox('Click to continue'))
     end

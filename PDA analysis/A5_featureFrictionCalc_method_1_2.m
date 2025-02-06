@@ -31,7 +31,7 @@
 %           6) averaged values of fast scan lines of force used for the fitting
 %           7) averaged values of fast scan lines of vertical force used for the fitting
 
-function avg_fc=A5_featureFrictionCalc_method_1_2(AFM,metadata,mask,secondMonitorMain,newFolder,method,idxRemovedPortion,varargin)
+function avg_fc=A5_featureFrictionCalc_method_1_2(AFM,metadata,mask,secondMonitorMain,newFolder,method,maskRemoval,varargin)
     % in case of code error, the waitbar won't be removed. So the following command force its closure
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)
@@ -76,7 +76,7 @@ function avg_fc=A5_featureFrictionCalc_method_1_2(AFM,metadata,mask,secondMonito
     %   second clearing: filter out force with 20% more than the setpoint for the specific section
     %   third clearing: remove entire fast scan lines by using the idx of manually selected portions        
     % show also the lateral and vertical data after clearing
-    [vertForce_clear,force_clear]=featureFrictionCalc1_clearingAndPlotData(vertical_Trace,vertical_ReTrace,setpoints,maxSetpoint,force,idxSection,idxRemovedPortion,newFolder,secondMonitorMain);
+    [vertForce_clear,force_clear]=featureFrictionCalc1_clearingAndPlotData(vertical_Trace,vertical_ReTrace,setpoints,maxSetpoint,force,idxSection,maskRemoval,newFolder,secondMonitorMain);
     clear vertical_ReTrace vertical_Trace force alpha W Delta mask AFM_height_IO Lateral_Trace Lateral_ReTrace
               
     % calc the friction coefficient depending on the method
@@ -415,7 +415,7 @@ function featureFrictionCalc6_plotClearedImages(x,y,maxSetpoint,path,secondMonit
 end
 
 %%%%%%%% CLEARING STEPS %%%%%%%%      
-function [vertForce_thirdClearing,force_thirdClearing]=featureFrictionCalc1_clearingAndPlotData(vertical_Trace,vertical_ReTrace,setpoints,maxSetpoints,force,idxSection,idxRemovedPortion,newFolder,secondMonitorMain)
+function [vertForce_thirdClearing,force_thirdClearing]=featureFrictionCalc1_clearingAndPlotData(vertical_Trace,vertical_ReTrace,setpoints,maxSetpoints,force,idxSection,maskRemoval,newFolder,secondMonitorMain)
 % NOTE: doesnt matter the used method. Its just the mask applying and removal of common outliers
 % Remove outliers among Vertical Deflection data using a defined threshold of 4nN 
 % ==> trace and retrace in vertical deflection should be almost the same.
@@ -462,22 +462,13 @@ function [vertForce_thirdClearing,force_thirdClearing]=featureFrictionCalc1_clea
     %%%%%% THIRD CLEARING %%%%%%%
     % build 1-dimensional array which contain 0 or 1 according to the idx of regions manually removed 
     % ( 0 = removed slow line)
+    % this snippet should useless, because the original data here are already cleaned. But I keep just in case
     vertForce_thirdClearing=vertForce_secondClearing;
     force_thirdClearing=force_secondClearing;
-    if ~isempty(idxRemovedPortion)
-    %array01RemovedRegion=ones(1,size(force_firstClearing,2));
-        for n=1:size(idxRemovedPortion,1)
-            if isnan(idxRemovedPortion(n,3)) 
-                % remove entire fast scan lines
-                vertForce_thirdClearing(:,idxRemovedPortion(n,1):idxRemovedPortion(n,2))=0;
-                force_thirdClearing(:,idxRemovedPortion(n,1):idxRemovedPortion(n,2))=0;
-            else
-                % remove portions
-                vertForce_thirdClearing(idxRemovedPortion(n,3):idxRemovedPortion(n,4),idxRemovedPortion(n,1):idxRemovedPortion(n,2))=0;
-                force_thirdClearing(idxRemovedPortion(n,3):idxRemovedPortion(n,4),idxRemovedPortion(n,1):idxRemovedPortion(n,2))=0;
-            end
-        end
-    end
+    if ~isempty(maskRemoval)
+        vertForce_thirdClearing(maskRemoval)=0;
+        force_thirdClearing(maskRemoval)=0;
+    end    
     % plot lateral (masked force, N) and vertical data (masked force, N). Not show up but save fig
     featureFrictionCalc6_plotClearedImages(vertForce_thirdClearing,force_thirdClearing,maxSetpoints,newFolder,secondMonitorMain,false)
 end

@@ -13,11 +13,11 @@ function avg_fc = A5_featureFrictionCalcFromSameScanHVOFF(secondMonitorMain,main
             [pixData,fOutlierRemoval,fOutlierRemoval_text]=prepareSettingsPixel;
     end
 %    folderResultsImg=prepareDirResults(mainPath,method,fOutlierRemoval,fOutlierRemoval_text)
-    [AFM,metadata,AFM_heightIO,idxRemovedPortion,filePathResults]=prepareData(secondMonitorMain,fullfile(mainPath,'HoverMode_OFF'));        
+    [AFM,metadata,AFM_heightIO,maskRemoval,filePathResults]=prepareData(secondMonitorMain,fullfile(mainPath,'HoverMode_OFF'));        
     if method == 2
-        avg_fc=A5_featureFrictionCalc_method_1_2(AFM,metadata,AFM_heightIO,secondMonitorMain,filePathResults,method,idxRemovedPortion,pixData,fOutlierRemoval,fOutlierRemoval_text);
+        avg_fc=A5_featureFrictionCalc_method_1_2(AFM,metadata,AFM_heightIO,secondMonitorMain,filePathResults,method,maskRemoval,pixData,fOutlierRemoval,fOutlierRemoval_text);
     else    
-        avg_fc=A5_featureFrictionCalc_method_1_2(AFM,metadata,AFM_heightIO,secondMonitorMain,filePathResults,method,idxRemovedPortion);
+        avg_fc=A5_featureFrictionCalc_method_1_2(AFM,metadata,AFM_heightIO,secondMonitorMain,filePathResults,method,maskRemoval);
     end
 end
 
@@ -25,32 +25,7 @@ end
 %%%%%%% FUNCTIONS %%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%
     
-%%%%%%%------- CLEARING THE DATA BY REMOVING SPECIFIC REGION OR ENTIRE FAST SCAN LINE REGION -------%%%%%%%%
-function [AFM_data_cleared,AFM_heightIO_cleared,idxRemovedPortion]=removePortions(AFM_data,AFM_heightIO,secondMonitorMain,filepath)
-% before start pre-process the lateral data, it may be necessary to manually remove portions which contains 
-% outliers by substuting the values with the minimum. For better details, see the documentation of the function
-    idxRemovedPortionOld=[];
-    [AFM_data_cleared,AFM_heightIO_cleared,idxRemovedPortion]=A3_featureRemovePortion(AFM_data,AFM_heightIO,secondMonitorMain);
-    % in case of removal, save the final images
-    if ~isequal(idxRemovedPortionOld,idxRemovedPortion)
-        % show the results  
-        AFM_height_cleared=AFM_data_cleared(1).AFM_image;
-        textTitle='Height (measured) channel - Masked, Fitted, Optimized, portions removed';
-        idImg=4;
-        textColorLabel='Height (nm)'; 
-        textNameFile=sprintf('%s/resultA4_5_OptFittedHeightChannel_PortionRemoved.tif',filepath);
-        showData(secondMonitorMain,false,idImg,AFM_height_cleared,true,textTitle,textColorLabel,textNameFile)
-        % fig is invisible
-        close gcf
-    
-        textTitle='Baseline and foreground processed - portions removed';
-        idImg=5;
-        textNameFile=sprintf('%s/resultA4_6_BaselineForeground_PortionRemoved.tif',filepath);
-        showData(secondMonitorMain,false,idImg,AFM_heightIO_cleared,false,textTitle,'',textNameFile,true)
-        % fig is invisible
-        close gcf
-    end
-end
+
 
 %%%%%%%%%%%------- PREPARE THE AFM DATA HOVER MODE OFF -------%%%%%%%%%%%
 function varargout=prepareData(secondMonitorMain,pathSingleScan)
@@ -63,7 +38,7 @@ function varargout=prepareData(secondMonitorMain,pathSingleScan)
         nameScan=tmp{end-1}; clear tmp        
         question=sprintf('Results of the scan %s HoverModeOFF already exists. Take it? If not, remove the previous one.',nameScan);
         if getValidAnswer(question,'',{'Yes','No'})
-            load(pathResultsData,"metaData","AFM_data","AFM_heightIO","idxRemovedPortion","filepathResults")
+            load(pathResultsData,"metaData","AFM_data","AFM_heightIO","maskRemoval","filepathResults")
             flag_exeA1=false;               
         else
             delete(pathResultsData)
@@ -73,13 +48,28 @@ function varargout=prepareData(secondMonitorMain,pathSingleScan)
     if flag_exeA1
         [AFM_data,AFM_heightIO,metaData,filepathResults,setpointN]=A1_openANDassembly_JPK(secondMonitorMain,'backgroundOnly','Yes','filePath',pathSingleScan);
         % remove manually regions
-        [AFM_data,AFM_heightIO,idxRemovedPortion]=removePortions(AFM_data,AFM_heightIO,secondMonitorMain,filepathResults);
-        save(fullfile(pathSingleScan,"resultsData_1_postProcessA4_HVoff"),"metaData","AFM_data","AFM_heightIO","setpointN","idxRemovedPortion","filepathResults")
+        [AFM_data,AFM_heightIO,maskRemoval] = featureRemovePortions(AFM_data,AFM_heightIO,secondMonitorMain);
+        % in case of removal, save the final images
+        if ~isempty(maskRemoval)
+            % show the results  
+            titleData='Yellow = Removed Portions';
+            nameFig=fullfile(filepathResults,"resultA4_5_RemovedPortions.tif");
+            showData(secondMonitorMain,false,4,maskRemoval,false,titleData,'',nameFig,'Binarized','Yes')
+            AFM_height_cleared=AFM_data(1).AFM_image;
+            titleData='Height (measured) channel - Masked, Fitted, Optimized, portions removed';
+            nameFig=fullfile(filepathResults,"resultA4_6_OptFittedHeightChannel_PortionRemoved.tif");
+            textColorLabel='Height (nm)'; 
+            showData(secondMonitorMain,false,5,AFM_height_cleared,true,titleData,textColorLabel,nameFig)
+            titleData='Baseline and foreground processed - portions removed';
+            nameFig=fullfile(filepathResults,"resultA4_7_BaselineForeground_PortionRemoved.tif");
+            showData(secondMonitorMain,false,6,AFM_heightIO,false,titleData,'',nameFig,'Binarized','Yes')
+        end
+        save(fullfile(pathSingleScan,"resultsData_1_postProcessA4_HVoff"),"metaData","AFM_data","AFM_heightIO","setpointN","maskRemoval","filepathResults")
     end                        
     varargout{1}=AFM_data;
     varargout{2}=metaData;
     varargout{3}=AFM_heightIO;
-    varargout{4}=idxRemovedPortion;
+    varargout{4}=maskRemoval;
     varargout{5}=filepathResults;
 end
 
