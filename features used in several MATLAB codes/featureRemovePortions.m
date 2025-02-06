@@ -53,35 +53,41 @@
 %   dataIOCleaned :         updated binarized AFM height image
 %   maskRemoval :              updated mask containing the removed portions
 %                              
-function [dataCleaned,dataIOCleaned,maskRemoval] = featureRemovePortions(dataToClear,dataIO,typeImageToShow,secondMonitorMain,varargin)
+function [dataCleaned,dataIOCleaned,maskRemoval] = featureRemovePortions(dataToClear,dataIO,secondMonitorMain,varargin)
     %init instance of inputParser
     p=inputParser();
     % Required arguments
     addRequired(p, 'dataToClear', @(x) (isstruct(x) || ismatrix(x)));
     addRequired(p, 'dataIO', @(x) ismatrix(x));
-    addRequired(p, 'typeImageToShow', @(x) ismember(x, {'Height', 'Lateral', 'Vertical'}));
     addRequired(p, 'secondMonitorMain', @(x) islogical(x) || isnumeric(x));
     % Optional parameters
     addParameter(p, 'imageToShow', [], @(x) (ismatrix(x) || isempty(x)));
     addParameter(p, 'maskRemoval', [], @(x) (ismatrix(x) || isempty(x)));
     addParameter(p, 'Normalization', false, @(x) islogical(x));   
     % validate and parse the inputs
-    parse(p, dataToClear, dataIO, typeImageToShow, secondMonitorMain, varargin{:});                                                                 
-    mapping = struct( ...
-        'Height', "Height (measured)", ...
-        'Lateral', "Lateral Deflection", ...
-        'Vertical', "Vertical Deflection");
+    parse(p, dataToClear, dataIO, secondMonitorMain, varargin{:});                                                                     
     % extract the data to show in the figure where select the areas to remove
     if isempty(p.Results.imageToShow)
-        % take the channel depending on the typeDataText
+        % by default take the height channel in case of struct
         if isstruct(dataToClear)
-            matchIdx = strcmp([dataToClear.Channel_name], mapping.(typeImageToShow)) & strcmp([dataToClear.Trace_type],'Trace');
-            dataToShow1=dataToClear(matchIdx).AFM_image;            
+            channel='Height (measured)';
+            matchIdx = strcmp([dataToClear.Channel_name],channel) & strcmp([dataToClear.Trace_type],'Trace');
+            dataToShow1=dataToClear(matchIdx).AFM_image; 
+            flagSingleImageShow=false;            
         else
-            dataToShow1=dataToClear;           
+            dataToShow1=dataToClear;   
+            flagSingleImageShow=true;
         end
     else
         dataToShow1=p.Results.imageToShow;
+        flagSingleImageShow=true;
+    end
+
+    if flagSingleImageShow
+        options={'Height (measured)','Lateral Deflection','Vertical Deflection'};
+        question='What channel is the given ''imageToShow'' or the single matrix ''dataToClear''?';
+        answer=getValidAnswer(question,'',options);
+        channel=options{answer};
     end
     % check if the mask has the same size of the data. The mask represents the already removed regions
     maskRemoval=p.Results.maskRemoval;
@@ -96,21 +102,23 @@ function [dataCleaned,dataIOCleaned,maskRemoval] = featureRemovePortions(dataToC
     text='Not Corrected'; flagFirst=true;        
     while true
         subplot(121)
+        if strcmp(channel,'Height (measured)')
+            textBar='Height [nm]';
+            multiplier=1e9;
+        else
+            textBar='Voltage [V]';
+            multiplier=1;
+        end
         if norm
             imshow(imadjust(dataToShow1/max(dataToShow1(:))))
         else
-            imagesc(dataToShow1*1e9)
-        end
-        if strcmp(typeImageToShow,'Height')
-            textBar='Height [nm]';
-        else
-            textBar='Force [nN]';
-        end
+            imagesc(dataToShow1*multiplier)
+        end        
         axis on, axis equal
         xlim([0 size(dataToShow1,2)]), ylim([0 size(dataToShow1,1)])
         ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
         colormap parula, c = colorbar; c.Label.String = textBar; c.Label.FontSize=15;
-        title(sprintf('%s channel',mapping.(typeImageToShow)),'FontSize',17)
+        title(sprintf('%s channel',channel),'FontSize',17)
         subplot(122)
         imagesc(dataIOCleaned)
         axis on, axis equal
@@ -119,10 +127,24 @@ function [dataCleaned,dataIOCleaned,maskRemoval] = featureRemovePortions(dataToC
         ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
         if flagFirst, objInSecondMonitor(secondMonitorMain,f1); flagFirst=false; end
         sgtitle(sprintf('%s images',text),'Fontsize',20,'interpreter','none')
-        answer = questdlg('Remove lines or portions?','','Yes','No','No');
-        if ~strcmp(answer,'Yes')
-            break
+        question = 'Remove lines or portions?';
+        if ~flagSingleImageShow
+            options = {'Yes','No','Change into height channel for the 1st figure','Change into lateral deflection channel for the 1st figure'};
         else
+            options = {'Yes','No'};
+        end
+        answer=getValidAnswer(question,'',options,2);
+        if answer==2 || answer == false
+            break
+        elseif answer==3
+            channel='Height (measured)';
+            matchIdx = strcmp([dataCleaned.Channel_name],channel) & strcmp([dataCleaned.Trace_type],'Trace');
+            dataToShow1=dataCleaned(matchIdx).AFM_image; 
+        elseif answer==4
+            channel='Lateral Deflection';
+            matchIdx = strcmp([dataCleaned.Channel_name],channel) & strcmp([dataCleaned.Trace_type],'Trace');
+            dataToShow1=dataCleaned(matchIdx).AFM_image; 
+        elseif answer == 1 || answer == true
             hold on            
             sgtitle('Select the figures to remove portions. Double click on the selection to terminate','FontSize',17)
             question='Choose the removal type';
