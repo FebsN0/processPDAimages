@@ -4,8 +4,9 @@
 % Check manually the processed image afterwards and compare with the AFM VD
 % image!
 
-function AFM_Elab=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,alpha,secondMonitorMain,newFolder,mainPath,varargin)
+function varargout=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,alpha,secondMonitorMain,newFolder,mainPath,varargin)
     % in case of code error, the waitbar won't be removed. So the following command force its closure
+    warning ('off','all'); 
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)
 
@@ -18,134 +19,295 @@ function AFM_Elab=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO
     parse(p,varargin{:});
     clearvars argName defaultVal
     if(strcmp(p.Results.Silent,'Yes')); SeeMe=0; else, SeeMe=1; end
-
-    % extract data (lateral deflection Trace and Retrace, vertical deflection) and then mask (glass-PDA) elementXelement
-    % ONLY in correspondence with the glass!
-    Lateral_Trace   = (AFM_cropped_Images(strcmpi([AFM_cropped_Images.Channel_name],'Lateral Deflection') & strcmpi([AFM_cropped_Images.Trace_type],'Trace')).AFM_image);
-    %Lateral_ReTrace = (AFM_cropped_Images(strcmpi([AFM_cropped_Images.Channel_name],'Lateral Deflection') & strcmpi([AFM_cropped_Images.Trace_type],'ReTrace')).AFM_image);
-    vertical_Trace  = (AFM_cropped_Images(strcmpi([AFM_cropped_Images.Channel_name],'Vertical Deflection') & strcmpi([AFM_cropped_Images.Trace_type],'Trace')).AFM_image);
-
-    Lateral_Trace_clean =Lateral_Trace;
-    %Subtract the minimum of the image
-    Lateral_Trace_clean_shift= Lateral_Trace_clean - min(min(Lateral_Trace_clean));
-    % Mask W to cut the PDA from the baseline fitting. Where there is PDA in corrispondece of the mask, then mask the
-    % lateral deflection data. Basically, the goal is fitting using the glass which is know to be flat. 
-    
-    % plot the original data
-    titleData1='Raw Lateral Deflection [V] - Trace'; titleData2={'Lateral Deflection - Trace [V]'; '(shifted toward minimum)'};
-    labelBar='Normalized';
-    nameFig=fullfile(newFolder,'resultA5_1_RawAndShiftedLateralDeflection.tif');
-    showData(secondMonitorMain,SeeMe,1,Lateral_Trace,true,titleData1,labelBar,nameFig,'data2',Lateral_Trace_clean_shift,'titleData2',titleData2)
-
-
-    % selection of the polynomial order
     if strcmp(p.Results.FitOrder,'Low')
-        limit=2;
+        limit=3;
     elseif strcmp(p.Results.FitOrder,'Medium')
         limit=6;
     else
         limit=9;
     end
-    % apply the PDA mask, so the PDA data  will be ignored. Use now the background
-    Lateral_Trace_shift_masked= Lateral_Trace_clean_shift;
-    Lateral_Trace_shift_masked(AFM_height_IO==1)=5;
-    %show dialog box
-    wb=waitbar(0/size(Lateral_Trace_shift_masked,1),sprintf('Removing Polynomial Baseline %.0f of %.0f',0,size(Lateral_Trace_shift_masked,1)),...
-        'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
-    setappdata(wb,'canceling',0);
-    warning ('off','all');    
-    % Init
-    fit_decision_final = nan(size(Lateral_Trace_shift_masked, 2), 4 + limit);
-    Bk_iterative = zeros(size(Lateral_Trace_shift_masked));
-    num_lines = size(Lateral_Trace_shift_masked, 2);
-    % build array abscissas for the fitting
-    x = (1:size(Lateral_Trace_shift_masked,1))';
-    for i = 1:num_lines        
-        % Check for cancellation
-        if getappdata(wb, 'canceling')
-            delete(wb);
-            error('Process cancelled');
-        end        
-        % Extract the current scan line
-        yData = Lateral_Trace_shift_masked(:, i);
-        xData = (1:length(yData))';        
-        % Remove masked values (set to 5)
-        valid_idx = yData < 5;
-        xValid = xData(valid_idx);
-        yValid = yData(valid_idx);
-        % Exclude top 1% which represents the edges
-        threshold = prctile(yValid, 99);   
-        % first round of outliers removal
-        yValid(yValid >= threshold) = NaN;   
-        xValid(yValid >= threshold) = NaN;  
-
-        [pos_outlier] = isoutlier(yValid, 'gesd');
+    
+    % extract data (lateral deflection Trace and Retrace, vertical deflection) and then mask (glass-PDA) elementXelement
+    % ONLY in correspondence with the glass!
+    Lateral_Trace   = (AFM_cropped_Images(strcmpi([AFM_cropped_Images.Channel_name],'Lateral Deflection') & strcmpi([AFM_cropped_Images.Trace_type],'Trace')).AFM_image);
+    %Lateral_ReTrace = (AFM_cropped_Images(strcmpi([AFM_cropped_Images.Channel_name],'Lateral Deflection') & strcmpi([AFM_cropped_Images.Trace_type],'ReTrace')).AFM_image);
+    vertical_Trace  = (AFM_cropped_Images(strcmpi([AFM_cropped_Images.Channel_name],'Vertical Deflection') & strcmpi([AFM_cropped_Images.Trace_type],'Trace')).AFM_image);    
+    % Mask W to cut the PDA from the baseline fitting. Where there is PDA in corrispondece of the mask, then mask the
+    % lateral deflection data. Basically, the goal is fitting using the glass which is know to be flat. 
+    Lateral_Trace_masked_BKonly= Lateral_Trace;
+    Lateral_Trace_masked_BKonly(AFM_height_IO==1)=NaN;
+    % remove outliers line by line (single entire array with all the lines takes too much time) before plane
+    % fitting using the masked AFM data containing only background. Change them with NaN
+    num_lines = size(Lateral_Trace_masked_BKonly, 2);
+    Lateral_Trace_mask_firstClear=zeros(size(Lateral_Trace_masked_BKonly));
+    for i=1:num_lines
+        yData = Lateral_Trace_masked_BKonly(:, i);
+        [pos_outlier] = isoutlier(yData, 'gesd');
         while any(pos_outlier)
-            yValid(pos_outlier) = NaN;
-            [pos_outlier] = isoutlier(yValid, 'gesd');
+            yData(pos_outlier) = NaN;
+            [pos_outlier] = isoutlier(yData, 'gesd');
         end
-        xValid = xValid(~isnan(yValid));
-        yValid = yValid(~isnan(yValid));
-
-        if ismember(i,300:1:320)
-            curveFitter(xValid,yValid)
-        end
-
-        % Handle insufficient data points
-        if length(yValid) < 4
-            Bk_iterative(:, i) = NaN; % Mark for interpolation later
-            continue;
-        end        
-        % Initialize AIC results
-        aic_values = nan(1, limit);
-        models = cell(1, limit);
-        % Test polynomial fits up to the limit
-        for p = 1:limit
-            poly_coeffs = polyfitn(xValid, yValid, p);                
-            models{p} = poly_coeffs;                  
-            % Compute AIC
-            residuals= yValid - polyval(poly_coeffs.Coefficients, xValid);
-            SSE = sum(residuals.^2);
-            n = length(yValid);
-            k = length(poly_coeffs.Coefficients); % Number of parameters
-            aic_values(p) = n * log(SSE / n) + 2 * k;
-        end  
-        % Select best model using AIC
-        [~, bestIdx] = min(aic_values);
-        bestModel = models{bestIdx};            
-        % Save fitting decisions
-        fit_decision_final(i, 1) = bestIdx;
-        fit_decision_final(i, 2) = aic_values(bestIdx);
-        fit_decision_final(i, 3) = sum((yData - polyval(bestModel.Coefficients, xData)).^2); % SSE
-        fit_decision_final(i, 4:4 + bestIdx) = bestModel.Coefficients;            
-        % Generate baseline using the best polynomial fit
-        Bk_iterative(:, i) = polyval(bestModel.Coefficients, x);     
-        % Update progress bar
-        waitbar(i / num_lines, wb, sprintf('Fitting on the line %d...', i));
+        Lateral_Trace_mask_firstClear(:,i) = yData;
     end
-    delete(wb);    
-    % Handle missing lines by interpolating from neighbors, also when more consecutive lines are totally NaN
-    % If that happens, then take the closest non NaN vectors and interpolate
-    nan_lines = find(isnan(Bk_iterative(1, :)));
-    for i = nan_lines
-        left_idx = find(~isnan(Bk_iterative(1, 1:i-1)), 1, 'last');
-        right_idx = find(~isnan(Bk_iterative(1, i+1:end)), 1, 'first') + i;
-        % adiacent interpolation
-        if ~isempty(left_idx) && ~isempty(right_idx)
-            Bk_iterative(:, i) = (Bk_iterative(:, left_idx) + Bk_iterative(:, right_idx)) / 2;
-        elseif ~isempty(left_idx)
-            Bk_iterative(:, i) = Bk_iterative(:, left_idx);
-        elseif ~isempty(right_idx)
-            Bk_iterative(:, i) = Bk_iterative(:, right_idx);
+    % plot. To better visual, change NaN into 0
+    Lateral_Trace_mask_firstClear(isnan(Lateral_Trace_mask_firstClear))=0;
+    titleData1='Raw Lateral Deflection - Trace'; titleData2='Background with removed outliers';
+    nameFig=fullfile(newFolder,'resultA5_1_RawLateralData_BackgroundNoOutliers.tif');
+    showData(secondMonitorMain,SeeMe,1,Lateral_Trace,false,titleData1,'Voltage [V]',nameFig,'data2',Lateral_Trace_mask_firstClear,'titleData2',titleData2,'closeImmediately',false)
+    % rechange to NaN
+    Lateral_Trace_mask_firstClear(Lateral_Trace_mask_firstClear==0)=NaN;
+    % plane fitting
+    [xGrid, yGrid] = meshgrid(1:size(Lateral_Trace_mask_firstClear,2), 1:size(Lateral_Trace_mask_firstClear,1));
+    % Estrarre solo i punti di background without outliers
+    [xData, yData, zData] = prepareSurfaceData(xGrid,yGrid,Lateral_Trace_mask_firstClear);    
+    % init and prepare the setting for the fitting
+    models = cell(limit+1, limit+1);
+    opts = fitoptions('Method', 'LinearLeastSquares');
+    opts.Robust = 'LAR';
+    fit_decision = zeros(limit+1,limit+1,3);
+    fit_decision_final_plane = struct();
+    wb=waitbar(1/(limit*limit),sprintf('Removing Plane Polynomial Baseline orderX: %d orderY: %d',0,0),...
+            'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
+    setappdata(wb,'canceling',0);
+    % Test polynomial fits up to the limit
+    i=1;
+    for px = 0:limit
+        for py = 0:limit
+            waitbar(i/(limit+1)/(limit+1), wb, sprintf('Removing Plane Polynomial Baseline orderX: %d orderY: %d',px,py));    
+            % Check for cancellation
+            if getappdata(wb, 'canceling')
+                delete(wb);
+                error('Process cancelled');
+            end 
+            if (px == 0 && py == 0) || px>=6 || py>=6
+                continue; % Avoid constant fit
+            end
+            % Define polynomial fit type for 2D surface
+            fitTypeM=sprintf('poly%d%d', px, py);
+            ft = fittype(fitTypeM);
+            [fitresult, gof] = fit( [xData, yData], zData, ft, opts );
+            if gof.adjrsquare < 0
+                gof.adjrsquare = 0.001;
+            end     
+            % Compute SSE and AIC
+            residuals = zData - feval(fitresult,xData,yData);
+            SSE = sum(residuals.^2);
+            n = length(yData);
+            k = numel(coeffnames(fitresult)); % Number of parameters; % Number of parameters (polynomial degree + 1)
+            aic_values = n * log(SSE / n) + 2 * k;           
+            % Store model and statistics
+            models{px+1,py+1} = fitresult;
+            fit_decision(px + 1, py + 1,1) = aic_values;
+            fit_decision(px + 1, py + 1,2) = gof.sse;
+            fit_decision(px + 1, py + 1,3) = gof.adjrsquare;
+            i=i+1;                   
         end
-    end    
-    % Remove background
-    Lateral_Trace_shift_noBK = Lateral_Trace_clean_shift - Bk_iterative;
-    % Plot the fitted backround:
-    titleData1='Fitted Background'; titleData2='Fitted Lateral Deflection channel [V] - Trace';
-    nameFig=fullfile(newFolder,'resultA5_2_ResultsFittingOnLateralDeflections.tif');
-    showData(secondMonitorMain,SeeMe,2,Bk_iterative,true,titleData1,'',nameFig,'data2',Lateral_Trace_shift_noBK,'titleData2',titleData2)
+    end
+    
+    % Select best model using AIC
+    [~, bestIdx] = min(fit_decision(:,:,1),[],'all');
+    [bestPx, bestPy] = ind2sub(size(fit_decision(:,:,1)), bestIdx);
+    bestModel = models{bestPx, bestPy};
+    % Save fitting decisions
+    fitTypeM=sprintf('poly%d%d', bestPx-1, bestPy-1);
+    fit_decision_final_plane.fitOrder = fitTypeM;
+    fit_decision_final_plane.SSE = fit_decision(bestPx, bestPy,2); % SSE
+    fit_decision_final_plane.R2 = fit_decision(bestPx, bestPy,3); % Adjusted R^2
+    correction_plane = feval(bestModel, xGrid,yGrid);
+    clear i n opts SSE k aic_values fit_decision fitresult fitTypeM ft gof models pos_outlier px py residuals varargin xGrid yGrid xData yData zData titleData* nameFig
+    % Correggere la scansione
+    Lateral_Trace=Lateral_Trace-min(Lateral_Trace(:));
+    Lateral_Trace_corrPlane = Lateral_Trace - correction_plane;
+    Lateral_Trace_corrPlane = Lateral_Trace_corrPlane-min(Lateral_Trace_corrPlane(:));
+    % plot
+    titleData1='Plane Fitted Background';
+    titleData2={'Lateral Deflection - Trace'; '(removed fitted plane and shifted)'};
+    nameFig=fullfile(newFolder,'resultA5_2_planeBKfit_LateralDeflection.tif');
+    showData(secondMonitorMain,SeeMe,1,correction_plane,false,titleData1,'Voltage [V]',nameFig,'data2',Lateral_Trace_corrPlane,'titleData2',titleData2,'closeImmediately',false)    
+    if getValidAnswer('Keep the Lateral Deflection with the plane-fitted background removed?','',{'Yes','No'})
+        Lateral_Trace_first = Lateral_Trace_corrPlane;
+        text='(Plane fitted BK removed)';
+    else
+        Lateral_Trace_first = Lateral_Trace;
+        text='(Plane fitted BK not removed)';
+    end
+    % fit lineXline
+    while true
+        
+        % apply the PDA mask, so the PDA data  will be ignored. Use now the background        
+        Lateral_Trace_masked_BKonly = Lateral_Trace_first;
+        Lateral_Trace_masked_BKonly(AFM_height_IO==1)=5;          
+        % Init
+        f1='fitOrder';f2='SSE';f3='R2';f4='coeffs';
+        f4_valCoeffs=nan(size(Lateral_Trace_masked_BKonly, 2),limit+1);
+        fit_decision_final_line = struct(f1,[],f2,[],f3,[],f4,f4_valCoeffs);                  
+        Bk_iterative = zeros(size(Lateral_Trace_masked_BKonly));
+        num_lines = size(Lateral_Trace_masked_BKonly, 2);
+        % build array abscissas for the fitting
+        x = (1:size(Lateral_Trace_masked_BKonly,1))';
+        flagLineMissingDataBorder=zeros(1,num_lines);
+        for i = 1:num_lines      
+            % Check for cancellation
+            if getappdata(wb, 'canceling')
+                delete(wb);
+                error('Process cancelled');
+            end
+            % Update progress bar
+            waitbar(i / num_lines, wb, sprintf('Fitting on the line %d...', i));
+            % Extract the current scan line
+            yData = Lateral_Trace_masked_BKonly(:, i);
+            xData = (1:length(yData))';        
+            % Remove masked values (set to 5)
+            xValid = xData(yData ~= 5);
+            yValid = yData(yData ~= 5);
+            % Remove outliers
+            [pos_outlier] = isoutlier(yValid, 'gesd');
+            while any(pos_outlier)
+                yValid(pos_outlier) = NaN;
+                [pos_outlier] = isoutlier(yValid, 'gesd');
+            end
+            xValid = xValid(~isnan(yValid));
+            yValid = yValid(~isnan(yValid));           
+            % Handle insufficient data points
+            if length(yValid) < 4
+                Bk_iterative(:, i) = NaN; % Mark for interpolation later
+                continue;
+            end
+            % Initialize AIC results
+            models = cell(1, limit);
+            % prepare the setting for the fitting
+            opts = fitoptions('Method', 'LinearLeastSquares');
+            opts.Robust = 'LAR';
+            fit_decision = zeros(3, limit);
+            % Test polynomial fits up to the limit
+            aic_values=zeros(1,limit);
+            for z = 1:limit
+                % Define polynomial fit type
+                ft = fittype(sprintf('poly%d', z));                
+                % Fit model using LAR and exclude data where yData >= 5
+                [fitresult, gof] = fit(xValid, yValid, ft, opts);                
+                if gof.adjrsquare < 0
+                    gof.adjrsquare = 0.001;
+                end                
+                % Compute SSE and AIC
+                residuals = yData - feval(fitresult, xData);
+                SSE = sum(residuals.^2);
+                n = length(yData);
+                k = z + 1; % Number of parameters (polynomial degree + 1)
+                aic_values(z) = n * log(SSE / n) + 2 * k;                
+                % Store model and statistics
+                models{z} = fitresult;
+                fit_decision(1, z) = z;
+                fit_decision(2, z) = SSE;     % AIC
+                fit_decision(3, z) = gof.adjrsquare; % Adjusted R^2
+            end  
+            % extract the best fit results depending on the model
+            [fittedline,bestFitOrder,fit_decision_final_tmp]=bestFit(x,aic_values,models,fit_decision);
+            % if a big portion is missing at the border, there is the risk of wrong fittin. Further check!
+            % if the last 200 elements
+            if xValid(1) > length(yData)*5/100 || (length(yData)-xValid(end)) > length(yData)*5/100
+                % last border
+                startX_endBorder=xValid(end-round(length(yData)*5/100));
+                % start border
+                endX_startBorder=xValid(round(length(yData)*5/100));
+                if mean(fittedline(end-round(length(yData)*10/100):end)) > mean(yValid(xValid>=startX_endBorder))*1.5 || ... 
+                        mean(fittedline(1:round(length(yData)*10/100))) > mean(yValid(xValid<=endX_startBorder))*1.5 
+                    % put a flag in case of missing data in the border which creates the risk of wrong fitting
+                    flagLineMissingDataBorder(i)=1;
+                    % plot the fitted line and the experimental values
+                    iteration=1;
+                    ftmp=figure; plot(xValid,yValid,'*','DisplayName','Experimental Background','Color',globalColor(1))
+                    hold on
+                    % plot at least two previous experimental data background to understand how they
+                    % distributed along the fast scan line
+                    idxPrev=find(flagLineMissingDataBorder(1:i)==0,2,"last");
+                    yDataPrevLine = Lateral_Trace_masked_BKonly(:, idxPrev);
+                    xDataPrevLine = (1:size(yDataPrevLine,1))';
+                    xDataPrevLine = [xDataPrevLine xDataPrevLine];
+                    % Remove masked values (set to 5)
+                    for j=1:2
+                        xValidtmp = xDataPrevLine(yDataPrevLine(:,j) ~= 5,j);
+                        yValidtmp = yDataPrevLine(yDataPrevLine(:,j) ~= 5,j);
+                        % Remove outliers
+                        [pos_outlier] = isoutlier(yValidtmp, 'gesd');
+                        while any(pos_outlier)
+                            yValidtmp(pos_outlier) = NaN;
+                            [pos_outlier] = isoutlier(yValidtmp, 'gesd');
+                        end
+                        xValidtmp = xValidtmp(~isnan(yValidtmp));
+                        yValidtmp = yValidtmp(~isnan(yValidtmp));    
+                        plot(xValidtmp,yValidtmp,'*','DisplayName',sprintf('ExpBK line %d',idxPrev(j)),'Color',globalColor(j+1))
+                        plot(Bk_iterative(:,idxPrev(j)),'Color',globalColor(j+1),'DisplayName',sprintf('FittedBK line %d',idxPrev(j)))
+                    end
+                    plot(fittedline,'DisplayName',sprintf('Best Fitted curve - fitOrder: %d - %d° iteration',bestFitOrder,iteration))                    
+                    objInSecondMonitor(secondMonitorMain,ftmp)
+                    legend('FontSize',18), xlim padded, ylim padded, title(sprintf('Line %d',i),'FontSize',14)
+                    question=sprintf(['The avg of one of the borders (%d elements over %d) of the first fitted %d-line is higher then the avg of true exp BK borders' ...
+                        '(%d elements)\nChoose the best option to manage the current line.'],round(length(yData)*10/100),length(yData),i,round(length(yData)*5/100));
+                    idxs=1:limit; flagContinue=true; 
+                    while flagContinue
+                        options={sprintf('Exclude the best fitOrder (Current fitOrder: %d) and re-process the line',bestFitOrder),'Transform the entire line into NaN vector which interpolation will be followed at the end.','None and continue to the next line.'};
+                        % dont remove stop here to zoom the figure
+                        operations=getValidAnswer(question,'',options);
+                        switch operations
+                            case 3                                
+                                break
+                            case 1
+                                if isscalar(idxs)            
+                                    idxstext = arrayfun(@(x) sprintf('fitOrder: %d', x), 1:limit, 'UniformOutput', false);
+                                    idxs=getValidAnswer('Operation not allowed: all the fitOrder already excluded. Choose the final fitOrder.','',idxstext);
+                                    flagContinue=false;
+                                else
+                                    idxs= idxs(idxs~=bestFitOrder);
+                                end                           
+                            case 2
+                                fittedline = NaN; % Mark for interpolation later
+                                break
+                        end
+                        [fittedline,bestFitOrder,fit_decision_final_tmp]=bestFit(x,aic_values(idxs),models(idxs),fit_decision(:,idxs));
+                        if flagContinue
+                            iteration=iteration+1;
+                            plot(fittedline,'DisplayName',sprintf('Best Fitted curve - fitOrder: %d - %d° iteration',bestFitOrder,iteration),'Color',globalColor(3+iteration))
+                        end
+                    end
+                    close gcf
+                end
+            end 
+            fit_decision_final_line(i)=fit_decision_final_tmp;
+            Bk_iterative(:, i) = fittedline;
+        end        
 
+        % [xGrid, yGrid] = meshgrid(1:size(Bk_iterative,2), 1:size(Bk_iterative,1));
+        % % Estrarre solo i punti di background without outliers
+        % [xData, yData, zData] = prepareSurfaceData(xGrid,yGrid,Bk_iterative);    
+        % curveFitter(xData,yData,zData)
+
+        delete(wb);    
+        % Handle missing lines by interpolating from neighbors, also when more consecutive lines are totally NaN
+        % If that happens, then take the closest non NaN vectors and interpolate
+        nan_lines = find(isnan(Bk_iterative(1, :)));
+        for i = nan_lines
+            left_idx = find(~isnan(Bk_iterative(1, 1:i-1)), 1, 'last');
+            right_idx = find(~isnan(Bk_iterative(1, i+1:end)), 1, 'first') + i;
+            % adiacent interpolation
+            if ~isempty(left_idx) && ~isempty(right_idx)
+                Bk_iterative(:, i) = (Bk_iterative(:, left_idx) + Bk_iterative(:, right_idx)) / 2;
+            elseif ~isempty(left_idx)
+                Bk_iterative(:, i) = Bk_iterative(:, left_idx);
+            elseif ~isempty(right_idx)
+                Bk_iterative(:, i) = Bk_iterative(:, right_idx);
+            end
+        end    
+        % Remove background
+        Lateral_Trace_shift_noBK = Lateral_Trace_first - Bk_iterative;
+        % Plot the fitted backround:
+        titleData1='Line x Line Fitted Background'; titleData2={'Lateral Deflection - Trace';text};
+        nameFig=fullfile(newFolder,'resultA5_3_LineBKfit_LateralDeflection.tif');
+        showData(secondMonitorMain,SeeMe,2,Bk_iterative,true,titleData1,'',nameFig,'data2',Lateral_Trace_shift_noBK,'titleData2',titleData2,'closeImmediately',false)
+        if getValidAnswer('Satisfied of the fitting?','',{'y','n'})
+            break
+        end
+    end
     % choose friction coefficients depending on the case (experimental results done in another moment),
     % or manually put the value
     question=sprintf('Which background friction coefficient use?');
@@ -197,10 +359,44 @@ function AFM_Elab=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO
     Corrected_LD_Trace= Lateral_Trace_Force + Baseline_Friction_Force;
     
     % plot the definitive corrected lateral force
-    titleData='Fitted and corrected Lateral Force [N]';
-    nameFig=fullfile(newFolder,'resultA5_3_ResultsDefinitiveLateralDeflectionsNewton.tif');
-    showData(secondMonitorMain,1,3,Corrected_LD_Trace,true,titleData,'',nameFig,'closeImmediately',false)
+    titleData='Fitted and corrected Lateral Force';
+    nameFig=fullfile(newFolder,'resultA5_4_ResultsDefinitiveLateralDeflectionsNewton_normalized.tif');
+    showData(secondMonitorMain,SeeMe,3,Corrected_LD_Trace,true,titleData,'',nameFig,'closeImmediately',false)
+    titleData='Fitted and corrected Lateral Force';
+    nameFig=fullfile(newFolder,'resultA5_5ResultsDefinitiveLateralDeflectionsNewton.tif');
+    labelFig='Force [nN]';
+    showData(secondMonitorMain,false,3,Corrected_LD_Trace*1e9,false,titleData,labelFig,nameFig)
+
     % save the corrected lateral force into cropped AFM image
     AFM_Elab=AFM_cropped_Images;    
     AFM_Elab(strcmpi([AFM_cropped_Images.Channel_name],'Lateral Deflection') & strcmpi([AFM_cropped_Images.Trace_type],'Trace')).AFM_image=Corrected_LD_Trace;
+
+    varargout{1}=AFM_Elab;
+    varargout{2}=fit_decision_final_line;
+    varargout{3}=fit_decision_final_plane;
+end
+
+
+function [fittedline,bestFitOrder,fit_decision_final_line_tmp]=bestFit(x,aic_values,models,fit_decision) %#ok<INUSD>
+        % Select best model using AIC
+        [~, bestIdx] = min(aic_values);
+        bestModel = models{bestIdx};
+        % Save fitting decisions
+        fit_decision_final_line_tmp=struct();
+        bestFitOrder=fit_decision(1, bestIdx);
+        fit_decision_final_line_tmp.fitOrder = bestFitOrder; % order
+        fit_decision_final_line_tmp.SSE = fit_decision(2, bestIdx); % SEE
+        fit_decision_final_line_tmp.R2 = fit_decision(3, bestIdx); % R^2
+        % Store polynomial coefficients
+        commPart = '';
+        j = 1;
+        % Extract coefficient vector
+        coeff_values = coeffvalues(bestModel);
+        for n = bestFitOrder:-1:0
+            commPart = sprintf('%s + %s', commPart, sprintf('bestModel.p%d*(x).^%d', j, n));
+            fit_decision_final_line_tmp.coeffs(1:length(coeff_values))= coeff_values;
+            j = j + 1;
+        end
+        % Compute fitted values for the baseline
+        fittedline=eval(commPart);
 end
