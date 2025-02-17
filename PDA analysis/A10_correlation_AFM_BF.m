@@ -1,10 +1,14 @@
 
 % OUTPUT:
-%       1: Height VS Lateral Deflection           -- 2: Height VS Lateral Deflection (up to max vertical deflection)
-%       3: Height VS FLUORESCENCE         
-%       4: Lateral Deflection VS FLUORESCENCE     -- 5: Lateral Deflection VS FLUORESCENCE (up to max vertical deflection)
-%       6: Vertical Deflection VS FLUORESCENCE    -- 7: Vertical Deflection VS Lateral Deflection
-%       8: delta fluorescence data (in correspondence of AFM data)
+%   dataResultsPlot = struct which contains the results of:
+%       1: delta fluorescence data (in correspondence of AFM data)
+%       2: Height VS Lateral Deflection           
+%       3: Height VS Lateral Deflection (up to max vertical deflection)
+%       4: Height VS FLUORESCENCE         
+%       5: Lateral Deflection VS FLUORESCENCE
+%       6: Lateral Deflection VS FLUORESCENCE (up to max vertical deflection)
+%       7: Vertical Deflection VS FLUORESCENCE
+%       8: Vertical Deflection VS Lateral Deflection
 
 % the following script process data from different situation:
 %       1) normal experiment:   AFM + pre and post scan fluorescence image  + BF image
@@ -12,7 +16,7 @@
 %               NOTE: it doesn't matter if before or after scanning
 %       3) process only AFM data
 
-function varargout=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints,secondMonitorMain,newFolder,varargin)
+function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints,secondMonitorMain,newFolder,varargin)
     
     p=inputParser();
     addRequired(p,'AFM_data');
@@ -37,7 +41,8 @@ function varargout=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints,secon
     else
         expTime='';
     end
-
+    % init var where store results
+    dataResultsPlot=struct();
     numBins=100; %default
     flag_onlyAFM=false;
     % prepare the fluorescence data X normal experiment and calc Delta fluorescence
@@ -80,13 +85,13 @@ function varargout=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints,secon
         Delta_glass(AFM_IO_Padded==1)=nan;                          
         Delta_glass(Delta<=0)=nan;
         % remove the data outside the AFM data which is only zero
-        Delta_glass(AFM_data(idx_LD).AFM_Padded==0)=nan;            
+        Delta_glass(AFM_data(idx_LD).AFM_padded==0)=nan;            
         % Intensity minimum in the glass region to be subtracted:
         Min_Delta_glass=min(min(Delta_glass,[],"omitnan"));
         % fix the fluorescence using the minimum value
         Delta_ADJ=Delta-Min_Delta_glass;
         % remove the data outside the AFM data which is only zero
-        Delta_ADJ(AFM_data(idx_LD).AFM_Padded==0)=nan;
+        Delta_ADJ(AFM_data(idx_LD).AFM_padded==0)=nan;
         % exclude data of background prepared few lines before
         Delta_ADJ(Delta_ADJ<0 | ~isnan(Delta_glass))=nan;
         % save the delta in correspondence of crystal and background
@@ -94,7 +99,7 @@ function varargout=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints,secon
             plotSave2(SeeMe,Delta_glass,Delta_ADJ,'Tritic glass','Tritic whole','Fluorescence emission','resultA10_1_FluorescenceGlassPDA.tif',secondMonitorMain,newFolder)
         end
     end
-
+    dataResultsPlot.Delta_ADJ=Delta_ADJ;
     if innerBord 
         % Identification of borders from the binarised Height image
         AFM_IO_Padded_Borders=AFM_IO_Padded;
@@ -106,12 +111,12 @@ function varargout=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints,secon
         plotSave1(SeeMe,AFM_IO_Borders_Grow,'Borders','resultA10_2_Borders.tif',secondMonitorMain,newFolder)
 
         % Elaboration of Height to extract inner and border regions
-        AFM_Height_Border=AFM_data(idx_H).AFM_Padded;
+        AFM_Height_Border=AFM_data(idx_H).AFM_padded;
         AFM_Height_Border(AFM_IO_Padded==0)=nan;
         AFM_Height_Border(AFM_IO_Borders_Grow==0)=nan; 
         AFM_Height_Border(AFM_Height_Border<=0)=nan;
         
-        AFM_Height_Inner=AFM_data(idx_H).AFM_Padded;
+        AFM_Height_Inner=AFM_data(idx_H).AFM_padded;
         AFM_Height_Inner(AFM_IO_Padded==0)=nan; 
         AFM_Height_Inner(AFM_IO_Borders_Grow==1)=nan;
         AFM_Height_Inner(AFM_Height_Inner<=0)=nan;
@@ -119,12 +124,12 @@ function varargout=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints,secon
         plotSave2(SeeMe,AFM_Height_Border*1e6,AFM_Height_Inner*1e6,'AFM Height Border','AFM Height Inner',sprintf('height (\x03bcm)'),'resultA10_3_BorderAndInner_AFM_Height.tif',secondMonitorMain,newFolder)
     
         % Elaboration of LD to extract inner and border regions
-        AFM_LD_Border=AFM_data(idx_LD).AFM_Padded;
+        AFM_LD_Border=AFM_data(idx_LD).AFM_padded;
         AFM_LD_Border(AFM_IO_Padded==0)=nan; 
         AFM_LD_Border(AFM_IO_Borders_Grow==0)=nan;
         AFM_LD_Border(AFM_LD_Border<=0)=nan;
     
-        AFM_LD_Inner=AFM_data(idx_LD).AFM_Padded;
+        AFM_LD_Inner=AFM_data(idx_LD).AFM_padded;
         AFM_LD_Inner(AFM_IO_Padded==0)=nan;
         AFM_LD_Inner(AFM_IO_Borders_Grow==1)=nan;
         AFM_LD_Inner(AFM_LD_Inner<=0)=nan; 
@@ -132,12 +137,12 @@ function varargout=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints,secon
         plotSave2(SeeMe,AFM_LD_Border*1e9,AFM_LD_Inner*1e9,'AFM LD Border','AFM LD Inner','Force [nN]','resultA10_4_BorderAndInner_AFM_LateralDeflection.tif',secondMonitorMain,newFolder)
     
         % Elaboration of VD to extract inner and border regions
-        AFM_VD_Border=AFM_data(idx_VD).AFM_Padded;
+        AFM_VD_Border=AFM_data(idx_VD).AFM_padded;
         AFM_VD_Border(AFM_IO_Padded==0)=nan; 
         AFM_VD_Border(AFM_IO_Borders_Grow==0)=nan;  
         AFM_VD_Border(AFM_VD_Border<=0)=nan;
         
-        AFM_VD_Inner=AFM_data(idx_VD).AFM_Padded;
+        AFM_VD_Inner=AFM_data(idx_VD).AFM_padded;
         AFM_VD_Inner(AFM_IO_Padded==0)=nan; 
         AFM_VD_Inner(AFM_IO_Borders_Grow==1)=nan;  
         AFM_VD_Inner(AFM_VD_Inner<=0)=nan;
@@ -154,90 +159,73 @@ function varargout=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints,secon
         close all 
    end
     
-    % Like what done to Delta_ADJ Remove glass regions from the big AFM_Padded Height and LD and VD AFM images
+    % Like what done to Delta_ADJ Remove glass regions from the big AFM_padded Height and LD and VD AFM images
     % take glass regions
-    AFM_data(idx_H).Padded_masked_glass=AFM_data(idx_H).AFM_Padded;
+    AFM_data(idx_H).Padded_masked_glass=AFM_data(idx_H).AFM_padded;
     AFM_data(idx_H).Padded_masked_glass(AFM_IO_Padded==1)=nan;
-    AFM_data(idx_H).Padded_masked_glass(AFM_data(idx_H).AFM_Padded<=0)=nan;
+    AFM_data(idx_H).Padded_masked_glass(AFM_data(idx_H).AFM_padded<=0)=nan;
     % only PDA regions
-    AFM_data(idx_H).Padded_masked=AFM_data(idx_H).AFM_Padded;
+    AFM_data(idx_H).Padded_masked=AFM_data(idx_H).AFM_padded;
     AFM_data(idx_H).Padded_masked(~isnan(AFM_data(idx_H).Padded_masked_glass))=nan;
-    AFM_data(idx_H).Padded_masked(AFM_data(idx_H).AFM_Padded<=0)=nan;
+    AFM_data(idx_H).Padded_masked(AFM_data(idx_H).AFM_padded<=0)=nan;
     % take glass regions
-    AFM_data(idx_VD).Padded_masked_glass=AFM_data(idx_VD).AFM_Padded;
+    AFM_data(idx_VD).Padded_masked_glass=AFM_data(idx_VD).AFM_padded;
     AFM_data(idx_VD).Padded_masked_glass(AFM_IO_Padded==1)=nan;
-    AFM_data(idx_VD).Padded_masked_glass(AFM_data(idx_VD).AFM_Padded<=0)=nan; 
+    AFM_data(idx_VD).Padded_masked_glass(AFM_data(idx_VD).AFM_padded<=0)=nan; 
     % only PDA regions
-    AFM_data(idx_VD).Padded_masked=AFM_data(idx_VD).AFM_Padded;
+    AFM_data(idx_VD).Padded_masked=AFM_data(idx_VD).AFM_padded;
     AFM_data(idx_VD).Padded_masked(~isnan(AFM_data(idx_VD).Padded_masked_glass))=nan;
-    AFM_data(idx_VD).Padded_masked(AFM_data(idx_VD).AFM_Padded<=0)=nan;    
+    AFM_data(idx_VD).Padded_masked(AFM_data(idx_VD).AFM_padded<=0)=nan;    
     % take glass regions
-    AFM_data(idx_LD).Padded_masked_glass=AFM_data(idx_LD).AFM_Padded;
+    AFM_data(idx_LD).Padded_masked_glass=AFM_data(idx_LD).AFM_padded;
     AFM_data(idx_LD).Padded_masked_glass(AFM_IO_Padded==1)=nan;
-    AFM_data(idx_LD).Padded_masked_glass(AFM_data(idx_LD).AFM_Padded<=0)=nan; 
+    AFM_data(idx_LD).Padded_masked_glass(AFM_data(idx_LD).AFM_padded<=0)=nan; 
     % only PDA regions
-    AFM_data(idx_LD).Padded_masked=AFM_data(idx_LD).AFM_Padded;
+    AFM_data(idx_LD).Padded_masked=AFM_data(idx_LD).AFM_padded;
     AFM_data(idx_LD).Padded_masked(~isnan(AFM_data(idx_LD).Padded_masked_glass))=nan; % opposite of masked_glass
-    AFM_data(idx_LD).Padded_masked(AFM_data(idx_LD).AFM_Padded<=0)=nan;
+    AFM_data(idx_LD).Padded_masked(AFM_data(idx_LD).AFM_padded<=0)=nan;
     % find the maximum vertical force to extract only meaningful lateral force: remember, lateral force cannot
     % be higher than vertical force. Those higher values are due to unstable tip scannings
     maxVD=max(max(AFM_data(idx_VD).Padded_masked));
     %extract meaningful lateral force
-    AFM_data(idx_LD).Padded_masked_maxVD=AFM_data(idx_LD).AFM_Padded;
+    AFM_data(idx_LD).Padded_masked_maxVD=AFM_data(idx_LD).AFM_padded;
     AFM_data(idx_LD).Padded_masked_maxVD(~isnan(AFM_data(idx_LD).Padded_masked_glass))=nan; % opposite of masked_glass
-    AFM_data(idx_LD).Padded_masked_maxVD(AFM_data(idx_LD).AFM_Padded<=0)=nan;
-    AFM_data(idx_LD).Padded_masked_maxVD(AFM_data(idx_LD).AFM_Padded>maxVD)=nan;
-    
-    varargout{1}=[];
-    varargout{2}=[];
-    varargout{3}=[];
-    varargout{4}=[];
-    varargout{5}=[];
-    varargout{6}=[];
-        
+    AFM_data(idx_LD).Padded_masked_maxVD(AFM_data(idx_LD).AFM_padded<=0)=nan;
+    AFM_data(idx_LD).Padded_masked_maxVD(AFM_data(idx_LD).AFM_padded>maxVD)=nan;
+
     if ~flag_heat
         % 7 - HEIGHT VS LATERAL FORCE
         % all lateral force
-        dataPlot_Height_LD=A10_feature_CDiB(AFM_data(idx_H).Padded_masked(:),AFM_data(idx_LD).AFM_Padded(:),secondMonitorMain,newFolder,'NumberOfBins',numBins,'xpar',1e9,'ypar',1e9,'YAyL','Lateral Force (nN)','XAxL',sprintf('Feature height (nm)'),'FigTitle','Height VS Lateral Deflection','NumFig',1);
+        dataResultsPlot.Height_LD=A10_feature_CDiB(AFM_data(idx_H).Padded_masked(:),AFM_data(idx_LD).AFM_padded(:),secondMonitorMain,newFolder,'NumberOfBins',numBins,'xpar',1e9,'ypar',1e9,'YAyL','Lateral Force (nN)','XAxL',sprintf('Feature height (nm)'),'FigTitle','Height VS Lateral Deflection','NumFig',1);
         %[BC_H_Vs_LD_Border]=A10_feature_CDiB(AFM_Height_Border(:),AFM_LD_Border(:),secondMonitorMain,newFolder,'xpar',1e9,'ypar',1e9,'YAyL','Lateral Force (nN)','XAxL','Feature height (nm)','FigTitle','LD Vs Height Border','NumFig',1);
         %[BC_H_Vs_LD_Inner]=A10_feature_CDiB(AFM_Height_Inner(:),AFM_LD_Inner(:),secondMonitorMain,newFolder,'xpar',1e9,'ypar',1e9,'YAyL','Lateral Force (nN)','XAxL','Feature height (nm)','FigTitle','LD Vs Height Inner','NumFig',1);
-        varargout{1}=dataPlot_Height_LD;
         % lateral force up to max vertical force
-        dataPlot_Height_LD_maxVD=A10_feature_CDiB(AFM_data(idx_H).Padded_masked(:),AFM_data(idx_LD).Padded_masked_maxVD(:),secondMonitorMain,newFolder,'NumberOfBins',numBins,'xpar',1e9,'ypar',1e9,'YAyL','Lateral Force (nN)','XAxL',sprintf('Feature height (nm)'),'FigTitle','Height VS Lateral Deflection (up to max vertical force)','NumFig',2);
-        varargout{2}=dataPlot_Height_LD_maxVD;
+        dataResultsPlot.Height_LD_maxVD=A10_feature_CDiB(AFM_data(idx_H).Padded_masked(:),AFM_data(idx_LD).Padded_masked_maxVD(:),secondMonitorMain,newFolder,'NumberOfBins',numBins,'xpar',1e9,'ypar',1e9,'YAyL','Lateral Force (nN)','XAxL',sprintf('Feature height (nm)'),'FigTitle','Height VS Lateral Deflection (up to max vertical force)','NumFig',2);
     end
 
     if ~flag_onlyAFM
         % 8 - HEIGHT VS FLUORESCENCE INCREASE
-        dataPlot_Height_FLUO=A10_feature_CDiB(AFM_data(idx_H).Padded_masked(:),Delta_ADJ(:),secondMonitorMain,newFolder,'NumberOfBins',numBins,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL',sprintf('Feature height (nm)'),'FigTitle',sprintf('Height Vs Fluorescence increase%s',expTime),'NumFig',3);
+        dataResultsPlot.Height_FLUO=A10_feature_CDiB(AFM_data(idx_H).Padded_masked(:),Delta_ADJ(:),secondMonitorMain,newFolder,'NumberOfBins',numBins,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL',sprintf('Feature height (nm)'),'FigTitle',sprintf('Height Vs Fluorescence increase%s',expTime),'NumFig',3);
         %[BC_Height_Border_Vs_Delta2ADJ_Border]=A10_feature_CDiB(AFM_Height_Border(:),TRITIC_Border_Delta(:),secondMonitorMain,newFolder,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Feature height (nm)','FigTitle','Height Vs Fluorescence increase (borders)','NumFig',2);
-        %[BC_Height_Inner_Vs_Delta2ADJ_Inner]=A10_feature_CDiB(AFM_Height_Inner(:),TRITIC_Inner_Delta(:),secondMonitorMain,newFolder,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Feature height (nm)','FigTitle','Height Vs Fluorescence increase (inner regions)','NumFig',2);
-        varargout{3}=dataPlot_Height_FLUO;
-        
+        %[BC_Height_Inner_Vs_Delta2ADJ_Inner]=A10_feature_CDiB(AFM_Height_Inner(:),TRITIC_Inner_Delta(:),secondMonitorMain,newFolder,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Feature height (nm)','FigTitle','Height Vs Fluorescence increase (inner regions)','NumFig',2);       
         if ~flag_heat
             % 9 - LATERAL DEFLECTION (glass removed) VS FLUORESCENCE INCREASE
             % all lateral force
-            dataPlot_LD_FLUO_padMask=A10_feature_CDiB(AFM_data(idx_LD).Padded_masked(:),Delta_ADJ(:),secondMonitorMain,newFolder,'NumberOfBins',2500,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Lateral Force (nN)','FigTitle','LD (only PDA) Vs Fluorescence increase','NumFig',4);
-            varargout{4}=dataPlot_LD_FLUO_padMask;
+            dataResultsPlot.LD_FLUO_padMask=A10_feature_CDiB(AFM_data(idx_LD).Padded_masked(:),Delta_ADJ(:),secondMonitorMain,newFolder,'NumberOfBins',2500,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Lateral Force (nN)','FigTitle','LD (only PDA) Vs Fluorescence increase','NumFig',4);
             % lateral force up to max vertical force
-            dataPlot_LD_FLUO_padMask_maxVD=A10_feature_CDiB(AFM_data(idx_LD).Padded_masked_maxVD(:),Delta_ADJ(:),secondMonitorMain,newFolder,'NumberOfBins',500,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Lateral Force (nN)','FigTitle','LD (only PDA and up to the max vertical force) Vs Fluorescence increase','NumFig',5);
-            varargout{5}=dataPlot_LD_FLUO_padMask_maxVD;
-           
+            dataResultsPlot.LD_FLUO_padMask_maxVD=A10_feature_CDiB(AFM_data(idx_LD).Padded_masked_maxVD(:),Delta_ADJ(:),secondMonitorMain,newFolder,'NumberOfBins',500,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Lateral Force (nN)','FigTitle','LD (only PDA and up to the max vertical force) Vs Fluorescence increase','NumFig',5);           
             % VERTICAL FORCE VS FLUORESCENCE INCREASE
-            dataPlot_VD_FLUO=A10_feature_CDiB(AFM_data(idx_VD).Padded_masked(:),Delta_ADJ(:),secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','(Measured) Vertical Force (nN)','FigTitle','VD Vs Fluorescence increase','NumFig',6); 
+            dataResultsPlot.VD_FLUO=A10_feature_CDiB(AFM_data(idx_VD).Padded_masked(:),Delta_ADJ(:),secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','(Measured) Vertical Force (nN)','FigTitle','VD Vs Fluorescence increase','NumFig',6); 
             %[BC_VD_Vs_Delta2ADJ_Border]=A10_feature_CDiB(AFM_VD_Border(:),TRITIC_Border_Delta(:),secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Vertical Force (nN)','FigTitle','VD Vs Fluorescence increase (borders)','NumFig',5);
             %[BC_VD_Vs_Delta2ADJ_Inner]=A10_feature_CDiB(AFM_VD_Inner(:),TRITIC_Inner_Delta(:),secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'ypar',1,'YAyL','Absolute fluorescence increase (A.U.)','XAxL','Vertical Force (nN)','FigTitle','VD Vs Fluorescence increase (inner regions)','NumFig',5);
-            varargout{6}=dataPlot_VD_FLUO;
         end
     end
     if ~flag_heat
         % VERTICAL FORCE VS LATERAL FORCE
-        dataPlot_VD_LD=A10_feature_CDiB(AFM_data(idx_VD).Padded_masked(:),AFM_data(idx_LD).Padded_masked(:),secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'ypar',1e9,'YAyL','Lateral Force (nN)','XAxL','(Measured) Vertical Force (nN)','FigTitle','LD Vs VD','NumFig',7);
+        dataResultsPlot.VD_LD=A10_feature_CDiB(AFM_data(idx_VD).Padded_masked(:),AFM_data(idx_LD).Padded_masked(:),secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'ypar',1e9,'YAyL','Lateral Force (nN)','XAxL','(Measured) Vertical Force (nN)','FigTitle','LD Vs VD','NumFig',7);
         %[BC_VD_Vs_LD_Border]=A10_feature_CDiB(AFM_VD_Border(:),AFM_LD_Border(:),secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'ypar',1e9,'YAyL','Lateral Force (nN)','XAxL','Vertical Force (nN)','FigTitle','LD Vs VD Border','NumFig',4);
         %[BC_VD_Vs_LD_Inner]=A10_feature_CDiB(AFM_VD_Inner(:),AFM_LD_Inner(:),secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'ypar',1e9,'YAyL','Lateral Force (nN)','XAxL','Vertical Force (nN)','FigTitle','LD Vs VD Inner','NumFig',4);
-        varargout{7}=dataPlot_VD_LD;
-    end
-    varargout{8}=Delta_ADJ;
+    end    
 end
 
 

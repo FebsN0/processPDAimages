@@ -210,8 +210,8 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_I
                 startX_endBorder=xValid(end-round(length(yData)*5/100));
                 % start border
                 endX_startBorder=xValid(round(length(yData)*5/100));
-                if mean(fittedline(end-round(length(yData)*10/100):end)) > mean(yValid(xValid>=startX_endBorder))*1.5 || ... 
-                        mean(fittedline(1:round(length(yData)*10/100))) > mean(yValid(xValid<=endX_startBorder))*1.5 
+                if mean(fittedline(end-round(length(yData)*10/100):end)) > mean(yValid(xValid>=startX_endBorder))*1.3 || ... 
+                        mean(fittedline(1:round(length(yData)*10/100))) > mean(yValid(xValid<=endX_startBorder))*1.3 
                     % put a flag in case of missing data in the border which creates the risk of wrong fitting
                     flagLineMissingDataBorder(i)=1;
                     % plot the fitted line and the experimental values
@@ -219,25 +219,35 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_I
                     ftmp=figure; plot(xValid,yValid,'*','DisplayName','Experimental Background','Color',globalColor(1))
                     hold on
                     % plot at least two previous experimental data background to understand how they
-                    % distributed along the fast scan line
-                    idxPrev=find(flagLineMissingDataBorder(1:i)==0,2,"last");
-                    yDataPrevLine = Lateral_Trace_masked_BKonly(:, idxPrev);
-                    xDataPrevLine = (1:size(yDataPrevLine,1))';
-                    xDataPrevLine = [xDataPrevLine xDataPrevLine];
-                    % Remove masked values (set to 5)
-                    for j=1:2
-                        xValidtmp = xDataPrevLine(yDataPrevLine(:,j) ~= 5,j);
-                        yValidtmp = yDataPrevLine(yDataPrevLine(:,j) ~= 5,j);
-                        % Remove outliers
-                        [pos_outlier] = isoutlier(yValidtmp, 'gesd');
-                        while any(pos_outlier)
-                            yValidtmp(pos_outlier) = NaN;
+                    % distributed along the fast scan line. In case the checker happens at the first two
+                    % iteration, special cases.
+                    % if first line, just do nothing.                    
+                    if i==2
+                        numPrevRows=1;
+                    else
+                        numPrevRows=2;
+                    end
+                    % if it is not first iteration
+                    if i~=1
+                        idxPrev=find(flagLineMissingDataBorder(1:i)==0,numPrevRows,"last");      
+                        yDataPrevLine = Lateral_Trace_masked_BKonly(:, idxPrev);
+                        xDataPrevLine = (1:size(yDataPrevLine,1))';
+                        xDataPrevLine = [xDataPrevLine xDataPrevLine]; %#ok<AGROW>
+                        % Remove masked values (set to 5)
+                        for j=1:numPrevRows
+                            xValidtmp = xDataPrevLine(yDataPrevLine(:,j) ~= 5,j);
+                            yValidtmp = yDataPrevLine(yDataPrevLine(:,j) ~= 5,j);
+                            % Remove outliers
                             [pos_outlier] = isoutlier(yValidtmp, 'gesd');
+                            while any(pos_outlier)
+                                yValidtmp(pos_outlier) = NaN;
+                                [pos_outlier] = isoutlier(yValidtmp, 'gesd');
+                            end
+                            xValidtmp = xValidtmp(~isnan(yValidtmp));
+                            yValidtmp = yValidtmp(~isnan(yValidtmp));    
+                            plot(xValidtmp,yValidtmp,'*','DisplayName',sprintf('ExpBK line %d',idxPrev(j)),'Color',globalColor(j+1))
+                            plot(Bk_iterative(:,idxPrev(j)),'Color',globalColor(j+1),'DisplayName',sprintf('FittedBK line %d',idxPrev(j)))
                         end
-                        xValidtmp = xValidtmp(~isnan(yValidtmp));
-                        yValidtmp = yValidtmp(~isnan(yValidtmp));    
-                        plot(xValidtmp,yValidtmp,'*','DisplayName',sprintf('ExpBK line %d',idxPrev(j)),'Color',globalColor(j+1))
-                        plot(Bk_iterative(:,idxPrev(j)),'Color',globalColor(j+1),'DisplayName',sprintf('FittedBK line %d',idxPrev(j)))
                     end
                     plot(fittedline,'DisplayName',sprintf('Best Fitted curve - fitOrder: %d - %d° iteration',bestFitOrder,iteration))                    
                     objInSecondMonitor(secondMonitorMain,ftmp)
@@ -246,7 +256,7 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_I
                         '(%d elements)\nChoose the best option to manage the current line.'],round(length(yData)*10/100),length(yData),i,round(length(yData)*5/100));
                     idxs=1:limit; flagContinue=true; 
                     while flagContinue
-                        options={sprintf('Exclude the best fitOrder (Current fitOrder: %d) and re-process the line',bestFitOrder),'Transform the entire line into NaN vector which interpolation will be followed at the end.','None and continue to the next line.'};
+                        options={sprintf('Exclude the best fitOrder (Current fitOrder: %d) and re-process the line',bestFitOrder),'Transform the entire line into NaN vector which interpolation will be followed at the end.','Keep the current and continue to the next line.'};
                         % dont remove stop here to zoom the figure
                         operations=getValidAnswer(question,'',options);
                         switch operations

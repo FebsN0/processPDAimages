@@ -9,6 +9,7 @@ function varargout = A7_feature_manualAlignment(fixed, moving)
     offset_y = 0;
     zoom_factor = 1.2; % Zoom increment
     original_moving = moving;  % Per il reset
+    original_fixed = fixed;
 
     % Asse dell'immagine
     hAx = axes('Parent', hFig, 'Units', 'normalized', 'Position', [0.05, 0.2, 0.9, 0.75]);
@@ -67,7 +68,19 @@ function varargout = A7_feature_manualAlignment(fixed, moving)
             case 'left'
                 offset_x = offset_x - step;
         end
-        moving = imtranslate(original_moving, [offset_x, offset_y], 'FillValues', 0);
+        moving = imtranslate(original_moving, [offset_x, offset_y]);
+        fixed = original_fixed;
+        %fixed=padarray(original_fixed, step, 0,'pre');
+        [rows, cols] = size(moving);
+        x_start = max(1, 1 + offset_x);
+        y_start = max(1, 1 + offset_y);
+        x_end = min(cols, cols + offset_x);
+        y_end = min(rows, rows + offset_y);
+        
+        fixed = fixed(y_start:y_end, x_start:x_end);
+        moving = moving(y_start:y_end, x_start:x_end);
+    
+
         update_display();
     end
 
@@ -88,6 +101,7 @@ function varargout = A7_feature_manualAlignment(fixed, moving)
         offset_x = 0;
         offset_y = 0;
         moving = original_moving;  % Ripristina immagine originale
+        fixed = original_fixed;
         update_display();
     end
 
@@ -95,7 +109,7 @@ function varargout = A7_feature_manualAlignment(fixed, moving)
     function update_display()
         old_xlim = xlim(hAx);
         old_ylim = ylim(hAx);
-        imshowpair(fixed, moving, 'falsecolor', 'Parent', hAx);
+        imshowpair(fixed, moving, 'falsecolor', 'Parent', hAx,'Scaling','independent');
         xlim(old_xlim); % Mantiene il livello di zoom attuale
         ylim(old_ylim);
         drawnow;

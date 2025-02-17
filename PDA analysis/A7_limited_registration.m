@@ -1,4 +1,4 @@
-function [moving_tr]=A7_limited_registration(moved,fixed,newFolder,secondMonitorMain,varargin)
+function [moving_adj,offset]=A7_limited_registration(moved,fixed,newFolder,secondMonitorMain,varargin)
 % Function to align optical images to each other (TRITC after and BF to TRITC before)
 % if BF is given, it must be the first input
 
@@ -100,8 +100,7 @@ function [moving_tr]=A7_limited_registration(moved,fixed,newFolder,secondMonitor
     while true
         figure(f2)
         uiwait(msgbox('Crop the area of interest containing the stimulated part',''));
-        % close the previous figure and keep the new one to the crop part
-    
+        % close the previous figure and keep the new one to the crop part    
         % Size and position of the crop rectangle [xmin ymin width height]. Crop the last open figure.
         [~,specs]=imcrop();
         % find the indexes of the cropped area
@@ -198,8 +197,11 @@ function [moving_tr]=A7_limited_registration(moved,fixed,newFolder,secondMonitor
                 else
                     evo_reduced_moved(evo_reduced_moved<Th_r_moving)=0;
                 end
+            %%%%%%%%%%%%%%%%%%%%%%%% MANUAL SELECTION BY BUTTONS %%%%%%%%%%%%%%%%%%%%%%%%
             elseif answer==1
-                [xoffset, yoffset]=A7_feature_manualAlignment(reduced_fixed_blurred,reduced_moved_blurred);
+                reduced_fixed_blurred_exp = padarray(reduced_fixed_blurred, [100, 100], min(reduced_fixed_blurred(:)), 'both');
+                reduced_moved_blurred_exp = padarray(reduced_moved_blurred, [100, 100], min(reduced_moved_blurred(:)), 'both');
+                [xoffset, yoffset]=A7_feature_manualAlignment(reduced_fixed_blurred_exp,reduced_moved_blurred_exp);
                 flagNoCorr=true;
             end
         end
@@ -211,17 +213,27 @@ function [moving_tr]=A7_limited_registration(moved,fixed,newFolder,secondMonitor
             corr_offset = [(xpeak-size(evo_reduced_moved,2)) (ypeak-size(evo_reduced_moved,1))];
             rect_offset = [(evo_reduced_fixed(1)-evo_reduced_moved(1)) (evo_reduced_fixed(2)-evo_reduced_moved(2))];
             % calc the offset which is required to traslate the original image
-            offset = corr_offset + rect_offset;
-            xoffset = round(offset(1));
-            yoffset = round(offset(2));
+            offset = round(corr_offset + rect_offset);
+            xoffset = offset(1);
+            yoffset = offset(2);
         end
         moving_tr=imtranslate(moved,[xoffset,yoffset]);
-               
+        fprintf('\nTotal Offset_X: %d - Total Offset_Y: %d\n\n',xoffset,yoffset)
+        % adjust the borders. If not done, the fusing image will be not clear
+        [rows, cols] = size(fixed);
+        x_start = max(1, 1 + xoffset);
+        y_start = max(1, 1 + yoffset);
+        x_end = min(cols, cols + xoffset);
+        y_end = min(rows, rows + yoffset);
+        % cut out the not common area
+        fixed_adj = fixed(y_start:y_end, x_start:x_end);
+        moving_adj = moving_tr(y_start:y_end, x_start:x_end);
+    
         f5=figure;
         if((~islogical(moved))&&(~islogical(fixed)))
-            imshow(imfuse(imadjust(moving_tr),imadjust(fixed)))
+            imshow(imfuse(imadjust(moving_adj),imadjust(fixed_adj)))
         else
-            imshow(imfuse(moving_tr,fixed))
+            imshow(imfuse(moving_adj,fixed_adj))
         end
         title(sprintf('Cropped %s-%s - Aligned',textCropped,textFirstLastFig),'FontSize',15)
         if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f5); end
