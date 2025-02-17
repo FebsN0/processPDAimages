@@ -38,7 +38,9 @@
 %   py.importlib.import_module('tifffile') 
 %           ===> ans = Python module with properties: ...
 % AWESOME! EVERYTHING IS READY!
-
+%
+% BE SURE TO DOWNLOAD FROM "Get More Apps" box the toolbox "polyfitn"
+%
 clc, clear, close all
 % check python and matlab version https://www.mathworks.com/support/requirements/python-compatibility.html
 vers=version('-release'); pe = pyenv; pe=pe.Version;
@@ -58,105 +60,111 @@ if ~exist(fullfile(mainPath,'HoverMode_ON'),"dir" )
     % HoverMode_ON is the directory which contains the .jpk file in Hover Mode ON, so the first scan (the second scan is Hover Mode off. Required for calc the friction coefficient
     error('Data Hover Mode ON doesn''t exist. Check the directory')  
 else
-    if ~exist(fullfile(mainPath,'HoverMode_ON','resultsData_1_postProcessA4_HVon.mat'),'file')
-        [AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM,folderResultsImg,setpoints]=A1_openANDassembly_JPK(secondMonitorMain,'filePath',fullfile(mainPath,'HoverMode_ON'));
+    flagExeA1=true;
+    if exist(fullfile(mainPath,'HoverMode_ON','resultsData_1_postProcessA4_HVon.mat'),'file')
+        tmp=strsplit(mainPath,'\');
+        nameScan=tmp{end}; clear tmp        
+        question=sprintf('Results of the scan %s HoverModeON already exists. Take it? If not, remove the previous one.',nameScan);
+        if getValidAnswer(question,'',{'Yes','No'})
+            load(fullfile(mainPath,'HoverMode_ON\resultsData_1_postProcessA4_HVon'))
+            flagExeA1=false;
+        else
+            delete(pathResultsData)           
+        end        
+    end
+    if flagExeA1
+        accuracy=chooseAccuracy("Step A3 - Fitting the baseline (i.e. Background) of AFM Height Data. Which fit order range use?");
+        [AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM,folderResultsImg,setpoints]=A1_openANDassembly_JPK(secondMonitorMain,'filePath',fullfile(mainPath,'HoverMode_ON'),'FitOrder',accuracy);
+        clear BW maskedImage accuracy question nameScan flagExeA1
         save(fullfile(mainPath,'HoverMode_ON\resultsData_1_postProcessA4_HVon'))
-    else
-        load(fullfile(mainPath,'HoverMode_ON\resultsData_1_postProcessA4_HVon'))
     end
 end
-
-% prepare the lateral force by using a proper friction coefficient
-while true
-    answer=getValidAnswer('Fitting AFM lateral channel data: which accuracy use?','',{'Low','Medium','High'});
-    switch answer
-        case 1
-            accuracy= 'Low';
-        case 2
-            accuracy= 'Medium';
-        case 3
-            accuracy= 'High';
-    end
-    AFM_A6_LatDeflecFitted=A5_LD_Baseline_Adaptor_masked(AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM.Alpha,secondMonitorMain,folderResultsImg,mainPath,'Accuracy',accuracy);
-    if getValidAnswer('Satisfied of the fitting?','',{'y','n'}) == 1
-        break
-    end
-end
-close all
 %%
+% prepare the lateral force by using a proper friction coefficient
+accuracy=chooseAccuracy("step A5 - Fitting the baseline (i.e. Background) of AFM Lateral Deflection Data. Which fit order range use?");
+AFM_A6_LatDeflecFitted=A5_LD_Baseline_Adaptor_masked(AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM.Alpha,secondMonitorMain,folderResultsImg,mainPath,'FitOrder',accuracy,'Silent','No');
+close all
+clear accuracy
 
+%%
 [nameDir,numberExperiment,~]=fileparts(fileparts(folderResultsImg));
 [~,nameExperiment,~]=fileparts(fileparts(nameDir));
 fprintf('\nAFM data is taken from the following experiment:\n\tEXPERIMENT: %s\t\tNUMBER:\t %s\n\n',nameExperiment,numberExperiment)
 % Open Brightfield image and the TRITIC (Before and After stimulation images)
-[fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the BrightField image');
-[BF_Mic_Image,~,metaData_BF]=A6_open_ND2(fullfile(filePathData,fileName)); 
-f1=figure('Visible','off');
-imshow(imadjust(BF_Mic_Image)), title('BrightField - original','FontSize',17)
-if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
-saveas(f1,sprintf('%s/resultA6_1_BrightField.tif',folderResultsImg))
 
-[fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the TRITIC Before Stimulation image',filePathData);
-[Tritic_Mic_Image_Before]=A6_open_ND2(fullfile(filePathData,fileName)); 
-f2=figure('Visible','off');
-imshow(imadjust(Tritic_Mic_Image_Before)), title('TRITIC Before Stimulation','FontSize',17)
-if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2); end
-saveas(f2,sprintf('%s/resultA6_2_TRITIC_Before_Stimulation.tif',folderResultsImg))
+filenameND2='resultA6_1_BrightField'; titleImage='BrightField - original';
+[BF_Mic_Image,metaData_BF,filePathData]=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain);
 
-[fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the TRITIC After Stimulation image',filePathData);
-[Tritic_Mic_Image_After]=A6_open_ND2(fullfile(filePathData,fileName)); 
-f3=figure('Visible','off');
-imshow(imadjust(Tritic_Mic_Image_After)), title('TRITIC After Stimulation','FontSize',17)
-if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
-saveas(f3,sprintf('%s/resultA6_3_TRITIC_After_Stimulation.tif',folderResultsImg))
-
-close all
-
-% Align the fluorescent images After with the BEFORE stimulation
+% .nd2 files inside dir
+fileList = dir(fullfile(filePathData, '*.nd2'));
+pattern = '\d+ms';
+matches = regexp({fileList.name}, pattern, 'match');
+matches = [matches{:}];
+timeValues = sort(unique(cellfun(@(x) str2double(erase(x, 'ms')), matches)));
+timeList = cellstr(string(unique(timeValues)));
+BF_Mic_Image_original=BF_Mic_Image;
 while true
-    Tritic_Mic_Image_After_aligned=A7_limited_registration(Tritic_Mic_Image_After,Tritic_Mic_Image_Before,folderResultsImg,secondMonitorMain);
-    if getValidAnswer('Satisfied of the alignment?','',{'y','n'}) == 1
-        break
-    else
-        close gcf
+    if ~isempty(timeList)
+        timeExp=timeList{getValidAnswer('What exposure time do you want to take?','',timeList)};
     end
-end
-%%
-% Align the Brightfield to TRITIC Before Stimulation
-while true
-    BF_Mic_Image_aligned=A7_limited_registration(BF_Mic_Image,Tritic_Mic_Image_Before,folderResultsImg,secondMonitorMain,'Brightfield','Yes','Moving','Yes');
-    if getValidAnswer('Satisfied of the alignment?','',{'y','n'}) == 1
-        break
-    else
-        close gcf
+    
+    % select the files with the choosen time exposure
+    matchingFiles = {fileList(contains({fileList.name}, [timeExp, 'ms'])).name};
+    % auto selection
+    beforeFiles = matchingFiles(contains(matchingFiles, 'before', 'IgnoreCase', true));
+    afterFiles = matchingFiles(contains(matchingFiles, {'post', 'after'}, 'IgnoreCase', true));
+    % in case not found, manual selection
+    if isempty(beforeFiles) || isempty(afterFiles)
+        disp('Issues in finding the files. Manual selection.');  
     end
+    filenameND2='resultA6_2_TRITIC_Before_Stimulation'; titleImage='TRITIC Before Stimulation';
+    Tritic_Mic_Image_Before=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain,filePathData,'Before',beforeFiles);
+    filenameND2='resultA6_3_TRITIC_After_Stimulation'; titleImage='TRITIC After Stimulation';
+    Tritic_Mic_Image_After=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain,filePathData,'Before',afterFiles);
+    close all       
+    % Align the fluorescent images After with the BEFORE stimulation
+    [Tritic_Mic_Image_After_aligned,offset]=A7_limited_registration(Tritic_Mic_Image_After,Tritic_Mic_Image_Before,folderResultsImg,secondMonitorMain);
+    % adjust BF and Tritic_Before depending on the offset
+    BF_Mic_Image=fixSize(BF_Mic_Image,offset);
+    Tritic_Mic_Image_Before=fixSize(Tritic_Mic_Image_Before,offset);   
+    % Align the Brightfield to TRITIC Before Stimulation
+    [BF_Mic_Image_aligned,offset]=A7_limited_registration(BF_Mic_Image,Tritic_Mic_Image_Before,folderResultsImg,secondMonitorMain,'Brightfield','Yes','Moving','Yes');    
+    Tritic_Mic_Image_After_aligned=fixSize(Tritic_Mic_Image_After_aligned,offset);
+    Tritic_Mic_Image_Before=fixSize(Tritic_Mic_Image_Before,offset);   
+    if getValidAnswer(sptintf('Satisfied of all the registration of BF and fluorescence image?\nIf not, change time exposure for better alignment'),'',{'Yes','No'})
+        close gcf
+        break
+    end
+    % in case of no satisfaction, restore original data
+    BF_Mic_Image=BF_Mic_Image_original;
+    close all
 end
-
-uiwait(msgbox('Click to continue',''));
-close gcf
-clear f1 f2 f3 question options choice fileName
-
+% adjust the metadata BF size
+nameExperiment=sprintf('%s_scan%s',nameExperiment,numberExperiment);
+clear fileList numberExperiment proportionMeter2Pixel f1 f2 f3 matchingFiles question options choice fileName Tritic_Mic_Image_After
+clear filePathData nameDir filenameND2 afterFiles beforeFiles BF_Mic_Image BF_Mic_Image_original offset time* titleImage pattern matches
 
 % Produce the binary IO of Brightfield
-[BF_Mic_Image_IO,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,~]=A8_Mic_to_Binary(BF_Mic_Image_aligned,secondMonitorMain,folderResultsImg,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned); 
-close gcf
-    
+[BF_Mic_Image_IO,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,~,~]=A8_Mic_to_Binary(BF_Mic_Image_aligned,secondMonitorMain,folderResultsImg,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned); 
+close all
+
+clear BF_Mic_Image_aligned 
+save(fullfile(mainPath,'HoverMode_ON\resultsData_2_postProcessA8_HVon'))
+%%
 % Align AFM to BF and extract the coordinates for alighnment to be transferred to the other data
-while true
-    [AFM_A10_IO_sizeOpt,AFM_A10_IO_padded_sizeBF,AFM_A10_data_optAlignment,results_AFM_BF_aligment]=A9_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_A6_LatDeflecFitted,folderResultsImg,secondMonitorMain,'Margin',150);
-    if getValidAnswer('Satisfied of the alignment (y) or restart (n)?','',{'y','n'}) == 1
-        break
-    end
-end
+[AFM_A10_IO_final,AFM_A10_data_final,results_AFM_BF_aligment,offset]=A9_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_A6_LatDeflecFitted,folderResultsImg,secondMonitorMain,'Margin',150);
 
-
+BF_Mic_Image_IO=fixSize(BF_Mic_Image_IO,offset);
+Tritic_Mic_Image_Before=fixSize(Tritic_Mic_Image_Before,offset);  
+Tritic_Mic_Image_After_aligned=fixSize(Tritic_Mic_Image_After_aligned,offset);  
+clear offset
 %%
 % correlation FLUORESCENCE AND AFM DATA
 
 % e stato rimosso da A1 vertForceAVG, quindi la variabile deve essere tolta. Forse stava qui da quando ancora
 % non scoprivo la cosa del baseline e quindi si puo usare tranquillamente setpoint
-[data_Height_LD,dataPlot_Height_LD_maxVD,data_Height_FLUO,data_LD_FLUO_padMask,dataPlot_LD_FLUO_padMask_maxVD, data_VD_FLUO, data_VD_LD]=A10_correlation_AFM_BF(AFM_A10_data_optAlignment,AFM_A10_IO_padded_sizeBF,setpoints,secondMonitorMain,folderResultsImg,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned);
-save(fullfile(folderResultsImg,'resultsData_2_postProcessA10_end'))
+Data_finalResults=A10_correlation_AFM_BF(AFM_A10_data_final,AFM_A10_IO_final,setpoints,secondMonitorMain,folderResultsImg,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned);
+save(fullfile(folderResultsImg,'resultsData_A10_end'))
 
 %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -183,4 +191,58 @@ function [AFM_data_cleared,AFM_heightIO_cleared,idxRemovedPortion]=removePortion
     showData(secondMonitorMain,false,idImg,AFM_heightIO_cleared,false,textTitle,'',textNameFile,true)
     % fig is invisible
     close gcf
+end
+
+function accuracy=chooseAccuracy(question)
+    options={'Low (1-3)','Medium (1-6)','High (1-9)'};
+    answer=getValidAnswer(question,'',options);
+    switch answer
+        case 1
+            accuracy= 'Low';
+        case 2
+            accuracy= 'Medium';
+        case 3
+            accuracy= 'High';
+    end      
+end
+
+function [Image,metaData,filePathData]=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain,varargin)
+    for i=varargin
+        filePathData=varargin{1};
+        mode=varargin{2};
+        if ~isempty(varargin{3})
+            fileName=varargin{3};
+            if ~isempty(fileName)
+                fileName=fileName{1};
+            end
+        end        
+    end
+    if ~exist('filePathData','var')
+        [fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the BrightField image');
+    else
+        if isempty(varargin{3})
+            [fileName, filePathData] = uigetfile({'*.nd2'}, sprintf('Select the TRITIC %s Stimulation image',mode),filePathData);
+        end
+    end
+    [Image,~,metaData]=A6_open_ND2(fullfile(filePathData,fileName)); 
+    f1=figure('Visible','off');
+    imshow(imadjust(Image)), title(titleImage,'FontSize',17)
+    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
+    saveas(f1,sprintf('%s/%s.tif',folderResultsImg,filenameND2))
+end
+
+function fixedImage=fixSize(originalImage,offset)
+    if length(offset)==2
+        offset_x=offset(1);
+        offset_y=offset(2);
+        [rows, cols] = size(originalImage);
+        x_start = max(1, 1 + offset_x);
+        y_start = max(1, 1 + offset_y);
+        x_end = min(cols, cols + offset_x);
+        y_end = min(rows, rows + offset_y);     
+    else
+        y_start=offset(1);  y_end=offset(2);
+        x_start=offset(3);  x_end=offset(4);
+    end
+    fixedImage = originalImage(y_start:y_end, x_start:x_end);
 end
