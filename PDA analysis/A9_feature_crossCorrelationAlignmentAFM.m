@@ -1,11 +1,12 @@
 function varargout = A9_feature_crossCorrelationAlignmentAFM(BF_IO,AFM_IO,varargin)
     % init
-    varargout=cell(9,1);
-        % 1 = max_c_it_OI;  % 2 = imax;
-        % 3 = final_time;
-        % 4 = xbegin;       % 5 = xend;
-        % 6 = ybegin;       % 7 = yend;
-        % 8 =AFM_padded;
+    varargout=cell(6,1);
+        % 1 = max_c_it_OI; 
+        % 2 = imax;
+        % 3 = size_OI;
+        % 4 = final_time;       
+        % 5 = [xbegin, xend, ybegin, yend]
+        % 6 = AFM_padded;
 
     p=inputParser();    %init instance of inputParser
     % Add required parameters
