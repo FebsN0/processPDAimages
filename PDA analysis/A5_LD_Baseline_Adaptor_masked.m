@@ -52,8 +52,8 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_I
     % plot. To better visual, change NaN into 0
     Lateral_Trace_mask_firstClear(isnan(Lateral_Trace_mask_firstClear))=0;
     titleData1='Raw Lateral Deflection - Trace'; titleData2='Background with removed outliers';
-    nameFig=fullfile(newFolder,'resultA5_1_RawLateralData_BackgroundNoOutliers.tif');
-    showData(secondMonitorMain,SeeMe,1,Lateral_Trace,false,titleData1,'Voltage [V]',nameFig,'data2',Lateral_Trace_mask_firstClear,'titleData2',titleData2,'closeImmediately',false)
+    nameFig='resultA5_1_RawLateralData_BackgroundNoOutliers';
+    showData(secondMonitorMain,SeeMe,1,Lateral_Trace,false,titleData1,'Voltage [V]',newFolder,nameFig,'data2',Lateral_Trace_mask_firstClear,'titleData2',titleData2,'closeImmediately',false)
     % rechange to NaN
     Lateral_Trace_mask_firstClear(Lateral_Trace_mask_firstClear==0)=NaN;
     % plane fitting
@@ -122,8 +122,8 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_I
     % plot
     titleData1='Plane Fitted Background';
     titleData2={'Lateral Deflection - Trace'; '(removed fitted plane and shifted)'};
-    nameFig=fullfile(newFolder,'resultA5_2_planeBKfit_LateralDeflection.tif');
-    showData(secondMonitorMain,SeeMe,1,correction_plane,false,titleData1,'Voltage [V]',nameFig,'data2',Lateral_Trace_corrPlane,'titleData2',titleData2,'closeImmediately',false)    
+    nameFig='resultA5_2_planeBKfit_LateralDeflection';
+    showData(secondMonitorMain,SeeMe,1,correction_plane,false,titleData1,'Voltage [V]',newFolder,nameFig,'data2',Lateral_Trace_corrPlane,'titleData2',titleData2,'closeImmediately',false)    
     if getValidAnswer('Keep the Lateral Deflection with the plane-fitted background removed?','',{'Yes','No'})
         Lateral_Trace_first = Lateral_Trace_corrPlane;
         text='(Plane fitted BK removed)';
@@ -312,8 +312,8 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_I
         Lateral_Trace_shift_noBK = Lateral_Trace_first - Bk_iterative;
         % Plot the fitted backround:
         titleData1='Line x Line Fitted Background'; titleData2={'Lateral Deflection - Trace';text};
-        nameFig=fullfile(newFolder,'resultA5_3_LineBKfit_LateralDeflection.tif');
-        showData(secondMonitorMain,SeeMe,2,Bk_iterative,true,titleData1,'',nameFig,'data2',Lateral_Trace_shift_noBK,'titleData2',titleData2,'closeImmediately',false)
+        nameFig='resultA5_3_LineBKfit_LateralDeflection';
+        showData(secondMonitorMain,SeeMe,2,Bk_iterative,true,titleData1,'',newFolder,nameFig,'data2',Lateral_Trace_shift_noBK,'titleData2',titleData2,'closeImmediately',false)
         if getValidAnswer('Satisfied of the fitting?','',{'y','n'})
             break
         end
@@ -370,12 +370,12 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_I
     
     % plot the definitive corrected lateral force
     titleData='Fitted and corrected Lateral Force';
-    nameFig=fullfile(newFolder,'resultA5_4_ResultsDefinitiveLateralDeflectionsNewton_normalized.tif');
-    showData(secondMonitorMain,SeeMe,3,Corrected_LD_Trace,true,titleData,'',nameFig,'closeImmediately',false)
+    nameFig='resultA5_4_ResultsDefinitiveLateralDeflectionsNewton_normalized';
+    showData(secondMonitorMain,SeeMe,3,Corrected_LD_Trace,true,titleData,'',newFolder,nameFig,'closeImmediately',false)
     titleData='Fitted and corrected Lateral Force';
-    nameFig=fullfile(newFolder,'resultA5_5ResultsDefinitiveLateralDeflectionsNewton.tif');
+    nameFig='resultA5_5ResultsDefinitiveLateralDeflectionsNewton';
     labelFig='Force [nN]';
-    showData(secondMonitorMain,false,3,Corrected_LD_Trace*1e9,false,titleData,labelFig,nameFig)
+    showData(secondMonitorMain,false,3,Corrected_LD_Trace*1e9,false,titleData,labelFig,newFolder,nameFig)
 
     % save the corrected lateral force into cropped AFM image
     AFM_Elab=AFM_cropped_Images;    

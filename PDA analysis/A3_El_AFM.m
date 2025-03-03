@@ -117,8 +117,8 @@ function [AFM_Images,IO_Image]=A3_El_AFM(filtData,iterationMain,secondMonitorMai
     
     titleData='Height (measured) channel - Line Tilted effect removed';
     idImg=1;
-    nameFile=fullfile(filepath,'resultA3_1_HeightRemovedTiltLine.tif');
-    showData(secondMonitorMain,SeeMe,idImg,poly_filt_data,true,titleData,'',nameFile)
+    nameFile='resultA3_1_HeightRemovedTiltLine';
+    showData(secondMonitorMain,SeeMe,idImg,poly_filt_data,true,titleData,'',filepath,nameFile)
     if SeeMe
         uiwait(msgbox('Click to continue'))
     end
@@ -182,8 +182,8 @@ function [AFM_Images,IO_Image]=A3_El_AFM(filtData,iterationMain,secondMonitorMai
     % show the results
     titleData='Height (measured) channel - Surface Tilted effect removed';
     idImg=1;
-    nameFile=fullfile(filepath,'resultA3_2_HeightRemovedTiltSurface.tif');
-    showData(secondMonitorMain,SeeMe,idImg,filt_data_no_Bk,true,titleData,'',nameFile)
+    nameFile='resultA3_2_HeightRemovedTiltSurface';
+    showData(secondMonitorMain,SeeMe,idImg,filt_data_no_Bk,true,titleData,'',filepath,nameFile)
     if SeeMe
         uiwait(msgbox('Click to continue'))
     end
@@ -306,7 +306,10 @@ function [AFM_Images,IO_Image]=A3_El_AFM(filtData,iterationMain,secondMonitorMai
         ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
         
         if getValidAnswer('Satisfied of the fitting?','',{'y','n'}) == 1
-            saveas(f3,sprintf('%s\\resultA3_3_HeightLineFitted.tif',filepath))
+            fullfileName=fullfile(filepath,'tiffImages','resultA3_3_HeightLineFitted');
+            saveas(f3,fullfileName,'tif')
+            fullfileName=fullfile(filepath,'figImages','resultA3_3_HeightLineFitted');
+            saveas(f3,fullfileName)
             close(f3), break
         end
     end
@@ -404,8 +407,8 @@ function [AFM_Images,IO_Image]=A3_El_AFM(filtData,iterationMain,secondMonitorMai
     % show data
     titleData=sprintf('Baseline and foreground processed - Iteration %d',iterationMain);
     idImg=5;
-    nameFile=fullfile(filepath,sprintf('resultA3_4_BaselineForeground_iteration%d.tif',iterationMain));
-    showData(secondMonitorMain,SeeMe,idImg,seg_binarized,false,titleData,'',nameFile,'Binarized','Yes')
+    nameFile=sprintf('resultA3_4_BaselineForeground_iteration%d',iterationMain);
+    showData(secondMonitorMain,SeeMe,idImg,seg_binarized,false,titleData,'',filepath,nameFile,'Binarized',true)
     if SeeMe
         uiwait(msgbox('Click to continue'))
     end

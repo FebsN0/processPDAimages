@@ -82,7 +82,7 @@ end
 %%
 % prepare the lateral force by using a proper friction coefficient
 accuracy=chooseAccuracy("step A5 - Fitting the baseline (i.e. Background) of AFM Lateral Deflection Data. Which fit order range use?");
-AFM_A6_LatDeflecFitted=A5_LD_Baseline_Adaptor_masked(AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM.Alpha,secondMonitorMain,folderResultsImg,mainPath,'FitOrder',accuracy,'Silent','No');
+AFM_A5_LatDeflecFitted=A5_LD_Baseline_Adaptor_masked(AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM.Alpha,secondMonitorMain,folderResultsImg,mainPath,'FitOrder',accuracy,'Silent','No');
 close all
 clear accuracy
 
@@ -131,7 +131,7 @@ while true
     [BF_Mic_Image_aligned,offset]=A7_limited_registration(BF_Mic_Image,Tritic_Mic_Image_Before,folderResultsImg,secondMonitorMain,'Brightfield','Yes','Moving','Yes');    
     Tritic_Mic_Image_After_aligned=fixSize(Tritic_Mic_Image_After_aligned,offset);
     Tritic_Mic_Image_Before=fixSize(Tritic_Mic_Image_Before,offset);   
-    if getValidAnswer(sptintf('Satisfied of all the registration of BF and fluorescence image?\nIf not, change time exposure for better alignment'),'',{'Yes','No'})
+    if getValidAnswer(sprintf('Satisfied of all the registration of BF and fluorescence image?\nIf not, change time exposure for better alignment'),'',{'Yes','No'})
         close gcf
         break
     end
@@ -145,14 +145,14 @@ clear fileList numberExperiment proportionMeter2Pixel f1 f2 f3 matchingFiles que
 clear filePathData nameDir filenameND2 afterFiles beforeFiles BF_Mic_Image BF_Mic_Image_original offset time* titleImage pattern matches
 
 % Produce the binary IO of Brightfield
-[BF_Mic_Image_IO,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,~,~]=A8_Mic_to_Binary(BF_Mic_Image_aligned,secondMonitorMain,folderResultsImg,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned); 
+[BF_Mic_Image_IO,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,~]=A8_Mic_to_Binary(BF_Mic_Image_aligned,secondMonitorMain,folderResultsImg,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned); 
 close all
 
 clear BF_Mic_Image_aligned 
 save(fullfile(mainPath,'HoverMode_ON\resultsData_2_postProcessA8_HVon'))
 %%
 % Align AFM to BF and extract the coordinates for alighnment to be transferred to the other data
-[AFM_A10_IO_final,AFM_A10_data_final,results_AFM_BF_aligment,offset]=A9_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_A6_LatDeflecFitted,folderResultsImg,secondMonitorMain,'Margin',150);
+[AFM_A10_IO_final,AFM_A10_data_final,results_AFM_BF_aligment,offset]=A9_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_A5_LatDeflecFitted,folderResultsImg,secondMonitorMain,'Margin',150);
 
 BF_Mic_Image_IO=fixSize(BF_Mic_Image_IO,offset);
 Tritic_Mic_Image_Before=fixSize(Tritic_Mic_Image_Before,offset);  
@@ -163,7 +163,7 @@ clear offset
 
 % e stato rimosso da A1 vertForceAVG, quindi la variabile deve essere tolta. Forse stava qui da quando ancora
 % non scoprivo la cosa del baseline e quindi si puo usare tranquillamente setpoint
-Data_finalResults=A10_correlation_AFM_BF(AFM_A10_data_final,AFM_A10_IO_final,setpoints,secondMonitorMain,folderResultsImg,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned);
+Data_finalResults=A10_correlation_AFM_BF(AFM_A10_data_final,AFM_A10_IO_final,setpoints,secondMonitorMain,folderResultsImg,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned,'innerBorderCalc',true);
 save(fullfile(folderResultsImg,'resultsData_A10_end'))
 
 %%
@@ -228,7 +228,10 @@ function [Image,metaData,filePathData]=selectND2file(folderResultsImg,filenameND
     f1=figure('Visible','off');
     imshow(imadjust(Image)), title(titleImage,'FontSize',17)
     if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
-    saveas(f1,sprintf('%s/%s.tif',folderResultsImg,filenameND2))
+    fullfileName=fullfile(folderResultsImg,'tiffImages',filenameND2);
+    saveas(f1,fullfileName,'tif')
+    fullfileName=fullfile(folderResultsImg,'figImages',filenameND2);
+    saveas(f1,fullfileName)
 end
 
 function fixedImage=fixSize(originalImage,offset)

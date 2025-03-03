@@ -16,7 +16,7 @@ function [varargout]=A2_CleanUpData2_AFM(data,setpoints,secondMonitorMain,newFol
     argName = 'cleanOnly';      defaultVal = 'No';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     argName = 'Silent';         defaultVal = 'Yes';     addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     argName = 'imageType';      defaultVal = 'Entire';  addParameter(p,argName,defaultVal, @(x) ismember(x,{'Entire','SingleSection','Assembled'}));
-    argName = 'Normalization';  defaultVal = 'No';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+    argName = 'Normalization';  defaultVal = false;     addParameter(p,argName,defaultVal, @(x) islogical(x));
     argName = 'sectionSize';    defaultVal = [];        addParameter(p,argName,defaultVal);
     argName = 'metadata';       defaultVal = [];        addParameter(p,argName,defaultVal);
     % validate and parse the inputs
@@ -30,7 +30,7 @@ function [varargout]=A2_CleanUpData2_AFM(data,setpoints,secondMonitorMain,newFol
         cleanOnly=0;
         if(strcmp(p.Results.Silent,'Yes'));     SeeMe=0; else, SeeMe=1; end                    
         imageTyp=p.Results.imageType;
-        if(strcmp(p.Results.Normalization,'Yes')); norm=1; else, norm=0; end
+        if p.Results.Normalization; norm=1; else, norm=0; end
     end
     
     if cleanOnly
@@ -71,31 +71,31 @@ function [varargout]=A2_CleanUpData2_AFM(data,setpoints,secondMonitorMain,newFol
         data=data_Height*1e9;
         titleData=sprintf('Height (measured) channel (Raw - %s)',imageTyp);
         idimg=2;
-        nameFig=sprintf('%s/resultA2_%d_HeightChannel_%s.tif',newFolder,idimg,imageTyp);
+        nameFig=sprintf('resultA2_%d_HeightChannel_%s',idimg,imageTyp);
         labelBar=sprintf('height (nm)');
-        showData(secondMonitorMain,SeeMe,1,data,norm,titleData,labelBar,nameFig)
+        showData(secondMonitorMain,SeeMe,1,data,norm,titleData,labelBar,newFolder,nameFig)
         % Lateral Deflection Trace
         data=data_LD_trace;
         titleData=sprintf('Lateral Deflection Trace channel (Raw - %s)',imageTyp);
-        nameFig=sprintf('%s/resultA2_3_Raw_LDChannel_trace_%s.tif',newFolder,imageTyp);
+        nameFig=sprintf('resultA2_3_Raw_LDChannel_trace_%s',imageTyp);
         labelBar='Voltage [V]';
-        showData(secondMonitorMain,SeeMe,2,data,norm,titleData,labelBar,nameFig)
+        showData(secondMonitorMain,SeeMe,2,data,norm,titleData,labelBar,newFolder,nameFig)
         % Lateral Deflection ReTrace
         data=data_LD_retrace;
         titleData=sprintf('Lateral Deflection Retrace channel (Raw - %s)',imageTyp);
-        nameFig=sprintf('%s/resultA2_4_Raw_LDChannel_retrace_%s.tif',newFolder,imageTyp);
-        showData(secondMonitorMain,SeeMe,3,data,norm,titleData,labelBar,nameFig)
+        nameFig=sprintf('resultA2_4_Raw_LDChannel_retrace_%s',imageTyp);
+        showData(secondMonitorMain,SeeMe,3,data,norm,titleData,labelBar,newFolder,nameFig)
         % Vertical Deflection trace
         data=data_VD_trace*1e9;
         titleData=sprintf('Vertical Deflection trace channel (Raw - %s)',imageTyp);
-        nameFig=sprintf('%s/resultA2_5_Raw_VDChannel_trace_%s.tif',newFolder,imageTyp);
+        nameFig=sprintf('resultA2_5_Raw_VDChannel_trace_%s',imageTyp);
         labelBar='Force [nN]';
-        showData(secondMonitorMain,SeeMe,4,data,norm,titleData,labelBar,nameFig)
+        showData(secondMonitorMain,SeeMe,4,data,norm,titleData,labelBar,newFolder,nameFig)
         % Vertical Deflection Retrace
         data=data_VD_retrace*1e9;
         titleData=sprintf('Vertical Deflection retrace channel (Raw - %s)',imageTyp);
-        nameFig=sprintf('%s/resultA2_6_Raw_VDChannel_retrace_%s.tif',newFolder,imageTyp);
-        showData(secondMonitorMain,SeeMe,5,data,norm,titleData,labelBar,nameFig)           
+        nameFig=sprintf('resultA2_6_Raw_VDChannel_retrace_%s',imageTyp);
+        showData(secondMonitorMain,SeeMe,5,data,norm,titleData,labelBar,newFolder,nameFig)           
         
         % show distribution of vertical forces (data_VD_trace). If good, it should coincide approximately with the setpoint
         data=data_VD_trace*1e9;
@@ -139,7 +139,8 @@ function [varargout]=A2_CleanUpData2_AFM(data,setpoints,secondMonitorMain,newFol
         set(legend1,'Location','bestoutside');
         title('Distribution Raw Vertical Forces','FontSize',18), xlabel('Force [nN]','FontSize',15)
         objInSecondMonitor(secondMonitorMain,f0);
-        saveas(f0,sprintf('%s/resultA2_1_distributionVerticalForces.tif',newFolder))
+        saveas(f0,sprintf('%s/tiffImages/resultA2_1_distributionVerticalForces.tif',newFolder))
+        saveas(f0,sprintf('%s/figImages/resultA2_1_distributionVerticalForces',newFolder))
         vertForceAVG=unique(round(vertForceAVG));
         if length(vertForceAVG)~=numSetpoints
             warndlg('Number of rounded vertical forces is less than number of setpoint!')
@@ -166,7 +167,8 @@ function [varargout]=A2_CleanUpData2_AFM(data,setpoints,secondMonitorMain,newFol
                 title('Baseline Trend among the sections','FontSize',18)
                 ylabel('Baseline shift [nN]','FontSize',15), xlabel('Time [min]','FontSize',15), grid on, grid minor
                 objInSecondMonitor(secondMonitorMain,f1);
-                saveas(f1,sprintf('%s/resultA2_0_baselineTrend.tif',newFolder))
+                saveas(f1,sprintf('%s/tiffImages/resultA2_0_baselineTrend.tif',newFolder))
+                saveas(f1,sprintf('%s/figImages/resultA2_0_baselineTrend',newFolder))
             else
                 warning('\n\tPlotting the baseline trend is not possible because only one baseline value is stored in the metadata (Scan = Section)')
             end

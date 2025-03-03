@@ -112,8 +112,8 @@ function [AFM_IO_3_BFaligned,AFM_Elab,info_allignment,offset]=A9_alignment_AFM_M
     imshowpair(BF_IO_0_original,AFM_IO_2_BFpadded,'falsecolor')
     title('Brightfield and resized AFM images - Post First cross-correlation','FontSize',14)
     if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
-    saveas(f1,sprintf('%s/resultA9_1_BForiginal_AFMresize_firstCrossCorrelation.tif',newFolder))
-    
+    saveas(f1,sprintf('%s/tiffImages/resultA9_1_BForiginal_AFMresize_firstCrossCorrelation',newFolder),'tif')
+    saveas(f1,sprintf('%s/figImages/resultA9_1_BForiginal_AFMresize_firstCrossCorrelation',newFolder))
     
     AFM_Elab_original=AFM_Elab;
     while true
@@ -178,8 +178,8 @@ function [AFM_IO_3_BFaligned,AFM_Elab,info_allignment,offset]=A9_alignment_AFM_M
         imshowpair(BF_IO_1_cropped,AFM_IO_2_BFpadded,'falsecolor')
         objInSecondMonitor(secondMonitorMain,f2);
         title(textTitle,'FontSize',14)
-        saveas(f2,sprintf('%s/resultA9_2_BFcropped_AFMscaled_preAlignment.tif',newFolder))
-          
+        saveas(f2,sprintf('%s/tiffImages/resultA9_2_BFcropped_AFMscaled_preAlignment',newFolder),'tif')
+        saveas(f2,sprintf('%s/figImages/resultA9_2_BFcropped_AFMscaled_preAlignment',newFolder))
         
         clear yend ybegin xend xbegin tmp_*
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -215,7 +215,7 @@ function [AFM_IO_3_BFaligned,AFM_Elab,info_allignment,offset]=A9_alignment_AFM_M
         %%%%%%%%%%%%%%%%%%%%%%%%%%                       
         elseif answerMethod==3
             % imregdemons(MOVING,FIXED)
-            [DisplacementField,AFM_IO_3_BFaligned] = imregdemons(AFM_IO_2_BFpadded,BF_IO_1_cropped,1000,'AccumulatedFieldSmoothing',2.0,'PyramidLevels',7,'DisplayWaitbar',true);
+            [DisplacementField,AFM_IO_3_BFaligned] = imregdemons(AFM_IO_2_BFpadded,BF_IO_1_cropped,1000,'AccumulatedFieldSmoothing',2.0,'PyramidLevels',8,'DisplayWaitbar',true);
             textTitle='Final alignment of Brightfield IO and resized AFM IO - Automatic Demon''s Algorithm Approach';
             % first, create the pad version where there is in the middle the AFM data, then transforms image according to the displacement field.
             for flag_AFM=1:size(AFM_Elab,2)
@@ -260,7 +260,8 @@ function [AFM_IO_3_BFaligned,AFM_Elab,info_allignment,offset]=A9_alignment_AFM_M
         imshowpair(BF_IO_1_cropped,AFM_IO_3_BFaligned,'falsecolor');
         if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
         title(textTitle,'FontSize',14)
-        saveas(f3,sprintf('%s/resultA9_4_BFreduced_AFMopt_EndAlignment.tif',newFolder))
+        saveas(f3,sprintf('%s/tiffImages/resultA9_4_BFreduced_AFMopt_EndAlignment',newFolder),'tif')
+        saveas(f3,sprintf('%s/figImages/resultA9_4_BFreduced_AFMopt_EndAlignment',newFolder))
         uiwait(msgbox('Click to continue.'))
 
         if getValidAnswer('Satisfied of the alignment (y) or restart (n)?','',{'y','n'})

@@ -71,7 +71,8 @@ function [moving_adj,offset]=A7_limited_registration(moved,fixed,newFolder,secon
         imshow(imadjust(el_image)),title('Brightfield with Bk Removed','FontSize',14)
         if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
         if saveFig
-            saveas(f1,sprintf('%s/resultA7_%d_1_comparisonOriginalAndBackgroundSubstracted.tif',newFolder,textResultName))   
+            saveas(f1,sprintf('%s/tiffImages/resultA7_%d_1_comparisonOriginalAndBackgroundSubstracted',newFolder,textResultName),'tif')
+            saveas(f1,sprintf('%s/figImages/resultA7_%d_1_comparisonOriginalAndBackgroundSubstracted',newFolder,textResultName))   
         end
         question=sprintf('Use the Backgrownd Subtracted Image?\nIf not, it will be used the original BF data');        
         if getValidAnswer(question,'',{'Yes','No'})
@@ -175,7 +176,8 @@ function [moving_adj,offset]=A7_limited_registration(moved,fixed,newFolder,secon
                     %save the result of binarization
                     if saveFig
                         if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,eval(sprintf('f4_%d',i))); end
-                        saveas(eval(sprintf('f4_%d',i)),sprintf('%s/resultA7_%d_4_%s_BinarizationResult.tif',newFolder,textResultName,text{i}))
+                        saveas(eval(sprintf('f4_%d',i)),sprintf('%s/tiffImages/resultA7_%d_4_%s_BinarizationResult',newFolder,textResultName,text{i}),'tif')
+                        saveas(eval(sprintf('f4_%d',i)),sprintf('%s/figImages/resultA7_%d_4_%s_BinarizationResult',newFolder,textResultName,text{i}))
                     end
                     close gcf
                     data{i}=originalData;
@@ -246,8 +248,10 @@ function [moving_adj,offset]=A7_limited_registration(moved,fixed,newFolder,secon
     end
     if saveFig
         figure(f2)
-        saveas(f2,sprintf('%s/resultA7_%d_2_Entire_%s_NotAligned.tif',newFolder,textResultName,textFirstLastFig))
+        saveas(f2,sprintf('%s/tiffImages/resultA7_%d_2_Entire_%s_NotAligned',newFolder,textResultName,textFirstLastFig),'tif')
+        saveas(f2,sprintf('%s/figImages/resultA7_%d_2_Entire_%s_NotAligned',newFolder,textResultName,textFirstLastFig))
         close(f2)
-        saveas(f5,sprintf('%s/resultA7_%d_5_Cropped_%s-%s-Aligned.tif',newFolder,textResultName,textCropped,textFirstLastFig))
+        saveas(f5,sprintf('%s/tiffImages/resultA7_%d_5_Cropped_%s-%s-Aligned',newFolder,textResultName,textCropped,textFirstLastFig),'tif')
+        saveas(f5,sprintf('%s/figImages/resultA7_%d_5_Cropped_%s-%s-Aligned',newFolder,textResultName,textCropped,textFirstLastFig))
     end    
 end

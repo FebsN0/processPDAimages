@@ -108,18 +108,14 @@ function [outputme] = A10_feature_CDiB(X_Data,Y_Data,secondMonitorMain,newFolder
         xlim(p.Results.Ylimit)
     else
         xlim padded
-    end
-    
-    grid on
-    grid minor
+    end    
+    grid on, grid minor
     xlabel(p.Results.XAxL,'FontSize',15);
     ylabel(p.Results.YAyL,'FontSize',15);
     if (~isempty(p.Results.FigTitle))
         title(p.Results.FigTitle,'FontSize',20);
-    end
-    
+    end    
     objInSecondMonitor(secondMonitorMain,ftmp);
-    saveas(ftmp,sprintf('%s/resultA10_end_%d_%s.fig',newFolder,p.Results.NumFig,p.Results.FigTitle))
-    saveas(ftmp,sprintf('%s/resultA10_end_%d_%s.tiff',newFolder,p.Results.NumFig,p.Results.FigTitle))
-
+    saveas(ftmp,sprintf('%s/tiffImages/resultA10_end_%d_%s',newFolder,p.Results.NumFig,p.Results.FigTitle),'tif')
+    saveas(ftmp,sprintf('%s/figImages/resultA10_end_%d_%s',newFolder,p.Results.NumFig,p.Results.FigTitle))
 end

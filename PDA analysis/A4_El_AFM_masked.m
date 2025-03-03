@@ -47,8 +47,8 @@ function [AFM_Images_Bk,AFM_height_IO]=A4_El_AFM_masked(AFM_Images,AFM_height_IO
         textTitle='Height (measured) channel - Pre-Optimization';
         idImg=1;
         textColorLabel='Height (nm)';
-        textNameFile=sprintf('%s/resultA4_1_height_preOptimization.tif',filepath);
-        showData(secondMonitorMain,false,idImg,image_height_glass,true,textTitle,textColorLabel,textNameFile)
+        textNameFile='resultA4_1_height_preOptimization';
+        showData(secondMonitorMain,false,idImg,image_height_glass,true,textTitle,textColorLabel,filepath,textNameFile)
         % fig is invisible
         close gcf
     end
@@ -82,8 +82,8 @@ function [AFM_Images_Bk,AFM_height_IO]=A4_El_AFM_masked(AFM_Images,AFM_height_IO
     textTitle='Height (measured) channel - Masked, Fitted, Optimized';
     idImg=3;
     textColorLabel='Normalized Height';
-    textNameFile=sprintf('%s/resultA4_2_OptFittedHeightChannel_Norm_iteration%d.tif',filepath,iterationMain);
-    showData(secondMonitorMain,SeeMe,idImg,AFM_noBk,true,textTitle,textColorLabel,textNameFile)
+    textNameFile=sprintf('resultA4_2_OptFittedHeightChannel_Norm_iteration%d',iterationMain);
+    showData(secondMonitorMain,SeeMe,idImg,AFM_noBk,true,textTitle,textColorLabel,filepath,textNameFile)
     if SeeMe
         uiwait(msgbox('Click to continue'))
     end
@@ -92,8 +92,8 @@ function [AFM_Images_Bk,AFM_height_IO]=A4_El_AFM_masked(AFM_Images,AFM_height_IO
     textTitle='Height (measured) channel - Masked, Fitted, Optimized';
     idImg=4;
     textColorLabel='Height (nm)';
-    textNameFile=sprintf('%s/resultA4_3_OptFittedHeightChannel_iteration%d.tif',filepath,iterationMain);
-    showData(secondMonitorMain,false,idImg,AFM_noBk,false,textTitle,textColorLabel,textNameFile)
+    textNameFile=sprintf('resultA4_3_OptFittedHeightChannel_iteration%d',iterationMain);
+    showData(secondMonitorMain,false,idImg,AFM_noBk,false,textTitle,textColorLabel,filepath,textNameFile)
     % fig is invisible
     close gcf   
 
@@ -126,7 +126,11 @@ function [AFM_Images_Bk,AFM_height_IO]=A4_El_AFM_masked(AFM_Images,AFM_height_IO
     xlabel(sprintf('Feature height (nm)'),'FontSize',15), ylabel('Percentage %','FontSize',15), grid minor, grid on
     title(sprintf('Distribution Height (Percentile %d°)',percentile),'FontSize',20)
     objInSecondMonitor(secondMonitorMain,f4);
-    saveas(f4,sprintf('%s/resultA4_4_OptHeightDistribution_iteration%d.tif',filepath,iterationMain))
+
+    fullfileFig=fullfile(filepath,'tiffImages',sprintf('resultA4_4_OptHeightDistribution_iteration%d',iterationMain));
+    saveas(f4,fullfileFig,'tif')
+    fullfileFig=fullfile(filepath,'figImages',sprintf('resultA4_4_OptHeightDistribution_iteration%d',iterationMain));
+    saveas(f4,fullfileFig)
     close(f4)
     % substitutes to the original height image with the new opt fitted heigh
     AFM_Images_Bk=AFM_Images;

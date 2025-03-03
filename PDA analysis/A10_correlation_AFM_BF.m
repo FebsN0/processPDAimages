@@ -23,18 +23,18 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints
     addRequired(p,'AFM_IO_Padded')
     argName = 'TRITIC_before';      defaultVal = [];     addParameter(p,argName,defaultVal, @(x) ismatrix(x));
     argName = 'TRITIC_after';       defaultVal = [];     addParameter(p,argName,defaultVal, @(x) ismatrix(x));
-    argName = 'Silent';             defaultVal = 'Yes';  addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
-    argName = 'afterHeating';       defaultVal = 'No';   addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+    argName = 'Silent';             defaultVal = true;   addParameter(p,argName,defaultVal, @(x) islogical(x));
+    argName = 'afterHeating';       defaultVal = false;  addParameter(p,argName,defaultVal, @(x) islogical(x));
     argName = 'TRITIC_expTime';     defaultVal = '';     addParameter(p,argName,defaultVal, @(x) ischar(x));
-    argName = 'innerBorderCalc';    defaultVal = 'No';   addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+    argName = 'innerBorderCalc';    defaultVal = false;  addParameter(p,argName,defaultVal,@(x) islogical(x));
 
     parse(p,AFM_data,AFM_IO_Padded,varargin{:});
     clearvars argName defaultVal
     
-    if(strcmp(p.Results.Silent,'Yes')); SeeMe=0; else, SeeMe=1; end
-    if(strcmp(p.Results.innerBorderCalc,'Yes')); innerBord=1; else, innerBord=0; end
+    if p.Results.Silent; SeeMe=0; else, SeeMe=1; end
+    if p.Results.innerBorderCalc; innerBord=1; else, innerBord=0; end
     % in case one of the two is missing, substract by min value
-    if(strcmp(p.Results.afterHeating,'Yes')); flag_heat=true; else, flag_heat=false; end
+    if p.Results.afterHeating; flag_heat=true; else, flag_heat=false; end
     % in case of after heating, better specify which exposure time has been used to track the saturation upper limit
     if ~isempty(p.Results.TRITIC_expTime)
         expTime=sprintf(' - %s',p.Results.TRITIC_expTime);
@@ -56,18 +56,9 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints
         % when (p.Results.TRITIC_before) = 0, take the after, otherwise the before
         Delta = (isempty(p.Results.TRITIC_before)*(p.Results.TRITIC_after-min(p.Results.TRITIC_after(:)))) + ...
                 (~isempty(p.Results.TRITIC_before)*(p.Results.TRITIC_before-min(p.Results.TRITIC_before(:))));
-        numBins=500;
-        
-        % if isempty(p.Results.TRITIC_before)
-        %     BF_After=p.Results.TRITIC_after;
-        %     Delta=BF_After-min(BF_After(:));
-        % 
-        % else            
-        %     BF_Before=p.Results.TRITIC_before;
-        %     Delta=BF_Before-min(BF_Before(:));
-        % end
-    % process only AFM data
+        numBins=500;            
     else
+    % process only AFM data
         flag_onlyAFM=true;
     end
 
@@ -85,18 +76,22 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints
         Delta_glass(AFM_IO_Padded==1)=nan;                          
         Delta_glass(Delta<=0)=nan;
         % remove the data outside the AFM data which is only zero
-        Delta_glass(AFM_data(idx_LD).AFM_padded==0)=nan;            
+        Delta_glass(AFM_data(idx_LD).AFM_padded==0)=nan;
         % Intensity minimum in the glass region to be subtracted:
         Min_Delta_glass=min(min(Delta_glass,[],"omitnan"));
         % fix the fluorescence using the minimum value
         Delta_ADJ=Delta-Min_Delta_glass;
+        showData(secondMonitorMain,0,1,Delta_ADJ,true,'Delta Fluorescence (After-Before)','',newFolder,'resultA10_1_DeltaFluorescenceFull')
         % remove the data outside the AFM data which is only zero
         Delta_ADJ(AFM_data(idx_LD).AFM_padded==0)=nan;
         % exclude data of background prepared few lines before
         Delta_ADJ(Delta_ADJ<0 | ~isnan(Delta_glass))=nan;
         % save the delta in correspondence of crystal and background
         if ~flag_heat
-            plotSave2(SeeMe,Delta_glass,Delta_ADJ,'Tritic glass','Tritic whole','Fluorescence emission','resultA10_1_FluorescenceGlassPDA.tif',secondMonitorMain,newFolder)
+            titleD1='Tritic glass';
+            titleD2='Tritic whole';
+            labelBar='Absolute Fluorescence';
+            showData(secondMonitorMain,SeeMe,2,Delta_glass,false,titleD1,labelBar,newFolder,'resultA10_2_FluorescenceGlassPDA','data2',Delta_ADJ,'titleData2',titleD2,'background',true)
         end
     end
     dataResultsPlot.Delta_ADJ=Delta_ADJ;
@@ -107,8 +102,7 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints
         AFM_IO_Borders= edge(AFM_IO_Padded_Borders,'approxcanny');
         se = strel('square',5); % this value results a border of 3! pixels in the later images(as the outer dilation (2px) is gonna be subtracted later)
         AFM_IO_Borders_Grow=imdilate(AFM_IO_Borders,se); 
-        
-        plotSave1(SeeMe,AFM_IO_Borders_Grow,'Borders','resultA10_2_Borders.tif',secondMonitorMain,newFolder)
+        showData(secondMonitorMain,SeeMe,3,AFM_IO_Borders_Grow,false,'Borders','',newFolder,'resultA10_3_Borders','Binarized',true)
 
         % Elaboration of Height to extract inner and border regions
         AFM_Height_Border=AFM_data(idx_H).AFM_padded;
@@ -121,7 +115,10 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints
         AFM_Height_Inner(AFM_IO_Borders_Grow==1)=nan;
         AFM_Height_Inner(AFM_Height_Inner<=0)=nan;
         
-        plotSave2(SeeMe,AFM_Height_Border*1e6,AFM_Height_Inner*1e6,'AFM Height Border','AFM Height Inner',sprintf('height (\x03bcm)'),'resultA10_3_BorderAndInner_AFM_Height.tif',secondMonitorMain,newFolder)
+        titleD1='AFM Height Border';
+        titleD2='AFM Height Inner';
+        labelBar=sprintf('Height (\x03bcm)');
+        showData(secondMonitorMain,SeeMe,4,AFM_Height_Border*1e6,false,titleD1,labelBar,newFolder,'resultA10_4_BorderAndInner_AFM_Height','data2',AFM_Height_Inner*1e6,'titleData2',titleD2,'background',true)
     
         % Elaboration of LD to extract inner and border regions
         AFM_LD_Border=AFM_data(idx_LD).AFM_padded;
@@ -134,8 +131,11 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints
         AFM_LD_Inner(AFM_IO_Borders_Grow==1)=nan;
         AFM_LD_Inner(AFM_LD_Inner<=0)=nan; 
     
-        plotSave2(SeeMe,AFM_LD_Border*1e9,AFM_LD_Inner*1e9,'AFM LD Border','AFM LD Inner','Force [nN]','resultA10_4_BorderAndInner_AFM_LateralDeflection.tif',secondMonitorMain,newFolder)
-    
+        titleD1='AFM LD Border';
+        titleD2='AFM LD Inner';
+        labelBar='Force [nN]';  
+        showData(secondMonitorMain,SeeMe,5,AFM_LD_Border*1e9,false,titleD1,labelBar,newFolder,'resultA10_5_BorderAndInner_AFM_LateralDeflection','data2',AFM_LD_Inner*1e9,'titleData2',titleD2,'background',true)
+
         % Elaboration of VD to extract inner and border regions
         AFM_VD_Border=AFM_data(idx_VD).AFM_padded;
         AFM_VD_Border(AFM_IO_Padded==0)=nan; 
@@ -147,14 +147,22 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints
         AFM_VD_Inner(AFM_IO_Borders_Grow==1)=nan;  
         AFM_VD_Inner(AFM_VD_Inner<=0)=nan;
     
-        plotSave2(SeeMe,AFM_VD_Border*1e9,AFM_VD_Inner*1e9,'AFM VD Border','AFM VD Inner','Force [nN]','resultA10_5_BorderAndInner_AFM_VerticalDeflection.tif',secondMonitorMain,newFolder)
-            % Elaboration of Fluorescent Images to extract inner and border regions
+        titleD1='AFM VD Border';
+        titleD2='AFM VD Inner';
+        labelBar='Force [nN]';  
+        showData(secondMonitorMain,SeeMe,6,AFM_VD_Border*1e9,false,titleD1,labelBar,newFolder,'resultA10_6_BorderAndInner_AFM_VerticalDeflection','data2',AFM_VD_Inner*1e9,'titleData2',titleD2,'background',true)
+        
+        % Elaboration of Fluorescent Images to extract inner and border regions
         if ~flag_heat
             TRITIC_Border_Delta=Delta_ADJ; 
             TRITIC_Border_Delta(isnan(AFM_LD_Border))=nan; 
             TRITIC_Inner_Delta=Delta_ADJ; 
             TRITIC_Inner_Delta(isnan(AFM_LD_Inner))=nan;
-            plotSave2(SeeMe,TRITIC_Border_Delta,TRITIC_Inner_Delta,'Tritic Border Delta','Tritic Inner Delta','Fluorescence emission','resultA10_6_BorderAndInner_TRITIC_DELTA.tif',secondMonitorMain,newFolder)
+ 
+            titleD1='Tritic Border Delta';
+            titleD2='Tritic Inner Delta';
+            labelBar='Absolute Fluorescence';  
+            showData(secondMonitorMain,SeeMe,7,TRITIC_Border_Delta,false,titleD1,labelBar,newFolder,'resultA10_7_BorderAndInner_TRITIC_DELTA','data2',TRITIC_Inner_Delta,'titleData2',titleD2,'background',true)     
         end
         close all 
    end
@@ -226,36 +234,4 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints
         %[BC_VD_Vs_LD_Border]=A10_feature_CDiB(AFM_VD_Border(:),AFM_LD_Border(:),secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'ypar',1e9,'YAyL','Lateral Force (nN)','XAxL','Vertical Force (nN)','FigTitle','LD Vs VD Border','NumFig',4);
         %[BC_VD_Vs_LD_Inner]=A10_feature_CDiB(AFM_VD_Inner(:),AFM_LD_Inner(:),secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'ypar',1e9,'YAyL','Lateral Force (nN)','XAxL','Vertical Force (nN)','FigTitle','LD Vs VD Inner','NumFig',4);
     end    
-end
-
-
-function plotSave1(SeeMe,dataIMG,nameTitle,nameFigure,secondMonitorMain,newFolder)
-    if SeeMe
-        ftmp=figure('Visible','on');
-    else
-        ftmp=figure('Visible','off');
-    end
-    imagesc(dataIMG); title(nameTitle,'FontSize',18)
-    objInSecondMonitor(secondMonitorMain,ftmp);
-    saveas(ftmp,sprintf('%s/%s',newFolder,nameFigure))
-end
-
-function plotSave2(SeeMe,dataIMG1,dataIMG2,nameTitle1,nameTitle2,nameColBar,nameFigure,secondMonitorMain,newFolder)
-    if SeeMe
-        ftmp=figure('Visible','on');
-    else
-        ftmp=figure('Visible','off');
-    end
-    sf1=subplot(121); h=imagesc(dataIMG1); title(nameTitle1,'FontSize',18)
-    set(h, 'AlphaData', ~isnan(h.CData))
-    c=colorbar; c.Label.String = nameColBar; c.FontSize  =15;
-    axis(sf1,'equal'), xlim tight, ylim tight
-    
-    sf2=subplot(122); h=imagesc(dataIMG2); title(nameTitle2,'FontSize',18)
-    set(h, 'AlphaData', ~isnan(h.CData))
-    c=colorbar; c.Label.String = nameColBar; c.FontSize =15;
-    axis(sf2,'equal'), xlim tight, ylim tight
-
-    objInSecondMonitor(secondMonitorMain,ftmp);
-    saveas(ftmp,sprintf('%s/%s.tif',newFolder,nameFigure))
 end
