@@ -30,7 +30,7 @@ function [outputme] = A10_feature_CDiB(X_Data,Y_Data,secondMonitorMain,newFolder
     if ~isempty(p.Results.setpoints)
         setpointN=p.Results.setpoints;
         if setpointN(1)>setpointN(end)
-            setpointN=flip(setpointN)*1e-9;
+            setpointN=flip(setpointN);
             DataOI=flip(DataOI);
         end
  

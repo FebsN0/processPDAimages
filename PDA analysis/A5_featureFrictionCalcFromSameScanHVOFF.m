@@ -25,8 +25,6 @@ end
 %%%%%%% FUNCTIONS %%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%
     
-
-
 %%%%%%%%%%%------- PREPARE THE AFM DATA HOVER MODE OFF -------%%%%%%%%%%%
 function varargout=prepareData(secondMonitorMain,pathSingleScan)
     % prepare the data to calculate the friction, regardless the method.        
