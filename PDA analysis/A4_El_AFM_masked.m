@@ -93,7 +93,7 @@ function [AFM_Images_Bk,AFM_height_IO]=A4_El_AFM_masked(AFM_Images,AFM_height_IO
     idImg=4;
     textColorLabel='Height (nm)';
     textNameFile=sprintf('resultA4_3_OptFittedHeightChannel_iteration%d',iterationMain);
-    showData(secondMonitorMain,false,idImg,AFM_noBk,false,textTitle,textColorLabel,filepath,textNameFile)
+    showData(secondMonitorMain,false,idImg,AFM_noBk*1e9,false,textTitle,textColorLabel,filepath,textNameFile)
     % fig is invisible
     close gcf   
 

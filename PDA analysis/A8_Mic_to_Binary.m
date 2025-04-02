@@ -34,7 +34,7 @@ function varargout=A8_Mic_to_Binary(imageBF_aligned,secondMonitorMain,newFolder,
         flagCrop=true;
         ftmp=figure;
         figure_image=imshow(imadjust(imageBF_aligned));
-        title('BrightField image post alignment')
+        title('BrightField image post alignment - CROP THE IMAGE')
         if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,ftmp); end
         [~,specs]=imcrop(figure_image);
         close gcf

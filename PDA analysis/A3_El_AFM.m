@@ -296,25 +296,17 @@ function [AFM_Images,IO_Image]=A3_El_AFM(filtData,iterationMain,secondMonitorMai
         end 
         AFM_noBk=filt_data_no_Bk-Bk_iterative;
         AFM_noBk=AFM_noBk-min(AFM_noBk(:));
-        AFM_noBk_visible_data=imadjust(AFM_noBk/max(AFM_noBk(:)));
         % plot the resulting corrected data
-        f3=figure;
-        imshow(AFM_noBk_visible_data),colormap parula, axis on, axis equal
-        title('Height (measured) channel - Single Line Fitted', 'FontSize',16)
-        objInSecondMonitor(secondMonitorMain,f3);
-        c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
-        ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
-        
+        title1='Height (measured) channel - Single Line Fitted';        
+        showData(secondMonitorMain,SeeMe,3,AFM_noBk*1e9,false,title1,'Height (nm)',filepath,'resultA3_3_HeightLineFitted_noNorm')    
+        showData(secondMonitorMain,true,3,AFM_noBk,true,title1,'',filepath,'resultA3_3_HeightLineFitted_norm','closeImmediately',false)    
         if getValidAnswer('Satisfied of the fitting?','',{'y','n'}) == 1
-            fullfileName=fullfile(filepath,'tiffImages','resultA3_3_HeightLineFitted');
-            saveas(f3,fullfileName,'tif')
-            fullfileName=fullfile(filepath,'figImages','resultA3_3_HeightLineFitted');
-            saveas(f3,fullfileName)
-            close(f3), break
+            close gcf, break
         end
     end
     % start the binarization to create the 0/1 height image. At the same time show normal and logical image
     % for better comparison
+    AFM_noBk_visible_data=imadjust(AFM_noBk/max(AFM_noBk(:))); % normalize for better show data
     f4=figure;
     subplot(121), imshow(AFM_noBk_visible_data),colormap parula, axis on
     title('Height (measured) channel - Single Line Fitted', 'FontSize',16)

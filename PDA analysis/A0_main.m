@@ -1,5 +1,12 @@
-% before continuing, install the proper python libraries in a virtual environment and setup matlab to use
-% python in that venv. To check if it is not using the right venv, check with pyenv.
+% before starting, check the pyenv compatibility with the current MATLAN version on the following website:
+% https://www.mathworks.com/support/requirements/python-compatibility.html?s_tid=srchtitle_site_search_1_python+compatibility
+% 
+% In case multiple pythons version or not compatible current version occur,
+% install the compatible version and run python using the proper version
+% before continuing.
+%
+% Once verified which python version to use, then install the proper python libraries in a virtual environment 
+% and setup matlab to use python in that venv. To check if it is not using the right venv, check with pyenv.
 % If you have like:
 %   Executable: "C:\Users\username\AppData\Local\Programs\Python\Python311\pythonw.exe"
 % You have not setted the venv! Follow the next instruction
@@ -14,11 +21,12 @@
 % check if properly created:
 %   where python   ===> C:\Users\user\nameVirtEnv\Scripts\python.exe
 %
-% 2) upgrade pip and Install libraries
-%   (nameVirtEnv) C:\Users\username> py -m pip install upgrade pip
+% 2) activate venv, upgrade pip and Install libraries
+%   C:\Users\username> nameVirtEnv\Scripts\activate
+%   (nameVirtEnv) C:\Users\username> py -m pip install --upgrade pip
 %   (nameVirtEnv) C:\Users\username> py -m pip --version ====> pip XX.X.X from C:\Users\username\nameVirtEnv\Lib\site-packages\pip (python 3.XX)
 % if something is different, something is wrong. Repeat!
-%   (nameVirtEnv) C:\Users\username> python -m pip install tifffile numpy
+%   (nameVirtEnv) C:\Users\username> python -m pip install tifffile numpy scipy
 %   (nameVirtEnv) C:\Users\username> py -m pip freeze  ===> list installed libraries
 % 3) Start python and Verify that modules can be loaded in Python. If so, everything is ready
 %   (nameVirtEnv) C:\Users\username> python
@@ -37,10 +45,21 @@
 % 6) check if everything is properly prepared:
 %   py.importlib.import_module('tifffile') 
 %           ===> ans = Python module with properties: ...
+% 7) further check:
+%    open the directory "test python on matlab" and run test.m
+%           ===> ans = (matrix value) 
+%
 % AWESOME! EVERYTHING IS READY!
 %
-% BE SURE TO DOWNLOAD FROM "Get More Apps" box the toolbox "polyfitn"
-%
+% %%%%%%%%%%%%%%%%%%%%%%%%%
+% %%% REQUIRED PACKAGES %%%
+% %%%%%%%%%%%%%%%%%%%%%%%%%
+% - Image Processing Toolbox, polyfitn, Xcorr2_fft, settingsdlg:      from "Get More Apps" box as toolbox 
+% - Bio-Formats :   from https://www.openmicroscopy.org/bio-formats/downloads/  (MATLAB icon)
+%                       NOTE: move the package into <DISK>:\Users\<name-user>\Documents\MATLAB\Third-part Toolbox.
+%                       If the folder doesn’t exist, create it. Save any plugin and extension in this directory.
+%                       IMPORTANT: add such directory in the MATLAB path by using pathtool
+
 clc, clear, close all
 % check python and matlab version https://www.mathworks.com/support/requirements/python-compatibility.html
 vers=version('-release'); pe = pyenv; pe=pe.Version;
@@ -53,7 +72,7 @@ end
 clear vers pv* pe
 secondMonitorMain=objInSecondMonitor;
 % upload .jpk files. If more than one and if from same experiment in which setpoint is changed, then assembly.
-
+%%
 % prepare the height data and extract the mask
 mainPath=uigetdir(pwd,sprintf('Locate the main scan directory which contains both HVon and HVoff directories'));
 if ~exist(fullfile(mainPath,'HoverMode_ON'),"dir" )

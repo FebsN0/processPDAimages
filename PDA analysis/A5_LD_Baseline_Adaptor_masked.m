@@ -249,7 +249,9 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_I
                             plot(Bk_iterative(:,idxPrev(j)),'Color',globalColor(j+1),'DisplayName',sprintf('FittedBK line %d',idxPrev(j)))
                         end
                     end
-                    plot(fittedline,'DisplayName',sprintf('Best Fitted curve - fitOrder: %d - %d° iteration',bestFitOrder,iteration))                    
+                    % +2 because second and/or third colors are used for the prev iteration
+                    idxColor=numPrevRows+2;
+                    plot(fittedline,'DisplayName',sprintf('Best Fitted curve - fitOrder: %d - %d° iteration',bestFitOrder,iteration),'Color',globalColor(1))                    
                     objInSecondMonitor(secondMonitorMain,ftmp)
                     legend('FontSize',18), xlim padded, ylim padded, title(sprintf('Line %d',i),'FontSize',14)
                     question=sprintf(['The avg of one of the borders (%d elements over %d) of the first fitted %d-line is higher then the avg of true exp BK borders' ...
@@ -276,8 +278,9 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_I
                         end
                         [fittedline,bestFitOrder,fit_decision_final_tmp]=bestFit(x,aic_values(idxs),models(idxs),fit_decision(:,idxs));
                         if flagContinue
-                            iteration=iteration+1;
-                            plot(fittedline,'DisplayName',sprintf('Best Fitted curve - fitOrder: %d - %d° iteration',bestFitOrder,iteration),'Color',globalColor(3+iteration))
+                            iteration=iteration+1;                            
+                            plot(fittedline,'DisplayName',sprintf('Best Fitted curve - fitOrder: %d - %d° iteration',bestFitOrder,iteration),'Color',globalColor(idxColor))
+                            idxColor=idxColor+1;
                         end
                     end
                     close gcf

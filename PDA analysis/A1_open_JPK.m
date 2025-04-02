@@ -7,16 +7,17 @@ function [varargout]=A1_open_JPK(pathJpk,varargin)
     % Maximum levels to search
     maxLevels = 4; originalPos=pwd; found=false;
     for i=1:maxLevels
-        if exist("PythonCodes","dir")
+        if isfolder(fullfile(pwd, 'PythonCodes'))
             found=true;
             break
-        end
-        cd ..      
+        else
+            cd ..        
+        end            
     end
     if ~found
         error('PythonCodes directory not found. Please, put the directory close to "PDA analysis" folder or move to the proper position')
     else
-        % Construct the path to the Python file
+        % Construct the path to the Python file       
         pythonFile = fullfile(pwd, 'PythonCodes', 'JPKScanTiffTags.py');
         % return to original position
         cd(originalPos)

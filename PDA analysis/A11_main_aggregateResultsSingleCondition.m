@@ -26,6 +26,10 @@ while true
     for k = 1:length(matchedSubfolders)
         % Construct the full path of the current subfolder and then search the specific file
         subfolderPath = fullfile(matchedSubfolders(k).folder, matchedSubfolders(k).name);
+        if typeShow == 1
+            parts=split(subfolderPath,'\');
+            subfolderName{k} = parts{end-1};
+        end
         filesInSubfolder = dir(fullfile(subfolderPath, 'resultsData_A10_end.mat'));
         % If the file exists, append it to the list
         if ~isempty(filesInSubfolder)
@@ -36,7 +40,7 @@ while true
     end
         
     slopes=zeros(1,length(allFiles));
-    xmax=zeros(length(allFiles),1);
+    %xmax=zeros(length(allFiles),1);
     for i=1:length(allFiles)
         % if only one type of data, better visual using different color, but in case of more type/different
         % samples, use single color for each type/sample
@@ -55,7 +59,13 @@ while true
         % the force is expressed in Newton ==> express in nanoNewton
         x=x*1e9;
         [xData,yData,ystdData] = prepareCurveData(x,y,ystd);
-        hp=plot(ax1,xData,yData,'x','Color',clr,'DisplayName','Experimental Data');
+        if typeShow == 1
+            nameplot = sprintf('Experimental Data - %s',subfolderName{i});
+        else
+            nameplot = 'Experimental Data';
+        end
+        hp=plot(ax1,xData,yData,'x','Color',clr,'DisplayName',nameplot);
+        hp.Annotation.LegendInformation.IconDisplayStyle = 'off';
         % Fit:
         ft = fittype( 'poly1' );
         opts = fitoptions( 'Method', 'LinearLeastSquares' );
@@ -63,19 +73,28 @@ while true
         [fitresult, gof] = fit( xData, yData, ft, opts );
         xfit=linspace(xData(1),xData(end),length(xData));
         yfit=xfit*fitresult.p1+fitresult.p2;
-        %yfit=xfit.^2*fitresult.p1+xfit*fitresult.p2+fitresult.p3;
-        hf{cnt}= plot(ax1,xfit,yfit,'Color',clr,'DisplayName','Fitted Curve','LineWidth',3);
+        if typeShow == 1
+            nameplot = sprintf('Fitted Curve - %s',subfolderName{i});
+            hf{i}= plot(ax1,xfit,yfit,'Color',clr,'DisplayName',nameplot,'LineWidth',3);
+        else
+            nameplot = 'Fitted Curve';
+            hf{cnt}= plot(ax1,xfit,yfit,'Color',clr,'DisplayName',nameplot,'LineWidth',3);
+        end
+        
         % save the fit var to calc the average
         slopes(i)=fitresult.p1;
     end
     slopeAVG_type(cnt)=mean(slopes);
     slopeSTD_type(cnt)=std(slopes);
+    if typeShow==1
+        break
+    end
     cnt=cnt+1;
 end
 
 title('LD Vs Fluorescence','FontSize',20);
 if typeShow==1
-    legend([hp, hf])
+    legend('Location', 'best','FontSize',15,'Interpreter','none')
 else
     textH=''; textN=''; textNT=cell(1,cnt-1); 
     for n=1:cnt-1
