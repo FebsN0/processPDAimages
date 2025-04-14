@@ -72,123 +72,205 @@ end
 clear vers pv* pe
 secondMonitorMain=objInSecondMonitor;
 % upload .jpk files. If more than one and if from same experiment in which setpoint is changed, then assembly.
-%%
+
 % prepare the height data and extract the mask
 mainPath=uigetdir(pwd,sprintf('Locate the main scan directory which contains both HVon and HVoff directories'));
-if ~exist(fullfile(mainPath,'HoverMode_ON'),"dir" )
-    % HoverMode_ON is the directory which contains the .jpk file in Hover Mode ON, so the first scan (the second scan is Hover Mode off. Required for calc the friction coefficient
-    error('Data Hover Mode ON doesn''t exist. Check the directory')  
-else
-    flagExeA1=true;
-    if exist(fullfile(mainPath,'HoverMode_ON','resultsData_1_postProcessA4_HVon.mat'),'file')
-        tmp=strsplit(mainPath,'\');
-        nameScan=tmp{end}; clear tmp        
-        question=sprintf('Results of the scan %s HoverModeON already exists. Take it? If not, remove the previous one.',nameScan);
-        if getValidAnswer(question,'',{'Yes','No'})
-            load(fullfile(mainPath,'HoverMode_ON\resultsData_1_postProcessA4_HVon'))
-            flagExeA1=false;
+tmp=strsplit(mainPath,'\');
+nameScan=tmp{end}; nameExperiment=tmp{end-2}; clear tmp
+question=sprintf('Name experiment: %s\nScan i-th: %s\nIs everything okay?',nameExperiment,nameScan);
+if ~getValidAnswer(question,'',{'Yes','No'})
+    while true
+        nameExperiment=inputdlg('Enter manually name experiment');
+        if isempty(nameExperiment) || isempty(nameExperiment{1})
+            disp('Input not valid')
         else
-            delete(pathResultsData)           
-        end        
-    end
-    if flagExeA1
-        accuracy=chooseAccuracy("Step A3 - Fitting the baseline (i.e. Background) of AFM Height Data. Which fit order range use?");
-        [AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM,folderResultsImg,setpoints]=A1_openANDassembly_JPK(secondMonitorMain,'filePath',fullfile(mainPath,'HoverMode_ON'),'FitOrder',accuracy);
-        clear BW maskedImage accuracy question nameScan flagExeA1
-        save(fullfile(mainPath,'HoverMode_ON\resultsData_1_postProcessA4_HVon'))
+            break
+        end
     end
 end
-%%
-% prepare the lateral force by using a proper friction coefficient
-accuracy=chooseAccuracy("step A5 - Fitting the baseline (i.e. Background) of AFM Lateral Deflection Data. Which fit order range use?");
-AFM_A5_LatDeflecFitted=A5_LD_Baseline_Adaptor_masked(AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM.Alpha,secondMonitorMain,folderResultsImg,mainPath,'FitOrder',accuracy,'Silent','No');
-close all
-clear accuracy
+clear question
 
-%%
-[nameDir,numberExperiment,~]=fileparts(fileparts(folderResultsImg));
-[~,nameExperiment,~]=fileparts(fileparts(nameDir));
-fprintf('\nAFM data is taken from the following experiment:\n\tEXPERIMENT: %s\t\tNUMBER:\t %s\n\n',nameExperiment,numberExperiment)
-% Open Brightfield image and the TRITIC (Before and After stimulation images)
+% check if data already exist. If so, upload.
+[flagExeA1,flagExeA5,flagExeA6_A7_A8,flagExeA9]=checkExistingData(mainPath,nameExperiment,nameScan);
 
-filenameND2='resultA6_1_BrightField'; titleImage='BrightField - original';
-[BF_Mic_Image,metaData_BF,filePathData]=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain);
 
-% .nd2 files inside dir
-fileList = dir(fullfile(filePathData, '*.nd2'));
-pattern = '\d+ms';
-matches = regexp({fileList.name}, pattern, 'match');
-matches = [matches{:}];
-timeValues = sort(unique(cellfun(@(x) str2double(erase(x, 'ms')), matches)));
-timeList = cellstr(string(unique(timeValues)));
-BF_Mic_Image_original=BF_Mic_Image;
-while true
-    if ~isempty(timeList)
-        timeExp=timeList{getValidAnswer('What exposure time do you want to take?','',timeList)};
-    end
-    
-    % select the files with the choosen time exposure
-    matchingFiles = {fileList(contains({fileList.name}, [timeExp, 'ms'])).name};
-    % auto selection
-    beforeFiles = matchingFiles(contains(matchingFiles, 'before', 'IgnoreCase', true));
-    afterFiles = matchingFiles(contains(matchingFiles, {'post', 'after'}, 'IgnoreCase', true));
-    % in case not found, manual selection
-    if isempty(beforeFiles) || isempty(afterFiles)
-        disp('Issues in finding the files. Manual selection.');  
-    end
-    filenameND2='resultA6_2_TRITIC_Before_Stimulation'; titleImage='TRITIC Before Stimulation';
-    Tritic_Mic_Image_Before=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain,filePathData,'Before',beforeFiles);
-    filenameND2='resultA6_3_TRITIC_After_Stimulation'; titleImage='TRITIC After Stimulation';
-    Tritic_Mic_Image_After=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain,filePathData,'Before',afterFiles);
-    close all       
-    % Align the fluorescent images After with the BEFORE stimulation
-    [Tritic_Mic_Image_After_aligned,offset]=A7_limited_registration(Tritic_Mic_Image_After,Tritic_Mic_Image_Before,folderResultsImg,secondMonitorMain);
-    % adjust BF and Tritic_Before depending on the offset
-    BF_Mic_Image=fixSize(BF_Mic_Image,offset);
-    Tritic_Mic_Image_Before=fixSize(Tritic_Mic_Image_Before,offset);   
-    % Align the Brightfield to TRITIC Before Stimulation
-    [BF_Mic_Image_aligned,offset]=A7_limited_registration(BF_Mic_Image,Tritic_Mic_Image_Before,folderResultsImg,secondMonitorMain,'Brightfield','Yes','Moving','Yes');    
-    Tritic_Mic_Image_After_aligned=fixSize(Tritic_Mic_Image_After_aligned,offset);
-    Tritic_Mic_Image_Before=fixSize(Tritic_Mic_Image_Before,offset);   
-    if getValidAnswer(sprintf('Satisfied of all the registration of BF and fluorescence image?\nIf not, change time exposure for better alignment'),'',{'Yes','No'})
-        close gcf
-        break
-    end
-    % in case of no satisfaction, restore original data
-    BF_Mic_Image=BF_Mic_Image_original;
+%% Aseembly sections if any, binarize height image and optimize it
+if flagExeA1
+    accuracy=chooseAccuracy("Step A3 - Fitting the baseline (i.e. Background) of AFM Height Data. Which fit order range use?");
+    [AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM,folderResultsImg,setpoints]=A1_openANDassembly_JPK(secondMonitorMain,'filePath',fullfile(mainPath,'HoverMode_ON'),'FitOrder',accuracy);
+    clear BW maskedImage accuracy question
+    save(fullfile(mainPath,'HoverMode_ON\resultsData_1_postProcessA4_HVon'))
+end
+%% prepare the lateral force by using a proper friction coefficient
+if flagExeA1 || flagExeA5
+    accuracy=chooseAccuracy("step A5 - Fitting the baseline (i.e. Background) of AFM Lateral Deflection Data. Which fit order range use?");
+    AFM_A5_LatDeflecFitted=A5_LD_Baseline_Adaptor_masked(AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM.Alpha,secondMonitorMain,folderResultsImg,mainPath,'FitOrder',accuracy,'Silent','No');
     close all
+    clear accuracy AFM_A4_HeightFittedMasked
+    save(fullfile(mainPath,'HoverMode_ON\resultsData_2_postProcessA5'))
 end
-% adjust the metadata BF size
-nameExperiment=sprintf('%s_scan%s',nameExperiment,numberExperiment);
-clear fileList numberExperiment proportionMeter2Pixel f1 f2 f3 matchingFiles question options choice fileName Tritic_Mic_Image_After
-clear filePathData nameDir filenameND2 afterFiles beforeFiles BF_Mic_Image BF_Mic_Image_original offset time* titleImage pattern matches
+%% Extract the Brightfield data and correctly align them (especially after-before TRITIC since longer time passed)
+% includes A6 and A7
+if flagExeA1 || flagExeA5 || flagExeA6_A7_A8
+    fprintf('\nAFM data is taken from the following experiment:\n\tEXPERIMENT: %s\t\tSCAN i-th:\t %s\n\n',nameExperiment,nameScan) 
+    [metaData_BF,BF_Mic_Image_aligned,Tritic_Mic_Image_After_aligned,Tritic_Mic_Image_Before]=selectNDdata(folderResultsImg,secondMonitorMain);
+    % Produce the binary IO of Brightfield
+    [BF_Mic_Image_IO,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,~]=A8_Mic_to_Binary(BF_Mic_Image_aligned,secondMonitorMain,folderResultsImg,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned); 
+    clear BF_Mic_Image_aligned 
+    close all
+    save(fullfile(mainPath,'HoverMode_ON\resultsData_3_postProcessA8'))
+end
+%% Align AFM to BF and extract the coordinates for alignment to be transferred to the other data
+if flagExeA1 || flagExeA5 || flagExeA6_A7_A8 || flagExeA9
+    [AFM_A10_IO_final,AFM_A10_data_final,results_AFM_BF_aligment,offset]=A9_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_A5_LatDeflecFitted,folderResultsImg,secondMonitorMain,'Margin',150);
+    % adjust size BF and TRITIC
+    BF_Mic_Image_IO=fixSize(BF_Mic_Image_IO,offset);
+    Tritic_Mic_Image_Before=fixSize(Tritic_Mic_Image_Before,offset);  
+    Tritic_Mic_Image_After_aligned=fixSize(Tritic_Mic_Image_After_aligned,offset);  
+    clear offset AFM_A5_LatDeflecFitted
+    save(fullfile(mainPath,'HoverMode_ON\resultsData_4_postProcessA9.mat'))
+end
+%% correlation FLUORESCENCE AND AFM DATA
 
-% Produce the binary IO of Brightfield
-[BF_Mic_Image_IO,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,~]=A8_Mic_to_Binary(BF_Mic_Image_aligned,secondMonitorMain,folderResultsImg,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned); 
-close all
-
-clear BF_Mic_Image_aligned 
-save(fullfile(mainPath,'HoverMode_ON\resultsData_2_postProcessA8_HVon'))
-%%
-% Align AFM to BF and extract the coordinates for alighnment to be transferred to the other data
-[AFM_A10_IO_final,AFM_A10_data_final,results_AFM_BF_aligment,offset]=A9_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_A5_LatDeflecFitted,folderResultsImg,secondMonitorMain,'Margin',150);
-
-BF_Mic_Image_IO=fixSize(BF_Mic_Image_IO,offset);
-Tritic_Mic_Image_Before=fixSize(Tritic_Mic_Image_Before,offset);  
-Tritic_Mic_Image_After_aligned=fixSize(Tritic_Mic_Image_After_aligned,offset);  
-clear offset
-%%
-% correlation FLUORESCENCE AND AFM DATA
-
-% e stato rimosso da A1 vertForceAVG, quindi la variabile deve essere tolta. Forse stava qui da quando ancora
-% non scoprivo la cosa del baseline e quindi si puo usare tranquillamente setpoint
+fprintf('\nAFM data is taken from the following experiment:\n\tEXPERIMENT: %s\n\n',nameExperiment)
 Data_finalResults=A10_correlation_AFM_BF(AFM_A10_data_final,AFM_A10_IO_final,setpoints,secondMonitorMain,folderResultsImg,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned,'innerBorderCalc',true);
+
+clear flag* Tritic_Mic_Image_Before Tritic_Mic_Image_After_aligned AFM_A10_data_final AFM_A10_IO_final
 save(fullfile(folderResultsImg,'resultsData_A10_end'))
 
 %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%% FUNCTIONS %%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [flagExeA1,flagExeA5,flagExeA6_A7_A8,flagExeA9]=checkExistingData(mainPath,nameExperiment,nameScan)
+    if ~exist(fullfile(mainPath,'HoverMode_ON'),"dir" )
+        % HoverMode_ON is the directory which contains the .jpk file in Hover Mode ON, so the first scan (the second scan is Hover Mode off. Required for calc the friction coefficient
+        error('Data Scan %s Hover Mode ON doesn''t exist. Check the directory',nameScan)
+    else
+        % check if some data already exist to avoid to do again some parts of the postprocessing          
+        % if A1 (assembly), A3 (binarization) and A4 (optminization) are already done
+        filePostA4  =  'resultsData_1_postProcessA4_HVon.mat';
+        flagExeA1=false;     % by default, run ENTIRE postprocess, otherwise skip to the next step (A5-A6-..)    
+        % if A5 (conversion of lateral data from Volt into Force according to the friction by processing HVoff) is already done
+        filePostA5  =  'resultsData_2_postProcessA5.mat';
+        flagExeA5=false;     % by default, run postprocess step A5, otherwise skip to the next step (A6-A7-..)    
+        % if A6 (BF and TRITIC extraction), A7 (BF and TRITIC alignment), A8 (BF binarization) are already done
+        filePostA6_A7_A8  = 'resultsData_3_postProcessA8.mat';
+        flagExeA6_A7_A8=false;     % by default, run postprocess steps A6-A7-A8, otherwise skip to the next step (A9)   
+        % if A9 (AFM-IO and BF-IO alignment) is already done
+        filePostA9  = 'resultsData_4_postProcessA9.mat';
+        flagExeA9=false;      % by default, run postprocess A9, otherwise skip to the last step (A10)    
+        % if A10 (final data) is already obtained
+        fileFinalData = 'resultsData_A10_end.mat';           
+        % Find final results recursively
+        if ~isempty(dir(fullfile(mainPath, '**', fileFinalData)))
+            %fullPath = fullfile(allFiles.folder, allFiles.name);
+            question=sprintf('Final results (post A10, correlation force-fluorescence) of the %s scan #%s already exists.\nChoose the right option:',nameExperiment,nameScan);
+            options={'Stop the process','Redo correlation force-fluorescence (A10)'};
+            if getValidAnswer(question,'',options)==1
+                error('Stopped by user.')
+            end
+            % redo A10        
+            tmpData=load(fullfile(mainPath, 'HoverMode_ON', filePostA9));
+        % A9 part
+        elseif exist(fullfile(mainPath, 'HoverMode_ON', filePostA9),'file')
+            question=sprintf('Results after alignment (A9) of the %s scan #%s already exists.\nChoose the right option:',nameExperiment,nameScan);
+            options={'Run next step A10','Redo A9'};
+            if getValidAnswer(question,'',options)==1
+                tmpData=load(fullfile(mainPath, 'HoverMode_ON', filePostA9));                
+            else
+                flagExeA9=true;
+            end
+        % A6_A7_A8 part
+        elseif exist(fullfile(mainPath, 'HoverMode_ON', filePostA6_A7_A8),'file')
+            question=sprintf('Results after BF and TRITIC images preparation (A6-A7-A8) of the %s scan #%s already exists.\nChoose the right option:',nameExperiment,nameScan);
+            options={'Run next step A9','Redo A6_A7_A8'};
+            if getValidAnswer(question,'',options)==1
+                tmpData=load(fullfile(mainPath, 'HoverMode_ON', filePostA6_A7_A8));
+                flagExeA9=true;
+            else
+                flagExeA6_A7_A8=true;
+            end
+        % A5 part
+        elseif exist(fullfile(mainPath, 'HoverMode_ON', filePostA5),'file')
+            question=sprintf('Results after conversion of lateral data from Volt to Force (A5) of the %s scan #%s already exists.\nChoose the right option:',nameExperiment,nameScan);
+            options={'Run next steps A6_A7_A8','Redo A5'};
+            if getValidAnswer(question,'',options)==1
+                tmpData=load(fullfile(mainPath, 'HoverMode_ON', filePostA5));
+                flagExeA6_A7_A8=true;
+            else
+                flagExeA5=true;
+            end
+        % A1-A2-A3-A4 part
+        elseif exist(fullfile(mainPath, 'HoverMode_ON', filePostA4),'file')
+            question=sprintf('Results after assembly, binarization and optminization (A1-A2-A3-A4) of the %s scan #%s already exists.\nChoose the right option:',nameExperiment,nameScan);
+            options={'Run next step A5','Redo A1-A2-A3-A4'};
+            if ~getValidAnswer(question,'',options)==2
+                tmpData=load(fullfile(mainPath, 'HoverMode_ON', filePostA4));
+                flagExeA5=true;
+            else
+                flagExeA1=true;
+            end
+        end
+        if exist('tmpData','var')
+            fieldNamesC = fieldnames(tmpData);
+            for i = 1:length(fieldNamesC)
+                assignin('base', fieldNamesC{i}, tmpData.(fieldNamesC{i}));
+            end
+        end
+    end
+    clear options question
+end
+
+function [metaData_BF,BF_Mic_Image_aligned,Tritic_Mic_Image_After_aligned,Tritic_Mic_Image_Before]=selectNDdata(folderResultsImg,secondMonitorMain)
+      % Open Brightfield image and the TRITIC (Before and After stimulation images)
+    filenameND2='resultA6_1_BrightField'; titleImage='BrightField - original';
+    [BF_Mic_Image,metaData_BF,filePathData]=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain);
+    % .nd2 files inside dir
+    fileList = dir(fullfile(filePathData, '*.nd2'));
+    pattern = '\d+ms';
+    matches = regexp({fileList.name}, pattern, 'match');
+    matches = [matches{:}];
+    timeValues = sort(unique(cellfun(@(x) str2double(erase(x, 'ms')), matches)));
+    timeList = cellstr(string(unique(timeValues)));
+    BF_Mic_Image_original=BF_Mic_Image;
+    while true
+        if ~isempty(timeList)
+            timeExp=timeList{getValidAnswer('What exposure time do you want to take?','',timeList)};
+        end
+        
+        % select the files with the choosen time exposure
+        matchingFiles = {fileList(contains({fileList.name}, [timeExp, 'ms'])).name};
+        % auto selection
+        beforeFiles = matchingFiles(contains(matchingFiles, 'before', 'IgnoreCase', true));
+        afterFiles = matchingFiles(contains(matchingFiles, {'post', 'after'}, 'IgnoreCase', true));
+        % in case not found, manual selection
+        if isempty(beforeFiles) || isempty(afterFiles)
+            disp('Issues in finding the files. Manual selection.');  
+        end
+        filenameND2='resultA6_2_TRITIC_Before_Stimulation'; titleImage='TRITIC Before Stimulation';
+        Tritic_Mic_Image_Before=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain,filePathData,'Before',beforeFiles);
+        filenameND2='resultA6_3_TRITIC_After_Stimulation'; titleImage='TRITIC After Stimulation';
+        Tritic_Mic_Image_After=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain,filePathData,'Before',afterFiles);
+        close all       
+        % Align the fluorescent images After with the BEFORE stimulation
+        [Tritic_Mic_Image_After_aligned,offset]=A7_limited_registration(Tritic_Mic_Image_After,Tritic_Mic_Image_Before,folderResultsImg,secondMonitorMain);
+        % adjust BF and Tritic_Before depending on the offset
+        BF_Mic_Image=fixSize(BF_Mic_Image,offset);
+        Tritic_Mic_Image_Before=fixSize(Tritic_Mic_Image_Before,offset);   
+        % Align the Brightfield to TRITIC Before Stimulation
+        [BF_Mic_Image_aligned,offset]=A7_limited_registration(BF_Mic_Image,Tritic_Mic_Image_Before,folderResultsImg,secondMonitorMain,'Brightfield','Yes','Moving','Yes');    
+        Tritic_Mic_Image_After_aligned=fixSize(Tritic_Mic_Image_After_aligned,offset);
+        Tritic_Mic_Image_Before=fixSize(Tritic_Mic_Image_Before,offset);   
+        if getValidAnswer(sprintf('Satisfied of all the registration of BF and fluorescence image?\nIf not, change time exposure for better alignment'),'',{'Yes','No'})
+            close gcf
+            break
+        end
+        % in case of no satisfaction, restore original data
+        BF_Mic_Image=BF_Mic_Image_original;
+        close all
+    end
+end
 
 function [AFM_data_cleared,AFM_heightIO_cleared,idxRemovedPortion]=removePortions(AFM_data,AFM_heightIO,secondMonitorMain,filepath)
 % before start pre-process the lateral data, it may be necessary to manually remove portions which contains 
