@@ -13,7 +13,7 @@ while true
     if mainFolderSingleCondition == 0
         break
     end
-    nameType{cnt}=inputdlg('Enter the name of the data type (example: TRCDA or TRCDA:DMPC, etc)');
+    nameType{cnt}=inputdlg('Enter the name of the data type (example: TRCDA or TRCDA:DMPC, etc)'); %#ok<SAGROW>
     disp(nameType{cnt}{1})
     commonPattern = 'Results Processing AFM and fluorescence images';
     % Get a list of all subfolders in the selected directory
@@ -92,13 +92,14 @@ while true
     cnt=cnt+1;
 end
 
-title('LD Vs Fluorescence','FontSize',20);
+
 if typeShow==1
     legend('Location', 'best','FontSize',15,'Interpreter','none')
+    title({sprintf('Comparison of different scans of the same sample (%s)',nameType{1}{1}); sprintf('Slope: = %.2e \x00B1 %.2e',slopeAVG_type,slopeSTD_type)},'FontSize',20);
 else
-    textH=''; textN=''; textNT=cell(1,cnt-1); 
+    textH=''; textN=''; textNT=cell(1,cnt-1);  
     for n=1:cnt-1
-        textNT{n} = sprintf(' %s \n - slopeAVG: = %.2e \x00B1 %.2e',nameType{n}{1},slopeAVG_type(n),slopeSTD_type(n));
+        textNT{n} = sprintf(' %s \n - slope: = %.2e \x00B1 %.2e',nameType{n}{1},slopeAVG_type(n),slopeSTD_type(n));
         if n==1
             textN = sprintf('textNT{%d}',n);
             textH = sprintf('hf{%d}',n);
@@ -108,6 +109,7 @@ else
         end
     end
     legend(eval(sprintf('[%s]',textH)),textNT, 'Location', 'best','FontSize',15,'Interpreter','none');
+    title('LD Vs Fluorescence - comparison different settings','FontSize',20);
 end
 xlim padded
 ylim padded
