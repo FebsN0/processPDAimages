@@ -251,10 +251,10 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_I
                     end
                     % +2 because second and/or third colors are used for the prev iteration
                     idxColor=numPrevRows+2;
-                    plot(fittedline,'DisplayName',sprintf('Best Fitted curve - fitOrder: %d - %d° iteration',bestFitOrder,iteration),'Color',globalColor(1))                    
+                    plot(fittedline,'DisplayName',sprintf('Best Fitted curve - fitOrder: %d - %d° iteration',bestFitOrder,iteration),'Color',globalColor(1),'LineWidth',2,'LineStyle','--')                    
                     objInSecondMonitor(secondMonitorMain,ftmp)
                     legend('FontSize',18), xlim padded, ylim padded, title(sprintf('Line %d',i),'FontSize',14)
-                    question=sprintf(['The avg of one of the borders (%d elements over %d) of the first fitted %d-line is higher then the avg of true exp BK borders' ...
+                    question=sprintf(['The avg of one of the borders (%d elements over %d) of the first\nfitted %d-line is higher then the avg of true exp BK borders' ...
                         '(%d elements)\nChoose the best option to manage the current line.'],round(length(yData)*10/100),length(yData),i,round(length(yData)*5/100));
                     idxs=1:limit; flagContinue=true; 
                     while flagContinue
@@ -279,7 +279,7 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_I
                         [fittedline,bestFitOrder,fit_decision_final_tmp]=bestFit(x,aic_values(idxs),models(idxs),fit_decision(:,idxs));
                         if flagContinue
                             iteration=iteration+1;                            
-                            plot(fittedline,'DisplayName',sprintf('Best Fitted curve - fitOrder: %d - %d° iteration',bestFitOrder,iteration),'Color',globalColor(idxColor))
+                            plot(fittedline,'DisplayName',sprintf('Best Fitted curve - fitOrder: %d - %d° iteration',bestFitOrder,iteration),'Color',globalColor(idxColor),'LineWidth',2,'LineStyle','--')
                             idxColor=idxColor+1;
                         end
                     end
@@ -289,11 +289,6 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_I
             fit_decision_final_line(i)=fit_decision_final_tmp;
             Bk_iterative(:, i) = fittedline;
         end        
-
-        % [xGrid, yGrid] = meshgrid(1:size(Bk_iterative,2), 1:size(Bk_iterative,1));
-        % % Estrarre solo i punti di background without outliers
-        % [xData, yData, zData] = prepareSurfaceData(xGrid,yGrid,Bk_iterative);    
-        % curveFitter(xData,yData,zData)
 
         delete(wb);    
         % Handle missing lines by interpolating from neighbors, also when more consecutive lines are totally NaN

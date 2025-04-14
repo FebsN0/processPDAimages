@@ -243,7 +243,7 @@ function [moving_adj,offset]=A7_limited_registration(moved,fixed,newFolder,secon
         if getValidAnswer('Satisfied of the alignment?','',{'y','n'})
             break
         else
-            close gcf
+            close(f5)
         end
     end
     if saveFig

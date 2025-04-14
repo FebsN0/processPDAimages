@@ -67,7 +67,7 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints
     idx_H = strcmp([AFM_data.Channel_name],'Height (measured)');
     idx_VD =  strcmp([AFM_data.Channel_name],'Vertical Deflection') & strcmp([AFM_data.Trace_type],'Trace');
  
-    % prepare Delta in correspondence of any background using AFM height I/O
+    % prepare Delta in correspondence of PDA using AFM height I/O
     % (crystal/PDA/polymer == 1   ||   background = 0)
     % NOTE: AFM_IO_Padded has the same size as well the BF images original
     if ~flag_onlyAFM
@@ -81,6 +81,12 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints
         Min_Delta_glass=min(min(Delta_glass,[],"omitnan"));
         % fix the fluorescence using the minimum value
         Delta_ADJ=Delta-Min_Delta_glass;
+        % normalize the fluorescence data
+        if getValidAnswer('Normalize the fluorescence data?','',{'y','n'})
+            [nameDir,~,~]=fileparts(fileparts(fileparts(folderResultsImg)));            
+            normFactor=A10_feature_normFluorescenceHeat(nameDir);
+            Delta_ADJ=Delta_ADJ/normFactor;
+        end
         showData(secondMonitorMain,0,1,Delta_ADJ,true,'Delta Fluorescence (After-Before)','',newFolder,'resultA10_1_DeltaFluorescenceFull')
         % remove the data outside the AFM data which is only zero
         Delta_ADJ(AFM_data(idx_LD).AFM_padded==0)=nan;
@@ -194,7 +200,9 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints
     AFM_data(idx_LD).Padded_masked(AFM_data(idx_LD).AFM_padded<=0)=nan;
     % find the maximum vertical force to extract only meaningful lateral force: remember, lateral force cannot
     % be higher than vertical force. Those higher values are due to unstable tip scannings
-    maxVD=max(max(AFM_data(idx_VD).Padded_masked));
+    % use setpoint+10% as upper limit
+    %maxVD=max(max(AFM_data(idx_VD).Padded_masked));
+    maxVD=max(setpoints)*1.1;
     %extract meaningful lateral force
     AFM_data(idx_LD).Padded_masked_maxVD=AFM_data(idx_LD).AFM_padded;
     AFM_data(idx_LD).Padded_masked_maxVD(~isnan(AFM_data(idx_LD).Padded_masked_glass))=nan; % opposite of masked_glass
