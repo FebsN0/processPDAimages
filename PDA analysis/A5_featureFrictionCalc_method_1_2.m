@@ -317,6 +317,8 @@ function avg_fc=A5_featureFrictionCalc_method_1_2(AFM,metadata,mask,secondMonito
     if flagWrongImage
         fileNotes=sprintf('%s/NOTES_resultA5_xFrictionCalc_method2_%d_pixelVSfrictionCoeffs_%s.txt',newFolder,fOutlierRemoval,fOutlierRemoval_text);
         fID=fopen(fileNotes,'a');
+        % check better this line
+        nameScan=fileparts(fileparts(newFolder));
         text=sprintf('Experiment %s is entirely wrong: the friction coefficient of any pixel reduction size is outside the acceptable range\n',nameScan);
         fwrite(fID,text)
         fclose(fID);

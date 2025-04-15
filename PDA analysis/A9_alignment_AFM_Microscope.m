@@ -270,9 +270,6 @@ function [AFM_IO_3_BFaligned,AFM_Elab,info_allignment,offset]=A9_alignment_AFM_M
         end
         AFM_Elab=AFM_Elab_original;
         close(f2)
-        if exist('f5','var')
-            close(f5)
-        end
     end   
 
     if answerCrop == 1
