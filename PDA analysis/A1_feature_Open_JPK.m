@@ -1,5 +1,5 @@
         % varargout = return any number of output arguments
-function [varargout]=A1_open_JPK(pathJpk,varargin)
+function [varargout]=A1_feature_Open_JPK(pathJpk,varargin)
 
     
 % the python file is assumed to be in a directory called "PythonCodes". Find it to a max distance of 4 upper
