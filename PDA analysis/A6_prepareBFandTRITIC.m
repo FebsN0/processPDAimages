@@ -1,0 +1,94 @@
+function varargout=A6_prepareBFandTRITIC(folderResultsImg,secondMonitorMain)
+    % Open Brightfield image and the TRITIC (Before and After stimulation images)
+    filenameND2='resultA6_1_BrightField'; titleImage='BrightField - original';
+    [BF_Mic_Image,metaData_BF,filePathData]=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain);
+    varargout{1}=metaData_BF;
+    % .nd2 files inside dir
+    fileList = dir(fullfile(filePathData, '*.nd2'));
+    pattern = '\d+ms';
+    matches = regexp({fileList.name}, pattern, 'match');
+    matches = [matches{:}];
+    timeValues = sort(unique(cellfun(@(x) str2double(erase(x, 'ms')), matches)));
+    timeList = cellstr(string(unique(timeValues)));
+    BF_Mic_Image_original=BF_Mic_Image;
+    while true
+        if ~isempty(timeList)
+            timeExp=timeList{getValidAnswer('What exposure time do you want to take?','',timeList)};
+        else
+            error('This error occurs when the file .nd2 does not containt time exposure in the filename. part has not prepared. Modify in a second moment. Contact the coder if you have issues.')
+        end
+        % select the files with the choosen time exposure
+        matchingFiles = {fileList(contains({fileList.name}, [timeExp, 'ms'])).name};
+        % auto selection
+        beforeFiles = matchingFiles(contains(matchingFiles, 'before', 'IgnoreCase', true));
+        afterFiles = matchingFiles(contains(matchingFiles, {'post', 'after'}, 'IgnoreCase', true));
+        % in case not found, manual selection
+        if isempty(beforeFiles) || isempty(afterFiles)
+            disp('Issues in finding the files. Manual selection.');  
+        end
+        
+        filenameND2='resultA6_2_TRITIC_Before_Stimulation'; titleImage='TRITIC Before Stimulation';
+        Tritic_Mic_Image_Before=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain,filePathData,'Before',beforeFiles);
+        filenameND2='resultA6_3_TRITIC_After_Stimulation'; titleImage='TRITIC After Stimulation';
+        Tritic_Mic_Image_After=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain,filePathData,'After',afterFiles);
+        close all       
+        % Align the fluorescent images After with the BEFORE stimulation
+        [Tritic_Mic_Image_After_aligned,offset]=A7_limited_registration(Tritic_Mic_Image_After,Tritic_Mic_Image_Before,folderResultsImg,secondMonitorMain);
+        % adjust BF and Tritic_Before depending on the offset
+        BF_Mic_Image=fixSize(BF_Mic_Image,offset);
+        Tritic_Mic_Image_Before=fixSize(Tritic_Mic_Image_Before,offset);   
+        % Align the Brightfield to TRITIC Before Stimulation
+        [BF_Mic_Image_aligned,offset]=A7_limited_registration(BF_Mic_Image,Tritic_Mic_Image_Before,folderResultsImg,secondMonitorMain,'Brightfield','Yes','Moving','Yes');    
+        varargout{2}=BF_Mic_Image_aligned;
+        Tritic_Mic_Image_After_aligned=fixSize(Tritic_Mic_Image_After_aligned,offset);
+        varargout{3}=Tritic_Mic_Image_After_aligned;
+        Tritic_Mic_Image_Before=fixSize(Tritic_Mic_Image_Before,offset);
+        varargout{4}=Tritic_Mic_Image_Before;
+        if getValidAnswer(sprintf('Satisfied of all the registration of BF and fluorescence image?\nIf not, change time exposure for better alignment'),'',{'Yes','No'})
+            close gcf
+            break
+        end
+        % in case of no satisfaction, restore original data
+        BF_Mic_Image=BF_Mic_Image_original;
+        close all
+        mainPathOpticalData=fileparts(fileparts(filePathData));
+        varargout{5}=mainPathOpticalData;
+        varargout{6}=timeExp;
+    end
+end
+
+
+function [Image,metaData,filePathData]=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain,varargin)
+    % the function extract the given .nd2 image file and generate the
+    % picture with a given title
+    % varargin:
+    %   - varargin{1} = filePathData : to select a .nd2 file from the same directory in which the current function has been previously
+    %                   called (save time instead of selecting files by starting from pwd)
+    %   - varargin{2} = mode : string text to give to the selected .nd2 file 
+    % beforeFiles
+    for i=varargin
+        filePathData=varargin{1};
+        mode=varargin{2};
+        if ~isempty(varargin{3})
+            fileName=varargin{3};
+            if ~isempty(fileName)
+                fileName=fileName{1};
+            end
+        end        
+    end
+    if ~exist('filePathData','var')
+        [fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the BrightField image');
+    else
+        if isempty(varargin{3})
+            [fileName, filePathData] = uigetfile({'*.nd2'}, sprintf('Select the TRITIC %s Stimulation image',mode),filePathData);
+        end
+    end
+    [Image,~,metaData]=A6_feature_Open_ND2(fullfile(filePathData,fileName)); 
+    f1=figure('Visible','off');
+    imshow(imadjust(Image)), title(titleImage,'FontSize',17)
+    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
+    fullfileName=fullfile(folderResultsImg,'tiffImages',filenameND2);
+    saveas(f1,fullfileName,'tif')
+    fullfileName=fullfile(folderResultsImg,'figImages',filenameND2);
+    saveas(f1,fullfileName)
+end
