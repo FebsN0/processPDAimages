@@ -4,83 +4,129 @@
 % This value should be used later on to normalise the processed!
 % fluorescent images so that different measurements (and PDA) can be
 % compared.
-function normFactor = A10_feature_normFluorescenceHeat(nameDir)
-
-    questdlg('Select location for TRITIC 1 Data','TBF data location','OK','OK');
-            [afm_file_name,AFM_file_path,afm_file_index]=uigetfile('Choose BF File');
-        TRITIC_Before_File_Path=sprintf('%c%c',AFM_file_path,afm_file_name);
-        
-        [Tritic_Mic_Image_1]=open_ND2(TRITIC_Before_File_Path);
-    figure,imshow(imadjust(Tritic_Mic_Image_1))
-    
-    
-    [binary_image_1,Tritic_Mic_Image_1_cropped,FurtherDetails1]=Mic_to_Binary_TRITC(Tritic_Mic_Image_1,'Silent','No');
-    Tritic_Mic_Image_1_cropped_masked=Tritic_Mic_Image_1_cropped;
-    Tritic_Mic_Image_1_cropped_masked(binary_image_1==0)=nan;
-    
-    Tritic_Mic_Image_1_cropped_masked_glass=Tritic_Mic_Image_1_cropped;
-    Tritic_Mic_Image_1_cropped_masked_glass(binary_image_1==1)=nan;
-    Tritic_Mic_Image_1_cropped__glass_min=nanmin(nanmin(Tritic_Mic_Image_1_cropped_masked_glass));
-    
-    Tritic_Mic_Image_1_cropped_masked_bgsub=minus(Tritic_Mic_Image_1_cropped_masked,Tritic_Mic_Image_1_cropped__glass_min);
-    Tritic_Mic_Image_1_cropped_bgsub_average=nanmean(nanmean(Tritic_Mic_Image_1_cropped_masked_bgsub));
-    figure,imagesc(Tritic_Mic_Image_1_cropped_masked_bgsub)
-    
-    
-    questdlg('Select location for TRITIC 2 Data','TBF data location','OK','OK');
-            [afm_file_name2,AFM_file_path2,afm_file_index2]=uigetfile('Choose BF File');
-        TRITIC_Before_File_Path2=sprintf('%c%c',AFM_file_path2,afm_file_name2);
-        
-        [Tritic_Mic_Image_2]=open_ND2(TRITIC_Before_File_Path2);
-    figure,imshow(imadjust(Tritic_Mic_Image_2))
-    
-    
-    [binary_image_2,Tritic_Mic_Image_2_cropped,FurtherDetails2]=Mic_to_Binary_TRITC(Tritic_Mic_Image_2,'Silent','No');
-    Tritic_Mic_Image_2_cropped_masked=Tritic_Mic_Image_2_cropped;
-    Tritic_Mic_Image_2_cropped_masked(binary_image_2==0)=nan;
-    
-    Tritic_Mic_Image_2_cropped_masked_glass=Tritic_Mic_Image_2_cropped;
-    Tritic_Mic_Image_2_cropped_masked_glass(binary_image_2==1)=nan;
-    Tritic_Mic_Image_2_cropped__glass_min=nanmin(nanmin(Tritic_Mic_Image_2_cropped_masked_glass));
-    
-    Tritic_Mic_Image_2_cropped_masked_bgsub=minus(Tritic_Mic_Image_2_cropped_masked,Tritic_Mic_Image_2_cropped__glass_min);
-    Tritic_Mic_Image_2_cropped_bgsub_average=nanmean(nanmean(Tritic_Mic_Image_2_cropped_masked_bgsub));
-    figure,imagesc(Tritic_Mic_Image_2_cropped_masked_bgsub)
-    
-    
-    
-    questdlg('Select location for TRITIC 3 Data','TBF data location','OK','OK');
-            [afm_file_name3,AFM_file_path3,afm_file_index3]=uigetfile('Choose BF File');
-        TRITIC_Before_File_Path3=sprintf('%c%c',AFM_file_path3,afm_file_name3);
-        
-        [Tritic_Mic_Image_3]=open_ND2(TRITIC_Before_File_Path3);
-    figure,imshow(imadjust(Tritic_Mic_Image_3))
-    
-    [binary_image_3,Tritic_Mic_Image_3_cropped,FurtherDetails3]=Mic_to_Binary_TRITC(Tritic_Mic_Image_3,'Silent','No');
-    Tritic_Mic_Image_3_cropped_masked=Tritic_Mic_Image_3_cropped;
-    Tritic_Mic_Image_3_cropped_masked(binary_image_3==0)=nan;
-    
-    Tritic_Mic_Image_3_cropped_masked_glass=Tritic_Mic_Image_3_cropped;
-    Tritic_Mic_Image_3_cropped_masked_glass(binary_image_3==1)=nan;
-    Tritic_Mic_Image_3_cropped__glass_min=nanmin(nanmin(Tritic_Mic_Image_3_cropped_masked_glass));
-    
-    Tritic_Mic_Image_3_cropped_masked_bgsub=minus(Tritic_Mic_Image_3_cropped_masked,Tritic_Mic_Image_3_cropped__glass_min);
-    Tritic_Mic_Image_3_cropped_bgsub_average=nanmean(nanmean(Tritic_Mic_Image_3_cropped_masked_bgsub));
-    figure,imagesc(Tritic_Mic_Image_3_cropped_masked_bgsub)
-    
-    Avg_3_images=zeros(1,3);
-    Avg_3_images(1,1)=Tritic_Mic_Image_1_cropped_bgsub_average;
-    Avg_3_images(1,2)=Tritic_Mic_Image_2_cropped_bgsub_average;
-    Avg_3_images(1,3)=Tritic_Mic_Image_3_cropped_bgsub_average;
-    
-    AVG_Avg_3_images=mean(Avg_3_images);
-    
-
-
-
-
+function normFactor = A10_feature_normFluorescenceHeat(nameDir,timeExp,nameExperiment,secondMonitorMain)
+    fprintf('\nAFM data is taken from the following experiment:\n\tEXPERIMENT: %s\n\n',nameExperiment)
+    heatSubDirectories=uigetdirMultiSelect(nameDir,sprintf('Select the directories which contains heated TRITIC fluorescence images'));
+    if ~iscell(heatSubDirectories)
+        error("Data Folders not selected")
+    end
+    clear nameDir
+    % find all the .nd2 files with the same time exposure used to build
+    % delta during the step A6
+    allMatchingTRITICFiles = [];
+    allMatchingBFFiles = [];
+    % build the pattern for regularexp
+    patternTRITIC = sprintf('TRITIC\\s*%s\\s*ms', timeExp); % \\s* represent zero or more space
+    patternBF = 'BFpre';
+    for i=1:length(heatSubDirectories)
+        currentDir = heatSubDirectories{i};
+        % ricorsive search: 
+        % - currentDir : starting point
+        % '**' : wildcard indicating "any number of subdirs (including zero)".
+        % *.nd2 : any filename with .nd2 format
+        fileList = dir(fullfile(currentDir, '**', '*.nd2')); 
+        for j=1:length(fileList)
+            filename=fileList(j).name;
+            foldername=fileList(j).folder;            
+            % run the search (case-insensitive)
+            if ~isempty(regexpi(filename, patternTRITIC, 'once'))
+                fullFilePath = fullfile(foldername, filename);
+                allMatchingTRITICFiles = [allMatchingTRITICFiles; {fullFilePath}]; %#ok<AGROW>
+            elseif ~isempty(regexpi(filename, patternBF, 'once'))
+                fullFilePath = fullfile(foldername, filename);
+                allMatchingBFFiles = [allMatchingBFFiles; {fullFilePath}]; %#ok<AGROW>
+            end
+        end
+    end
+    clear i j currentDir fileList pattern* heatSubDirectories filename fullFilePath foldername
+    if isempty(allMatchingTRITICFiles)
+        error(['No .nd2 files found containing "', timeExp, 'ms" in their filename.']);
+    else
+        % check if each file of allMatchingBFFiles is from the same directory of allMatchingTRITICFiles.
+        % Moreover, sort them in case the order is different. 
+        % extract directories path
+        bfDirs = cellfun(@fileparts, allMatchingBFFiles, 'UniformOutput', false);
+        triticDirs = cellfun(@fileparts, allMatchingTRITICFiles, 'UniformOutput', false);
+        % sort and save the idxs
+        [sortedBFDirs, bfSortIndices] = sort(bfDirs);
+        [sortedTriticDirs, triticSortIndices] = sort(triticDirs);
+        if ~isequal(sortedBFDirs, sortedTriticDirs)
+            error('Same files are not from same directories. Check better the filenames of the files');
+        else
+            disp(['List of .nd2 files found containing "', timeExp, 'ms" in their filename:']);
+            disp(allMatchingTRITICFiles);
+            % If everything ok, then sort also the filepath
+            sortedBFFiles = allMatchingBFFiles(bfSortIndices);
+            sortedTRITICFiles = allMatchingTRITICFiles(triticSortIndices);
+        end
+    end
+    clear bfDirs triticDirs bfSortIndices triticSortIndices allMatchingTRITICFiles allMatchingBFFiles sortedBFDirs sortedTriticDirs
+    all_Tritic_masked=cell(1,length(sortedTRITICFiles));
+    for i=1:length(sortedTRITICFiles)
+        pathfile=fileparts(sortedTRITICFiles{i});
+        if exist(fullfile(pathfile,sprintf('data_BF_TRITIC_postHeat_timeExp%sms.mat',timeExp)),"file")
+            load(fullfile(pathfile,sprintf('data_BF_TRITIC_postHeat_timeExp%sms.mat',timeExp))) %#ok<LOAD>
+        else
+            % within the same directory, manage the TRITIC and BF images
+            titleFig=sprintf('TRITIC post heat - TimeExp: %s',timeExp);
+            Tritic_Image=openANDprepareND2(sortedTRITICFiles{i},titleFig,secondMonitorMain);
+            titleFig='BF post heat';
+            [BF_Image,metadataBF]=openANDprepareND2(sortedBFFiles{i},titleFig,secondMonitorMain);
+            % align BF and TRITIC        
+            [BF_Image_aligned,offset]=A7_limited_registration(BF_Image,Tritic_Image,pathfile,secondMonitorMain,'Brightfield','Yes','Moving','Yes','saveFig','No');    
+            Tritic_Image=fixSize(Tritic_Image,offset);
+            close all
+            % generate the binarized BF. In case of cropping, also save the
+            % cropped TRITIC. Usually dont crop, entire fluorescence data is useful data
+            [binary_BF_image,Tritic_Image]=A8_Mic_to_Binary(BF_Image_aligned,secondMonitorMain,pathfile,'TRITIC_before',Tritic_Image,'saveFig','No');
+            % mask the TRITIC using the new binarized BF to have PDA parts only
+            Tritic_masked=Tritic_Image;
+            Tritic_masked(binary_BF_image==0)=nan;      
+            % mask the TRITIC using the new binarized BF to have BACKGROUND parts only
+            Tritic_masked_glass=Tritic_Image;
+            Tritic_masked_glass(binary_BF_image==1)=nan;
+            Tritic_masked_glass_min=min(Tritic_masked_glass(:),[],'omitnan');
+            Tritic_masked= Tritic_masked-Tritic_masked_glass_min;
+            clear BF_Image Tritic_masked_glass_min offset Tritic_masked_glass titleFig BF_Image_aligned
+            save(fullfile(pathfile,sprintf('data_BF_TRITIC_postHeat_timeExp%sms',timeExp)),"metadataBF","binary_BF_image","Tritic_Image","Tritic_masked","secondMonitorMain","timeExp")
+        end
+        all_Tritic_masked{i}=Tritic_masked;
+    end
+    % since there may be still some background data in PDA parts because of
+    % not accurate binarization, remove BK outliers by considering all the
+    % available scans.
+    % first, remove NaN elements, then convert the the content of each cell array into a single array
+    temp = cellfun(@(c) reshape(c(~isnan(c)), [], 1), all_Tritic_masked, 'UniformOutput', false);
+    % convert cell array into simple array
+    clearedPixelValues = vertcat(temp{:});
+    clear temp
+    % define the percentile threshold to remove lower outliers
+    low_percentil= 1; % 1° percentil
+    % considering all the pixels of every scan post heated, define the threshold to remove outliers from the single scan
+    threshold = prctile(clearedPixelValues, low_percentil);            
+    % for each scan, calc the avg fluorescence after heating to indicate the
+    % grade of PDA activation.
+    avgSingleScan=zeros(1,length(all_Tritic_masked));
+    for i=1:length(all_Tritic_masked)
+        pixelsSingleScan=all_Tritic_masked{i}(:);
+        % remove NaN
+        pixelsSingleScanNonNaN=pixelsSingleScan(~isnan(pixelsSingleScan));
+        % remove lower outliers part of 1% percentile
+        pixelsSingleScanCorrected=pixelsSingleScanNonNaN(pixelsSingleScanNonNaN>threshold);
+        avgSingleScan(i)=mean(pixelsSingleScanCorrected);
+    end
+    % This value will be used to normalize the final data
+    normFactor=mean(avgSingleScan);    
+    %clearedPixelValues_2 = clearedPixelValues(clearedPixelValues > threshold);
+    %normFactor=mean(clearedPixelValues_2);  
 end
 
-
-
-
+function [image,metaData]=openANDprepareND2(filepath,titleFig,secondMonitorMain)
+    [image,~,metaData]=A6_feature_Open_ND2(filepath);
+    [pathfile,nameFile]=fileparts(filepath);
+    f1=figure('Visible','off');
+    imshow(imadjust(image)), title(titleFig,'FontSize',17)
+    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
+    fullfileName=fullfile(pathfile,nameFile);
+    saveas(f1,fullfileName,'tif')
+end
