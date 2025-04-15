@@ -16,7 +16,7 @@
 %               NOTE: it doesn't matter if before or after scanning
 %       3) process only AFM data
 
-function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints,secondMonitorMain,newFolder,varargin)
+function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints,secondMonitorMain,newFolder,mainPathOpticalData,timeExp,varargin)
     
     p=inputParser();
     addRequired(p,'AFM_data');
@@ -83,8 +83,8 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,setpoints
         Delta_ADJ=Delta-Min_Delta_glass;
         % normalize the fluorescence data
         if getValidAnswer('Normalize the fluorescence data?','',{'y','n'})
-            [nameDir,~,~]=fileparts(fileparts(fileparts(folderResultsImg)));            
-            normFactor=A10_feature_normFluorescenceHeat(nameDir);
+            [~,nameExperiment]=fileparts(mainPathOpticalData);
+            normFactor=A10_feature_normFluorescenceHeat(mainPathOpticalData,timeExp,nameExperiment,secondMonitorMain);
             Delta_ADJ=Delta_ADJ/normFactor;
         end
         showData(secondMonitorMain,0,1,Delta_ADJ,true,'Delta Fluorescence (After-Before)','',newFolder,'resultA10_1_DeltaFluorescenceFull')

@@ -113,7 +113,7 @@ end
 % includes A6 and A7
 if flagExeA1 || flagExeA5 || flagExeA6_A7_A8
     fprintf('\nAFM data is taken from the following experiment:\n\tEXPERIMENT: %s\t\tSCAN i-th:\t %s\n\n',nameExperiment,nameScan) 
-    [metaData_BF,BF_Mic_Image_aligned,Tritic_Mic_Image_After_aligned,Tritic_Mic_Image_Before]=selectNDdata(folderResultsImg,secondMonitorMain);
+    [metaData_BF,BF_Mic_Image_aligned,Tritic_Mic_Image_After_aligned,Tritic_Mic_Image_Before,mainPathOpticalData,timeExp]=A6_prepareBFandTRITIC(folderResultsImg,secondMonitorMain);
     % Produce the binary IO of Brightfield
     [BF_Mic_Image_IO,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,~]=A8_Mic_to_Binary(BF_Mic_Image_aligned,secondMonitorMain,folderResultsImg,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned); 
     clear BF_Mic_Image_aligned 
@@ -131,10 +131,7 @@ if flagExeA1 || flagExeA5 || flagExeA6_A7_A8 || flagExeA9
     save(fullfile(mainPath,'HoverMode_ON\resultsData_4_postProcessA9.mat'))
 end
 %% correlation FLUORESCENCE AND AFM DATA
-
-fprintf('\nAFM data is taken from the following experiment:\n\tEXPERIMENT: %s\n\n',nameExperiment)
-Data_finalResults=A10_correlation_AFM_BF(AFM_A10_data_final,AFM_A10_IO_final,setpoints,secondMonitorMain,folderResultsImg,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned,'innerBorderCalc',true);
-
+Data_finalResults=A10_correlation_AFM_BF(AFM_A10_data_final,AFM_A10_IO_final,setpoints,secondMonitorMain,folderResultsImg,mainPathOpticalData,timeExp,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned,'innerBorderCalc',true);
 clear flag* Tritic_Mic_Image_Before Tritic_Mic_Image_After_aligned AFM_A10_data_final AFM_A10_IO_final
 save(fullfile(folderResultsImg,'resultsData_A10_end'))
 
@@ -222,56 +219,6 @@ function [flagExeA1,flagExeA5,flagExeA6_A7_A8,flagExeA9]=checkExistingData(mainP
     clear options question
 end
 
-function [metaData_BF,BF_Mic_Image_aligned,Tritic_Mic_Image_After_aligned,Tritic_Mic_Image_Before]=selectNDdata(folderResultsImg,secondMonitorMain)
-      % Open Brightfield image and the TRITIC (Before and After stimulation images)
-    filenameND2='resultA6_1_BrightField'; titleImage='BrightField - original';
-    [BF_Mic_Image,metaData_BF,filePathData]=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain);
-    % .nd2 files inside dir
-    fileList = dir(fullfile(filePathData, '*.nd2'));
-    pattern = '\d+ms';
-    matches = regexp({fileList.name}, pattern, 'match');
-    matches = [matches{:}];
-    timeValues = sort(unique(cellfun(@(x) str2double(erase(x, 'ms')), matches)));
-    timeList = cellstr(string(unique(timeValues)));
-    BF_Mic_Image_original=BF_Mic_Image;
-    while true
-        if ~isempty(timeList)
-            timeExp=timeList{getValidAnswer('What exposure time do you want to take?','',timeList)};
-        end
-        
-        % select the files with the choosen time exposure
-        matchingFiles = {fileList(contains({fileList.name}, [timeExp, 'ms'])).name};
-        % auto selection
-        beforeFiles = matchingFiles(contains(matchingFiles, 'before', 'IgnoreCase', true));
-        afterFiles = matchingFiles(contains(matchingFiles, {'post', 'after'}, 'IgnoreCase', true));
-        % in case not found, manual selection
-        if isempty(beforeFiles) || isempty(afterFiles)
-            disp('Issues in finding the files. Manual selection.');  
-        end
-        filenameND2='resultA6_2_TRITIC_Before_Stimulation'; titleImage='TRITIC Before Stimulation';
-        Tritic_Mic_Image_Before=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain,filePathData,'Before',beforeFiles);
-        filenameND2='resultA6_3_TRITIC_After_Stimulation'; titleImage='TRITIC After Stimulation';
-        Tritic_Mic_Image_After=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain,filePathData,'Before',afterFiles);
-        close all       
-        % Align the fluorescent images After with the BEFORE stimulation
-        [Tritic_Mic_Image_After_aligned,offset]=A7_limited_registration(Tritic_Mic_Image_After,Tritic_Mic_Image_Before,folderResultsImg,secondMonitorMain);
-        % adjust BF and Tritic_Before depending on the offset
-        BF_Mic_Image=fixSize(BF_Mic_Image,offset);
-        Tritic_Mic_Image_Before=fixSize(Tritic_Mic_Image_Before,offset);   
-        % Align the Brightfield to TRITIC Before Stimulation
-        [BF_Mic_Image_aligned,offset]=A7_limited_registration(BF_Mic_Image,Tritic_Mic_Image_Before,folderResultsImg,secondMonitorMain,'Brightfield','Yes','Moving','Yes');    
-        Tritic_Mic_Image_After_aligned=fixSize(Tritic_Mic_Image_After_aligned,offset);
-        Tritic_Mic_Image_Before=fixSize(Tritic_Mic_Image_Before,offset);   
-        if getValidAnswer(sprintf('Satisfied of all the registration of BF and fluorescence image?\nIf not, change time exposure for better alignment'),'',{'Yes','No'})
-            close gcf
-            break
-        end
-        % in case of no satisfaction, restore original data
-        BF_Mic_Image=BF_Mic_Image_original;
-        close all
-    end
-end
-
 function [AFM_data_cleared,AFM_heightIO_cleared,idxRemovedPortion]=removePortions(AFM_data,AFM_heightIO,secondMonitorMain,filepath)
 % before start pre-process the lateral data, it may be necessary to manually remove portions which contains 
 % outliers by substuting the values with the minimum. For better details, see the documentation of the function
@@ -305,48 +252,4 @@ function accuracy=chooseAccuracy(question)
         case 3
             accuracy= 'High';
     end      
-end
-
-function [Image,metaData,filePathData]=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain,varargin)
-    for i=varargin
-        filePathData=varargin{1};
-        mode=varargin{2};
-        if ~isempty(varargin{3})
-            fileName=varargin{3};
-            if ~isempty(fileName)
-                fileName=fileName{1};
-            end
-        end        
-    end
-    if ~exist('filePathData','var')
-        [fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the BrightField image');
-    else
-        if isempty(varargin{3})
-            [fileName, filePathData] = uigetfile({'*.nd2'}, sprintf('Select the TRITIC %s Stimulation image',mode),filePathData);
-        end
-    end
-    [Image,~,metaData]=A6_open_ND2(fullfile(filePathData,fileName)); 
-    f1=figure('Visible','off');
-    imshow(imadjust(Image)), title(titleImage,'FontSize',17)
-    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
-    fullfileName=fullfile(folderResultsImg,'tiffImages',filenameND2);
-    saveas(f1,fullfileName,'tif')
-    fullfileName=fullfile(folderResultsImg,'figImages',filenameND2);
-    saveas(f1,fullfileName)
-end
-
-function fixedImage=fixSize(originalImage,offset)
-    if length(offset)==2
-        offset_x=offset(1);
-        offset_y=offset(2);
-        [rows, cols] = size(originalImage);
-        x_start = max(1, 1 + offset_x);
-        y_start = max(1, 1 + offset_y);
-        x_end = min(cols, cols + offset_x);
-        y_end = min(rows, rows + offset_y);     
-    else
-        y_start=offset(1);  y_end=offset(2);
-        x_start=offset(3);  x_end=offset(4);
-    end
-    fixedImage = originalImage(y_start:y_end, x_start:x_end);
 end

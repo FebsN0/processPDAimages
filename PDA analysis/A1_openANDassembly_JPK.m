@@ -120,7 +120,7 @@ function varargout = A1_openANDassembly_JPK(secondMonitorMain,varargin)
         end      
         % open jpk, it returns the AFM file, the details (position of tip, IGain, Pgain, Sn, Kn and
         % calculates alpha, based on the pub), it returns the location of the file.
-        [data,metaData]=A1_open_JPK(fullName);
+        [data,metaData]=A1_feature_Open_JPK(fullName);
         % for unknown reasons, some jpk file have wrong and unreasonable vertical calibrations.
         % so it is better to check the metadata!
         

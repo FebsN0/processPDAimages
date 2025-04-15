@@ -1,9 +1,18 @@
-% Function to binarise optical images (BF, and embedded in the limited
-% registration: TRITC)
-% Use the PCDA and DCDA versions for those PDA films (line 62-72 is cut for
-% more contrast)
-
-
+% Function to binarise optical images (BF and TRITIC)
+% INPUT
+% (mandatory):
+%       BF image to be binarised
+%       secondMonitorMain
+%       folderResultsImg : folder where store the images
+% (optional):
+%       argument to specify: 'TRITIC_before' ==> upload Tritic Before
+%       argument to specify: 'TRITIC_after' ==> upload Tritic After,
+% OUTPUT:
+%       binary_image of BF image
+%       cropped Tritic Before (if 'TRITIC_before' has been specified)
+%       cropped Tritic After (if 'TRITIC_after' has been specified)
+%       FurtherDetails : details about binarisation
+%       
 function varargout=A8_Mic_to_Binary(imageBF_aligned,secondMonitorMain,newFolder,varargin)
 
     p=inputParser();
@@ -13,12 +22,9 @@ function varargout=A8_Mic_to_Binary(imageBF_aligned,secondMonitorMain,newFolder,
     argName = 'TRITIC_before';      defaultVal = [];        addParameter(p,argName,defaultVal, @(x) ismatrix(x));
     argName = 'TRITIC_after';       defaultVal = [];        addParameter(p,argName,defaultVal, @(x) ismatrix(x));
     argName = 'saveFig';            defaultVal = 'Yes';     addParameter(p, argName, defaultVal, @(x) ismember(x,{'No','Yes'}));
-    argName = 'Silent';             defaultVal = 'No';      addParameter(p, argName, defaultVal, @(x) ismember(x,{'Yes','No'})); 
 
     parse(p,imageBF_aligned,varargin{:});
     clearvars argName defaultVal
-
-    if(strcmp(p.Results.Silent,'Yes')), SeeMe=0; else, SeeMe=1; end
     if(strcmp(p.Results.saveFig,'Yes')), saveFig=1; else, saveFig=0; end
 
     reduced_imageBF=imageBF_aligned;
@@ -30,7 +36,7 @@ function varargout=A8_Mic_to_Binary(imageBF_aligned,secondMonitorMain,newFolder,
     end
     flagCrop=false;
     % decide if crop the image. If not, leave as original size
-    if getValidAnswer('The image is not cropped yet, would Like to Crop the Image?', '', {'Yes','No'})
+    if getValidAnswer('The image is not cropped yet, would Like to Crop the Image? Dont in case of post heated scans', '', {'Yes','No'})
         flagCrop=true;
         ftmp=figure;
         figure_image=imshow(imadjust(imageBF_aligned));
@@ -45,48 +51,52 @@ function varargout=A8_Mic_to_Binary(imageBF_aligned,secondMonitorMain,newFolder,
         XEnd=round(specs(1,2))+round(specs(1,end));
         if(XEnd>size(imageBF_aligned,1)), XEnd=size(imageBF_aligned,1); end
         if(YEnd>size(imageBF_aligned,2)), YEnd=size(imageBF_aligned,2); end
-        % extract the cropped area
+        % extract the cropped area of BF as well TRITIC if uploaded
         reduced_imageBF=imageBF_aligned(XBegin:XEnd,YBegin:YEnd);
         if exist('reduced_Tritic_before','var')
-            reduced_Tritic_before=reduced_Tritic_before(XBegin:XEnd,YBegin:YEnd);
-            varargout{2}=reduced_Tritic_before;
+            reduced_Tritic_before=reduced_Tritic_before(XBegin:XEnd,YBegin:YEnd);            
         end
         if exist('reduced_Tritic_after','var')
             reduced_Tritic_after=reduced_Tritic_after(XBegin:XEnd,YBegin:YEnd);
-            varargout{3}=reduced_Tritic_after;
         end
-    else
+    end
+    if exist('reduced_Tritic_before','var')
+        varargout{2}=reduced_Tritic_before;
+    end
+    if exist('reduced_Tritic_after','var')
         varargout{3}=reduced_Tritic_after;
     end
     
-
-    question=sprintf('Performs morphological opening operation?\n(In original code it is always yes, whereas commented in case of the PDCA code');
+    % the following part has been observed to make worse the binarization.
+    % Not fully understood why it was implemented in the original versions...
+    %{
+    question=sprintf('Performs morphological opening operation? (Recommended for heated sample)');
     if getValidAnswer(question,'',{'Yes','No'},2)
-        % init a matrix with same imageBF's size
-        Im_Neg = zeros(size(reduced_imageBF));
         % find the highest value in the imageBF's matrix 
-        a=max(max(reduced_imageBF));
-        % add the highest value to any element of the matrix
-        Im_Neg= Im_Neg + a;
-        % now substract with the imageBF matrix. Obtain the "mould" image of brightfield
-        Im_Neg= Im_Neg - reduced_imageBF;
+        maxPixel=max(reduced_imageBF(:));
+        % create a matrix with same imageBF's size and add the maxPixel value
+        Im_baseShift= zeros(size(reduced_imageBF)) + maxPixel;
+        % substract the new matrix with the imageBF matrix to obtain the "mould" image of brightfield
+        Im_mold= Im_baseShift - reduced_imageBF;
         % define the Structuring Element. In this case it is a 50x50 matrix (each element = 1), which will be
         % used to erode and dilate the BF image
-        SE=strel('square',50);
+        SE=strel('square',25);
         % performs morphological opening operation on the grayscale/binary image ==> it is an erosion followed by a dilation,
         % using the same SE for both operations. Required to remove small objects from an image while preserving the s
         % hape and size of larger objects in the image. Imadjust transform the image into grayscale.
-        background=imopen(imadjust(Im_Neg),SE);
+        background=imopen(imadjust(Im_mold),SE);
         % remove the morphological opening matrix from the "mould"
-        I2=imadjust(Im_Neg)-background;
-        a=max(max(I2));
-        Im_Pos=zeros(size(reduced_imageBF));
-        Im_Pos= Im_Pos + a;
-        image2=imadjust(Im_Pos - I2);
+        I2=imadjust(Im_mold)-background;
+        maxPixel=max(max(I2));
+        Im_baseShift= zeros(size(reduced_imageBF)) + maxPixel;
+        image2=imadjust(Im_baseShift - I2);
         clearvars Im_Neg a background I2 Im_Pos
     else
         image2=reduced_imageBF; %%%%%%% in the original version Mic_to_Binary_PCDA.m, previous section was omitted %%%%%%%%%%%
     end
+    %}
+    image2=reduced_imageBF; %%%%%%% in the original version Mic_to_Binary_PCDA.m, previous section was omitted %%%%%%%%%%%
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     closest_indices=[];
     satisfied='Manual Selection';
@@ -162,16 +172,21 @@ function varargout=A8_Mic_to_Binary(imageBF_aligned,secondMonitorMain,newFolder,
     kernel=strel('square',2);
     binary_image=imerode(binary_image,kernel);
     binary_image=imdilate(binary_image,kernel);
-    if SeeMe && saveFig
-        f2=figure;
-        imshow(binary_image)
-        text=sprintf('Definitive Binarized BrightField (Morphological Opening - kernel: square 2 pixels)');
-        title(text,'FontSize',14)
-        if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f2); end
+    
+    f2=figure('Visible','off');
+    imshow(binary_image)
+    text=sprintf('Definitive Binarized BrightField (Morphological Opening - kernel: square 2 pixels)');
+    title(text,'FontSize',14)
+    if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f2); end
+    if saveFig
         saveas(f2,sprintf('%s/tiffImages/resultA8_2_DefinitiveBinarizedBrightField',newFolder),'tif')
         saveas(f2,sprintf('%s/figImages/resultA8_2_DefinitiveBinarizedBrightField',newFolder))
-        close(f2)
+    else
+    % for the heated sample case in which no figImages exist, so store
+    % only the tiff to easy how good was the binarization
+        saveas(f2,sprintf('%s/binarizedBF',newFolder),'tif')      
     end
+    close(f2)  
 
     if flagCrop == 1
         FurtherDetails=struct(...
