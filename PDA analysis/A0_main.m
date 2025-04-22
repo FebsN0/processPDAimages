@@ -131,7 +131,7 @@ if flagExeA1 || flagExeA5 || flagExeA6_A7_A8 || flagExeA9
     save(fullfile(mainPath,'HoverMode_ON\resultsData_4_postProcessA9.mat'))
 end
 %% correlation FLUORESCENCE AND AFM DATA
-Data_finalResults=A10_correlation_AFM_BF(AFM_A10_data_final,AFM_A10_IO_final,setpoints,secondMonitorMain,folderResultsImg,mainPathOpticalData,timeExp,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned,'innerBorderCalc',true);
+Data_finalResults=A10_correlation_AFM_BF(AFM_A10_data_final,AFM_A10_IO_final,setpoints,secondMonitorMain,folderResultsImg,mainPathOpticalData,timeExp,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned,'innerBorderCalc',true,'TRITIC_expTime',timeExp);
 clear flag* Tritic_Mic_Image_Before Tritic_Mic_Image_After_aligned AFM_A10_data_final AFM_A10_IO_final
 save(fullfile(folderResultsImg,'resultsData_A10_end'))
 
@@ -208,6 +208,8 @@ function [flagExeA1,flagExeA5,flagExeA6_A7_A8,flagExeA9]=checkExistingData(mainP
             else
                 flagExeA1=true;
             end
+        else
+            flagExeA1=true;
         end
         if exist('tmpData','var')
             fieldNamesC = fieldnames(tmpData);

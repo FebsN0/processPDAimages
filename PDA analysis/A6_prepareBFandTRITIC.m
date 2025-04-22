@@ -1,7 +1,7 @@
 function varargout=A6_prepareBFandTRITIC(folderResultsImg,secondMonitorMain)
     % Open Brightfield image and the TRITIC (Before and After stimulation images)
     filenameND2='resultA6_1_BrightField'; titleImage='BrightField - original';
-    [BF_Mic_Image,metaData_BF,filePathData]=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain);
+    [BF_Mic_Image,metaData_BF,filePathData]=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain);    
     varargout{1}=metaData_BF;
     % .nd2 files inside dir
     fileList = dir(fullfile(filePathData, '*.nd2'));
@@ -27,9 +27,9 @@ function varargout=A6_prepareBFandTRITIC(folderResultsImg,secondMonitorMain)
             disp('Issues in finding the files. Manual selection.');  
         end
         
-        filenameND2='resultA6_2_TRITIC_Before_Stimulation'; titleImage='TRITIC Before Stimulation';
+        filenameND2='resultA6_2_TRITIC_Before_Stimulation'; titleImage=sprintf('TRITIC Before Stimulation - timeExp: %s',timeExp);
         Tritic_Mic_Image_Before=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain,filePathData,'Before',beforeFiles);
-        filenameND2='resultA6_3_TRITIC_After_Stimulation'; titleImage='TRITIC After Stimulation';
+        filenameND2='resultA6_3_TRITIC_After_Stimulation'; titleImage=sprintf('TRITIC After Stimulation - timeExp: %s',timeExp);
         Tritic_Mic_Image_After=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain,filePathData,'After',afterFiles);
         close all       
         % Align the fluorescent images After with the BEFORE stimulation
@@ -39,11 +39,14 @@ function varargout=A6_prepareBFandTRITIC(folderResultsImg,secondMonitorMain)
         Tritic_Mic_Image_Before=fixSize(Tritic_Mic_Image_Before,offset);   
         % Align the Brightfield to TRITIC Before Stimulation
         [BF_Mic_Image_aligned,offset]=A7_limited_registration(BF_Mic_Image,Tritic_Mic_Image_Before,folderResultsImg,secondMonitorMain,'Brightfield','Yes','Moving','Yes');    
-        varargout{2}=BF_Mic_Image_aligned;
+        varargout{2}=BF_Mic_Image_aligned;        
         Tritic_Mic_Image_After_aligned=fixSize(Tritic_Mic_Image_After_aligned,offset);
         varargout{3}=Tritic_Mic_Image_After_aligned;
         Tritic_Mic_Image_Before=fixSize(Tritic_Mic_Image_Before,offset);
         varargout{4}=Tritic_Mic_Image_Before;
+        [mainPathOpticalData,~]=fileparts(fileparts(fileparts(filePathData))); % ce qualcosa che non va nel naming
+        varargout{5}=mainPathOpticalData;
+        varargout{6}=timeExp;
         if getValidAnswer(sprintf('Satisfied of all the registration of BF and fluorescence image?\nIf not, change time exposure for better alignment'),'',{'Yes','No'})
             close gcf
             break
@@ -51,9 +54,6 @@ function varargout=A6_prepareBFandTRITIC(folderResultsImg,secondMonitorMain)
         % in case of no satisfaction, restore original data
         BF_Mic_Image=BF_Mic_Image_original;
         close all
-        mainPathOpticalData=fileparts(fileparts(filePathData));
-        varargout{5}=mainPathOpticalData;
-        varargout{6}=timeExp;
     end
 end
 

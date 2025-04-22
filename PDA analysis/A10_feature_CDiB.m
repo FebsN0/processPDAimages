@@ -10,6 +10,7 @@ function [outputme] = A10_feature_CDiB(X_Data,Y_Data,secondMonitorMain,newFolder
     argName = 'YAyL';           defaultVal = 'Relative Intensity Increase (A.U.)';      addParameter(p,argName,defaultVal);
     argName = 'XAxL';           defaultVal = 'Force (N)';                               addParameter(p,argName,defaultVal);
     argName = 'FigTitle';       defaultVal = '';                                        addParameter(p,argName,defaultVal);
+    argName = 'FigFilename';    defaultVal = 'AA';                                      addParameter(p,argName,defaultVal);
     argName = 'Xlimit';         defaultVal = ([]);                                      addParameter(p,argName,defaultVal);
     argName = 'Ylimit';         defaultVal = ([]);                                      addParameter(p,argName,defaultVal);
     argName = 'MType';          defaultVal = 'o';                                       addParameter(p,argName,defaultVal);
@@ -116,6 +117,6 @@ function [outputme] = A10_feature_CDiB(X_Data,Y_Data,secondMonitorMain,newFolder
         title(p.Results.FigTitle,'FontSize',20);
     end    
     objInSecondMonitor(secondMonitorMain,ftmp);
-    saveas(ftmp,sprintf('%s/tiffImages/resultA10_end_%d_%s',newFolder,p.Results.NumFig,p.Results.FigTitle),'tif')
-    saveas(ftmp,sprintf('%s/figImages/resultA10_end_%d_%s',newFolder,p.Results.NumFig,p.Results.FigTitle))
+    saveas(ftmp,sprintf('%s/tiffImages/resultA10_end_%d_%s',newFolder,p.Results.NumFig,p.Results.FigFilename),'tif')
+    saveas(ftmp,sprintf('%s/figImages/resultA10_end_%d_%s',newFolder,p.Results.NumFig,p.Results.FigFilename))
 end

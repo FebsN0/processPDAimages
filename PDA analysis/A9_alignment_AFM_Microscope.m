@@ -194,7 +194,7 @@ function [AFM_IO_3_BFaligned,AFM_Elab,info_allignment,offset]=A9_alignment_AFM_M
             sprintf('(2) Automatic method\n Iterative process of expansion, reduction and rotation.'); ...
             sprintf('(3) Automatic method\n Thirion''s Demons Algorithm and Diffeomorphism')
                     '(4) Stop here the process. The fist cross-correlatin is okay.'};
-        answerMethod=getValidAnswer(question,'',options,2);        
+        answerMethod=getValidAnswer(question,'',options,3);        
         clear flag_AFM options question saveFig SeeMe textTitle BF_IO_0_original rect
         flagDemons=false;
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%

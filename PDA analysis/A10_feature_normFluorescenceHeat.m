@@ -16,7 +16,8 @@ function normFactor = A10_feature_normFluorescenceHeat(nameDir,timeExp,nameExper
     allMatchingTRITICFiles = [];
     allMatchingBFFiles = [];
     % build the pattern for regularexp
-    patternTRITIC = sprintf('TRITIC\\s*%s\\s*ms', timeExp); % \\s* represent zero or more space
+    %patternTRITIC = sprintf('TRITIC\\s*%s\\s*ms', timeExp); % \\s* represent zero or more space
+    patternTRITIC = sprintf('TRITIC.*\\s*%s\\s*ms', timeExp);
     patternBF = 'BFpre';
     for i=1:length(heatSubDirectories)
         currentDir = heatSubDirectories{i};
@@ -41,6 +42,8 @@ function normFactor = A10_feature_normFluorescenceHeat(nameDir,timeExp,nameExper
     clear i j currentDir fileList pattern* heatSubDirectories filename fullFilePath foldername
     if isempty(allMatchingTRITICFiles)
         error(['No .nd2 files found containing "', timeExp, 'ms" in their filename.']);
+    elseif length(allMatchingTRITICFiles)~=length(allMatchingBFFiles)
+        error('Number of TRITIC files different from the number of BRIGHTFIELD files.');
     else
         % check if each file of allMatchingBFFiles is from the same directory of allMatchingTRITICFiles.
         % Moreover, sort them in case the order is different. 
@@ -104,8 +107,10 @@ function normFactor = A10_feature_normFluorescenceHeat(nameDir,timeExp,nameExper
     low_percentil= 1; % 1° percentil
     % considering all the pixels of every scan post heated, define the threshold to remove outliers from the single scan
     threshold = prctile(clearedPixelValues, low_percentil);            
-    % for each scan, calc the avg fluorescence after heating to indicate the
-    % grade of PDA activation.
+    
+    % original approach: calc the norm factor as average of average of the
+    % pixels of single scan (double average)
+    %{
     avgSingleScan=zeros(1,length(all_Tritic_masked));
     for i=1:length(all_Tritic_masked)
         pixelsSingleScan=all_Tritic_masked{i}(:);
@@ -115,10 +120,13 @@ function normFactor = A10_feature_normFluorescenceHeat(nameDir,timeExp,nameExper
         pixelsSingleScanCorrected=pixelsSingleScanNonNaN(pixelsSingleScanNonNaN>threshold);
         avgSingleScan(i)=mean(pixelsSingleScanCorrected);
     end
-    % This value will be used to normalize the final data
-    normFactor=mean(avgSingleScan);    
-    %clearedPixelValues_2 = clearedPixelValues(clearedPixelValues > threshold);
-    %normFactor=mean(clearedPixelValues_2);  
+    normFactor=mean(avgSingleScan);
+    %}
+    
+    % new approach: calc the norm factor as average of any pixels of any
+    % scans all togheter (single average)
+    clearedPixelValues_2 = clearedPixelValues(clearedPixelValues > threshold);
+    normFactor=mean(clearedPixelValues_2);  
 end
 
 function [image,metaData]=openANDprepareND2(filepath,titleFig,secondMonitorMain)

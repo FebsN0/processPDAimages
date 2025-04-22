@@ -147,6 +147,7 @@ function varargout=A8_Mic_to_Binary(imageBF_aligned,secondMonitorMain,newFolder,
             % show dialog box before continue
             uiwait(msgbox('Before click to continue the binarization, zoom or pan on the image for a better view',''));
             zoom off; pan off;
+            figure(imhistfig)
             closest_indices=selectRangeGInput(1,1,1:no_sub_div,Y);         
             close(imhistfig)
             % find the threshold

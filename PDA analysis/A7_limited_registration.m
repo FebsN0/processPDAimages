@@ -100,7 +100,7 @@ function [moving_adj,offset]=A7_limited_registration(moved,fixed,newFolder,secon
 
     while true
         figure(f2)
-        uiwait(msgbox('Crop the area of interest containing the stimulated part',''));
+        uiwait(msgbox('Crop the area to register the two images.',''));
         % close the previous figure and keep the new one to the crop part    
         % Size and position of the crop rectangle [xmin ymin width height]. Crop the last open figure.
         [~,specs]=imcrop();
