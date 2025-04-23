@@ -215,7 +215,20 @@ function [AFM_IO_3_BFaligned,AFM_Elab,info_allignment,offset]=A9_alignment_AFM_M
         %%%%%%%%%%%%%%%%%%%%%%%%%%                       
         elseif answerMethod==3
             % imregdemons(MOVING,FIXED)
-            [DisplacementField,AFM_IO_3_BFaligned] = imregdemons(AFM_IO_2_BFpadded,BF_IO_1_cropped,1000,'AccumulatedFieldSmoothing',2.0,'PyramidLevels',8,'DisplayWaitbar',true);
+            [DisplacementField,~] = imregdemons(AFM_IO_2_BFpadded,BF_IO_1_cropped,1000,'AccumulatedFieldSmoothing',2.0,'PyramidLevels',8,'DisplayWaitbar',true);
+            % unfortunately, imregdemons uses bilinear interpolation and it is not possible to change 
+            % (no optional arguments regarding the interpolation [...,'Interp', 'nearest']) because imregdemons is hardcoded
+            % Consequently, the pixels at the borders (between 0 and 1) will no longer be binary.
+            % To overcome the issue, only the displacement field will be considered and then used to warp AFM_IO_2_BFpadded,
+            % rather than using the second output of imregdemons.
+            AFM_IO_3_BFaligned = imwarp(AFM_IO_2_BFpadded,DisplacementField, 'Interp', 'nearest');
+            % further check. It should not happen, but just in case...
+            nonBinaryMask = AFM_IO_3_BFaligned(AFM_IO_3_BFaligned ~= 0 & AFM_IO_3_BFaligned ~= 1);
+            if ~isempty(nonBinaryMask)
+                warndlg("Aware! For some unexpected reason, the interpolation of the borders 0-1 gave non binary values! Using the average, such values will be biclassified.")
+                threshold=mean(nonBinaryMask(:));
+                AFM_IO_3_BFaligned = AFM_IO_3_BFaligned > threshold;
+            end
             textTitle='Final alignment of Brightfield IO and resized AFM IO - Automatic Demon''s Algorithm Approach';
             % first, create the pad version where there is in the middle the AFM data, then transforms image according to the displacement field.
             for flag_AFM=1:size(AFM_Elab,2)
