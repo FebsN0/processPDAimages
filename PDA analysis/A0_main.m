@@ -166,9 +166,10 @@ function [flagExeA1,flagExeA5,flagExeA6_A7_A8,flagExeA9]=checkExistingData(mainP
             options={'Stop the process','Redo correlation force-fluorescence (A10)'};
             if getValidAnswer(question,'',options)==1
                 error('Stopped by user.')
+            else
+                % redo A10        
+                tmpData=load(fullfile(mainPath, 'HoverMode_ON', filePostA9));
             end
-            % redo A10        
-            tmpData=load(fullfile(mainPath, 'HoverMode_ON', filePostA9));
         % A9 part
         elseif exist(fullfile(mainPath, 'HoverMode_ON', filePostA9),'file')
             question=sprintf('Results after alignment (A9) of the %s scan #%s already exists.\nChoose the right option:',nameExperiment,nameScan);
@@ -176,27 +177,33 @@ function [flagExeA1,flagExeA5,flagExeA6_A7_A8,flagExeA9]=checkExistingData(mainP
             if getValidAnswer(question,'',options)==1
                 tmpData=load(fullfile(mainPath, 'HoverMode_ON', filePostA9));                
             else
+                % redo A9                
                 flagExeA9=true;
+                tmpData=load(fullfile(mainPath, 'HoverMode_ON', filePostA6_A7_A8));
             end
         % A6_A7_A8 part
         elseif exist(fullfile(mainPath, 'HoverMode_ON', filePostA6_A7_A8),'file')
             question=sprintf('Results after BF and TRITIC images preparation (A6-A7-A8) of the %s scan #%s already exists.\nChoose the right option:',nameExperiment,nameScan);
             options={'Run next step A9','Redo A6_A7_A8'};
-            if getValidAnswer(question,'',options)==1
-                tmpData=load(fullfile(mainPath, 'HoverMode_ON', filePostA6_A7_A8));
+            if getValidAnswer(question,'',options)==1                
                 flagExeA9=true;
+                tmpData=load(fullfile(mainPath, 'HoverMode_ON', filePostA6_A7_A8));
             else
+                % Redo A6_A7_A8                 
                 flagExeA6_A7_A8=true;
+                tmpData=load(fullfile(mainPath, 'HoverMode_ON', filePostA5));
             end
         % A5 part
         elseif exist(fullfile(mainPath, 'HoverMode_ON', filePostA5),'file')
             question=sprintf('Results after conversion of lateral data from Volt to Force (A5) of the %s scan #%s already exists.\nChoose the right option:',nameExperiment,nameScan);
             options={'Run next steps A6_A7_A8','Redo A5'};
             if getValidAnswer(question,'',options)==1
-                tmpData=load(fullfile(mainPath, 'HoverMode_ON', filePostA5));
                 flagExeA6_A7_A8=true;
+                tmpData=load(fullfile(mainPath, 'HoverMode_ON', filePostA5));
             else
+                % Redo A5
                 flagExeA5=true;
+                tmpData=load(fullfile(mainPath, 'HoverMode_ON', filePostA4));
             end
         % A1-A2-A3-A4 part
         elseif exist(fullfile(mainPath, 'HoverMode_ON', filePostA4),'file')

@@ -207,7 +207,7 @@ else
     saveas(f1,sprintf('%s/RESULTSfinal_LDvsFLUO.tif',mainFolderSingleCondition))
 end
 
-if isvalid(f2)
+if exist("f2",'var')
     figure(f2)
     xlim padded
     ylim padded
@@ -220,7 +220,7 @@ if isvalid(f2)
     saveas(f2,sprintf('%s/RESULTSfinal_LDvsHeight.tif',mainFolderSingleCondition))
 end
 
-if isvalid(f3)
+if exist("f3",'var')
     figure(f3)
     xlim padded
     ylim padded
