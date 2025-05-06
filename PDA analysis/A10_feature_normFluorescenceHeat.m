@@ -11,6 +11,7 @@ function normFactor = A10_feature_normFluorescenceHeat(nameDir,timeExp,nameExper
         error("Data Folders not selected")
     end
     clear nameDir
+  
     % find all the .nd2 files with the same time exposure used to build
     % delta during the step A6
     allMatchingTRITICFiles = [];

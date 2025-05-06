@@ -94,7 +94,7 @@ function [outputme] = A10_feature_CDiB(X_Data,Y_Data,secondMonitorMain,newFolder
         stde_VDH_B(i)=outputme(i).STDBin*p.Results.ypar;
     end
      
-    ftmp=figure; hold on
+    ftmp=figure('Visible','off'); hold on
     try
         errorbar(x_VDH_B,y_VDH_B,stde_VDH_B,'MarkerFaceColor',sprintf('%c',p.Results.MCoulor),'MarkerEdgeColor',sprintf('%c',p.Results.MCoulor),'Marker',sprintf('%c',p.Results.MType));
     catch

@@ -1,7 +1,7 @@
 %Function to open and import Nikon ND2 files
 %Written by Dr. Roberto D. Ortuso, University of Geneva.
 
-function [IOI,complete_path_to_afm_file,metadataND2]=A6_open_ND2(varargin)
+function [IOI,complete_path_to_afm_file,metadataND2]=A6_feature_Open_ND2(varargin)
 
     if(~isempty(varargin))
         if(isfile(varargin{1,1}))
@@ -288,8 +288,8 @@ function [IOI,complete_path_to_afm_file,metadataND2]=A6_open_ND2(varargin)
                     'ImageWidthPixels',stackSizeX, ...
                     'ImageHeightPixels',stackSizeY, ...
                     'pixelSizeUnit', voxelSizeXdefaultUnit, ...
-                    'ImageWidthMeter', voxelSizeXdouble, ...
-                    'ImageHeightMeter', voxelSizeYdouble);
+                    'ImageWidth_umeterXpixel', voxelSizeXdouble, ...
+                    'ImageHeight_umeterXpixel', voxelSizeYdouble);
 
 end
 
