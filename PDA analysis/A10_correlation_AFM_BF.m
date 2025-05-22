@@ -193,13 +193,14 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,size_umet
         % any cleared pixel from TRITIC images of heated samples
         [~,nameExperiment]=fileparts(mainPathOpticalData);
         normFactor=A10_feature_normFluorescenceHeat(mainPathOpticalData,timeExp,nameExperiment,secondMonitorMain);            
-        Delta_ADJ=Delta_ADJ/normFactor*100;
-        Delta_ADJ_def=Delta_ADJ_def/normFactor*100;
-        Delta_ADJ_firstMaskOnly=Delta_ADJ_firstMaskOnly/normFactor*100;
+        Delta_ADJ=Delta_ADJ/normFactor.avg*100;
+        Delta_ADJ_def=Delta_ADJ_def/normFactor.avg*100;
+        Delta_ADJ_firstMaskOnly=Delta_ADJ_firstMaskOnly/normFactor.avg*100;
         % store the data
         Delta.firstMask_norm=Delta_ADJ_firstMaskOnly;
         Delta.completeMask_norm=Delta_ADJ;
         Delta.completeMask_99percMaxSet_norm=Delta_ADJ_def;
+        Delta.normFactor=normFactor;
     end
     dataResultsPlot.DeltaData=Delta; 
     clear DeltaData Delta_ADJ_firstMaskOnly Delta_ADJ Delta_ADJ_def

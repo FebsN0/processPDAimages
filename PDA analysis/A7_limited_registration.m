@@ -12,6 +12,7 @@ function [moving_adj,offset]=A7_limited_registration(moved,fixed,newFolder,secon
     addRequired(p,'fixed')
     %Add default parameters.
     argName = 'Brightfield';    defaultVal = 'No';      addParameter(p, argName, defaultVal, @(x) ismember(x,{'Yes','No'}));
+    argName = 'typeTritic';     defaultVal =  0;        addParameter(p, argName, defaultVal, @(x) ismember(x,[0,1]));
     argName = 'Moving';         defaultVal = 'No';      addParameter(p, argName, defaultVal, @(x) ismember(x,{'No','Yes'}));
     argName = 'saveFig';        defaultVal = 'Yes';     addParameter(p, argName, defaultVal, @(x) ismember(x,{'No','Yes'}));
     
@@ -23,13 +24,15 @@ function [moving_adj,offset]=A7_limited_registration(moved,fixed,newFolder,secon
 
     % title and name figures based on what input and more are given
     if strcmpi(p.Results.Brightfield,'Yes')
-        textFirstLastFig='BrightField and TRITIC Before Images Overlapped';
+        if p.Results.typeTritic
+            textFirstLastFig='BrightField and TRITIC After Images Overlapped';
+        else
+            textFirstLastFig='BrightField and TRITIC Before Images Overlapped';
+        end
         textResultName=2;
-        textCropped = 'Fitted';
     else
         textFirstLastFig='TRITIC Before and After Images Overlapped';
         textResultName=1;
-        textCropped = '';
     end
      
     % run the polynomial fitting on the Brightfield image since it is likely to be "tilted"
@@ -95,7 +98,7 @@ function [moving_adj,offset]=A7_limited_registration(moved,fixed,newFolder,secon
     % dont close this figure. If BK is not fixed, then use this image to crop
     f2=figure;
     imshow(fused_image)
-    title(sprintf('%s Not Aligned',textFirstLastFig),'FontSize',14)
+    title(sprintf('%s - Not Aligned',textFirstLastFig),'FontSize',14)
     if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2); end
 
     while true
@@ -237,7 +240,7 @@ function [moving_adj,offset]=A7_limited_registration(moved,fixed,newFolder,secon
         else
             imshow(imfuse(moving_adj,fixed_adj))
         end
-        title(sprintf('Cropped %s-%s - Aligned',textCropped,textFirstLastFig),'FontSize',15)
+        title(sprintf('%s - Aligned',textFirstLastFig),'FontSize',15)
         if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f5); end
         uiwait(msgbox('Check on the image. Click ''OK'' to continue',''));
         if getValidAnswer('Satisfied of the alignment?','',{'y','n'})
@@ -248,10 +251,10 @@ function [moving_adj,offset]=A7_limited_registration(moved,fixed,newFolder,secon
     end
     if saveFig
         figure(f2)
-        saveas(f2,sprintf('%s/tiffImages/resultA7_%d_2_Entire_%s_NotAligned',newFolder,textResultName,textFirstLastFig),'tif')
-        saveas(f2,sprintf('%s/figImages/resultA7_%d_2_Entire_%s_NotAligned',newFolder,textResultName,textFirstLastFig))
+        saveas(f2,sprintf('%s/tiffImages/resultA7_%d_2_%s_NotAligned',newFolder,textResultName,textFirstLastFig),'tif')
+        saveas(f2,sprintf('%s/figImages/resultA7_%d_2_%s_NotAligned',newFolder,textResultName,textFirstLastFig))
         close(f2)
-        saveas(f5,sprintf('%s/tiffImages/resultA7_%d_5_Cropped_%s-%s-Aligned',newFolder,textResultName,textCropped,textFirstLastFig),'tif')
-        saveas(f5,sprintf('%s/figImages/resultA7_%d_5_Cropped_%s-%s-Aligned',newFolder,textResultName,textCropped,textFirstLastFig))
+        saveas(f5,sprintf('%s/tiffImages/resultA7_%d_5_%s-Aligned',newFolder,textResultName,textFirstLastFig),'tif')
+        saveas(f5,sprintf('%s/figImages/resultA7_%d_5_%s-Aligned',newFolder,textResultName,textFirstLastFig))
     end    
 end

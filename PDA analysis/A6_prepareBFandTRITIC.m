@@ -1,7 +1,17 @@
 function varargout=A6_prepareBFandTRITIC(folderResultsImg,secondMonitorMain)
     % Open Brightfield image and the TRITIC (Before and After stimulation images)
     filenameND2='resultA6_1_BrightField'; titleImage='BrightField - original';
-    [BF_Mic_Image,metaData_BF,filePathData]=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain);    
+    [BF_Mic_Image,metaData_BF,filePathData,fileName]=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain);    
+    [~, nameOnly, ~] = fileparts(fileName);
+    nameLower = lower(nameOnly);    
+    % check if filename include word post/after. In this way, it will take
+    % the proper TRITIC image when it is compared with the BF 
+    if contains(nameLower, 'post') || contains(nameLower, 'after')
+        flag_PRE_POST = 1;  % flag post
+    else
+        flag_PRE_POST = 0;  % flag pre / none
+    end
+
     varargout{1}=metaData_BF;
     % .nd2 files inside dir
     fileList = dir(fullfile(filePathData, '*.nd2'));
@@ -26,25 +36,33 @@ function varargout=A6_prepareBFandTRITIC(folderResultsImg,secondMonitorMain)
         if isempty(beforeFiles) || isempty(afterFiles)
             disp('Issues in finding the files. Manual selection.');  
         end
-        
+        % extract the TRITIC data. Note: the two figures that will be saved
+        % are scaled differently, so the direct comparison on the images is
+        % not correct.
         filenameND2='resultA6_2_TRITIC_Before_Stimulation'; titleImage=sprintf('TRITIC Before Stimulation - timeExp: %s',timeExp);
-        Tritic_Mic_Image_Before=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain,filePathData,'Before',beforeFiles);
+        Tritic_Mic_Image_Before=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain,filePathData,'Before',beforeFiles);               
         filenameND2='resultA6_3_TRITIC_After_Stimulation'; titleImage=sprintf('TRITIC After Stimulation - timeExp: %s',timeExp);
         Tritic_Mic_Image_After=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain,filePathData,'After',afterFiles);
         close all       
+        
         % Align the fluorescent images After with the BEFORE stimulation
         [Tritic_Mic_Image_After_aligned,offset]=A7_limited_registration(Tritic_Mic_Image_After,Tritic_Mic_Image_Before,folderResultsImg,secondMonitorMain);
         % adjust BF and Tritic_Before depending on the offset
         BF_Mic_Image=fixSize(BF_Mic_Image,offset);
         Tritic_Mic_Image_Before=fixSize(Tritic_Mic_Image_Before,offset);   
         % Align the Brightfield to TRITIC Before Stimulation
-        [BF_Mic_Image_aligned,offset]=A7_limited_registration(BF_Mic_Image,Tritic_Mic_Image_Before,folderResultsImg,secondMonitorMain,'Brightfield','Yes','Moving','Yes');    
-        varargout{2}=BF_Mic_Image_aligned;        
+        if flag_PRE_POST
+            [BF_Mic_Image_aligned,offset]=A7_limited_registration(BF_Mic_Image,Tritic_Mic_Image_After_aligned,folderResultsImg,secondMonitorMain,'Brightfield','Yes','Moving','Yes','typeTritic',flag_PRE_POST);                
+        else
+            [BF_Mic_Image_aligned,offset]=A7_limited_registration(BF_Mic_Image,Tritic_Mic_Image_Before,folderResultsImg,secondMonitorMain,'Brightfield','Yes','Moving','Yes');                
+        end
         Tritic_Mic_Image_After_aligned=fixSize(Tritic_Mic_Image_After_aligned,offset);
-        varargout{3}=Tritic_Mic_Image_After_aligned;
         Tritic_Mic_Image_Before=fixSize(Tritic_Mic_Image_Before,offset);
+        varargout{2}=BF_Mic_Image_aligned;                
+        varargout{3}=Tritic_Mic_Image_After_aligned;        
         varargout{4}=Tritic_Mic_Image_Before;
-        [mainPathOpticalData,~]=fileparts(fileparts(fileparts(filePathData))); % ce qualcosa che non va nel naming
+
+        [mainPathOpticalData,~]=fileparts(fileparts(fileparts(filePathData)));
         varargout{5}=mainPathOpticalData;
         varargout{6}=timeExp;
         if getValidAnswer(sprintf('Satisfied of all the registration of BF and fluorescence image?\nIf not, change time exposure for better alignment'),'',{'Yes','No'})
@@ -58,7 +76,7 @@ function varargout=A6_prepareBFandTRITIC(folderResultsImg,secondMonitorMain)
 end
 
 
-function [Image,metaData,filePathData]=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain,varargin)
+function [Image,metaData,filePathData,fileName]=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain,varargin)
     % the function extract the given .nd2 image file and generate the
     % picture with a given title
     % varargin:
