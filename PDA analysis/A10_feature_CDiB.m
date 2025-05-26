@@ -23,9 +23,8 @@ function [outputme] = A10_feature_CDiB(X_Data,Y_Data,secondMonitorMain,newFolder
     DataOI(:,2)=Y_Data;
     clearvars X_Data Y_Data varargin
     
+    % clean NaN
     DataOI(isnan(DataOI(:,1)),:)=[];
-    DataOI(DataOI(:,1)<0,:)=[];
-    DataOI(DataOI(:,2)<0,:)=[];
     
     % if setpoint is declared, then manage the plot using that
     if ~isempty(p.Results.setpoints)
@@ -43,8 +42,8 @@ function [outputme] = A10_feature_CDiB(X_Data,Y_Data,secondMonitorMain,newFolder
             x_bin_start(i)=mean([setpointN(i-1),setpointN(i)]);
         end
     else
-        % define x line based on first and last elements and number of bins
-        x_bin_start = linspace(0,max(max(DataOI(:,1)))+0.1*max(max(DataOI(:,1))), p.Results.NumberOfBins);
+        % define x line based on lowest and highest values and number of bins
+        x_bin_start = linspace(min(DataOI(:,1)),max(DataOI(:,1))+0.1*max(DataOI(:,1)), p.Results.NumberOfBins);
     end
 
     for i=1:length(x_bin_start)-1

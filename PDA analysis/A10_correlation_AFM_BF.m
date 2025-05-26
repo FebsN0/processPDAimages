@@ -26,7 +26,6 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,size_umet
     argName = 'TRITIC_after';       defaultVal = [];     addParameter(p,argName,defaultVal, @(x) ismatrix(x));
     argName = 'Silent';             defaultVal = true;   addParameter(p,argName,defaultVal, @(x) islogical(x));
     argName = 'afterHeating';       defaultVal = false;  addParameter(p,argName,defaultVal, @(x) islogical(x));
-    argName = 'TRITIC_expTime';     defaultVal = '';     addParameter(p,argName,defaultVal, @(x) ischar(x));
     argName = 'innerBorderCalc';    defaultVal = false;  addParameter(p,argName,defaultVal,@(x) islogical(x));
 
     parse(p,AFM_data,AFM_IO_Padded,varargin{:});
@@ -48,12 +47,7 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,size_umet
     if p.Results.innerBorderCalc; innerBord=1; else, innerBord=0; end
     % in case one of the two is missing, substract by min value
     if p.Results.afterHeating; flag_heat=true; else, flag_heat=false; end
-    % in case of after heating, better specify which exposure time has been used to track the saturation upper limit
-    if ~isempty(p.Results.TRITIC_expTime)
-        expTime=sprintf('%s',p.Results.TRITIC_expTime);
-    else
-        expTime='';
-    end
+
     % init var where store results
     dataResultsPlot=struct();
     numBins=100; %default
@@ -74,7 +68,10 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,size_umet
     % process only AFM data
         flag_onlyAFM=true;
     end
-
+    % plot original Delta
+    labelBar={'Absolute fluorescence increase (A.U.)'}; % in case of no normalization
+    showData(secondMonitorMain,SeeMe,1,Delta,false,'Delta Fluorescence (After-Before, original)',labelBar,newFolder,'resultA10_1_DeltaFluorescenceOriginal','meterUnit',size_umeterXpix)
+   
     % find the idx of Height and Lateral/vertical Deflection in Trace Mode
     idx_LD = strcmp([AFM_data.Channel_name],'Lateral Deflection') & strcmp([AFM_data.Trace_type],'Trace');
     idx_H = strcmp([AFM_data.Channel_name],'Height (measured)');
@@ -89,232 +86,305 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,size_umet
     % The new solution is merging the mask of Delta with any channel before applying it to the single data.
     % In this way, the same mask is applied to any data!
     % crystal/PDA/polymer == 1   ||   background = 0
-    mask=logical(AFM_IO_Padded);          
+    mask_original=logical(AFM_IO_Padded);       
     % obtain the mask from Delta if it exists. 
-    if ~flag_onlyAFM      
-        mask_validValues= Delta>0;                          % exclude zeros and negative values
-        mask = mask & mask_validValues;                     % merge the mask with original AFM_IO_Padded        
+    if ~flag_onlyAFM              
         % obtain the minimum value of background so Delta can be
         % substracted by such a value
-        Delta_glass=Delta; Delta_glass(mask) = NaN;
-        % keep the Delta with first mask only for figure in the next part
-        Delta_ADJ_firstMaskOnly=Delta;
-        Delta_ADJ_firstMaskOnly(~mask)=nan;
+        Delta_glass=Delta; Delta_glass(mask_original) = NaN;
         % Intensity minimum in the glass region to be subtracted:
         Min_Delta_glass=min(Delta_glass(:),[],"omitnan");
-        % Fix Delta with first mask only. Already masked
-        Delta_ADJ_firstMaskOnly=Delta_ADJ_firstMaskOnly-Min_Delta_glass;
-        Delta_glass=Delta_glass-Min_Delta_glass;
-        Delta=Delta-Min_Delta_glass;
-        % Delta with the first mask to show how really Delta is. Normalized
-        % to increase contrast
-        showData(secondMonitorMain,SeeMe,1,Delta_ADJ_firstMaskOnly,true,'Delta Fluorescence (After-Before, first mask)','',newFolder,'resultA10_1_DeltaFluorescenceFirstMask','meterUnit',size_umeterXpix)
-        % save the delta in correspondence of crystal and background
+        % Fix Delta
+        Delta_glass_ADJ=Delta_glass-Min_Delta_glass;
+        Delta_ADJ=Delta-Min_Delta_glass;
         if ~flag_heat
-            titleD1='Tritic whole (before masking)';
-            titleD2='Tritic background (first masking only)';
-            labelBar='Absolute Fluorescence';
-            showData(secondMonitorMain,SeeMe,2,Delta,false,titleD1,labelBar,newFolder,'resultA10_2_Fluorescence_PDA_BackGround','data2',Delta_glass,'titleData2',titleD2,'background',true,'meterUnit',size_umeterXpix)
+            titleD1='Delta Fluorescence (Shifted)';
+            titleD2='Delta Fluorescence background (Masked and Shifted)';            
+            showData(secondMonitorMain,SeeMe,2,Delta_ADJ,false,titleD1,labelBar,newFolder,'resultA10_2_Fluorescence_PDA_BackGround','data2',Delta_glass_ADJ,'titleData2',titleD2,'background',true,'meterUnit',size_umeterXpix)
         end
-
+        % create the first new mask (AFM IO + Delta Pos)
+        mask_validValues= Delta_ADJ>0;                      % exclude zeros and negative values
+        mask_first = mask_original & mask_validValues;                     % merge the mask with original AFM_IO_Padded        
+        % copy Delta and apply first mask (AFM IO + pos values)
+        Delta_ADJ_firstMasking=Delta_ADJ;
+        Delta_ADJ_firstMasking(~mask_first)=nan;               
+        % store Delta and its modifications
+        DeltaData=struct();
+        DeltaData.Delta_original=Delta;
+        DeltaData.Delta_ADJ_minShifted=Delta_ADJ;
+        DeltaData.Delta_ADJ_firstMasking_Delta=Delta_ADJ_firstMasking;           
     end
     % obtain the mask from each channel 
     idx=idx_H |idx_LD | idx_VD;
+    mask = mask_first;
     for i=1:length(idx)
         if idx(i)
             mask_validValues= AFM_data(i).AFM_padded>0;     % exclude zeros and negative values
             mask = mask & mask_validValues;                 % merge the mask with the previous mask or with original AFM_IO_Padded 
         end
     end
-
     % obtain the definitive mask considering the removal of:
     % 1)    Lateral Force > 1.1*maxSetpoint
     % 2)    99°percentile height
-    mask_definitive=mask; % keep the less "aggressive mask"
+    mask_second=mask; % keep the less "aggressive mask"
     % extract meaningful lateral force. Use setpoint+10% as upper limit:
     % remember, lateral force higher than vertical force is derived not from friction phenomena but rather 
     % the collision between the tip and the surface and other instabilities.
     limitVD=max(setpoints)*1.1;
     mask_validValues= AFM_data(idx_LD).AFM_padded<=limitVD;          % exclude values higher than limit setpoint  
-    mask_definitive=mask_definitive & mask_validValues;         % merge the mask with the previous mask  
+    mask_third=mask_second & mask_validValues;         % merge the mask with the previous mask  
     % high vertical may generate wrong height values. Remove 99* percentile
     percentile=99;
     AFM_height_tmp = AFM_data(idx_H).AFM_padded; % copy height channel
-    AFM_height_tmp(~mask_definitive) = NaN;    
+    AFM_height_tmp(~mask_third) = NaN;    
     % exclude nan and transform into array
     AFM_height_tmp_array = AFM_height_tmp(~isnan(AFM_height_tmp));
     threshold = prctile(AFM_height_tmp_array, percentile);
     mask_validValues= AFM_data(idx_H).AFM_padded<threshold;     % exclude 99 percentile from the height
-    mask_definitive=mask_definitive & mask_validValues;         % merge the mask with the previous mask
+    mask_third=mask_third & mask_validValues;         % merge the mask with the previous mask
 
     masking = struct();
-    masking.mask_basicClearing_totElements = nnz(mask);
-    masking.mask_basicClearing = mask;
-    masking.mask_setpointLimit_99percRemoval_totElements = nnz(mask_definitive);
-    masking.mask_setpointLimit_99percRemoval = mask_definitive;    
+    % store delta original (AFM IO)
+    masking.mask_original = mask_original;
+    masking.mask_original_totElements = nnz(mask_original);
+    % store mask after delta
+    masking.mask_first_delta = mask_first;
+    masking.mask_first_delta_totElements = nnz(mask_first);
+    % store mask after each channel
+    masking.mask_second_eachChannel = mask_second;
+    masking.mask_second_eachChannel_totElements = nnz(mask_second);
+    % store mask after 99perc and <maxSetpoint
+    masking.mask_third_setpointLimit_99percRemoval = mask_third;
+    masking.mask_third_setpointLimit_99percRemoval_totElements = nnz(mask_third);
     dataResultsPlot.maskingResults = masking;
+    % show the plots
+    showData(secondMonitorMain,SeeMe,3,mask_first,true,'First Mask (Delta)','',newFolder,'resultA10_3_FirstMask','Binarized',true,'meterUnit',size_umeterXpix)
+    showData(secondMonitorMain,SeeMe,4,mask_second,true,'Second Mask (each AFM channel)','',newFolder,'resultA10_4_SecondMask','Binarized',true,'meterUnit',size_umeterXpix)
+    showData(secondMonitorMain,SeeMe,5,mask_third,true,'Third Mask (99perc + <maxSP)','',newFolder,'resultA10_5_ThirdMask','Binarized',true,'meterUnit',size_umeterXpix)   
     clear masking mask_validValues 
+    
     % Finally, applying the mask_definitive to all the data!
     if ~flag_onlyAFM
         % fix Delta using new mask
-        Delta_ADJ=Delta;
-        Delta_ADJ(~mask) = NaN;
-        Delta_ADJ=Delta_ADJ-Min_Delta_glass;
+        Delta_ADJ_secondMasking=Delta_ADJ;
+        Delta_ADJ_secondMasking(~mask_second) = NaN;
         % fix Delta using the definitive mask considering 99perc removal and LD>1.1*maxSetpoint removal
-        Delta_ADJ_def=Delta;
-        Delta_ADJ_def(~mask_definitive) = NaN;
-        Delta_ADJ_def=Delta_ADJ_def-Min_Delta_glass;
+        Delta_ADJ_thirdMasking=Delta_ADJ;
+        Delta_ADJ_thirdMasking(~mask_second) = NaN;
+        % store the results
+        DeltaData.Delta_ADJ_secondMasking_eachAFM=Delta_ADJ_secondMasking;
+        DeltaData.Delta_ADJ_thirdMasking_99percMaxSet=Delta_ADJ_thirdMasking;
     end
     for i=1:length(idx)
         if idx(i)
+            % apply original mask (AFM IO only)
             tmp = AFM_data(i).AFM_padded;
-            tmp(~mask) = NaN;
-            AFM_data(i).Padded_masked = tmp;
+            tmp(~mask_original) = NaN;
+            AFM_data(i).originalMasking = tmp;
+            % apply first Masking (mask from Delta)
             tmp = AFM_data(i).AFM_padded;
-            tmp(~mask_definitive) = NaN;
-            AFM_data(i).Padded_masked_maxVD_99perc = tmp;
+            tmp(~mask_first) = NaN;
+            AFM_data(i).firstMasking_Delta = tmp;
+            % apply second Masking (mask from merging AFM channel masking)
+            tmp = AFM_data(i).AFM_padded;
+            tmp(~mask_second) = NaN;
+            AFM_data(i).secondMasking_eachAFM = tmp;
+            % apply third Masking (mask from 99perc + <maxSP)
+            tmp = AFM_data(i).AFM_padded;
+            tmp(~mask_third) = NaN;
+            AFM_data(i).thirdMasking_maxVD_99perc = tmp;
         end
-    end
-    tmp=Delta;
-    Delta=struct();
-    Delta.original=tmp; clear tmp
-    Delta.firstMask=Delta_ADJ_firstMaskOnly;
-    Delta.completeMask=Delta_ADJ;
-    Delta.completeMask_99percMaxSet=Delta_ADJ_def;
-    showData(secondMonitorMain,SeeMe,1,Delta_ADJ_def,true,'Delta Fluorescence (After-Before, definitive mask)','',newFolder,'resultA10_3_DeltaFluorescenceDefinitiveMasked','meterUnit',size_umeterXpix)        
+    end   
+    
+    % Delta with the first mask to show how really Delta is.
+    showData(secondMonitorMain,SeeMe,6,Delta_ADJ_firstMasking,false,'Delta Fluorescence (1st mask)',labelBar,newFolder,'resultA10_6_DeltaFluorescenceFirstMask','meterUnit',size_umeterXpix)
+    showData(secondMonitorMain,SeeMe,7,Delta_ADJ_secondMasking,false,'Delta Fluorescence (2nd mask)',labelBar,newFolder,'resultA10_7_DeltaFluorescenceDefinitiveMasked','meterUnit',size_umeterXpix)            
+    showData(secondMonitorMain,SeeMe,8,Delta_ADJ_thirdMasking,false,'Delta Fluorescence (3rd mask)',labelBar,newFolder,'resultA10_8_DeltaFluorescenceDefinitiveMasked','meterUnit',size_umeterXpix)            
        
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%% NORMALIZE DELTA DATA %%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%
     if ~flag_onlyAFM                
-        ylabelAxis_noNorm='Absolute fluorescence increase (A.U.)';
+        ylabelAxis_noNorm=labelBar;
         ylabelAxis_norm=string(sprintf('Normalised Fluorescence (%%)'));
         % normalize the fluorescence data: the normFactor is the average of
         % any cleared pixel from TRITIC images of heated samples
         [~,nameExperiment]=fileparts(mainPathOpticalData);
         normFactor=A10_feature_normFluorescenceHeat(mainPathOpticalData,timeExp,nameExperiment,secondMonitorMain);            
-        Delta_ADJ=Delta_ADJ/normFactor.avg*100;
-        Delta_ADJ_def=Delta_ADJ_def/normFactor.avg*100;
-        Delta_ADJ_firstMaskOnly=Delta_ADJ_firstMaskOnly/normFactor.avg*100;
-        % store the data
-        Delta.firstMask_norm=Delta_ADJ_firstMaskOnly;
-        Delta.completeMask_norm=Delta_ADJ;
-        Delta.completeMask_99percMaxSet_norm=Delta_ADJ_def;
-        Delta.normFactor=normFactor;
+        Delta=Delta/normFactor.avg*100;
+        Delta_ADJ=Delta_ADJ/normFactor.avg*100;        
+        Delta_ADJ_firstMasking=Delta_ADJ_firstMasking/normFactor.avg*100;
+        Delta_ADJ_secondMasking=Delta_ADJ_secondMasking/normFactor.avg*100;
+        Delta_ADJ_thirdMasking=Delta_ADJ_thirdMasking/normFactor.avg*100;
+        % store the data normalized
+        DeltaData.normFactor=normFactor;
+        DeltaData.Delta_original_norm=Delta;
+        DeltaData.Delta_ADJ_minShifted_norm=Delta_ADJ;
+        DeltaData.Delta_ADJ_firstMasking_Delta_norm=Delta_ADJ_firstMasking;                
+        DeltaData.Delta_ADJ_secondMasking_eachAFM_norm=Delta_ADJ_secondMasking;
+        DeltaData.Delta_ADJ_thirdMasking_99percMaxSet_norm=Delta_ADJ_thirdMasking;        
     end
-    dataResultsPlot.DeltaData=Delta; 
-    clear DeltaData Delta_ADJ_firstMaskOnly Delta_ADJ Delta_ADJ_def
+    dataResultsPlot.DeltaData=DeltaData;
+    dataResultsPlot.AFM_Data=AFM_data; 
+    clear Delta_ADJ Delta_ADJ_firstMasking Delta_ADJ_secondMasking Delta_ADJ_thirdMasking 
         
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%% EXTRACT BORDERS AND DISTINGUISH INNER AND OUTER OF THE DATA %%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
-    if innerBord 
-        % Identification of borders from the binarised Height image
-        AFM_IO_Padded_Borders=AFM_IO_Padded;
-        AFM_IO_Padded_Borders(AFM_IO_Padded_Borders<=0)=nan;
-        AFM_IO_Borders= edge(AFM_IO_Padded_Borders,'approxcanny');
-        se = strel('square',5); % this value results a border of 3! pixels in the later images(as the outer dilation (2px) is gonna be subtracted later)
-        AFM_IO_Borders_Grow=imdilate(AFM_IO_Borders,se); 
-        showData(secondMonitorMain,SeeMe,3,AFM_IO_Borders_Grow,false,'Borders','',newFolder,'resultA10_4_Borders','Binarized',true)
-
-        % Elaboration of Height to extract inner and border regions
-        AFM_Height_Border=AFM_data(idx_H).AFM_padded;
-        AFM_Height_Border(AFM_IO_Padded==0)=nan;
-        AFM_Height_Border(AFM_IO_Borders_Grow==0)=nan; 
-        AFM_Height_Border(AFM_Height_Border<=0)=nan;
-        
-        AFM_Height_Inner=AFM_data(idx_H).AFM_padded;
-        AFM_Height_Inner(AFM_IO_Padded==0)=nan; 
-        AFM_Height_Inner(AFM_IO_Borders_Grow==1)=nan;
-        AFM_Height_Inner(AFM_Height_Inner<=0)=nan;
-        
-        titleD1='AFM Height Border';
-        titleD2='AFM Height Inner';
-        labelBar=sprintf('Height (\x03bcm)');
-        showData(secondMonitorMain,SeeMe,4,AFM_Height_Border*1e6,false,titleD1,labelBar,newFolder,'resultA10_5_BorderAndInner_AFM_Height','data2',AFM_Height_Inner*1e6,'titleData2',titleD2,'background',true)
-    
-        % Elaboration of LD to extract inner and border regions
-        AFM_LD_Border=AFM_data(idx_LD).AFM_padded;
-        AFM_LD_Border(AFM_IO_Padded==0)=nan; 
-        AFM_LD_Border(AFM_IO_Borders_Grow==0)=nan;
-        AFM_LD_Border(AFM_LD_Border<=0)=nan;
-    
-        AFM_LD_Inner=AFM_data(idx_LD).AFM_padded;
-        AFM_LD_Inner(AFM_IO_Padded==0)=nan;
-        AFM_LD_Inner(AFM_IO_Borders_Grow==1)=nan;
-        AFM_LD_Inner(AFM_LD_Inner<=0)=nan; 
-    
-        titleD1='AFM LD Border';
-        titleD2='AFM LD Inner';
-        labelBar='Force [nN]';  
-        showData(secondMonitorMain,SeeMe,5,AFM_LD_Border*1e9,false,titleD1,labelBar,newFolder,'resultA10_6_BorderAndInner_AFM_LateralDeflection','data2',AFM_LD_Inner*1e9,'titleData2',titleD2,'background',true)
-
-        % Elaboration of VD to extract inner and border regions
-        AFM_VD_Border=AFM_data(idx_VD).AFM_padded;
-        AFM_VD_Border(AFM_IO_Padded==0)=nan; 
-        AFM_VD_Border(AFM_IO_Borders_Grow==0)=nan;  
-        AFM_VD_Border(AFM_VD_Border<=0)=nan;
-        
-        AFM_VD_Inner=AFM_data(idx_VD).AFM_padded;
-        AFM_VD_Inner(AFM_IO_Padded==0)=nan; 
-        AFM_VD_Inner(AFM_IO_Borders_Grow==1)=nan;  
-        AFM_VD_Inner(AFM_VD_Inner<=0)=nan;
-    
-        titleD1='AFM VD Border';
-        titleD2='AFM VD Inner';
-        labelBar='Force [nN]';  
-        showData(secondMonitorMain,SeeMe,6,AFM_VD_Border*1e9,false,titleD1,labelBar,newFolder,'resultA10_7_BorderAndInner_AFM_VerticalDeflection','data2',AFM_VD_Inner*1e9,'titleData2',titleD2,'background',true)
-        
-        % Elaboration of Fluorescent Images to extract inner and border regions
-        if ~flag_heat           
-            TRITIC_Border_Delta=Delta.completeMask; 
-            TRITIC_Border_Delta(isnan(AFM_LD_Border))=nan; 
-            TRITIC_Inner_Delta=Delta.completeMask; 
-            TRITIC_Inner_Delta(isnan(AFM_LD_Inner))=nan;
-            titleD1='Tritic Border Delta';
-            titleD2='Tritic Inner Delta';
-            labelBar='Absolute Fluorescence';  
-            showData(secondMonitorMain,SeeMe,7,TRITIC_Border_Delta,false,titleD1,labelBar,newFolder,'resultA10_8_BorderAndInner_TRITIC_DELTA','data2',TRITIC_Inner_Delta,'titleData2',titleD2,'background',true)     
-        end
-        close all 
+    if innerBord
+        calcBorders(AFM_data,AFM_IO_Padded,idx_H,idx_LD,idx_VD,DeltaData,flag_heat,secondMonitorMain,SeeMe,newFolder)        
     end    
    
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%% FINAL PART: CORRELATE THE DATA %%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+    % Define data for masks
+    maskFields = {
+        'firstMasking_Delta',                'Delta_ADJ_firstMasking_Delta',        'Delta_ADJ_firstMasking_Delta_norm',            '1st mask',     '1M';
+        'secondMasking_eachAFM',             'Delta_ADJ_secondMasking_eachAFM',     'Delta_ADJ_secondMasking_eachAFM_norm',         '2nd mask',     '2M';
+        'thirdMasking_maxVD_99perc',         'Delta_ADJ_thirdMasking_99percMaxSet', 'Delta_ADJ_thirdMasking_99percMaxSet_norm',     '3rd mask',     '3M';
+    };
     if ~flag_heat
         % 7 - HEIGHT VS LATERAL FORCE
-        dataResultsPlot.Height_LD=A10_feature_CDiB(AFM_data(idx_H).Padded_masked(:),AFM_data(idx_LD).AFM_padded(:),secondMonitorMain,newFolder,'NumberOfBins',numBins,'xpar',1e9,'ypar',1e9,'YAyL','Lateral Force (nN)','XAxL',sprintf('Feature height (nm)'),'FigTitle','Height VS Lateral Deflection','FigFilename','Height_LD','NumFig',1);
-        dataResultsPlot.Height_LD_perc99maxVD=A10_feature_CDiB(AFM_data(idx_H).Padded_masked_maxVD_99perc(:),AFM_data(idx_LD).Padded_masked_maxVD_99perc(:),secondMonitorMain,newFolder,'NumberOfBins',numBins,'xpar',1e9,'ypar',1e9,'YAyL','Lateral Force (nN)','XAxL',sprintf('Feature height (nm)'),'FigTitle','Height (99 percentile removed) VS Lateral Deflection (up to max vertical force)','FigFilename','Height99perc_LDmaxVD','NumFig',2);                            
+        tmp=struct();
+        for i=1:size(maskFields,1)
+            x = AFM_data(idx_H).(maskFields{i,1})(:);
+            y = AFM_data(idx_LD).(maskFields{i,1})(:);
+            titleP = sprintf('Height VS Lateral Deflection (%s)', maskFields{i,4});
+            figName = sprintf('Height_LD_%s', maskFields{i,5});
+            tmp.(['Height_LD_' maskFields{i,5}]) = A10_feature_CDiB(x,y,secondMonitorMain,newFolder,'NumberOfBins',numBins,'xpar',1e9,'XAxL','Feature height (nm)','ypar',1e9,'YAyL','Lateral Force (nN)','FigTitle',titleP,'FigFilename',figName,'NumFig',1);
+        end
+        dataResultsPlot.Height_LD=tmp;
     end
 
     if ~flag_onlyAFM
         % 8 - HEIGHT VS FLUORESCENCE INCREASE
-        dataResultsPlot.Height_FLUO=A10_feature_CDiB(AFM_data(idx_H).Padded_masked(:),Delta.completeMask(:),secondMonitorMain,newFolder,'NumberOfBins',numBins,'xpar',1e9,'ypar',1,'YAyL',ylabelAxis_noNorm,'XAxL',sprintf('Feature height (nm)'),'FigTitle',sprintf('Height Vs Fluorescence (time exp %s ms)',expTime),'FigFilename','Height_Fluo','NumFig',3);
-        dataResultsPlot.Height_FLUO_perc99maxVD=A10_feature_CDiB(AFM_data(idx_H).Padded_masked_maxVD_99perc(:),Delta.completeMask_99percMaxSet(:),secondMonitorMain,newFolder,'NumberOfBins',numBins,'xpar',1e9,'ypar',1,'YAyL',ylabelAxis_noNorm,'XAxL',sprintf('Feature height (nm)'),'FigTitle',sprintf('Height (99 percentile removed) Vs Fluorescence (time exp %s ms)',expTime),'FigFilename','Height99perc_Fluo','NumFig',4);        
-        % norm
-        dataResultsPlot.Height_FLUO_norm=A10_feature_CDiB(AFM_data(idx_H).Padded_masked(:),Delta.completeMask_norm(:),secondMonitorMain,newFolder,'NumberOfBins',numBins,'xpar',1e9,'ypar',1,'YAyL',ylabelAxis_norm,'XAxL',sprintf('Feature height (nm)'),'FigTitle',sprintf('Height Vs Fluorescence (time exp %s ms) - Normalized',expTime),'FigFilename','Height_Fluo_norm','NumFig',3);
-        dataResultsPlot.Height_FLUO_perc99maxVD_norm=A10_feature_CDiB(AFM_data(idx_H).Padded_masked_maxVD_99perc(:),Delta.completeMask_99percMaxSet_norm(:),secondMonitorMain,newFolder,'NumberOfBins',numBins,'xpar',1e9,'ypar',1,'YAyL',ylabelAxis_norm,'XAxL',sprintf('Feature height (nm)'),'FigTitle',sprintf('Height (99 percentile removed) Vs Fluorescence (time exp %s ms) - Normalized',expTime),'FigFilename','Height99perc_Fluo_norm','NumFig',4);                
+        tmp=struct();
+        for i = 1:size(maskFields,1)
+            x = AFM_data(idx_H).(maskFields{i,1})(:);
+            y1 = DeltaData.(maskFields{i,2})(:); y2=DeltaData.(maskFields{i,3})(:);
+            titleP = sprintf('Height Vs Fluorescence (%s - time exp %s ms)', maskFields{i,4}, timeExp);
+            figName = sprintf('Height_Fluo_%s', maskFields{i,5});
+            tmp.(['Height_FLUO_' maskFields{i,5}]) = A10_feature_CDiB(x,y1,secondMonitorMain,newFolder,'NumberOfBins',numBins,'xpar',1e9,'XAxL','Feature height (nm)','ypar',1,'YAyL',ylabelAxis_noNorm,'FigTitle',titleP,'FigFilename',figName,'NumFig',2);            
+            %norm
+            figName = sprintf('Height_Fluo_%s_norm', maskFields{i,5});
+            tmp.(['Height_FLUO_' maskFields{i,5} '_norm'])=A10_feature_CDiB(x,y2,secondMonitorMain,newFolder,'NumberOfBins',numBins,'xpar',1e9,'XAxL','Feature height (nm)','ypar',1,'YAyL',ylabelAxis_norm,'FigTitle',titleP,'FigFilename',figName,'NumFig',3);
+        end
+        dataResultsPlot.Height_FLUO=tmp;
+
         if ~flag_heat
             % 9 - LATERAL DEFLECTION Vs FLUORESCENCE INCREASE
-            dataResultsPlot.LD_FLUO=A10_feature_CDiB(AFM_data(idx_LD).Padded_masked(:),Delta.completeMask(:),secondMonitorMain,newFolder,'NumberOfBins',2500,'xpar',1e9,'ypar',1,'YAyL',ylabelAxis_noNorm,'XAxL','Lateral Force (nN)','FigTitle','LD Vs Fluorescence','FigFilename','LD_Fluo','NumFig',5);
-            dataResultsPlot.LD_FLUO_perc99maxVD=A10_feature_CDiB(AFM_data(idx_LD).Padded_masked_maxVD_99perc(:),Delta.completeMask_99percMaxSet(:),secondMonitorMain,newFolder,'NumberOfBins',500,'xpar',1e9,'ypar',1,'YAyL',ylabelAxis_noNorm,'XAxL','Lateral Force (nN)','FigTitle',sprintf('LD (up to the max vertical force) Vs Fluorescence (time exp %s ms)',timeExp),'FigFilename','LDmaxVD_Fluo','NumFig',6);           
-            % norm
-            dataResultsPlot.LD_FLUO_norm=A10_feature_CDiB(AFM_data(idx_LD).Padded_masked(:),Delta.completeMask_norm(:),secondMonitorMain,newFolder,'NumberOfBins',2500,'xpar',1e9,'ypar',1,'YAyL',ylabelAxis_norm,'XAxL','Lateral Force (nN)','FigTitle','LD Vs Fluorescence - Normalized','FigFilename','LD_Fluo_norm','NumFig',5);
-            dataResultsPlot.LD_FLUO_perc99maxVD_norm=A10_feature_CDiB(AFM_data(idx_LD).Padded_masked_maxVD_99perc(:),Delta.completeMask_99percMaxSet_norm(:),secondMonitorMain,newFolder,'NumberOfBins',500,'xpar',1e9,'ypar',1,'YAyL',ylabelAxis_norm,'XAxL','Lateral Force (nN)','FigTitle',sprintf('LD (up to the max vertical force) Vs Fluorescence (time exp %s ms) - Normalized',timeExp),'FigFilename','LDmaxVD_Fluo_norm','NumFig',6);                       
+            tmp=struct();
+            for i = 1:size(maskFields,1)
+                x = AFM_data(idx_LD).(maskFields{i,1})(:);
+                y1 = DeltaData.(maskFields{i,2})(:); y2=DeltaData.(maskFields{i,3})(:);
+                titleP = sprintf('Lateral Force Vs Fluorescence (%s - time exp %s ms)', maskFields{i,4}, timeExp); 
+                figName = sprintf('LD_Fluo_%s', maskFields{i,5});
+                tmp.(['LD_FLUO_' maskFields{i,5}]) =        A10_feature_CDiB(x,y1,secondMonitorMain,newFolder,'NumberOfBins',2000,'xpar',1e9,'XAxL','Lateral Force (nN)','ypar',1,'YAyL',ylabelAxis_noNorm,'FigTitle',titleP,'FigFilename',figName,'NumFig',4);            
+                %norm
+                figName = sprintf('Height_Fluo_%s_norm', maskFields{i,5});
+                tmp.(['LD_FLUO_' maskFields{i,5} '_norm'])= A10_feature_CDiB(x,y2,secondMonitorMain,newFolder,'NumberOfBins',2000,'xpar',1e9,'XAxL','Lateral Force (nN)','ypar',1,'YAyL',ylabelAxis_norm,'FigTitle',titleP,'FigFilename',figName,'NumFig',5);
+            end
+            dataResultsPlot.LD_FLUO=tmp;
+           
             % 10 - VERTICAL FORCE VS FLUORESCENCE INCREASE
-            dataResultsPlot.VD_FLUO=A10_feature_CDiB(AFM_data(idx_VD).Padded_masked(:),Delta.completeMask(:),secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'ypar',1,'YAyL',ylabelAxis_noNorm,'XAxL','Vertical Force (nN)','FigTitle',sprintf('VD Vs Fluorescence (time exp %s ms)',timeExp),'FigFilename','VD_Fluo','NumFig',7); 
-            dataResultsPlot.VD_FLUO_perc99maxVD=A10_feature_CDiB(AFM_data(idx_VD).Padded_masked_maxVD_99perc(:),Delta.completeMask_99percMaxSet(:),secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'ypar',1,'YAyL',ylabelAxis_noNorm,'XAxL','Vertical Force (nN)','FigTitle',sprintf('VD Vs Fluorescence (time exp %s ms)',timeExp),'FigFilename','VD_Fluo','NumFig',8); 
-            % norm
-            dataResultsPlot.VD_FLUO_norm=A10_feature_CDiB(AFM_data(idx_VD).Padded_masked(:),Delta.completeMask_norm(:),secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'ypar',1,'YAyL',ylabelAxis_norm,'XAxL','Vertical Force (nN)','FigTitle',sprintf('VD Vs Fluorescence (time exp %s ms) - Normalized',timeExp),'FigFilename','VD_Fluo_norm','NumFig',7); 
-            dataResultsPlot.VD_FLUO_perc99maxVD_norm=A10_feature_CDiB(AFM_data(idx_VD).Padded_masked_maxVD_99perc(:),Delta.completeMask_99percMaxSet_norm(:),secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'ypar',1,'YAyL',ylabelAxis_norm,'XAxL','Vertical Force (nN)','FigTitle',sprintf('VD Vs Fluorescence (time exp %s ms) - Normalized',timeExp),'FigFilename','VD_Fluo_norm','NumFig',8); 
+            tmp=struct();
+            for i = 1:size(maskFields,1)
+                x = AFM_data(idx_VD).(maskFields{i,1})(:);
+                y1 = DeltaData.(maskFields{i,2})(:); y2=DeltaData.(maskFields{i,3})(:);
+                titleP = sprintf('Vertical Force Vs Fluorescence (%s - time exp %s ms)', maskFields{i,4}, timeExp); 
+                figName = sprintf('VD_Fluo_%s', maskFields{i,5});
+                tmp.(['VD_FLUO_' maskFields{i,5}]) =        A10_feature_CDiB(x,y1,secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'XAxL','Vertical Force (nN)','ypar',1,'YAyL',ylabelAxis_noNorm,'FigTitle',titleP,'FigFilename',figName,'NumFig',6);            
+                %norm
+                figName = sprintf('VD_Fluo_%s_norm', maskFields{i,5});
+                tmp.(['VD_FLUO_' maskFields{i,5} '_norm'])= A10_feature_CDiB(x,y2,secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'XAxL','Vertical Force (nN)','ypar',1,'YAyL',ylabelAxis_norm,'FigTitle',titleP,'FigFilename',figName,'NumFig',7);
+            end
+            dataResultsPlot.VD_FLUO=tmp;
         end
     end
     if ~flag_heat
-        % VERTICAL FORCE VS LATERAL FORCE
-        dataResultsPlot.VD_LD=A10_feature_CDiB(AFM_data(idx_VD).Padded_masked(:),AFM_data(idx_LD).Padded_masked(:),secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'ypar',1e9,'YAyL','Lateral Force (nN)','XAxL','Vertical Force (nN)','FigTitle','Lateral Force Vs Vertical Force','FigFilename','LD_VD','NumFig',8);
-        dataResultsPlot.VD_LD_perc99maxVD=A10_feature_CDiB(AFM_data(idx_VD).Padded_masked_maxVD_99perc(:),AFM_data(idx_LD).Padded_masked_maxVD_99perc(:),secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'ypar',1e9,'YAyL','Lateral Force (nN)','XAxL','Vertical Force (nN)','FigTitle','Lateral Force (up to the max vertical force) Vs Vertical Force','FigFilename','LD_VD','NumFig',9);
+        % 11 - VERTICAL FORCE VS LATERAL FORCE
+        tmp=struct();
+        for i=1:size(maskFields,1)
+            x = AFM_data(idx_VD).(maskFields{i,1})(:);
+            y = AFM_data(idx_LD).(maskFields{i,1})(:); 
+            titleP = sprintf('Vertical Force VS Lateral Force (%s)', maskFields{i,4});
+            figName = sprintf('VD_LD_%s', maskFields{i,5});
+            tmp.(['VD_LD_' maskFields{i,5}]) = A10_feature_CDiB(x,y,secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'XAxL','Vertical Force (nN)','ypar',1e9,'YAyL','Lateral Force (nN)','FigTitle',titleP,'FigFilename',figName,'NumFig',8);
+        end
+        dataResultsPlot.VD_LD=tmp;
     end    
 end
 
 
+function calcBorders(AFM_data,AFM_IO_Padded,idx_H,idx_LD,idx_VD,DeltaData,flag_heat,secondMonitorMain,SeeMe,newFolder)     
+    % Identification of borders from the binarised Height image
+    AFM_IO_Padded_Borders=AFM_IO_Padded;
+    AFM_IO_Padded_Borders(AFM_IO_Padded_Borders<=0)=nan;
+    AFM_IO_Borders= edge(AFM_IO_Padded_Borders,'approxcanny');
+    se = strel('square',5); % this value results a border of 3! pixels in the later images(as the outer dilation (2px) is gonna be subtracted later)
+    AFM_IO_Borders_Grow=imdilate(AFM_IO_Borders,se); 
+    showData(secondMonitorMain,SeeMe,9,AFM_IO_Borders_Grow,false,'Borders','',newFolder,'resultA10_6_Borders','Binarized',true)
+
+    % Elaboration of Height to extract inner and border regions
+    AFM_Height_Border=AFM_data(idx_H).AFM_padded;
+    AFM_Height_Border(AFM_IO_Padded==0)=nan;
+    AFM_Height_Border(AFM_IO_Borders_Grow==0)=nan; 
+    AFM_Height_Border(AFM_Height_Border<=0)=nan;
+    
+    AFM_Height_Inner=AFM_data(idx_H).AFM_padded;
+    AFM_Height_Inner(AFM_IO_Padded==0)=nan; 
+    AFM_Height_Inner(AFM_IO_Borders_Grow==1)=nan;
+    AFM_Height_Inner(AFM_Height_Inner<=0)=nan;
+    
+    titleD1='AFM Height Border';
+    titleD2='AFM Height Inner';
+    labelBar=sprintf('Height (\x03bcm)');
+    showData(secondMonitorMain,SeeMe,10,AFM_Height_Border*1e6,false,titleD1,labelBar,newFolder,'resultA10_7_BorderAndInner_AFM_Height','data2',AFM_Height_Inner*1e6,'titleData2',titleD2,'background',true)
+
+    % Elaboration of LD to extract inner and border regions
+    AFM_LD_Border=AFM_data(idx_LD).AFM_padded;
+    AFM_LD_Border(AFM_IO_Padded==0)=nan; 
+    AFM_LD_Border(AFM_IO_Borders_Grow==0)=nan;
+    AFM_LD_Border(AFM_LD_Border<=0)=nan;
+
+    AFM_LD_Inner=AFM_data(idx_LD).AFM_padded;
+    AFM_LD_Inner(AFM_IO_Padded==0)=nan;
+    AFM_LD_Inner(AFM_IO_Borders_Grow==1)=nan;
+    AFM_LD_Inner(AFM_LD_Inner<=0)=nan; 
+
+    titleD1='AFM LD Border';
+    titleD2='AFM LD Inner';
+    labelBar='Force [nN]';  
+    showData(secondMonitorMain,SeeMe,11,AFM_LD_Border*1e9,false,titleD1,labelBar,newFolder,'resultA10_8_BorderAndInner_AFM_LateralDeflection','data2',AFM_LD_Inner*1e9,'titleData2',titleD2,'background',true)
+
+    % Elaboration of VD to extract inner and border regions
+    AFM_VD_Border=AFM_data(idx_VD).AFM_padded;
+    AFM_VD_Border(AFM_IO_Padded==0)=nan; 
+    AFM_VD_Border(AFM_IO_Borders_Grow==0)=nan;  
+    AFM_VD_Border(AFM_VD_Border<=0)=nan;
+    
+    AFM_VD_Inner=AFM_data(idx_VD).AFM_padded;
+    AFM_VD_Inner(AFM_IO_Padded==0)=nan; 
+    AFM_VD_Inner(AFM_IO_Borders_Grow==1)=nan;  
+    AFM_VD_Inner(AFM_VD_Inner<=0)=nan;
+
+    titleD1='AFM VD Border';
+    titleD2='AFM VD Inner';
+    labelBar='Force [nN]';  
+    showData(secondMonitorMain,SeeMe,12,AFM_VD_Border*1e9,false,titleD1,labelBar,newFolder,'resultA10_9_BorderAndInner_AFM_VerticalDeflection','data2',AFM_VD_Inner*1e9,'titleData2',titleD2,'background',true)
+    
+    % Elaboration of Fluorescent Images to extract inner and border regions
+    if ~flag_heat           
+        TRITIC_Border_Delta=DeltaData.Delta_ADJ_secondMasking_eachAFM; 
+        TRITIC_Border_Delta(isnan(AFM_LD_Border))=nan; 
+        TRITIC_Inner_Delta=Delta.completeMask; 
+        TRITIC_Inner_Delta(isnan(AFM_LD_Inner))=nan;
+        titleD1='Tritic Border Delta';
+        titleD2='Tritic Inner Delta';
+        labelBar='Absolute Fluorescence';  
+        showData(secondMonitorMain,SeeMe,13,TRITIC_Border_Delta,false,titleD1,labelBar,newFolder,'resultA10_10_BorderAndInner_TRITIC_DELTA','data2',TRITIC_Inner_Delta,'titleData2',titleD2,'background',true)     
+    end
+    close all 
+end

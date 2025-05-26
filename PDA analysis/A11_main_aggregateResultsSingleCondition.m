@@ -8,7 +8,12 @@ warning('off', warnID);
 typeShow=getValidAnswer('Show one or more type of data?','',{'One type only (ex. only TRCDA different scans)','More different types (ex. TRCDA, TRCDA:DMPC,etc)'});
 % prepare fig
 if typeShow==1
-    f4=figure; ax4=axes(f4); hold(ax4, 'on');
+    % x Height vs FLUO
+    f3=figure; ax3=axes(f3); hold(ax3,'on');
+    % x Height vs LateralForce
+    f4=figure; ax4=axes(f4); hold(ax4,'on');
+    % baseline trend
+    f5=figure; ax5=axes(f5); hold(ax5,'on');
 end
 
 % f1_1 and f1_3 for LD-FLUO (FULL, noNorm - Norm)
@@ -19,15 +24,14 @@ hold(ax1_1, 'on'); hold(ax1_2, 'on');
 f2_1=figure; f2_2=figure;
 ax2_1=axes(f2_1); ax2_2=axes(f2_2);
 hold(ax2_1, 'on'); hold(ax2_2, 'on');
-% x LD vs height
-f3=figure; ax3=axes(f3); hold(ax3, 'on');
+
 % init
 allDelta={};
 cnt=1; % counter x for samples
 arrayXlegend_mask_noNorm=[]; arrayXlegend_mask_norm=[];
 arrayXlegend_full_noNorm=[]; arrayXlegend_full_norm=[];
 arrayXlegend_mask_upperLimit_noNorm=[]; arrayXlegend_mask_upperLimit_norm=[];
-arrayXlegend_HeightLD=[];
+arrayXlegend_Height_LD=[]; arrayXlegend_Height_FLUO=[];
 while true
     mainFolderSingleCondition=uigetdir(pwd,'Select for the same type the main folder containing the subfolders ''Results Processing AFM and fluorescence images'' of different scans. Close to exit.');
     if mainFolderSingleCondition == 0
@@ -86,7 +90,7 @@ while true
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%%%% extract the data fluorescene and store them %%%%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        allDelta{cntDelta+i}= Data_finalResults.DeltaData.original;         %#ok<SAGROW>
+        allDelta{cntDelta+i}= Data_finalResults.DeltaData.Delta_ADJ_minShifted;         %#ok<SAGROW>
         allDelta_pixScale(cntDelta+i)=metaData_BF.ImageHeight_umeterXpixel; %#ok<SAGROW>
         subfolder_allscanFolder{cntDelta+i}=folderResultsImg;               %#ok<SAGROW>
 
@@ -95,39 +99,46 @@ while true
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         % x = force (N) ==> xMultiplier = 1e9 ==> nN
         % y = FLUO (absolute) ==> yMultiplier = none (=1)
-        hp=plotSingleData(Data_finalResults.LD_FLUO,nameData,ax1_1,clr,1e9,1,true);
+        hp=plotSingleData(Data_finalResults.LD_FLUO.LD_FLUO_2M,nameData,ax1_1,clr,1e9,1,true);
         if (typeShow == 2 && i==1) || typeShow == 1
             arrayXlegend_full_noNorm=[arrayXlegend_full_noNorm, hp.mainLine]; %#ok<AGROW>
         end              
         % norm data
-        hp=plotSingleData(Data_finalResults.LD_FLUO_norm,nameData,ax1_2,clr,1e9,1,true);
+        hp=plotSingleData(Data_finalResults.LD_FLUO.LD_FLUO_2M_norm,nameData,ax1_2,clr,1e9,1,true);
         if (typeShow == 2 && i==1) || typeShow == 1
             arrayXlegend_full_norm=[arrayXlegend_full_norm, hp.mainLine]; %#ok<AGROW>
         end
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%%%% extract the masked data fluorescene VS lateral deflection (absolute fluo and norm) and show only %%%%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
-        [hp,data]=plotSingleData(Data_finalResults.LD_FLUO_perc99maxVD,nameData,ax2_1,clr,1e9,1,false);
+        [hp,data]=plotSingleData(Data_finalResults.LD_FLUO.LD_FLUO_3M,nameData,ax2_1,clr,1e9,1,false);
         if (typeShow == 2 && i==1) || typeShow == 1
             arrayXlegend_mask_noNorm=[arrayXlegend_mask_noNorm, hp.mainLine]; %#ok<AGROW>
         end
         dataXfitting_noNorm(i)=data;
         % norm data
-        [hp,data]=plotSingleData(Data_finalResults.LD_FLUO_perc99maxVD_norm,nameData,ax2_2,clr,1e9,1,false);
+        [hp,data]=plotSingleData(Data_finalResults.LD_FLUO.LD_FLUO_3M_norm,nameData,ax2_2,clr,1e9,1,false);
         if (typeShow == 2 && i==1) || typeShow == 1
             arrayXlegend_mask_norm=[arrayXlegend_mask_norm, hp.mainLine]; %#ok<AGROW>
         end
         dataXfitting_norm(i)=data;
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        %%%%%% extract the data Lateral Force VS Height %%%%%%
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%       
-        % x = force (N)  ==> xMultiplier = 1e9 ==> nN
-        % y = height (m) ==> yMultiplier = 1e9 ==> nm
-        hp=plotSingleData(Data_finalResults.Height_LD_perc99maxVD,nameData,ax3,clr,1e9,1e9,true);
-        if (typeShow == 2 && i==1) || typeShow == 1
-            arrayXlegend_HeightLD=[arrayXlegend_HeightLD, hp.mainLine]; %#ok<AGROW>
-        end
-        if typeShow==1
+        
+        if typeShow == 1
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%%%%% extract the data Height VS fluorescence %%%%%%%
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%               
+            % x = height (m) ==> xMultiplier = 1e9 ==> nm
+            hp=plotSingleData(Data_finalResults.Height_FLUO.Height_FLUO_3M,nameData,ax3,clr,1e9,1,true);
+            arrayXlegend_Height_FLUO=[arrayXlegend_Height_FLUO, hp.mainLine]; %#ok<AGROW>            
+        
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%%%%% extract the data Height VS Lateral Force %%%%%%
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%       
+            % x = height (m) ==> xMultiplier = 1e9 ==> nm
+            % y = force (N)  ==> yMultiplier = 1e9 ==> nN
+            hp=plotSingleData(Data_finalResults.Height_LD.Height_LD_3M,nameData,ax4,clr,1e9,1e9,true);
+            arrayXlegend_Height_LD=[arrayXlegend_Height_LD, hp.mainLine]; %#ok<AGROW>
+
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             %%%%%% extract the Baseline trend and show %%%%%%
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%              
@@ -140,7 +151,7 @@ while true
             if length(baseline_nN) > 1
                 % plot the baseline trend from metadata
                 
-                hp=plot(ax4,arrayTime,baseline_nN,'-*','LineWidth',2,'MarkerSize',10,'MarkerEdgeColor',clr,'Color',clr,'DisplayName',nameData);
+                hp=plot(ax5,arrayTime,baseline_nN,'-*','LineWidth',2,'MarkerSize',10,'MarkerEdgeColor',clr,'Color',clr,'DisplayName',nameData);
                 if cnt==1 && i==1
                     arrayXlegend_baseline=hp;
                 elseif (cnt~=1 && i==1) || typeShow == 1
@@ -227,18 +238,24 @@ else
  
 end
 
-ylabelText='Lateral Force [nN]';
-xlabelText='Height [nm]';
-filepath=fullfile(foldername,'RESULTSfinal_HeightVsLD.tif');
-textTitle=sprintf('Height Vs Lateral Force - comparison of different scans (sample %s)',nameType{1}{1});
-adjustPlot(ax3,xlabelText,ylabelText,textTitle,arrayXlegend_HeightLD,filepath,secondMonitorMain)
-
-if exist("f4",'var')
+if typeShow==1
+    % Height VS FLUO
+    xlabelText='Height [nm]';
+    ylabelText='Absolute fluorescence increase (A.U.)';
+    filepath=fullfile(foldername,'RESULTSfinal_HeightVsFLUO.tif');
+    textTitle=sprintf('Height Vs Fluorescence - comparison of different scans (sample %s)',nameType{1}{1});
+    adjustPlot(ax3,xlabelText,ylabelText,textTitle,arrayXlegend_Height_FLUO,filepath,secondMonitorMain)
+    % Height VS LD
+    ylabelText='Lateral Force [nN]';    
+    filepath=fullfile(foldername,'RESULTSfinal_HeightVsLD.tif');
+    textTitle=sprintf('Height Vs Lateral Force - comparison of different scans (sample %s)',nameType{1}{1});
+    adjustPlot(ax4,xlabelText,ylabelText,textTitle,arrayXlegend_Height_LD,filepath,secondMonitorMain)
+    % trend baseline
     ylabelText='Baseline shift [nN]';
     xlabelText='Time [min]';
     filepath=fullfile(foldername,'RESULTSfinal_baseline.tif');
     textTitle=sprintf('Baseline Shift Trend - comparison of different scans (sample %s)',nameType{1}{1});
-    adjustPlot(ax4,xlabelText,ylabelText,textTitle,arrayXlegend_baseline,filepath,secondMonitorMain)
+    adjustPlot(ax5,xlabelText,ylabelText,textTitle,arrayXlegend_baseline,filepath,secondMonitorMain)
 end
 clear array* ax* f1* f2* f3 f4 textTitle xlabelText ylabelText filepath foldername slope* cnt nameType fitResults*
 %%
