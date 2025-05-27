@@ -32,6 +32,8 @@ arrayXlegend_mask_noNorm=[]; arrayXlegend_mask_norm=[];
 arrayXlegend_full_noNorm=[]; arrayXlegend_full_norm=[];
 arrayXlegend_mask_upperLimit_noNorm=[]; arrayXlegend_mask_upperLimit_norm=[];
 arrayXlegend_Height_LD=[]; arrayXlegend_Height_FLUO=[];
+arrayXlegend_baseline=[];
+arrayXlegend_fitLine_noNorm=[]; arrayXlegend_fitLine_norm=[];
 while true
     mainFolderSingleCondition=uigetdir(pwd,'Select for the same type the main folder containing the subfolders ''Results Processing AFM and fluorescence images'' of different scans. Close to exit.');
     if mainFolderSingleCondition == 0
@@ -74,6 +76,7 @@ while true
     dataXfitting_noNorm = struct('xData', {}, 'yData', {}, 'ystdData', {});    
     dataXfitting_norm=struct('xData', {}, 'yData', {}, 'ystdData', {}); 
     cntDelta=length(allDelta);
+    nameScans=cell(1,length(allResultsData));
     for i=1:length(allResultsData)
         % if only one type of data, better visual using different color, but in case of more type/different
         % samples, use single color for each type/sample
@@ -84,19 +87,20 @@ while true
             clr=globalColor(cnt);
             nameData=sprintf('Sample %s',nameType{cnt}{1});
         end
+        nameScans{i}=nameData;
         % load only fluorescence and lateral deflection
         load(allResultsData{i},"Data_finalResults","metaData_AFM","metaData_BF","folderResultsImg")
         
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        %%%%%% extract the data fluorescene and store them %%%%%%
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%% extract the data Delta (shifted but not masked) and store them %%%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         allDelta{cntDelta+i}= Data_finalResults.DeltaData.Delta_ADJ_minShifted;         %#ok<SAGROW>
-        allDelta_pixScale(cntDelta+i)=metaData_BF.ImageHeight_umeterXpixel; %#ok<SAGROW>
-        subfolder_allscanFolder{cntDelta+i}=folderResultsImg;               %#ok<SAGROW>
+        allDelta_pixScale(cntDelta+i)=metaData_BF.ImageHeight_umeterXpixel;             %#ok<SAGROW>
+        subfolder_allscanFolder{cntDelta+i}=folderResultsImg;                           %#ok<SAGROW>
 
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        %%%%%% extract the FULL data fluorescene VS lateral deflection (absolute fluo and norm) and show only %%%%%%
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%% extract the second masked (each AFM channel) data fluorescene VS lateral deflection (absolute fluo and norm) and show only %%%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         % x = force (N) ==> xMultiplier = 1e9 ==> nN
         % y = FLUO (absolute) ==> yMultiplier = none (=1)
         hp=plotSingleData(Data_finalResults.LD_FLUO.LD_FLUO_2M,nameData,ax1_1,clr,1e9,1,true);
@@ -108,19 +112,15 @@ while true
         if (typeShow == 2 && i==1) || typeShow == 1
             arrayXlegend_full_norm=[arrayXlegend_full_norm, hp.mainLine]; %#ok<AGROW>
         end
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        %%%%%% extract the masked data fluorescene VS lateral deflection (absolute fluo and norm) and show only %%%%%%
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
-        [hp,data]=plotSingleData(Data_finalResults.LD_FLUO.LD_FLUO_3M,nameData,ax2_1,clr,1e9,1,false);
-        if (typeShow == 2 && i==1) || typeShow == 1
-            arrayXlegend_mask_noNorm=[arrayXlegend_mask_noNorm, hp.mainLine]; %#ok<AGROW>
-        end
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%% extract the third masked (99 perc + <maxSP) data lateral deflection VS fluorescene (absolute fluo and norm) and show only %%%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        % no save data for legend because the fitted handle figures will be
+        % used
+        [~,data]=plotSingleData(Data_finalResults.LD_FLUO.LD_FLUO_3M,nameData,ax2_1,clr,1e9,1,false);
         dataXfitting_noNorm(i)=data;
         % norm data
-        [hp,data]=plotSingleData(Data_finalResults.LD_FLUO.LD_FLUO_3M_norm,nameData,ax2_2,clr,1e9,1,false);
-        if (typeShow == 2 && i==1) || typeShow == 1
-            arrayXlegend_mask_norm=[arrayXlegend_mask_norm, hp.mainLine]; %#ok<AGROW>
-        end
+        [~,data]=plotSingleData(Data_finalResults.LD_FLUO.LD_FLUO_3M_norm,nameData,ax2_2,clr,1e9,1,false);
         dataXfitting_norm(i)=data;
         
         if typeShow == 1
@@ -129,8 +129,7 @@ while true
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%               
             % x = height (m) ==> xMultiplier = 1e9 ==> nm
             hp=plotSingleData(Data_finalResults.Height_FLUO.Height_FLUO_3M,nameData,ax3,clr,1e9,1,true);
-            arrayXlegend_Height_FLUO=[arrayXlegend_Height_FLUO, hp.mainLine]; %#ok<AGROW>            
-        
+            arrayXlegend_Height_FLUO=[arrayXlegend_Height_FLUO, hp.mainLine]; %#ok<AGROW>                   
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             %%%%%% extract the data Height VS Lateral Force %%%%%%
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%       
@@ -138,7 +137,6 @@ while true
             % y = force (N)  ==> yMultiplier = 1e9 ==> nN
             hp=plotSingleData(Data_finalResults.Height_LD.Height_LD_3M,nameData,ax4,clr,1e9,1e9,true);
             arrayXlegend_Height_LD=[arrayXlegend_Height_LD, hp.mainLine]; %#ok<AGROW>
-
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             %%%%%% extract the Baseline trend and show %%%%%%
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%              
@@ -149,26 +147,32 @@ while true
             arrayTime=0:totTimeSection:totTimeScan-totTimeSection;
             baseline_nN=metaData_AFM.Baseline_N*1e9;
             if length(baseline_nN) > 1
-                % plot the baseline trend from metadata
-                
+                % plot the baseline trend from metadata                
                 hp=plot(ax5,arrayTime,baseline_nN,'-*','LineWidth',2,'MarkerSize',10,'MarkerEdgeColor',clr,'Color',clr,'DisplayName',nameData);
-                if cnt==1 && i==1
-                    arrayXlegend_baseline=hp;
-                elseif (cnt~=1 && i==1) || typeShow == 1
-                    arrayXlegend_baseline=[arrayXlegend_baseline, hp]; %#ok<AGROW>
-                end
+                arrayXlegend_baseline=[arrayXlegend_baseline, hp]; %#ok<AGROW>                
             end
-        end
-        
+        end       
     end
     % choose the upper limit to fit the data below and plot it
     idx=[];    
-    [fitResults_all_noNorm,hl,idx]=chooseAndFit(dataXfitting_noNorm,typeShow,ax2_1,secondMonitorMain,true,idx,globalColor(cnt),nameType{cnt}{1});
+    [fitResults_all_noNorm,hl,hp,idx]=chooseAndFit(dataXfitting_noNorm,typeShow,ax2_1,secondMonitorMain,true,idx,globalColor(cnt),nameType{cnt}{1},nameScans);
     arrayXlegend_mask_upperLimit_noNorm(cnt)=hl; %#ok<SAGROW>
+    % store the handle figure to organize the legend names
+    if typeShow == 2
+        arrayXlegend_fitLine_noNorm=[arrayXlegend_fitLine_noNorm, hp(1)]; %#ok<AGROW>
+    else
+        arrayXlegend_fitLine_noNorm=hp;
+    end
     % norm
-    [fitResults_all_norm,hl]=chooseAndFit(dataXfitting_norm,typeShow,ax2_2,secondMonitorMain,false,idx,globalColor(cnt),nameType{cnt}{1});
+    [fitResults_all_norm,hl,hp]=chooseAndFit(dataXfitting_norm,typeShow,ax2_2,secondMonitorMain,false,idx,globalColor(cnt),nameType{cnt}{1},nameScans);
     arrayXlegend_mask_upperLimit_norm(cnt)=hl; %#ok<SAGROW>
-
+        % store the handle figure to organize the legend names
+    if typeShow == 2
+        arrayXlegend_fitLine_norm=[arrayXlegend_fitLine_norm, hp(1)]; %#ok<AGROW>
+    else
+        arrayXlegend_fitLine_norm=hp;
+    end
+    % store slope data
     slopeAVG_noNorm(cnt)=mean([fitResults_all_noNorm(:).slope]); %#ok<SAGROW>
     slopeSTD_noNorm(cnt)=std([fitResults_all_noNorm(:).slope]); %#ok<SAGROW>
     slopeAVG_norm(cnt)=mean([fitResults_all_norm(:).slope]); %#ok<SAGROW>
@@ -179,9 +183,9 @@ while true
     cnt=cnt+1;
 end
 
-% build the array to show in the legend: first the data lines and then the upper limit vertical line
-arrayXlegend_mask_noNorm=[arrayXlegend_mask_noNorm arrayXlegend_mask_upperLimit_noNorm]; 
-arrayXlegend_mask_norm=[arrayXlegend_mask_norm arrayXlegend_mask_upperLimit_norm]; 
+% build the final arrays to show in the legend: first the data lines and then the upper limit vertical line
+arrayXlegend_mask_noNorm=[arrayXlegend_fitLine_noNorm arrayXlegend_mask_upperLimit_noNorm]; 
+arrayXlegend_mask_norm=[arrayXlegend_fitLine_norm arrayXlegend_mask_upperLimit_norm]; 
 
 clear metaData_AFM metaData_BF clr cntDelta Data_finalResults firstPlot fitResults flagFirstSelectRangeXfit
 clear hf hl hp i idxLineSample j k subfolder_scanID allResultsData baseline_nN nameData
@@ -193,7 +197,8 @@ if typeShow==2
     foldername= uigetdir('*.tif',"Where save the final results?");
     textTitle='Comparison of different scans of different same samples';
 else
-    foldername=mainFolderSingleCondition;
+    foldername=sprintf('%s\\resultsA11_ComparisonAllScans',mainFolderSingleCondition);
+    mkdir(foldername)
     textTitle=sprintf('Comparison of different scans of the same sample (%s)',nameType{1}{1});
 end
 
@@ -306,7 +311,7 @@ function [hp,dataXfitting]=plotSingleData(data,nameData,idAxis,clr,xMultiplier,y
     dataXfitting.ystdData=ystdData;
 end
 
-function [fitResults,hl,idx]=chooseAndFit(dataXfitting,typeShow,idAxis,secondMonitorMain,firstPlot,idx,clr,nameSample)
+function [fitResults,hl,arrayXlegend,idx]=chooseAndFit(dataXfitting,typeShow,idAxis,secondMonitorMain,firstPlot,idx,clr,nameSample,nameData)
     fitResults=struct();
     if firstPlot
         figTmp=figure; hold on
@@ -325,11 +330,7 @@ function [fitResults,hl,idx]=chooseAndFit(dataXfitting,typeShow,idAxis,secondMon
         for i=1:length(dataXfitting)
             xData = dataXfitting(i).xData;
             yData = dataXfitting(i).yData;
-            ystdData = dataXfitting(i).ystdData;
-            shadedErrorBar(xData,yData, ystdData, ...
-            'lineProps',{'x', 'LineWidth', .5,'Color',clr}, ...
-            'transparent', true, ...
-            'patchSaturation', 0.3);
+            plot(xData,yData,'*','MarkerFaceColor',globalColor(i))                        
         end
         objInSecondMonitor(secondMonitorMain,figTmp);        
         xlim padded, ylim padded
@@ -347,7 +348,7 @@ function [fitResults,hl,idx]=chooseAndFit(dataXfitting,typeShow,idAxis,secondMon
         nameLineXlegend='Upper range for fitting';
         lineClr='k';    
     else
-        nameLineXlegend=sprintf('xmaxXfit - sample %s',nameSample);
+        nameLineXlegend=sprintf('xmaxXfit - %s',nameSample);
         lineClr=clr;
     end
     % be sure that xR have the same values
@@ -358,13 +359,13 @@ function [fitResults,hl,idx]=chooseAndFit(dataXfitting,typeShow,idAxis,secondMon
     end
     if ~all(xR == xR(1))
         warning('the vertical lines are not the same. Some problems..')
-    end
+    end    
     hl=xline(idAxis,round(xData(idx)),'--','LineWidth',1,'DisplayName',nameLineXlegend,'Color',lineClr);            
-          
     % Fitting
     ft = fittype( 'poly1' );
     opts = fitoptions( 'Method', 'LinearLeastSquares' );
     opts.Robust = 'LAR';
+    arrayXlegend=[];
     for i=1:length(dataXfitting)
         xData = dataXfitting(i).xData;
         yData = dataXfitting(i).yData;
@@ -377,7 +378,8 @@ function [fitResults,hl,idx]=chooseAndFit(dataXfitting,typeShow,idAxis,secondMon
         else
             clrXfit=clr;
         end
-        plot(idAxis,xfit,yfit,'Color',clrXfit,'LineWidth',3);
+        hp=plot(idAxis,xfit,yfit,'Color',clrXfit,'LineWidth',3,'DisplayName',nameData{i});
+        arrayXlegend=[arrayXlegend hp]; %#ok<AGROW>
         % save the fit var to calc the average
         fitResults(i).slope=fitresult.p1; % slope
         fitResults(i).offset=fitresult.p2; % offset

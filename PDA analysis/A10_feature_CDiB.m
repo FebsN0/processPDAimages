@@ -18,14 +18,17 @@ function [outputme] = A10_feature_CDiB(X_Data,Y_Data,secondMonitorMain,newFolder
     argName = 'NumFig';         defaultVal = '';                                        addParameter(p,argName,defaultVal);
 
     parse(p,varargin{:});
-    
-    DataOI(:,1)=X_Data;
-    DataOI(:,2)=Y_Data;
-    clearvars X_Data Y_Data varargin
-    
     % clean NaN
-    DataOI(isnan(DataOI(:,1)),:)=[];
-    
+    x_clean=X_Data(~isnan(X_Data));
+    y_clean=Y_Data(~isnan(Y_Data));
+    % additional check. Using the original method, the pixels were not at same 2D position.
+    if length(x_clean)~=length(y_clean)
+        error("The two given vectors have different lengths after removing NaN values. As results, the pixels are not in the same 2D position!")
+    end
+    DataOI(:,1)=x_clean;
+    DataOI(:,2)=y_clean;
+    clearvars X_Data Y_Data varargin x_clean y_clean
+
     % if setpoint is declared, then manage the plot using that
     if ~isempty(p.Results.setpoints)
         setpointN=p.Results.setpoints;
@@ -43,7 +46,7 @@ function [outputme] = A10_feature_CDiB(X_Data,Y_Data,secondMonitorMain,newFolder
         end
     else
         % define x line based on lowest and highest values and number of bins
-        x_bin_start = linspace(min(DataOI(:,1)),max(DataOI(:,1))+0.1*max(DataOI(:,1)), p.Results.NumberOfBins);
+        x_bin_start = linspace(min(DataOI(:,1)),max(DataOI(:,1))+0.1*max(DataOI(:,1)), p.Results.NumberOfBins+1);
     end
 
     for i=1:length(x_bin_start)-1
