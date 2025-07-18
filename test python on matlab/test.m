@@ -19,8 +19,8 @@ parameter=py.int(2);
 % https://www.mathworks.com/help/matlab/ref/pyrunfile.html#mw_03ecec06-0677-4345-9112-ea93ac49881e
 
 % check the data type of returned variables
-class(result)
-class(result{1})
+class(result);
+class(result{1});
 
 % convert the Python arrays to MATLAB matrices
 C1=double(result{1});
@@ -32,4 +32,4 @@ C4=double(result{4});
 C1check=A1+A2;
 C2check=A1*A2;
 C3check=eye(2,2);
-C4check=inv(A1);
+C4check=inv(A1)

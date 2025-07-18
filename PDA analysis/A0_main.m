@@ -131,8 +131,11 @@ if flagExeA1 || flagExeA5 || flagExeA6_A7_A8 || flagExeA9
     save(fullfile(mainPath,'HoverMode_ON\resultsData_4_postProcessA9.mat'))
 end
 %% correlation FLUORESCENCE AND AFM DATA
-Data_finalResults=A10_correlation_AFM_BF(AFM_A10_data_final,AFM_A10_IO_final,metaData_BF.ImageHeight_umeterXpixel,setpoints,secondMonitorMain,folderResultsImg,mainPathOpticalData,timeExp,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned,'innerBorderCalc',false,'TRITIC_expTime',timeExp);
-clear flag* Tritic_Mic_Image_Before Tritic_Mic_Image_After_aligned AFM_A10_data_final AFM_A10_IO_final
+Data_finalResults=A10_correlation_AFM_BF(AFM_A10_data_final,AFM_A10_IO_final,metaData_BF.ImageHeight_umeterXpixel,setpoints,secondMonitorMain,folderResultsImg,mainPathOpticalData,timeExp,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned,'innerBorderCalc',false);
+
+%Data_finalResults=A10_correlation_AFM_BF__OLDVERSION(AFM_A10_data_final,AFM_A10_IO_final,metaData_BF.ImageHeight_umeterXpixel,setpoints,secondMonitorMain,folderResultsImg,mainPathOpticalData,timeExp,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned,'innerBorderCalc',false);
+
+clear flag* Tritic_Mic_Image_Before Tritic_Mic_Image_After_aligned AFM_A10_data_final AFM_A10_IO_final AFM_A4_HeightFittedMasked
 close all
 save(fullfile(folderResultsImg,'resultsData_A10_end'))
 disp('A10 - Correlation completed')
@@ -210,7 +213,7 @@ function [flagExeA1,flagExeA5,flagExeA6_A7_A8,flagExeA9]=checkExistingData(mainP
         elseif exist(fullfile(mainPath, 'HoverMode_ON', filePostA4),'file')
             question=sprintf('Results after assembly, binarization and optminization (A1-A2-A3-A4) of the %s scan #%s already exists.\nChoose the right option:',nameExperiment,nameScan);
             options={'Run next step A5','Redo A1-A2-A3-A4'};
-            if ~getValidAnswer(question,'',options)==2
+            if getValidAnswer(question,'',options)==1
                 tmpData=load(fullfile(mainPath, 'HoverMode_ON', filePostA4));
                 flagExeA5=true;
             else
