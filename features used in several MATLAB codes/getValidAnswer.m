@@ -8,24 +8,48 @@ function user_choice = getValidAnswer(question, title, options, default_choice)
     if nargin < 4 || isempty(default_choice)
         default_choice = 1; 
     end
-    if ~isnumeric(default_choice) || default_choice < 1 || default_choice > numel(options) || ~ismember(options{default_choice},options)
+    if ~isnumeric(default_choice) || default_choice < 1 || default_choice > numel(options) 
         error('Invalid default choice!.');
     end
-    
+    % Normalize options to strings for comparison
+    try
+        optionStrs = cellfun(@(x) lower(string(x)), options, 'UniformOutput', false);
+    catch
+        error('Options must be either strings or scalar numeric values.');
+    end
+
     % Default dialog box size
     base_width = 450; button_height = 40; spacing = 10;
     % Check the longest string in the question and how many rows
     max_question_length = max(cellfun(@length, strsplit(question, '\n')));
     num_lines_question = length(strsplit(question, '\n'));
     
+    % Check if it's a yes/no dialog
+    yesStrings = ["yes", "y", "1"];
+    noStrings = ["no", "n", "0"];    
     % if options is just Yes and No, then simple dialog box
-    if length(options) == 2 && any(strcmpi(options, 'yes') | strcmpi(options, 'y')) && any(strcmpi(options, 'no') | strcmpi(options, 'n'))
+    flagYesNo=zeros(1,2);
+    if length(options) == 2        
+        for i=1:2
+            singleOption=optionStrs{i};
+            if any(ismember(singleOption,yesStrings))
+                flagYesNo(i)=1;
+                continue
+            else            
+                flagYesNo(i)=any(ismember(singleOption,noStrings));
+                continue
+            end
+        end
+    end
+    if all(flagYesNo)
         flagYesNo=1;
         max_option_length = 3;
         num_lines_options = 1;
     else
-    % check how many options rows. Since the options may contains \n, check the length better
         flagYesNo=0;
+    end
+    if ~flagYesNo
+    % check how many options rows. Since the options may contains \n, check the length better
         num_lines_options = length(options);
         num_lines_options_split = 0;
         lengthRow=[];
@@ -184,13 +208,13 @@ function user_choice = getValidAnswer(question, title, options, default_choice)
                 if numPressed >= 0 && numPressed <= numel(options)
                     buttonCallback(numPressed);
                     clc
-                    fprintf('\nDefinitive selection: %d\n',numPressed)                    
+                    fprintf('\nDefinitive selection: %s\n',string(options{numPressed})) 
                 end
             else
                 % In case the sequence number is empty, select default option
                 buttonCallback(default_choice);
                 clc
-                fprintf('\nDefinitive selection: %d\n',default_choice)                
+                fprintf('\nDefinitive selection: %s\n',string(options{default_choice}))                
             end       
         elseif ismember(event.Key, {'1','2','3','4','5','6','7','8','9','0'})
             % check if the clicked button is a number button. If so, add to the sequence number

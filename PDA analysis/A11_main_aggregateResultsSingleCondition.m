@@ -18,8 +18,8 @@ end
 
 % f1_1 and f1_3 for LD-FLUO (FULL, noNorm - Norm)
 f1_1=figure; f1_2=figure;
-ax1_1=axes(f1_1); ax1_2=axes(f1_2);
-hold(ax1_1, 'on'); hold(ax1_2, 'on');
+ax1_1=axes(f1_1); hold(ax1_1, 'on');
+ax1_2=axes(f1_2); hold(ax1_2, 'on');
 % f2_1 and f2_2 for LD-FLUO (Masked, noNorm - Norm)
 f2_1=figure; f2_2=figure;
 ax2_1=axes(f2_1); ax2_2=axes(f2_2);
@@ -35,8 +35,8 @@ arrayXlegend_Height_LD=[]; arrayXlegend_Height_FLUO=[];
 arrayXlegend_baseline=[];
 arrayXlegend_fitLine_noNorm=[]; arrayXlegend_fitLine_norm=[];
 while true
-    mainFolderSingleCondition=uigetdir(pwd,'Select for the same type the main folder containing the subfolders ''Results Processing AFM and fluorescence images'' of different scans. Close to exit.');
-    if mainFolderSingleCondition == 0
+    mainFolderSingleCondition=uigetdirMultiSelect(pwd,'Select one or more scans of the same sample directory. Close to exit.');
+    if isempty(mainFolderSingleCondition)
         break
     end
     while true
@@ -50,7 +50,14 @@ while true
     disp(nameType{cnt}{1})
     commonPattern = 'Results Processing AFM and fluorescence images';
     % Get a list of all subfolders in the selected directory
-    allSubfolders = dir(fullfile(mainFolderSingleCondition, '**', '*'));
+    allSubfolders = []; % inizializza struttura vuota
+
+    for i = 1:length(mainFolderSingleCondition)
+        folder = mainFolderSingleCondition{i};
+        thisSubfolders = dir(fullfile(folder, '**', '*'));
+        % Aggiungi i risultati al vettore complessivo
+        allSubfolders = [allSubfolders; thisSubfolders];
+    end
     % Filter to only include subfolders matching the common pattern
     matchedSubfolders = allSubfolders([allSubfolders.isdir] & contains({allSubfolders.name}, commonPattern));    
     % Initialize a cell array to store file paths
@@ -103,24 +110,25 @@ while true
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         % x = force (N) ==> xMultiplier = 1e9 ==> nN
         % y = FLUO (absolute) ==> yMultiplier = none (=1)
-        hp=plotSingleData(Data_finalResults.LD_FLUO.LD_FLUO_2M,nameData,ax1_1,clr,1e9,1,true);
+        hp=plotSingleData(Data_finalResults.LD_FLUO.LD_FLUO_2M,nameData,ax1_1,clr,1e9,1,true,typeShow);
         if (typeShow == 2 && i==1) || typeShow == 1
-            arrayXlegend_full_noNorm=[arrayXlegend_full_noNorm, hp.mainLine]; %#ok<AGROW>
+            arrayXlegend_full_noNorm=[arrayXlegend_full_noNorm, hp]; %#ok<AGROW>
         end              
         % norm data
-        hp=plotSingleData(Data_finalResults.LD_FLUO.LD_FLUO_2M_norm,nameData,ax1_2,clr,1e9,1,true);
+        hp=plotSingleData(Data_finalResults.LD_FLUO.LD_FLUO_2M_norm,nameData,ax1_2,clr,1e9,1,true,typeShow);
         if (typeShow == 2 && i==1) || typeShow == 1
-            arrayXlegend_full_norm=[arrayXlegend_full_norm, hp.mainLine]; %#ok<AGROW>
+            arrayXlegend_full_norm=[arrayXlegend_full_norm, hp]; %#ok<AGROW>
         end
+
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%%%% extract the third masked (99 perc + <maxSP) data lateral deflection VS fluorescene (absolute fluo and norm) and show only %%%%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         % no save data for legend because the fitted handle figures will be
         % used
-        [~,data]=plotSingleData(Data_finalResults.LD_FLUO.LD_FLUO_3M,nameData,ax2_1,clr,1e9,1,false);
+        [~,data]=plotSingleData(Data_finalResults.LD_FLUO.LD_FLUO_3M,nameData,ax2_1,clr,1e9,1,false,typeShow);
         dataXfitting_noNorm(i)=data;
         % norm data
-        [~,data]=plotSingleData(Data_finalResults.LD_FLUO.LD_FLUO_3M_norm,nameData,ax2_2,clr,1e9,1,false);
+        [~,data]=plotSingleData(Data_finalResults.LD_FLUO.LD_FLUO_3M_norm,nameData,ax2_2,clr,1e9,1,false,typeShow);
         dataXfitting_norm(i)=data;
         
         if typeShow == 1
@@ -128,15 +136,15 @@ while true
             %%%%%% extract the data Height VS fluorescence %%%%%%%
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%               
             % x = height (m) ==> xMultiplier = 1e9 ==> nm
-            hp=plotSingleData(Data_finalResults.Height_FLUO.Height_FLUO_3M,nameData,ax3,clr,1e9,1,true);
-            arrayXlegend_Height_FLUO=[arrayXlegend_Height_FLUO, hp.mainLine]; %#ok<AGROW>                   
+            hp=plotSingleData(Data_finalResults.Height_FLUO.Height_FLUO_3M,nameData,ax3,clr,1e9,1,true,typeShow);
+            arrayXlegend_Height_FLUO=[arrayXlegend_Height_FLUO, hp]; %#ok<AGROW>                   
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             %%%%%% extract the data Height VS Lateral Force %%%%%%
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%       
             % x = height (m) ==> xMultiplier = 1e9 ==> nm
             % y = force (N)  ==> yMultiplier = 1e9 ==> nN
-            hp=plotSingleData(Data_finalResults.Height_LD.Height_LD_3M,nameData,ax4,clr,1e9,1e9,true);
-            arrayXlegend_Height_LD=[arrayXlegend_Height_LD, hp.mainLine]; %#ok<AGROW>
+            hp=plotSingleData(Data_finalResults.Height_LD.Height_LD_3M,nameData,ax4,clr,1e9,1e9,true,typeShow);
+            arrayXlegend_Height_LD=[arrayXlegend_Height_LD, hp]; %#ok<AGROW>
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             %%%%%% extract the Baseline trend and show %%%%%%
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%              
@@ -290,20 +298,25 @@ clear allValues filename titleD1 labelBar singleFolder rangeScale
 %%%%%% FUNCTIONS %%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%
 
-function [hp,dataXfitting]=plotSingleData(data,nameData,idAxis,clr,xMultiplier,yMultiplier,flagFullData)
+function [hp,dataXfitting]=plotSingleData(data,nameData,idAxis,clr,xMultiplier,yMultiplier,flagFullData,typeShow)
 %%%%%% extract the data and show only %%%%%%
     x=cell2mat({data.BinCenter});
     y=cell2mat({data.MeanBin});
     ystd=cell2mat({data.STDBin});
     x=x*xMultiplier; y=y*yMultiplier; ystd=ystd*yMultiplier;
     [xData,yData,ystdData] = prepareCurveData(x,y,ystd);
-    hp=shadedErrorBar(xData,yData, ystdData, ...
-        'lineProps',{'x', 'LineWidth', .5,'Color',clr,'DisplayName',nameData}, ...
-        'transparent', true, ...
-        'patchSaturation', 0.3, ...
-        'plotAxes',idAxis);
-    if flagFullData
-        hp.mainLine.MarkerSize=5; hp.mainLine.LineStyle="-"; hp.mainLine.LineWidth=1.5; hp.mainLine.MarkerFaceColor="auto"; % hp.mainLine.Marker="o"
+    if typeShow==1
+        hpp=shadedErrorBar(xData,yData, ystdData, ...
+            'lineProps',{'x', 'LineWidth', .5,'Color',clr,'DisplayName',nameData}, ...
+            'transparent', true, ...
+            'patchSaturation', 0.3, ...
+            'plotAxes',idAxis);
+        if flagFullData
+            hpp.mainLine.MarkerSize=5; hpp.mainLine.LineStyle="-"; hpp.mainLine.LineWidth=1.5; hpp.mainLine.MarkerFaceColor="auto";
+        end
+        hp=hpp;
+    else
+        hp=plot(idAxis,xData,yData,'-','LineWidth', .5,'Color',clr,'DisplayName',nameData);
     end
     dataXfitting=struct();
     dataXfitting.xData=xData;
@@ -397,5 +410,5 @@ function adjustPlot(idAxis,xlabelText,ylabelText,textTitle,arrayXlegend,filepath
     idAxis.XAxis.FontSize = 15; idAxis.YAxis.FontSize = 15; 
     ylabel(idAxis,ylabelText,'FontSize',20), xlabel(idAxis,xlabelText,'FontSize',20)
     saveas(fig,filepath)
-    close(fig)
+    %close(fig)
 end

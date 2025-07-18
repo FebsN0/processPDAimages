@@ -17,26 +17,33 @@ function showData(secondMonitorMain,SeeMe,i,data1,norm,titleData1,labelBar,nameD
     argName = 'Binarized';          defaultVal = false;   addOptional(p,argName,defaultVal, @(x) islogical(x));
     argName = 'data2';              defaultVal = [];      addOptional(p,argName,defaultVal)
     argName = 'titleData2';         defaultVal = [];      addOptional(p,argName,defaultVal)
-    argName = 'closeImmediately';   defaultVal = true;    addOptional(p,argName,defaultVal, @(x) islogical(x));
     argName = 'background';         defaultVal = false;   addOptional(p,argName,defaultVal, @(x) islogical(x));
+    argName = 'meterUnit';          defaultVal = [];      addOptional(p,argName,defaultVal);
+    argName = 'scale';              defaultVal = [];      addOptional(p,argName,defaultVal);
 
     parse(p,varargin{:});
     if p.Results.Binarized, bin=true; else, bin=false; end
     if p.Results.background, bk=true; else, bk=false; end
-
+    
     if SeeMe
         eval(sprintf('f%d=figure(''Visible'',''on'');',i)) 
     else
         eval(sprintf('f%d=figure(''Visible'',''off'');',i)) 
     end   
+    if ~isempty(p.Results.meterUnit)
+        pixmeter=p.Results.meterUnit;
+    else
+        pixmeter=1;
+    end
+    rangeScale=p.Results.scale;
 
     if ~isempty(p.Results.data2)
         subplot(121)
-        showSingleData(secondMonitorMain,data1, norm, titleData1, labelBar,bin,bk)       
+        showSingleData(data1, norm, titleData1, labelBar,bin,bk,pixmeter,rangeScale)       
         subplot(122)
-        showSingleData(secondMonitorMain,p.Results.data2, norm, p.Results.titleData2, labelBar,bin,bk)
+        showSingleData(p.Results.data2, norm, p.Results.titleData2, labelBar,bin,bk,pixmeter,rangeScale)
     else
-        showSingleData(secondMonitorMain,data1, norm, titleData1, labelBar,bin,bk)
+        showSingleData(data1, norm, titleData1, labelBar,bin,bk,pixmeter,rangeScale)
     end    
     objInSecondMonitor(secondMonitorMain,eval(sprintf('f%d',i)));
     
@@ -49,38 +56,50 @@ function showData(secondMonitorMain,SeeMe,i,data1,norm,titleData1,labelBar,nameD
     saveas(eval(sprintf('f%d',i)),fullnameFig,'tiff')
     fullnameFig=fullfile(nameDir,"figImages",nameFig);
     saveas(eval(sprintf('f%d',i)),fullnameFig)
-    if p.Results.closeImmediately
+    if ~SeeMe
         eval(sprintf('close(f%d)',i))
     end
 end
 
-function showSingleData(secondMonitorMain,data, norm, titleData, labelBar,bin,bk)
+function showSingleData(data, norm, titleData, labelBar,bin,bk,pixelSize,rangeScale)   
+    % Create axis vectors. In case there is no pixel size, then use meter axis
+    x = (0:size(data,2)-1)*pixelSize; 
+    y = (0:size(data,1)-1)*pixelSize;
     if norm
-        imshow(imadjust(data/max(max(data))))
-        c = colorbar; c.Label.String = 'Normalized'; c.Label.FontSize=15;
-    else
-        h=imagesc(data);
-        if bk
-            % make white the nan data for better visual
-            set(h, 'AlphaData', ~isnan(h.CData))
-        end
-        if bin          
-            c=colorbar;
-            set(c,'YTickLabel',[]);
-            if secondMonitorMain==1
-                cLabel = ylabel(c,'Background                                                                                Foreground');
-                c.FontSize=16;
-            else
-                cLabel = ylabel(c,'Background                                    Foreground');
-                c.FontSize=16;
-            end
-            set(cLabel,'Rotation',90);
-        else
-            c=colorbar; c.Label.String=labelBar; c.Label.FontSize=15; 
-        end
+        data=data/max(max(data));
     end
+    h=imagesc(x,y,data);
+    if ~isempty(rangeScale)
+        clim(rangeScale)
+    end
+    c=colorbar; c.Label.FontSize=16;
+    if bk
+        % make white the nan data for better visual
+        set(h, 'AlphaData', ~isnan(h.CData))
+    end
+    if bin       
+        % Apply a custom two-color colormap (e.g., blue for 0, yellow for 1)
+        colormap([0 0 1; 1 1 0]);
+        % colormap is binary and not gradient
+        clim([0 1]);
+        %c.Ticks = [0 1];
+        set(c,'YTickLabel',[]);
+        cLabel = ylabel(c,'Background                                     Foreground');
+        cLabel.FontSize=14;        
+    elseif norm
+        c.Label.String = 'Normalized';
+    else
+        c.Label.String=labelBar;
+    end
+    
     colormap parula,
     title(titleData,'FontSize',16),
-    xlabel('slow direction','FontSize',14), ylabel('fast scan line direction','FontSize',14)
-    axis on, axis equal, xlim([0 size(data,2)]), ylim([0 size(data,1)])
+    if pixelSize ~= 1
+        xlabel('slow direction (\mum)','FontSize',14); ylabel('fast direction (\mum)','FontSize',14);
+        xticks(0:10:max(x)); yticks(0:10:max(y));
+    else
+        xlabel('slow direction','FontSize',14), ylabel('fast direction','FontSize',14)    
+    end
+    axis on, axis equal
+    xlim tight, ylim tight
 end
