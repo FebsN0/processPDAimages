@@ -31,7 +31,7 @@
 %           6) averaged values of fast scan lines of force used for the fitting
 %           7) averaged values of fast scan lines of vertical force used for the fitting
 
-function avg_fc=A5_featureFrictionCalc_method_1_2(AFM,metadata,mask,secondMonitorMain,newFolder,method,maskRemoval,varargin)
+function avg_fc=A5_featureFrictionCalc_method_1_2(AFM,metadata,mask,idxMon,newFolder,method,maskRemoval,varargin)
     % in case of code error, the waitbar won't be removed. So the following command force its closure
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)
@@ -76,7 +76,7 @@ function avg_fc=A5_featureFrictionCalc_method_1_2(AFM,metadata,mask,secondMonito
     %   second clearing: filter out force with 20% more than the setpoint for the specific section
     %   third clearing: remove entire fast scan lines by using the idx of manually selected portions        
     % show also the lateral and vertical data after clearing
-    [vertForce_clear,force_clear]=featureFrictionCalc1_clearingAndPlotData(vertical_Trace,vertical_ReTrace,setpoints,maxSetpoint,force,idxSection,maskRemoval,newFolder,secondMonitorMain);
+    [vertForce_clear,force_clear]=featureFrictionCalc1_clearingAndPlotData(vertical_Trace,vertical_ReTrace,setpoints,maxSetpoint,force,idxSection,maskRemoval,newFolder,idxMon);
     clear vertical_ReTrace vertical_Trace force alpha W Delta mask AFM_height_IO Lateral_Trace Lateral_ReTrace
               
     % calc the friction coefficient depending on the method
@@ -266,7 +266,7 @@ function avg_fc=A5_featureFrictionCalc_method_1_2(AFM,metadata,mask,secondMonito
             title(titleText,'FontSize',20);
             leg=legend('show');
             leg.FontSize=15; leg.Location="bestoutside";        
-            if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f_pixelsVSfc); end           
+            objInSecondMonitor(f_pixelsVSfc,idxMon);
             % select the right friction coefficient
             uiwait(msgbox('Select the best friction coefficient'));
             idx_x=selectRangeGInput(1,1,pix,fc_pix);
@@ -285,7 +285,7 @@ function avg_fc=A5_featureFrictionCalc_method_1_2(AFM,metadata,mask,secondMonito
             vertForce_avg_best=vertForce_avg_clear_AllPixelSize{idx_x};
             force_avg_best=force_avg_clear_AllPixelSizes{idx_x};
             % show the new data with the choosen pixel size reduction
-            featureFrictionCalc6_plotClearedImages(vertForce_clear_best,force_clear_best,maxSetpoint,newFolder,secondMonitorMain,true,pixFinal)     
+            featureFrictionCalc6_plotClearedImages(vertForce_clear_best,force_clear_best,maxSetpoint,newFolder,idxMon,true,pixFinal)     
         end
     end
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -337,7 +337,7 @@ function avg_fc=A5_featureFrictionCalc_method_1_2(AFM,metadata,mask,secondMonito
         xlabel('Setpoint (nN)','Fontsize',15); ylabel('Delta Offset (nN)','Fontsize',15); grid on, grid minor
         legend('Location','northwest','FontSize',15,'Interpreter','none')
         title(sprintf('Delta Offset vs Vertical Force - Method %d %s',method,fOutlierRemoval_text),'FontSize',20);
-        if ~isempty(secondMonitorMain); objInSecondMonitor(secondMonitorMain,f_fcFitt); end
+        objInSecondMonitor(f_fcFitt,idxMon);
         filename=fullfile(newFolder,sprintf('resultA5_xFrictionCalc_%d_Method_%d_%sDeltaOffsetVSsetpoint.tif',id,method,fOutlierRemovalID));
         saveas(f_fcFitt,filename)
         uiwait(msgbox('Click to conclude'));
@@ -382,7 +382,7 @@ function [flag,numElemSections]=checkNaNelements(vectorAvg,idxSection,minElement
 end
 
 %%%%%%%% SHOW VERTICAL AND LATERAL CLEARED DATA %%%%%%%%
-function featureFrictionCalc6_plotClearedImages(x,y,maxSetpoint,path,secondMonitorMain,postProcess,varargin) 
+function featureFrictionCalc6_plotClearedImages(x,y,maxSetpoint,path,idxMon,postProcess,varargin) 
 % show and save the lateral and vertical forces indipendtly of the method used. Data cleared with the three
 % clearing methods (vertical force threshold + 20% more max setpoint + manually removed portions)
     f1=figure('Visible','off');
@@ -411,7 +411,7 @@ function featureFrictionCalc6_plotClearedImages(x,y,maxSetpoint,path,secondMonit
         fileName='resultA5_xFrictionCalc_1_lateralVerticalData_cleared_preCalcFC.tif';
     end
     sgtitle(sgTitleFigure,'Fontsize',20);
-    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
+    objInSecondMonitor(f1,idxMon);
     saveas(f1,fullfile(path,fileName))
     close(f1)
 end

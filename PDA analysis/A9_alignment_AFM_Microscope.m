@@ -1,5 +1,5 @@
 % to align AFM height IO image to BF IO image, the main alignment
-function [AFM_IO_3_BFaligned,AFM_Elab,info_allignment,offset]=A9_alignment_AFM_Microscope(BF_IO_0_original,metaData_BF,AFM_IO_0_mask,metaData_AFM,AFM_Elab,newFolder,secondMonitorMain,varargin)
+function [AFM_IO_3_BFaligned,AFM_Elab,info_allignment,offset]=A9_alignment_AFM_Microscope(BF_IO_0_original,metaData_BF,AFM_IO_0_mask,metaData_AFM,AFM_Elab,newFolder,idxMon,varargin)
     % OUTPUT DETAILS
     %   - AFM_IO_padded :   AFM height 0/1 data ALIGNED with BF 0/1 data BUT the image is slighly bigger (in
     %                       case of margin or only crop) which values, outside AFM height is only 0. Briefly,
@@ -111,7 +111,7 @@ function [AFM_IO_3_BFaligned,AFM_Elab,info_allignment,offset]=A9_alignment_AFM_M
     f1=figure;
     imshowpair(BF_IO_0_original,AFM_IO_2_BFpadded,'falsecolor')
     title('Brightfield and resized AFM images - Post First cross-correlation','FontSize',14)
-    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
+    objInSecondMonitor(f1,idxMon);
     saveas(f1,sprintf('%s/tiffImages/resultA9_1_BForiginal_AFMresize_firstCrossCorrelation',newFolder),'tif')
     saveas(f1,sprintf('%s/figImages/resultA9_1_BForiginal_AFMresize_firstCrossCorrelation',newFolder))
     
@@ -176,7 +176,7 @@ function [AFM_IO_3_BFaligned,AFM_Elab,info_allignment,offset]=A9_alignment_AFM_M
         f1.Visible = 'off';
         f2=figure;
         imshowpair(BF_IO_1_cropped,AFM_IO_2_BFpadded,'falsecolor')
-        objInSecondMonitor(secondMonitorMain,f2);
+        objInSecondMonitor(f2,idxMon);
         title(textTitle,'FontSize',14)
         saveas(f2,sprintf('%s/tiffImages/resultA9_2_BFcropped_AFMscaled_preAlignment',newFolder),'tif')
         saveas(f2,sprintf('%s/figImages/resultA9_2_BFcropped_AFMscaled_preAlignment',newFolder))
@@ -202,14 +202,14 @@ function [AFM_IO_3_BFaligned,AFM_Elab,info_allignment,offset]=A9_alignment_AFM_M
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         if answerMethod==1
             % the output AFM_Elab will contain the corrected aligned data. Rect is required to 
-            [AFM_IO_3_BFaligned,AFM_Elab,details_it_reg,rect]=A9_feature_manualAlignmentGUI(AFM_IO_2_BFpadded,BF_IO_1_cropped,AFM_Elab,locationAFM2toBF1,max_c_it_OI,secondMonitorMain,newFolder);                         
+            [AFM_IO_3_BFaligned,AFM_Elab,details_it_reg,rect]=A9_feature_manualAlignmentGUI(AFM_IO_2_BFpadded,BF_IO_1_cropped,AFM_Elab,locationAFM2toBF1,max_c_it_OI,idxMon,newFolder);                         
             textTitle='Final alignment of Brightfield IO and resized AFM IO - Manual Approach';
         %%%%%%%%%%%%%%%%%%%%%%%%%%
         %%% automatic approach %%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%
         elseif answerMethod == 2
             textTitle='Final alignment of Brightfield IO and resized AFM IO - Automatic Approach';
-            [AFM_IO_3_BFaligned,AFM_Elab,details_it_reg,rect]=A9_feature_automaticLinearAlignment(AFM_IO_2_BFpadded,BF_IO_1_cropped,AFM_Elab,locationAFM2toBF1,max_c_it_OI,secondMonitorMain,newFolder);
+            [AFM_IO_3_BFaligned,AFM_Elab,details_it_reg,rect]=A9_feature_automaticLinearAlignment(AFM_IO_2_BFpadded,BF_IO_1_cropped,AFM_Elab,locationAFM2toBF1,max_c_it_OI,idxMon,newFolder);
         %%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%% Demon's approach %%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%                       
@@ -271,7 +271,7 @@ function [AFM_IO_3_BFaligned,AFM_Elab,info_allignment,offset]=A9_alignment_AFM_M
         % SHOW THE FINAL ALIGNMENT
         f3=figure;
         imshowpair(BF_IO_1_cropped,AFM_IO_3_BFaligned,'falsecolor');
-        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f3); end
+        objInSecondMonitor(f3,idxMon);
         title(textTitle,'FontSize',14)
         saveas(f3,sprintf('%s/tiffImages/resultA9_4_BFreduced_AFMopt_EndAlignment',newFolder),'tif')
         saveas(f3,sprintf('%s/figImages/resultA9_4_BFreduced_AFMopt_EndAlignment',newFolder))

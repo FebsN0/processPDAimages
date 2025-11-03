@@ -1,6 +1,6 @@
 % Function to collect data into bins
 
-function [outputme] = A10_feature_CDiB(X_Data,Y_Data,secondMonitorMain,newFolder,varargin)
+function [outputme] = A10_feature_CDiB(X_Data,Y_Data,idxMon,newFolder,varargin)
 
     p=inputParser();
     argName = 'setpoints';      defaultVal = [];                                        addParameter(p,argName,defaultVal);
@@ -118,7 +118,7 @@ function [outputme] = A10_feature_CDiB(X_Data,Y_Data,secondMonitorMain,newFolder
     if (~isempty(p.Results.FigTitle))
         title(p.Results.FigTitle,'FontSize',20);
     end    
-    objInSecondMonitor(secondMonitorMain,ftmp);
+    objInSecondMonitor(ftmp,idxMon);
     saveas(ftmp,sprintf('%s/tiffImages/resultA10_end_%d_%s',newFolder,p.Results.NumFig,p.Results.FigFilename),'tif')
     saveas(ftmp,sprintf('%s/figImages/resultA10_end_%d_%s',newFolder,p.Results.NumFig,p.Results.FigFilename))
 end

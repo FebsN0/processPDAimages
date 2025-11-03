@@ -1,4 +1,4 @@
-function [moving_adj,offset]=A7_limited_registration(moved,fixed,newFolder,secondMonitorMain,varargin)
+function [moving_adj,offset]=A7_limited_registration(moved,fixed,newFolder,idxMon,varargin)
 % Function to align optical images to each other (TRITC after and BF to TRITC before)
 % if BF is given, it must be the first input
 
@@ -72,7 +72,7 @@ function [moving_adj,offset]=A7_limited_registration(moved,fixed,newFolder,secon
         imshow(imadjust(image_of_interest)),title('Original Brightfield','FontSize',14)
         subplot(1,2,2)
         imshow(imadjust(el_image)),title('Brightfield with Bk Removed','FontSize',14)
-        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
+        objInSecondMonitor(f1,idxMon);
         if saveFig
             saveas(f1,sprintf('%s/tiffImages/resultA7_%d_1_comparisonOriginalAndBackgroundSubstracted',newFolder,textResultName),'tif')
             saveas(f1,sprintf('%s/figImages/resultA7_%d_1_comparisonOriginalAndBackgroundSubstracted',newFolder,textResultName))   
@@ -99,7 +99,7 @@ function [moving_adj,offset]=A7_limited_registration(moved,fixed,newFolder,secon
     f2=figure;
     imshow(fused_image)
     title(sprintf('%s - Not Aligned',textFirstLastFig),'FontSize',14)
-    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2); end
+    objInSecondMonitor(f2,idxMon);
 
     while true
         figure(f2)
@@ -143,7 +143,7 @@ function [moving_adj,offset]=A7_limited_registration(moved,fixed,newFolder,secon
                     satisfied=1;
                     eval(sprintf('f4_%d=figure;',i));
                     subplot(121), imshow(imadjust(data{i}))
-                    if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,eval(sprintf('f4_%d',i))); end
+                    objInSecondMonitor(eval(sprintf('f4_%d',i)),idxMon);
                     title(sprintf('Original %s',text{i}), 'FontSize',16)
                     while satisfied==1
                         % reset every time
@@ -178,7 +178,7 @@ function [moving_adj,offset]=A7_limited_registration(moved,fixed,newFolder,secon
                     end
                     %save the result of binarization
                     if saveFig
-                        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,eval(sprintf('f4_%d',i))); end
+                        objInSecondMonitor(eval(sprintf('f4_%d',i)),idxMon);
                         saveas(eval(sprintf('f4_%d',i)),sprintf('%s/tiffImages/resultA7_%d_4_%s_BinarizationResult',newFolder,textResultName,text{i}),'tif')
                         saveas(eval(sprintf('f4_%d',i)),sprintf('%s/figImages/resultA7_%d_4_%s_BinarizationResult',newFolder,textResultName,text{i}))
                     end
@@ -241,7 +241,7 @@ function [moving_adj,offset]=A7_limited_registration(moved,fixed,newFolder,secon
             imshow(imfuse(moving_adj,fixed_adj))
         end
         title(sprintf('%s - Aligned',textFirstLastFig),'FontSize',15)
-        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f5); end
+        objInSecondMonitor(f5,idxMon);
         uiwait(msgbox('Check on the image. Click ''OK'' to continue',''));
         if getValidAnswer('Satisfied of the alignment?','',{'y','n'})
             break

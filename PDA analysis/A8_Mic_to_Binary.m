@@ -13,7 +13,7 @@
 %       cropped Tritic After (if 'TRITIC_after' has been specified)
 %       FurtherDetails : details about binarisation
 %       
-function varargout=A8_Mic_to_Binary(imageBF_aligned,secondMonitorMain,newFolder,varargin)
+function varargout=A8_Mic_to_Binary(imageBF_aligned,idxMon,newFolder,varargin)
 
     p=inputParser();
     %Add default mandatory parameters.
@@ -41,7 +41,7 @@ function varargout=A8_Mic_to_Binary(imageBF_aligned,secondMonitorMain,newFolder,
         ftmp=figure;
         figure_image=imshow(imadjust(imageBF_aligned));
         title('BrightField image post alignment - CROP THE IMAGE')
-        if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,ftmp); end
+        objInSecondMonitor(ftmp,idxMon);
         [~,specs]=imcrop(figure_image);
         close gcf
         % take the coordinate of the cropped area
@@ -105,7 +105,7 @@ function varargout=A8_Mic_to_Binary(imageBF_aligned,secondMonitorMain,newFolder,
     [Y,E] = histcounts(image2,no_sub_div); 
     
     f1=figure;
-    if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f1); end
+    objInSecondMonitor(f1,idxMon);
     subplot(121), imshow(imadjust(image2)), title('Cropped Brightfield Image', 'FontSize',16)
     
     while(strcmp(satisfied,'Manual Selection'))
@@ -178,7 +178,7 @@ function varargout=A8_Mic_to_Binary(imageBF_aligned,secondMonitorMain,newFolder,
     imshow(binary_image)
     text=sprintf('Definitive Binarized BrightField (Morphological Opening - kernel: square 2 pixels)');
     title(text,'FontSize',14)
-    if ~isempty(secondMonitorMain),objInSecondMonitor(secondMonitorMain,f2); end
+    objInSecondMonitor(f2,idxMon);
     if saveFig
         saveas(f2,sprintf('%s/tiffImages/resultA8_2_DefinitiveBinarizedBrightField',newFolder),'tif')
         saveas(f2,sprintf('%s/figImages/resultA8_2_DefinitiveBinarizedBrightField',newFolder))

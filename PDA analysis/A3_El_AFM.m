@@ -1,4 +1,4 @@
-function [AFM_Images,IO_Image]=A3_El_AFM(filtData,iterationMain,secondMonitorMain,filepath,varargin)
+function [AFM_Images,IO_Image]=A3_El_AFM(filtData,iterationMain,idxMon,filepath,varargin)
 
 % The function extracts Images from the experiments.
 % It removes baseline and extracts foreground from the AFM image.
@@ -118,7 +118,7 @@ function [AFM_Images,IO_Image]=A3_El_AFM(filtData,iterationMain,secondMonitorMai
     titleData='Height (measured) channel - Line Tilted effect removed';
     idImg=1;
     nameFile='resultA3_1_HeightRemovedTiltLine';
-    showData(secondMonitorMain,SeeMe,idImg,poly_filt_data,true,titleData,'',filepath,nameFile)
+    showData(idxMon,SeeMe,idImg,poly_filt_data,true,titleData,'',filepath,nameFile)
     if SeeMe
         uiwait(msgbox('Click to continue'))
     end
@@ -183,7 +183,7 @@ function [AFM_Images,IO_Image]=A3_El_AFM(filtData,iterationMain,secondMonitorMai
     titleData='Height (measured) channel - Surface Tilted effect removed';
     idImg=1;
     nameFile='resultA3_2_HeightRemovedTiltSurface';
-    showData(secondMonitorMain,SeeMe,idImg,filt_data_no_Bk,true,titleData,'',filepath,nameFile)
+    showData(idxMon,SeeMe,idImg,filt_data_no_Bk,true,titleData,'',filepath,nameFile)
     if SeeMe
         uiwait(msgbox('Click to continue'))
     end
@@ -298,8 +298,8 @@ function [AFM_Images,IO_Image]=A3_El_AFM(filtData,iterationMain,secondMonitorMai
         AFM_noBk=AFM_noBk-min(AFM_noBk(:));
         % plot the resulting corrected data
         title1='Height (measured) channel - Single Line Fitted';        
-        showData(secondMonitorMain,SeeMe,3,AFM_noBk*1e9,false,title1,'Height (nm)',filepath,'resultA3_3_HeightLineFitted_noNorm')    
-        showData(secondMonitorMain,true,3,AFM_noBk,true,title1,'',filepath,'resultA3_3_HeightLineFitted_norm','closeImmediately',false)    
+        showData(idxMon,SeeMe,3,AFM_noBk*1e9,false,title1,'Height (nm)',filepath,'resultA3_3_HeightLineFitted_noNorm')    
+        showData(idxMon,true,3,AFM_noBk,true,title1,'',filepath,'resultA3_3_HeightLineFitted_norm','closeImmediately',false)    
         if getValidAnswer('Satisfied of the fitting?','',{'y','n'}) == 1
             close gcf, break
         end
@@ -310,7 +310,7 @@ function [AFM_Images,IO_Image]=A3_El_AFM(filtData,iterationMain,secondMonitorMai
     f4=figure;
     subplot(121), imshow(AFM_noBk_visible_data),colormap parula, axis on
     title('Height (measured) channel - Single Line Fitted', 'FontSize',16)
-    objInSecondMonitor(secondMonitorMain,f4);
+    objInSecondMonitor(f4,idxMon);
     c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
     ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
 
@@ -371,7 +371,7 @@ function [AFM_Images,IO_Image]=A3_El_AFM(filtData,iterationMain,secondMonitorMai
         f5=figure;
         imshow(AFM_noBk_visible_data),colormap parula, axis on
         title('Height (measured) channel - CLOSE THIS WINDOW WHEN SEGMENTATION TERMINATED', 'FontSize',16)
-        objInSecondMonitor(secondMonitorMain,f5);
+        objInSecondMonitor(f5,idxMon);
         c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
         ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
         % for some reasons, the exported variable is stored in the base workspace, outside the current
@@ -400,7 +400,7 @@ function [AFM_Images,IO_Image]=A3_El_AFM(filtData,iterationMain,secondMonitorMai
     titleData=sprintf('Baseline and foreground processed - Iteration %d',iterationMain);
     idImg=5;
     nameFile=sprintf('resultA3_4_BaselineForeground_iteration%d',iterationMain);
-    showData(secondMonitorMain,SeeMe,idImg,seg_binarized,false,titleData,'',filepath,nameFile,'Binarized',true)
+    showData(idxMon,SeeMe,idImg,seg_binarized,false,titleData,'',filepath,nameFile,'Binarized',true)
     if SeeMe
         uiwait(msgbox('Click to continue'))
     end

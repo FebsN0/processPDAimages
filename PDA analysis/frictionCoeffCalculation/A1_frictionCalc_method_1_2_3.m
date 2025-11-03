@@ -34,7 +34,7 @@
 %           6) averaged values of fast scan lines of force used for the fitting
 %           7) averaged values of fast scan lines of vertical force used for the fitting
 
-function [resFrictionAllExp,varargout]=A1_frictionCalc_method_1_2_3(AFM_AllScanImages,metadata_AllScan,AFM_AllScan_height_IO,secondMonitorMain,newFolder,method,nameScan_AllScan,idxRemovedPortion_onlyBK,varargin)
+function [resFrictionAllExp,varargout]=A1_frictionCalc_method_1_2_3(AFM_AllScanImages,metadata_AllScan,AFM_AllScan_height_IO,idxMon,newFolder,method,nameScan_AllScan,idxRemovedPortion_onlyBK,varargin)
     % in case of code error, the waitbar won't be removed. So the following command force its closure
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)
@@ -316,7 +316,7 @@ function [resFrictionAllExp,varargout]=A1_frictionCalc_method_1_2_3(AFM_AllScanI
                     leg=legend('show');
                     leg.FontSize=12; leg.Location="bestoutside";
                 end
-                if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f_pixelsVSfc); end
+                if ~isempty(secondMonitorMain), objInSecondMonitor(f_pixelsVSfc,idxMon); end
                       
                 saveas(f_pixelsVSfc,sprintf('%s/resultMethod3_1_pixelVSfrictionCoeffs_%s_%s.tif',newFolder,nameScan,fOutlierRemoval_text))
             end
@@ -353,7 +353,7 @@ function [resFrictionAllExp,varargout]=A1_frictionCalc_method_1_2_3(AFM_AllScanI
         xlabel('Setpoint (nN)','Fontsize',15); ylabel('Delta Offset (nN)','Fontsize',15); grid on, grid minor
         legend('Location','northwest','FontSize',15,'Interpreter','none')
         title(sprintf('Delta Offset vs Vertical Force - Method %d %s',method,fOutlierRemoval_text),'FontSize',20);
-        if ~isempty(secondMonitorMain); objInSecondMonitor(secondMonitorMain,f_fcAll); end
+        if ~isempty(secondMonitorMain); objInSecondMonitor(f_fcAll,idxMon); end
         saveas(f_fcAll,sprintf('%s/resultMethod_%d_DeltaOffsetVSsetpoint%s.tif',newFolder,method,fOutlierRemoval_text))
         uiwait(msgbox('Click to conclude'));
         close(f_fcAll)

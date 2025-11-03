@@ -70,7 +70,7 @@ if  ~(ismember(vers,pv1) && ismember(pe,pv1)) && ~(ismember(vers,pv2) && ismembe
 	error("Matlab and Python version not compatible. Check and update")
 end
 clear vers pv* pe
-secondMonitorMain=objInSecondMonitor;
+idxMon=objInSecondMonitor;
 % upload .jpk files. If more than one and if from same experiment in which setpoint is changed, then assembly.
 
 % prepare the height data and extract the mask
@@ -97,14 +97,14 @@ clear question
 %% Aseembly sections if any, binarize height image and optimize it
 if flagExeA1
     accuracy=chooseAccuracy("Step A3 - Fitting the baseline (i.e. Background) of AFM Height Data. Which fit order range use?");
-    [AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM,folderResultsImg,setpoints]=A1_openANDassembly_JPK(secondMonitorMain,'filePath',fullfile(mainPath,'HoverMode_ON'),'FitOrder',accuracy);
+    [AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM,folderResultsImg,setpoints]=A1_openANDassembly_JPK(idxMon,'filePath',fullfile(mainPath,'HoverMode_ON'),'FitOrder',accuracy);
     clear BW maskedImage accuracy question
     save(fullfile(mainPath,'HoverMode_ON\resultsData_1_postProcessA4_HVon'))
 end
 %% prepare the lateral force by using a proper friction coefficient
 if flagExeA1 || flagExeA5
     accuracy=chooseAccuracy("step A5 - Fitting the baseline (i.e. Background) of AFM Lateral Deflection Data. Which fit order range use?");
-    AFM_A5_LatDeflecFitted=A5_LD_Baseline_Adaptor_masked(AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM.Alpha,secondMonitorMain,folderResultsImg,mainPath,'FitOrder',accuracy,'Silent','No');
+    AFM_A5_LatDeflecFitted=A5_LD_Baseline_Adaptor_masked(AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM.Alpha,idxMon,folderResultsImg,mainPath,'FitOrder',accuracy,'Silent','No');
     close all
     clear accuracy AFM_A4_HeightFittedMasked
     save(fullfile(mainPath,'HoverMode_ON\resultsData_2_postProcessA5'))
@@ -113,16 +113,16 @@ end
 % includes A6 and A7
 if flagExeA1 || flagExeA5 || flagExeA6_A7_A8
     fprintf('\nAFM data is taken from the following experiment:\n\tEXPERIMENT: %s\t\tSCAN i-th:\t %s\n\n',nameExperiment,nameScan) 
-    [metaData_BF,BF_Mic_Image_aligned,Tritic_Mic_Image_After_aligned,Tritic_Mic_Image_Before,mainPathOpticalData,timeExp]=A6_prepareBFandTRITIC(folderResultsImg,secondMonitorMain);
+    [metaData_BF,BF_Mic_Image_aligned,Tritic_Mic_Image_After_aligned,Tritic_Mic_Image_Before,mainPathOpticalData,timeExp]=A6_prepareBFandTRITIC(folderResultsImg,idxMon);
     % Produce the binary IO of Brightfield
-    [BF_Mic_Image_IO,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,~]=A8_Mic_to_Binary(BF_Mic_Image_aligned,secondMonitorMain,folderResultsImg,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned); 
+    [BF_Mic_Image_IO,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,~]=A8_Mic_to_Binary(BF_Mic_Image_aligned,idxMon,folderResultsImg,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned); 
     clear BF_Mic_Image_aligned 
     close all
     save(fullfile(mainPath,'HoverMode_ON\resultsData_3_postProcessA8'))
 end
 %% Align AFM to BF and extract the coordinates for alignment to be transferred to the other data
 if flagExeA1 || flagExeA5 || flagExeA6_A7_A8 || flagExeA9
-    [AFM_A10_IO_final,AFM_A10_data_final,results_AFM_BF_aligment,offset]=A9_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_A5_LatDeflecFitted,folderResultsImg,secondMonitorMain,'Margin',150);
+    [AFM_A10_IO_final,AFM_A10_data_final,results_AFM_BF_aligment,offset]=A9_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_A5_LatDeflecFitted,folderResultsImg,idxMon,'Margin',150);
     % adjust size BF and TRITIC
     BF_Mic_Image_IO=fixSize(BF_Mic_Image_IO,offset);
     Tritic_Mic_Image_Before=fixSize(Tritic_Mic_Image_Before,offset);  
@@ -131,7 +131,7 @@ if flagExeA1 || flagExeA5 || flagExeA6_A7_A8 || flagExeA9
     save(fullfile(mainPath,'HoverMode_ON\resultsData_4_postProcessA9.mat'))
 end
 %% correlation FLUORESCENCE AND AFM DATA
-Data_finalResults=A10_correlation_AFM_BF(AFM_A10_data_final,AFM_A10_IO_final,metaData_BF.ImageHeight_umeterXpixel,setpoints,secondMonitorMain,folderResultsImg,mainPathOpticalData,timeExp,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned,'innerBorderCalc',false);
+Data_finalResults=A10_correlation_AFM_BF(AFM_A10_data_final,AFM_A10_IO_final,metaData_BF.ImageHeight_umeterXpixel,setpoints,idxMon,folderResultsImg,mainPathOpticalData,timeExp,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned,'innerBorderCalc',false);
 
 %Data_finalResults=A10_correlation_AFM_BF__OLDVERSION(AFM_A10_data_final,AFM_A10_IO_final,metaData_BF.ImageHeight_umeterXpixel,setpoints,secondMonitorMain,folderResultsImg,mainPathOpticalData,timeExp,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned,'innerBorderCalc',false);
 

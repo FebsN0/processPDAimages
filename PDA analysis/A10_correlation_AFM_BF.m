@@ -17,7 +17,7 @@
 %               NOTE: it doesn't matter if before or after scanning
 %       3) process only AFM data
 
-function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,size_umeterXpix,setpoints,secondMonitorMain,newFolder,mainPathOpticalData,timeExp,varargin)
+function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,size_umeterXpix,setpoints,idxMon,newFolder,mainPathOpticalData,timeExp,varargin)
     
     p=inputParser();
     addRequired(p,'AFM_data');
@@ -73,11 +73,11 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,size_umet
     % extract the normalization factor from post heated sample scans. The
         % factor will be used later.
         [~,nameExperiment]=fileparts(mainPathOpticalData);
-        normFactor=A10_feature_normFluorescenceHeat(mainPathOpticalData,timeExp,nameExperiment,secondMonitorMain);         
+        normFactor=A10_feature_normFluorescenceHeat(mainPathOpticalData,timeExp,nameExperiment,idxMon);         
     end    
     % plot original Delta
     labelBar={'Absolute fluorescence increase (A.U.)'}; % in case of no normalization
-    showData(secondMonitorMain,SeeMe,1,Delta,false,'Delta Fluorescence (After-Before, original)',labelBar,newFolder,'resultA10_1_DeltaFluorescenceOriginal','meterUnit',size_umeterXpix)
+    showData(idxMon,SeeMe,1,Delta,false,'Delta Fluorescence (After-Before, original)',labelBar,newFolder,'resultA10_1_DeltaFluorescenceOriginal','meterUnit',size_umeterXpix)
    
     % find the idx of Height and Lateral/vertical Deflection in Trace Mode
     idx_LD = strcmp([AFM_data.Channel_name],'Lateral Deflection') & strcmp([AFM_data.Trace_type],'Trace');
@@ -149,7 +149,7 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,size_umet
         legend('FontSize',15), grid on, grid minor
         xlabel('Absolute Fluorescence','FontSize',15)
         title("Distribution Delta BK-FR and minimum values","FontSize",20)
-        objInSecondMonitor(secondMonitorMain,f1);
+        objInSecondMonitor(f1,idxMon);
         nameFig='resultA10_2_DistributionDelta_FR_BK';
         fullnameFig=fullfile(newFolder,"tiffImages",nameFig);
         saveas(f1,fullnameFig,'tiff')
@@ -160,7 +160,7 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,size_umet
         if ~flag_heat
             titleD1='Delta Fluorescence (Shifted)';
             titleD2='Delta Fluorescence background (Masked and Shifted)';            
-            showData(secondMonitorMain,SeeMe,2,Delta_ADJ,false,titleD1,labelBar,newFolder,'resultA10_3_Fluorescence_PDA_BackGround','data2',Delta_glass_ADJ,'titleData2',titleD2,'background',true,'meterUnit',size_umeterXpix)
+            showData(idxMon,SeeMe,2,Delta_ADJ,false,titleD1,labelBar,newFolder,'resultA10_3_Fluorescence_PDA_BackGround','data2',Delta_glass_ADJ,'titleData2',titleD2,'background',true,'meterUnit',size_umeterXpix)
         end
     end
     % obtain the mask from each channel 
@@ -207,9 +207,9 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,size_umet
     masking.mask_third_setpointLimit_99percRemoval_totElements = nnz(mask_third);
     dataResultsPlot.maskingResults = masking;
     % show the plots
-    showData(secondMonitorMain,SeeMe,3,mask_first,true,'First Mask (Delta)','',newFolder,'resultA10_4_FirstMask','Binarized',true,'meterUnit',size_umeterXpix)
-    showData(secondMonitorMain,SeeMe,4,mask_second,true,'Second Mask (each AFM channel)','',newFolder,'resultA10_5_SecondMask','Binarized',true,'meterUnit',size_umeterXpix)
-    showData(secondMonitorMain,SeeMe,5,mask_third,true,'Third Mask (99perc + <maxSP)','',newFolder,'resultA10_6_ThirdMask','Binarized',true,'meterUnit',size_umeterXpix)   
+    showData(idxMon,SeeMe,3,mask_first,true,'First Mask (Delta)','',newFolder,'resultA10_4_FirstMask','Binarized',true,'meterUnit',size_umeterXpix)
+    showData(idxMon,SeeMe,4,mask_second,true,'Second Mask (each AFM channel)','',newFolder,'resultA10_5_SecondMask','Binarized',true,'meterUnit',size_umeterXpix)
+    showData(idxMon,SeeMe,5,mask_third,true,'Third Mask (99perc + <maxSP)','',newFolder,'resultA10_6_ThirdMask','Binarized',true,'meterUnit',size_umeterXpix)   
     clear masking mask_validValues 
     
     % Finally, applying the mask_definitive to all the data!
@@ -246,9 +246,9 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,size_umet
     end   
     
     % Delta with the first mask to show how really Delta is.
-    showData(secondMonitorMain,SeeMe,6,Delta_ADJ_firstMasking,false,'Delta Fluorescence (1st mask)',labelBar,newFolder,'resultA10_7_DeltaFluorescenceFirstMask','meterUnit',size_umeterXpix)
-    showData(secondMonitorMain,SeeMe,7,Delta_ADJ_secondMasking,false,'Delta Fluorescence (2nd mask)',labelBar,newFolder,'resultA10_8_DeltaFluorescenceDefinitiveMasked','meterUnit',size_umeterXpix)            
-    showData(secondMonitorMain,SeeMe,8,Delta_ADJ_thirdMasking,false,'Delta Fluorescence (3rd mask)',labelBar,newFolder,'resultA10_9_DeltaFluorescenceDefinitiveMasked','meterUnit',size_umeterXpix)            
+    showData(idxMon,SeeMe,6,Delta_ADJ_firstMasking,false,'Delta Fluorescence (1st mask)',labelBar,newFolder,'resultA10_7_DeltaFluorescenceFirstMask','meterUnit',size_umeterXpix)
+    showData(idxMon,SeeMe,7,Delta_ADJ_secondMasking,false,'Delta Fluorescence (2nd mask)',labelBar,newFolder,'resultA10_8_DeltaFluorescenceDefinitiveMasked','meterUnit',size_umeterXpix)            
+    showData(idxMon,SeeMe,8,Delta_ADJ_thirdMasking,false,'Delta Fluorescence (3rd mask)',labelBar,newFolder,'resultA10_9_DeltaFluorescenceDefinitiveMasked','meterUnit',size_umeterXpix)            
        
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%% NORMALIZE DELTA DATA %%%
@@ -279,7 +279,7 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,size_umet
     %%% EXTRACT BORDERS AND DISTINGUISH INNER AND OUTER OF THE DATA %%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
     if innerBord
-        calcBorders(AFM_data,AFM_IO_Padded,idx_H,idx_LD,idx_VD,DeltaData,flag_heat,secondMonitorMain,SeeMe,newFolder)        
+        calcBorders(AFM_data,AFM_IO_Padded,idx_H,idx_LD,idx_VD,DeltaData,flag_heat,idxMon,SeeMe,newFolder)        
     end    
    
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -300,7 +300,7 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,size_umet
             y = AFM_data(idx_LD).(maskFields{i,1})(:);
             titleP = sprintf('Height VS Lateral Deflection (%s)', maskFields{i,4});
             figName = sprintf('Height_LD_%s', maskFields{i,5});
-            tmp.(['Height_LD_' maskFields{i,5}]) = A10_feature_CDiB(x,y,secondMonitorMain,newFolder,'NumberOfBins',numBins,'xpar',1e9,'XAxL','Feature height (nm)','ypar',1e9,'YAyL','Lateral Force (nN)','FigTitle',titleP,'FigFilename',figName,'NumFig',1);
+            tmp.(['Height_LD_' maskFields{i,5}]) = A10_feature_CDiB(x,y,idxMon,newFolder,'NumberOfBins',numBins,'xpar',1e9,'XAxL','Feature height (nm)','ypar',1e9,'YAyL','Lateral Force (nN)','FigTitle',titleP,'FigFilename',figName,'NumFig',1);
         end
         dataResultsPlot.Height_LD=tmp;
     end
@@ -313,10 +313,10 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,size_umet
             y1 = DeltaData.(maskFields{i,2})(:); y2=DeltaData.(maskFields{i,3})(:);
             titleP = sprintf('Height Vs Fluorescence (%s - time exp %s ms)', maskFields{i,4}, timeExp);
             figName = sprintf('Height_Fluo_%s', maskFields{i,5});
-            tmp.(['Height_FLUO_' maskFields{i,5}]) = A10_feature_CDiB(x,y1,secondMonitorMain,newFolder,'NumberOfBins',numBins,'xpar',1e9,'XAxL','Feature height (nm)','ypar',1,'YAyL',ylabelAxis_noNorm,'FigTitle',titleP,'FigFilename',figName,'NumFig',2);            
+            tmp.(['Height_FLUO_' maskFields{i,5}]) = A10_feature_CDiB(x,y1,idxMon,newFolder,'NumberOfBins',numBins,'xpar',1e9,'XAxL','Feature height (nm)','ypar',1,'YAyL',ylabelAxis_noNorm,'FigTitle',titleP,'FigFilename',figName,'NumFig',2);            
             %norm
             figName = sprintf('Height_Fluo_%s_norm', maskFields{i,5});
-            tmp.(['Height_FLUO_' maskFields{i,5} '_norm'])=A10_feature_CDiB(x,y2,secondMonitorMain,newFolder,'NumberOfBins',numBins,'xpar',1e9,'XAxL','Feature height (nm)','ypar',1,'YAyL',ylabelAxis_norm,'FigTitle',titleP,'FigFilename',figName,'NumFig',3);
+            tmp.(['Height_FLUO_' maskFields{i,5} '_norm'])=A10_feature_CDiB(x,y2,idxMon,newFolder,'NumberOfBins',numBins,'xpar',1e9,'XAxL','Feature height (nm)','ypar',1,'YAyL',ylabelAxis_norm,'FigTitle',titleP,'FigFilename',figName,'NumFig',3);
         end
         dataResultsPlot.Height_FLUO=tmp;
 
@@ -328,10 +328,10 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,size_umet
                 y1 = DeltaData.(maskFields{i,2})(:); y2=DeltaData.(maskFields{i,3})(:);
                 titleP = sprintf('Lateral Force Vs Fluorescence (%s - time exp %s ms)', maskFields{i,4}, timeExp); 
                 figName = sprintf('LD_Fluo_%s', maskFields{i,5});
-                tmp.(['LD_FLUO_' maskFields{i,5}]) =        A10_feature_CDiB(x,y1,secondMonitorMain,newFolder,'NumberOfBins',2000,'xpar',1e9,'XAxL','Lateral Force (nN)','ypar',1,'YAyL',ylabelAxis_noNorm,'FigTitle',titleP,'FigFilename',figName,'NumFig',4);            
+                tmp.(['LD_FLUO_' maskFields{i,5}]) =        A10_feature_CDiB(x,y1,idxMon,newFolder,'NumberOfBins',2000,'xpar',1e9,'XAxL','Lateral Force (nN)','ypar',1,'YAyL',ylabelAxis_noNorm,'FigTitle',titleP,'FigFilename',figName,'NumFig',4);            
                 %norm
                 figName = sprintf('Height_Fluo_%s_norm', maskFields{i,5});
-                tmp.(['LD_FLUO_' maskFields{i,5} '_norm'])= A10_feature_CDiB(x,y2,secondMonitorMain,newFolder,'NumberOfBins',2000,'xpar',1e9,'XAxL','Lateral Force (nN)','ypar',1,'YAyL',ylabelAxis_norm,'FigTitle',titleP,'FigFilename',figName,'NumFig',5);
+                tmp.(['LD_FLUO_' maskFields{i,5} '_norm'])= A10_feature_CDiB(x,y2,idxMon,newFolder,'NumberOfBins',2000,'xpar',1e9,'XAxL','Lateral Force (nN)','ypar',1,'YAyL',ylabelAxis_norm,'FigTitle',titleP,'FigFilename',figName,'NumFig',5);
             end
             dataResultsPlot.LD_FLUO=tmp;
            
@@ -342,10 +342,10 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,size_umet
                 y1 = DeltaData.(maskFields{i,2})(:); y2=DeltaData.(maskFields{i,3})(:);
                 titleP = sprintf('Vertical Force Vs Fluorescence (%s - time exp %s ms)', maskFields{i,4}, timeExp); 
                 figName = sprintf('VD_Fluo_%s', maskFields{i,5});
-                tmp.(['VD_FLUO_' maskFields{i,5}]) =        A10_feature_CDiB(x,y1,secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'XAxL','Vertical Force (nN)','ypar',1,'YAyL',ylabelAxis_noNorm,'FigTitle',titleP,'FigFilename',figName,'NumFig',6);            
+                tmp.(['VD_FLUO_' maskFields{i,5}]) =        A10_feature_CDiB(x,y1,idxMon,newFolder,'setpoints',setpoints,'xpar',1e9,'XAxL','Vertical Force (nN)','ypar',1,'YAyL',ylabelAxis_noNorm,'FigTitle',titleP,'FigFilename',figName,'NumFig',6);            
                 %norm
                 figName = sprintf('VD_Fluo_%s_norm', maskFields{i,5});
-                tmp.(['VD_FLUO_' maskFields{i,5} '_norm'])= A10_feature_CDiB(x,y2,secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'XAxL','Vertical Force (nN)','ypar',1,'YAyL',ylabelAxis_norm,'FigTitle',titleP,'FigFilename',figName,'NumFig',7);
+                tmp.(['VD_FLUO_' maskFields{i,5} '_norm'])= A10_feature_CDiB(x,y2,idxMon,newFolder,'setpoints',setpoints,'xpar',1e9,'XAxL','Vertical Force (nN)','ypar',1,'YAyL',ylabelAxis_norm,'FigTitle',titleP,'FigFilename',figName,'NumFig',7);
             end
             dataResultsPlot.VD_FLUO=tmp;
         end
@@ -358,7 +358,7 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,size_umet
             y = AFM_data(idx_LD).(maskFields{i,1})(:); 
             titleP = sprintf('Vertical Force VS Lateral Force (%s)', maskFields{i,4});
             figName = sprintf('VD_LD_%s', maskFields{i,5});
-            tmp.(['VD_LD_' maskFields{i,5}]) = A10_feature_CDiB(x,y,secondMonitorMain,newFolder,'setpoints',setpoints,'xpar',1e9,'XAxL','Vertical Force (nN)','ypar',1e9,'YAyL','Lateral Force (nN)','FigTitle',titleP,'FigFilename',figName,'NumFig',8);
+            tmp.(['VD_LD_' maskFields{i,5}]) = A10_feature_CDiB(x,y,idxMon,newFolder,'setpoints',setpoints,'xpar',1e9,'XAxL','Vertical Force (nN)','ypar',1e9,'YAyL','Lateral Force (nN)','FigTitle',titleP,'FigFilename',figName,'NumFig',8);
         end
         dataResultsPlot.VD_LD=tmp;
     end    

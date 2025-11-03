@@ -4,7 +4,7 @@
 % This value should be used later on to normalise the processed!
 % fluorescent images so that different measurements (and PDA) can be
 % compared.
-function normFactor = A10_feature_normFluorescenceHeat(nameDir,timeExp,nameExperiment,secondMonitorMain)
+function normFactor = A10_feature_normFluorescenceHeat(nameDir,timeExp,nameExperiment,idxMon)
     fprintf('\nAFM data is taken from the following experiment:\n\tEXPERIMENT: %s\n\n',nameExperiment)
     heatSubDirectories=uigetdirMultiSelect(nameDir,sprintf('Select the directories which contains heated TRITIC fluorescence images'));
     if ~iscell(heatSubDirectories)
@@ -148,7 +148,7 @@ function normFactor = A10_feature_normFluorescenceHeat(nameDir,timeExp,nameExper
         histogram(clearedPixelValues_2,edges,Normalization="percentage")
         ytickformat("percentage")
         grid on, grid minor,xlim padded
-        objInSecondMonitor(secondMonitorMain,fig)
+        objInSecondMonitor(fig,idxMon)
         xlabel("Fluorescence Absolute Intensity",'FontSize',20), ylabel('Frequency','FontSize',20)
         title({'Fluorescence Distribution';sprintf('Average of %d masked TRITIC postHeat images - TimeExp: %s',length(sortedTRITICFiles),timeExp)},'FontSize',20)
         hline=xline(normFactor.avg,'r--','LineWidth',5,'DisplayName',sprintf('Avg \x00B1 Std: %.3e \x00B1 %.2e',normFactor.avg,normFactor.std));
@@ -166,7 +166,7 @@ function [image,metaData]=openANDprepareND2(filepath,titleFig,secondMonitorMain)
     [pathfile,nameFile]=fileparts(filepath);
     f1=figure('Visible','off');
     imshow(imadjust(image)), title(titleFig,'FontSize',17)
-    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
+    if ~isempty(secondMonitorMain), objInSecondMonitor(f1,idxMon); end
     fullfileName=fullfile(pathfile,nameFile);
     saveas(f1,fullfileName,'tif')
 end

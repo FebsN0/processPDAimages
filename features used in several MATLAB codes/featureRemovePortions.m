@@ -53,7 +53,7 @@
 %   dataIOCleaned :         updated binarized AFM height image
 %   maskRemoval :              updated mask containing the removed portions
 %                              
-function [dataCleaned,dataIOCleaned,maskRemoval] = featureRemovePortions(dataToClear,dataIO,secondMonitorMain,varargin)
+function [dataCleaned,dataIOCleaned,maskRemoval] = featureRemovePortions(dataToClear,dataIO,idxMon,varargin)
     %init instance of inputParser
     p=inputParser();
     % Required arguments
@@ -65,7 +65,7 @@ function [dataCleaned,dataIOCleaned,maskRemoval] = featureRemovePortions(dataToC
     addParameter(p, 'maskRemoval', [], @(x) (ismatrix(x) || isempty(x)));
     addParameter(p, 'Normalization', false, @(x) islogical(x));   
     % validate and parse the inputs
-    parse(p, dataToClear, dataIO, secondMonitorMain, varargin{:});                                                                     
+    parse(p, dataToClear, dataIO, idxMon, varargin{:});                                                                     
     % extract the data to show in the figure where select the areas to remove
     if isempty(p.Results.imageToShow)
         % by default take the height channel in case of struct
@@ -125,7 +125,7 @@ function [dataCleaned,dataIOCleaned,maskRemoval] = featureRemovePortions(dataToC
         xlim([0 size(dataIOCleaned,2)]), ylim([0 size(dataIOCleaned,1)])
         title('Background (blue) - Foreground (yellow)','FontSize',17)
         ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
-        if flagFirst, objInSecondMonitor(secondMonitorMain,f1); flagFirst=false; end
+        if flagFirst, objInSecondMonitor(f1,idxMon); flagFirst=false; end
         sgtitle(sprintf('%s images',text),'Fontsize',20,'interpreter','none')
         question = 'Remove lines or portions?';
         if ~flagSingleImageShow

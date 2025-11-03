@@ -1,4 +1,4 @@
-function featureFrictionCalc6_plotClearedImages(x,y,maxSetpoint,path,name,secondMonitorMain,method,varargin)   
+function featureFrictionCalc6_plotClearedImages(x,y,maxSetpoint,path,name,idxMon,method,varargin)   
     if method==1
         titleText='(Mask not applied)';
         nameFileID='_1';
@@ -33,7 +33,7 @@ function featureFrictionCalc6_plotClearedImages(x,y,maxSetpoint,path,name,second
     sgtitle(sprintf('Background of %s',name),'Fontsize',20,'interpreter','none')
     ylabel(' fast direction - scan line','FontSize',15), xlabel('slow direction','FontSize',15)
     axis equal, xlim([0 size(x,2)]), ylim([0 size(x,1)])
-    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
+    if ~isempty(idxMon), objInSecondMonitor(f1,idxMon); end
     saveas(f1,fullfile(path,sprintf('lateralVerticalData_cleared_scanName_%s_method%s.tif',name,nameFileID)))
     close(f1)
 end

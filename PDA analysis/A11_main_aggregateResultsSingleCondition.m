@@ -1,5 +1,5 @@
 clc, clear, close all
-secondMonitorMain=objInSecondMonitor;
+idxMon=objInSecondMonitor;
 
 % turn off warning prepareCurve
 warnID = 'curvefit:prepareFittingData:removingNaNAndInf';
@@ -163,7 +163,7 @@ while true
     end
     % choose the upper limit to fit the data below and plot it
     idx=[];    
-    [fitResults_all_noNorm,hl,hp,idx]=chooseAndFit(dataXfitting_noNorm,typeShow,ax2_1,secondMonitorMain,true,idx,globalColor(cnt),nameType{cnt}{1},nameScans);
+    [fitResults_all_noNorm,hl,hp,idx]=chooseAndFit(dataXfitting_noNorm,typeShow,ax2_1,idxMon,true,idx,globalColor(cnt),nameType{cnt}{1},nameScans);
     arrayXlegend_mask_upperLimit_noNorm(cnt)=hl; %#ok<SAGROW>
     % store the handle figure to organize the legend names
     if typeShow == 2
@@ -172,7 +172,7 @@ while true
         arrayXlegend_fitLine_noNorm=hp;
     end
     % norm
-    [fitResults_all_norm,hl,hp]=chooseAndFit(dataXfitting_norm,typeShow,ax2_2,secondMonitorMain,false,idx,globalColor(cnt),nameType{cnt}{1},nameScans);
+    [fitResults_all_norm,hl,hp]=chooseAndFit(dataXfitting_norm,typeShow,ax2_2,idxMon,false,idx,globalColor(cnt),nameType{cnt}{1},nameScans);
     arrayXlegend_mask_upperLimit_norm(cnt)=hl; %#ok<SAGROW>
         % store the handle figure to organize the legend names
     if typeShow == 2
@@ -213,22 +213,22 @@ end
 xlabelText='Lateral Force [nN]';
 ylabelText='Absolute fluorescence increase (A.U.)';
 filepath=fullfile(foldername,'RESULTSfinal_LDvsFLUO_noNorm.tif');
-adjustPlot(ax1_1,xlabelText,ylabelText,textTitle,arrayXlegend_full_noNorm,filepath,secondMonitorMain)
+adjustPlot(ax1_1,xlabelText,ylabelText,textTitle,arrayXlegend_full_noNorm,filepath,idxMon)
 
 ylabelText=string(sprintf('Normalised Fluorescence (%%)'));
 filepath=fullfile(foldername,'RESULTSfinal_LDvsFLUO_norm.tif');
-adjustPlot(ax1_2,xlabelText,ylabelText,textTitle,arrayXlegend_full_norm,filepath,secondMonitorMain)
+adjustPlot(ax1_2,xlabelText,ylabelText,textTitle,arrayXlegend_full_norm,filepath,idxMon)
 
 if typeShow==1
     textTitle={sprintf('LD-Fluorescence comparison of different scans of the same sample (%s)',nameType{1}{1}); sprintf('Slope (avg \x00B1 std) = %.2e \x00B1 %.2e',slopeAVG_noNorm,slopeSTD_noNorm)};
     ylabelText='Absolute fluorescence increase (A.U.)';
     filepath=fullfile(foldername,'RESULTSfinal_LDvsFLUO_99percMaxSetpoint_noNorm.tif');
-    adjustPlot(ax2_1,xlabelText,ylabelText,textTitle,arrayXlegend_mask_noNorm,filepath,secondMonitorMain)
+    adjustPlot(ax2_1,xlabelText,ylabelText,textTitle,arrayXlegend_mask_noNorm,filepath,idxMon)
     % norm data
     textTitle={sprintf('LD-Fluorescence comparison of different scans of the same sample (%s)',nameType{1}{1}); sprintf('Slope (avg \x00B1 std) = %.2e \x00B1 %.2e',slopeAVG_norm,slopeSTD_norm)};
     ylabelText=string(sprintf('Normalised Fluorescence (%%)'));
     filepath=fullfile(foldername,'RESULTSfinal_LDvsFLUO_99percMaxSetpoint_norm.tif');
-    adjustPlot(ax2_2,xlabelText,ylabelText,textTitle,arrayXlegend_mask_norm,filepath,secondMonitorMain)
+    adjustPlot(ax2_2,xlabelText,ylabelText,textTitle,arrayXlegend_mask_norm,filepath,idxMon)
 else
     % no norm
     % adjust text to put in the legend. Show only one type of information for each sample
@@ -239,7 +239,7 @@ else
     textTitle='LD-Fluorescence Comparison of different samples';
     ylabelText='Absolute fluorescence increase (A.U.)';    
     filepath=fullfile(foldername,'RESULTSfinal_LDvsFLUO_99percMaxSetpoint_noNorm.tif');    
-    adjustPlot(ax2_1,xlabelText,ylabelText,textTitle,arrayXlegend_mask_noNorm,filepath,secondMonitorMain)
+    adjustPlot(ax2_1,xlabelText,ylabelText,textTitle,arrayXlegend_mask_noNorm,filepath,idxMon)
     % norm
     for n = 1:cnt-1
         text_dataSlope = sprintf(' %s \n - slope: = %.2e \x00B1 %.2e',nameType{n}{1},slopeAVG_norm(n),slopeSTD_norm(n));
@@ -247,7 +247,7 @@ else
     end
     ylabelText=string(sprintf('Normalised Fluorescence (%%)'));
     filepath=fullfile(foldername,'RESULTSfinal_LDvsFLUO_99percMaxSetpoint_norm.tif');    
-    adjustPlot(ax2_2,xlabelText,ylabelText,textTitle,arrayXlegend_mask_norm,filepath,secondMonitorMain)
+    adjustPlot(ax2_2,xlabelText,ylabelText,textTitle,arrayXlegend_mask_norm,filepath,idxMon)
  
 end
 
@@ -257,18 +257,18 @@ if typeShow==1
     ylabelText='Absolute fluorescence increase (A.U.)';
     filepath=fullfile(foldername,'RESULTSfinal_HeightVsFLUO.tif');
     textTitle=sprintf('Height Vs Fluorescence - comparison of different scans (sample %s)',nameType{1}{1});
-    adjustPlot(ax3,xlabelText,ylabelText,textTitle,arrayXlegend_Height_FLUO,filepath,secondMonitorMain)
+    adjustPlot(ax3,xlabelText,ylabelText,textTitle,arrayXlegend_Height_FLUO,filepath,idxMon)
     % Height VS LD
     ylabelText='Lateral Force [nN]';    
     filepath=fullfile(foldername,'RESULTSfinal_HeightVsLD.tif');
     textTitle=sprintf('Height Vs Lateral Force - comparison of different scans (sample %s)',nameType{1}{1});
-    adjustPlot(ax4,xlabelText,ylabelText,textTitle,arrayXlegend_Height_LD,filepath,secondMonitorMain)
+    adjustPlot(ax4,xlabelText,ylabelText,textTitle,arrayXlegend_Height_LD,filepath,idxMon)
     % trend baseline
     ylabelText='Baseline shift [nN]';
     xlabelText='Time [min]';
     filepath=fullfile(foldername,'RESULTSfinal_baseline.tif');
     textTitle=sprintf('Baseline Shift Trend - comparison of different scans (sample %s)',nameType{1}{1});
-    adjustPlot(ax5,xlabelText,ylabelText,textTitle,arrayXlegend_baseline,filepath,secondMonitorMain)
+    adjustPlot(ax5,xlabelText,ylabelText,textTitle,arrayXlegend_baseline,filepath,idxMon)
 end
 clear array* ax* f1* f2* f3 f4 textTitle xlabelText ylabelText filepath foldername slope* cnt nameType fitResults*
 %%
@@ -290,7 +290,7 @@ for i=1:length(allDelta)
     labelBar='Absolute Fluorescence';
     Delta=allDelta{i};
     singleFolder=subfolder_allscanFolder{i};
-    showData(secondMonitorMain,false,1,Delta,false,titleD1,labelBar,singleFolder,filename,'meterUnit',allDelta_pixScale(i),'scale',rangeScale)
+    showData(idxMon,false,1,Delta,false,titleD1,labelBar,singleFolder,filename,'meterUnit',allDelta_pixScale(i),'scale',rangeScale)
 end
 clear allValues filename titleD1 labelBar singleFolder rangeScale
 %%
@@ -345,7 +345,7 @@ function [fitResults,hl,arrayXlegend,idx]=chooseAndFit(dataXfitting,typeShow,idA
             yData = dataXfitting(i).yData;
             plot(xData,yData,'*','MarkerFaceColor',globalColor(i))                        
         end
-        objInSecondMonitor(secondMonitorMain,figTmp);        
+        objInSecondMonitor(figTmp,idxMon);        
         xlim padded, ylim padded
         grid on, grid minor
         uiwait(msgbox('Click on the plot to decide the upper limit in x axis for the fitting','Success','modal'))   
@@ -399,12 +399,12 @@ function [fitResults,hl,arrayXlegend,idx]=chooseAndFit(dataXfitting,typeShow,idA
     end
 end
 
-function adjustPlot(idAxis,xlabelText,ylabelText,textTitle,arrayXlegend,filepath,secondMonitorMain)
+function adjustPlot(idAxis,xlabelText,ylabelText,textTitle,arrayXlegend,filepath,idxMon)
     xlim(idAxis,'padded'), ylim(idAxis,'padded')
     idAxis.XAxis.MinorTick = 'on';   
     grid(idAxis,'on'), grid(idAxis,'minor')
     fig = ancestor(idAxis, 'figure');
-    objInSecondMonitor(secondMonitorMain,fig);
+    objInSecondMonitor(fig,idxMon);
     legend(idAxis,arrayXlegend,'Location', 'best','FontSize',12,'Interpreter','none')
     title(idAxis,textTitle,'FontSize',23,'Interpreter','none');
     idAxis.XAxis.FontSize = 15; idAxis.YAxis.FontSize = 15; 

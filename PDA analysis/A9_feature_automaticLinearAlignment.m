@@ -1,4 +1,4 @@
-function [AFM_IO_3_BFaligned,AFM_Elab,details_it_reg,rect] = A9_feature_automaticLinearAlignment(AFM_IO,BF_IO,AFM_Elab,locationAFM2toBF1,max_c_it_OI,secondMonitorMain,newFolder)
+function [AFM_IO_3_BFaligned,AFM_Elab,details_it_reg,rect] = A9_feature_automaticLinearAlignment(AFM_IO,BF_IO,AFM_Elab,locationAFM2toBF1,max_c_it_OI,idxMon,newFolder)
     wb=waitbar(0,'Initializing Iterative Cross Correlation','CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
     setappdata(wb,'canceling',0);         
     rotation_deg_tot=0;                
@@ -136,7 +136,7 @@ function [AFM_IO_3_BFaligned,AFM_Elab,details_it_reg,rect] = A9_feature_automati
     waitbar(1/1,wb,'Completed the EXP/RED/ROT optimization');
     uiwait(msgbox(sprintf('Performed %d Cycles in %3.2f min',N_cycles_opt,minutes(final_time2))))            
     figure(f2max)
-    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2max); end
+    if ~isempty(idxMon), objInSecondMonitor(f2max,idxMon); end
     title('Trend Cross-correlation score (max value among the four different image editing)','FontSize',14)
     saveas(f2max,sprintf('%s/resultA9_4_TrendCross-correlationScore_EndIterativeProcess.tif',newFolder))
     close(f2max), close(h_it)

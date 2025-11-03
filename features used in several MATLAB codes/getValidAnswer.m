@@ -1,4 +1,13 @@
 function user_choice = getValidAnswer(question, title, options, default_choice)
+% adaptive window which ask the user which option want to be selected
+% INPUT:        question : text of the question
+%               title : name of the window. You can leave blank as ''
+%               options : list of the possible options to be select (NOTE: if options contains 2 strings like "yes" OR "y" OR "1" and "no" OR "n" OR "0" ==> outcomes will be just 0 or 1 (logical))
+%               default_choice : by default the option is first. Just click Enter keyboard button instead of point with the mouse.
+% OUTPUT:       user_choice : give the idx of the choosen option (if option 2 ==> user_choice = 2)
+%
+% NOTE: the script is perfectly working but there are some aesthetic issues.
+
     
     % persistent allow to store a number sequence (for example if there are more than 9 options, it is
     % necessary to store two/three/etc digits when the function is called
@@ -25,8 +34,8 @@ function user_choice = getValidAnswer(question, title, options, default_choice)
     num_lines_question = length(strsplit(question, '\n'));
     
     % Check if it's a yes/no dialog
-    yesStrings = ["yes", "y", "1"];
-    noStrings = ["no", "n", "0"];    
+    yesStrings = ["yes", "y", "1","true"];
+    noStrings = ["no", "n", "0","false"];    
     % if options is just Yes and No, then simple dialog box
     flagYesNo=zeros(1,2);
     if length(options) == 2        

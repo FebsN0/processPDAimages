@@ -1,7 +1,7 @@
 % the output AFM_data will have new fields compared to the input AFM_data
 % AFM_aligned is the version iteratively modified of AFM_scaled
 % AFM_image_padded is AFM_aligned but with the size of AFM_IO_padded, which is the same for the BF_IO
-function varargout=A9_feature_manualAlignmentGUI(AFM_IO_padded,BF_IO,AFM_data,rect,max_c_it_OI,secondMonitorMain,newFolder,varargin)
+function varargout=A9_feature_manualAlignmentGUI(AFM_IO_padded,BF_IO,AFM_data,rect,max_c_it_OI,idxMon,newFolder,varargin)
     p=inputParser(); 
     argName = 'saveFig';    defaultVal = 'Yes';     addParameter(p, argName, defaultVal, @(x) ismember(x,{'No','Yes'}));
     parse(p,varargin{:});
@@ -167,7 +167,7 @@ function varargout=A9_feature_manualAlignmentGUI(AFM_IO_padded,BF_IO,AFM_data,re
     function on_close()
         if saveFig
             figure(f2max)
-            if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2max); end
+            if ~isempty(idxMon), objInSecondMonitor(f2max,idxMon); end
             title('Trend Cross-correlation score','FontSize',14)
             saveas(f2max,sprintf('%s/resultA9_4_trendScoreCrossCorrelation_manualApproach.tif',newFolder))
             % Close the figure

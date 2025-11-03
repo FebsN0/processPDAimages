@@ -9,7 +9,7 @@
 clc, clear, close all
 colors={"#0072BD","#D95319","#EDB120","#7E2F8E","#77AC30","#4DBEEE","#A2142F",'k','#FF00FF','#00FF00'};
 
-secondMonitorMain=objInSecondMonitor;
+idxMon=objInSecondMonitor;
 fmain=figure;
 m=1;
 
@@ -27,13 +27,13 @@ fitresult_allScans=cell(1,maxScans);
 nameData=cell(1,maxScans);
 
 while true
-    [AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM,newFolder,setpoints]=A1_openANDassembly_JPK(secondMonitorMain,'saveFig','Yes');
+    [AFM_A4_HeightFittedMasked,AFM_height_IO,metaData_AFM,newFolder,setpoints]=A1_openANDassembly_JPK(idxMon,'saveFig','Yes');
     % Open Brightfield image and the TRITIC after sample heating and AFM scanning 
     [fileName, filePathData] = uigetfile({'*.nd2'}, 'Select the BrightField image');
     [BF_Mic_Image,~,metaData_BF]=A7_open_ND2(fullfile(filePathData,fileName)); 
     f1=figure('Visible','off');
     imshow(imadjust(BF_Mic_Image)), title('BrightField - original','FontSize',17)
-    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
+    if ~isempty(idxMon), objInSecondMonitor(f1,idxMon); end
     saveas(f1,sprintf('%s/resultA8_0_BrightField.tif',newFolder))
     close(f1), clear f1
 
@@ -47,13 +47,13 @@ while true
         imshow(imadjust(Tritic_Mic_Image))
         disp(char(nameData{m}))
         title(sprintf('TRITIC after heating - %s',char(nameData{m})),'FontSize',17)
-        if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f2); end
+        if ~isempty(idxMon), objInSecondMonitor(f2,idxMon); end
         saveas(f2,sprintf('%s/resultA8_0_TRITIC_after_heating_%s.tif',newFolder,char(nameData{m})))
         close(f2), clear f2
         
         % Align the Brightfield to TRITIC
         while true
-            BF_Mic_Image_aligned=A8_limited_registration(BF_Mic_Image,Tritic_Mic_Image,newFolder,secondMonitorMain,'Brightfield','Yes','Moving','Yes','saveFig','No');
+            BF_Mic_Image_aligned=A8_limited_registration(BF_Mic_Image,Tritic_Mic_Image,newFolder,idxMon,'Brightfield','Yes','Moving','Yes','saveFig','No');
             answer=getValidAnswer('Satisfied of the alignment?','',{'y','n'});
             close gcf
             if answer
@@ -61,18 +61,18 @@ while true
             end      
         end
         % Produce the binary IO of Brightfield
-        [BF_Mic_Image_IO,~,Tritic_Mic_Image_postA9,~]=A9_Mic_to_Binary(BF_Mic_Image_aligned,secondMonitorMain,newFolder,'TRITIC_after',Tritic_Mic_Image,'saveFig','No','Silent','Yes'); 
+        [BF_Mic_Image_IO,~,Tritic_Mic_Image_postA9,~]=A9_Mic_to_Binary(BF_Mic_Image_aligned,idxMon,newFolder,'TRITIC_after',Tritic_Mic_Image,'saveFig','No','Silent','Yes'); 
         
         % Align AFM to BF and extract the coordinates for alighnment to be transferred to the other data
         while true
-            [~,AFM_A10_IO_padded_sizeBF,AFM_A10_data_optAlignment,~]=A10_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_A4_HeightFittedMasked,newFolder,secondMonitorMain,'Margin',70,'saveFig','No','Silent','Yes');
+            [~,AFM_A10_IO_padded_sizeBF,AFM_A10_data_optAlignment,~]=A10_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_A4_HeightFittedMasked,newFolder,idxMon,'Margin',70,'saveFig','No','Silent','Yes');
             if getValidAnswer('Satisfied of the alignment or restart?','',{'y','n'}) == 1
                 break
             end
         end     
         
         % correlation FLUORESCENCE AND AFM DATA
-        [~,~,results_Height_fluo,~,~,~,~,deltaADJ]=A11_correlation_AFM_BF(AFM_A10_data_optAlignment,AFM_A10_IO_padded_sizeBF,setpoints,secondMonitorMain,newFolder,'TRITIC_after',Tritic_Mic_Image_postA9,'afterHeating','Yes','TRITIC_expTime',char(nameData{m}));
+        [~,~,results_Height_fluo,~,~,~,~,deltaADJ]=A11_correlation_AFM_BF(AFM_A10_data_optAlignment,AFM_A10_IO_padded_sizeBF,setpoints,idxMon,newFolder,'TRITIC_after',Tritic_Mic_Image_postA9,'afterHeating','Yes','TRITIC_expTime',char(nameData{m}));
         results_Height_fluo_allScans{m}=results_Height_fluo;
 
         % select the end point in which create the curve fitting
@@ -88,7 +88,7 @@ while true
         histogram(deltaADJ)
         xlabel('Absolute fluorescence increase (A.U.)','FontSize',15)
         title(sprintf('Distribution Delta Fluorescence - %s',nameData{m}),'FontSize',15)
-        objInSecondMonitor(secondMonitorMain,fh);
+        objInSecondMonitor(fh,idxMon);
         saveas(fh,sprintf('%s/A12_deltaFluorescenceDistribution - %s.tiff',newFolder,char(nameData{m})))
         close(fh)
 
@@ -117,7 +117,7 @@ while true
     end    
 end
 %%
-objInSecondMonitor(secondMonitorMain,fmain);
+objInSecondMonitor(fmain,idxMon);
 
 ylabel('Absolute fluorescence increase (A.U.)','FontSize',15)
 xlabel('Feature height (nm)','FontSize',15)

@@ -1,4 +1,4 @@
-function definitiveFc=featureFrictionCalc7_distributionFc_allScansAllPixels(frictionCoefficients,nameAllScans,secondMonitorMain,newFolder,varargin)
+function definitiveFc=featureFrictionCalc7_distributionFc_allScansAllPixels(frictionCoefficients,nameAllScans,idxMon,newFolder,varargin)
 % make the cell array containing all the fc as array to generate the edges       
     allFcVsPix_Array = [frictionCoefficients{:}];
     % create the edges in which count the values
@@ -33,7 +33,7 @@ function definitiveFc=featureFrictionCalc7_distributionFc_allScansAllPixels(fric
         mainTitle=sprintf('Distribution of FC of any scan - method %d',method);
     end
     title(mainTitle,'Fontsize',20)
-    if ~isempty(secondMonitorMain); objInSecondMonitor(secondMonitorMain,f_fcAll); end
+    objInSecondMonitor(f_fcAll,idxMon);
     legend('Interpreter','none','FontSize',15,'Location','northeast')
     uiwait(msgbox('Click twice on the distribution to select the range to consider the friction coefficients required for the averaging.'));
     idx_x=selectRangeGInput(2,1,edges);

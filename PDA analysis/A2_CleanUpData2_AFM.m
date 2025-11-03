@@ -8,7 +8,7 @@
 % 
 % INPUT: OUTPUT of A1_open_JPK (single struct data)
 
-function [varargout]=A2_CleanUpData2_AFM(data,setpoints,secondMonitorMain,newFolder,varargin)
+function [varargout]=A2_CleanUpData2_AFM(data,setpoints,idxMon,newFolder,varargin)
            
     %init instance of inputParser
     p=inputParser();
@@ -73,29 +73,29 @@ function [varargout]=A2_CleanUpData2_AFM(data,setpoints,secondMonitorMain,newFol
         idimg=2;
         nameFig=sprintf('resultA2_%d_HeightChannel_%s',idimg,imageTyp);
         labelBar=sprintf('height (nm)');
-        showData(secondMonitorMain,SeeMe,1,data,norm,titleData,labelBar,newFolder,nameFig)
+        showData(idxMon,SeeMe,1,data,norm,titleData,labelBar,newFolder,nameFig)
         % Lateral Deflection Trace
         data=data_LD_trace;
         titleData=sprintf('Lateral Deflection Trace channel (Raw - %s)',imageTyp);
         nameFig=sprintf('resultA2_3_Raw_LDChannel_trace_%s',imageTyp);
         labelBar='Voltage [V]';
-        showData(secondMonitorMain,SeeMe,2,data,norm,titleData,labelBar,newFolder,nameFig)
+        showData(idxMon,SeeMe,2,data,norm,titleData,labelBar,newFolder,nameFig)
         % Lateral Deflection ReTrace
         data=data_LD_retrace;
         titleData=sprintf('Lateral Deflection Retrace channel (Raw - %s)',imageTyp);
         nameFig=sprintf('resultA2_4_Raw_LDChannel_retrace_%s',imageTyp);
-        showData(secondMonitorMain,SeeMe,3,data,norm,titleData,labelBar,newFolder,nameFig)
+        showData(idxMon,SeeMe,3,data,norm,titleData,labelBar,newFolder,nameFig)
         % Vertical Deflection trace
         data=data_VD_trace*1e9;
         titleData=sprintf('Vertical Deflection trace channel (Raw - %s)',imageTyp);
         nameFig=sprintf('resultA2_5_Raw_VDChannel_trace_%s',imageTyp);
         labelBar='Force [nN]';
-        showData(secondMonitorMain,SeeMe,4,data,norm,titleData,labelBar,newFolder,nameFig)
+        showData(idxMon,SeeMe,4,data,norm,titleData,labelBar,newFolder,nameFig)
         % Vertical Deflection Retrace
         data=data_VD_retrace*1e9;
         titleData=sprintf('Vertical Deflection retrace channel (Raw - %s)',imageTyp);
         nameFig=sprintf('resultA2_6_Raw_VDChannel_retrace_%s',imageTyp);
-        showData(secondMonitorMain,SeeMe,5,data,norm,titleData,labelBar,newFolder,nameFig)           
+        showData(idxMon,SeeMe,5,data,norm,titleData,labelBar,newFolder,nameFig)           
         
         % show distribution of vertical forces (data_VD_trace). If good, it should coincide approximately with the setpoint
         data=data_VD_trace*1e9;
@@ -138,7 +138,7 @@ function [varargout]=A2_CleanUpData2_AFM(data,setpoints,secondMonitorMain,newFol
         legend1 = legend('FontSize',15);
         set(legend1,'Location','bestoutside');
         title('Distribution Raw Vertical Forces','FontSize',18), xlabel('Force [nN]','FontSize',15)
-        objInSecondMonitor(secondMonitorMain,f0);
+        objInSecondMonitor(f0,idxMon);
         saveas(f0,sprintf('%s/tiffImages/resultA2_1_distributionVerticalForces.tif',newFolder))
         saveas(f0,sprintf('%s/figImages/resultA2_1_distributionVerticalForces',newFolder))
         vertForceAVG=unique(round(vertForceAVG));
@@ -166,7 +166,7 @@ function [varargout]=A2_CleanUpData2_AFM(data,setpoints,secondMonitorMain,newFol
                 plot(arrayTime,metadata.Baseline_N*1e9,'-*','LineWidth',2,'MarkerSize',15,'MarkerEdgeColor','red')
                 title('Baseline Trend among the sections','FontSize',18)
                 ylabel('Baseline shift [nN]','FontSize',15), xlabel('Time [min]','FontSize',15), grid on, grid minor
-                objInSecondMonitor(secondMonitorMain,f1);
+                objInSecondMonitor(f1,idxMon);
                 saveas(f1,sprintf('%s/tiffImages/resultA2_0_baselineTrend.tif',newFolder))
                 saveas(f1,sprintf('%s/figImages/resultA2_0_baselineTrend',newFolder))
             else

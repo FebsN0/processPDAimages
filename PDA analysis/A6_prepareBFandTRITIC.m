@@ -1,7 +1,7 @@
-function varargout=A6_prepareBFandTRITIC(folderResultsImg,secondMonitorMain)
+function varargout=A6_prepareBFandTRITIC(folderResultsImg,idxMon)
     % Open Brightfield image and the TRITIC (Before and After stimulation images)
     filenameND2='resultA6_1_BrightField'; titleImage='BrightField - original';
-    [BF_Mic_Image,metaData_BF,filePathData,fileName]=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain);    
+    [BF_Mic_Image,metaData_BF,filePathData,fileName]=selectND2file(folderResultsImg,filenameND2,titleImage,idxMon);    
     [~, nameOnly, ~] = fileparts(fileName);
     nameLower = lower(nameOnly);    
     % check if filename include word post/after. In this way, it will take
@@ -40,21 +40,21 @@ function varargout=A6_prepareBFandTRITIC(folderResultsImg,secondMonitorMain)
         % are scaled differently, so the direct comparison on the images is
         % not correct.
         filenameND2='resultA6_2_TRITIC_Before_Stimulation'; titleImage=sprintf('TRITIC Before Stimulation - timeExp: %s',timeExp);
-        Tritic_Mic_Image_Before=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain,filePathData,'Before',beforeFiles);               
+        Tritic_Mic_Image_Before=selectND2file(folderResultsImg,filenameND2,titleImage,idxMon,filePathData,'Before',beforeFiles);               
         filenameND2='resultA6_3_TRITIC_After_Stimulation'; titleImage=sprintf('TRITIC After Stimulation - timeExp: %s',timeExp);
-        Tritic_Mic_Image_After=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain,filePathData,'After',afterFiles);
+        Tritic_Mic_Image_After=selectND2file(folderResultsImg,filenameND2,titleImage,idxMon,filePathData,'After',afterFiles);
         close all       
         
         % Align the fluorescent images After with the BEFORE stimulation
-        [Tritic_Mic_Image_After_aligned,offset]=A7_limited_registration(Tritic_Mic_Image_After,Tritic_Mic_Image_Before,folderResultsImg,secondMonitorMain);
+        [Tritic_Mic_Image_After_aligned,offset]=A7_limited_registration(Tritic_Mic_Image_After,Tritic_Mic_Image_Before,folderResultsImg,idxMon);
         % adjust BF and Tritic_Before depending on the offset
         BF_Mic_Image=fixSize(BF_Mic_Image,offset);
         Tritic_Mic_Image_Before=fixSize(Tritic_Mic_Image_Before,offset);   
         % Align the Brightfield to TRITIC Before Stimulation
         if flag_PRE_POST
-            [BF_Mic_Image_aligned,offset]=A7_limited_registration(BF_Mic_Image,Tritic_Mic_Image_After_aligned,folderResultsImg,secondMonitorMain,'Brightfield','Yes','Moving','Yes','typeTritic',flag_PRE_POST);                
+            [BF_Mic_Image_aligned,offset]=A7_limited_registration(BF_Mic_Image,Tritic_Mic_Image_After_aligned,folderResultsImg,idxMon,'Brightfield','Yes','Moving','Yes','typeTritic',flag_PRE_POST);                
         else
-            [BF_Mic_Image_aligned,offset]=A7_limited_registration(BF_Mic_Image,Tritic_Mic_Image_Before,folderResultsImg,secondMonitorMain,'Brightfield','Yes','Moving','Yes');                
+            [BF_Mic_Image_aligned,offset]=A7_limited_registration(BF_Mic_Image,Tritic_Mic_Image_Before,folderResultsImg,idxMon,'Brightfield','Yes','Moving','Yes');                
         end
         Tritic_Mic_Image_After_aligned=fixSize(Tritic_Mic_Image_After_aligned,offset);
         Tritic_Mic_Image_Before=fixSize(Tritic_Mic_Image_Before,offset);
@@ -76,7 +76,7 @@ function varargout=A6_prepareBFandTRITIC(folderResultsImg,secondMonitorMain)
 end
 
 
-function [Image,metaData,filePathData,fileName]=selectND2file(folderResultsImg,filenameND2,titleImage,secondMonitorMain,varargin)
+function [Image,metaData,filePathData,fileName]=selectND2file(folderResultsImg,filenameND2,titleImage,idxMon,varargin)
     % the function extract the given .nd2 image file and generate the
     % picture with a given title
     % varargin:
@@ -104,7 +104,7 @@ function [Image,metaData,filePathData,fileName]=selectND2file(folderResultsImg,f
     [Image,~,metaData]=A6_feature_Open_ND2(fullfile(filePathData,fileName)); 
     f1=figure('Visible','off');
     imshow(imadjust(Image)), title(titleImage,'FontSize',17)
-    if ~isempty(secondMonitorMain), objInSecondMonitor(secondMonitorMain,f1); end
+    objInSecondMonitor(f1,idxMon);
     fullfileName=fullfile(folderResultsImg,'tiffImages',filenameND2);
     saveas(f1,fullfileName,'tif')
     fullfileName=fullfile(folderResultsImg,'figImages',filenameND2);

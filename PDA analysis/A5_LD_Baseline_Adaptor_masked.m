@@ -4,7 +4,7 @@
 % Check manually the processed image afterwards and compare with the AFM VD
 % image!
 
-function varargout=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,alpha,secondMonitorMain,newFolder,mainPath,varargin)
+function varargout=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_IO,alpha,idxMon,newFolder,mainPath,varargin)
     % in case of code error, the waitbar won't be removed. So the following command force its closure
     warning ('off','all'); 
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
@@ -24,7 +24,7 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_I
     if strcmp(p.Results.FitOrder,'Low'); limit=3; elseif strcmp(p.Results.FitOrder,'Medium'), limit=6; else, limit=9; end
     
     % select a single line manually to check the LD
-    figure, imagesc(AFM_height_IO), objInSecondMonitor(secondMonitorMain,gcf)
+    figure, imagesc(AFM_height_IO), objInSecondMonitor(idxMon,gcf)
     uiwait(msgbox(sprintf('Select a point on the mask where analyze the single fast scan line'),''));
     idxLine=selectRangeGInput(1,1,1:size(AFM_height_IO,2),1:size(AFM_height_IO,1));
     close gcf
@@ -47,9 +47,9 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_I
 
     idCall=1;
     % show LD value distribution of the entire matrix
-    figDistr=checkDistributionDataLD(idCall,SeeMe,secondMonitorMain,DataXdistribution);
+    figDistr=checkDistributionDataLD(idCall,SeeMe,idxMon,DataXdistribution);
     % show LD of a single fast scan line (idx manually selected previously)
-    figSingleLine=plotSingleLineCheck(idCall,secondMonitorMain,DataXSingleLine,idxLine);
+    figSingleLine=plotSingleLineCheck(idCall,idxMon,DataXSingleLine,idxLine);
     idCall=idCall+1;
 
 
@@ -70,7 +70,7 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_I
     Lateral_Trace_BK_2_firstClear(isnan(Lateral_Trace_BK_2_firstClear))=0;
     titleData1='Raw Lateral Deflection - Trace'; titleData2='Background with removed outliers';
     nameFig='resultA5_1_RawLateralData_BackgroundNoOutliers';
-    showData(secondMonitorMain,SeeMe,2,Lateral_Trace,false,titleData1,'Voltage [V]',newFolder,nameFig,'data2',Lateral_Trace_BK_2_firstClear,'titleData2',titleData2)
+    showData(idxMon,SeeMe,2,Lateral_Trace,false,titleData1,'Voltage [V]',newFolder,nameFig,'data2',Lateral_Trace_BK_2_firstClear,'titleData2',titleData2)
     % rechange to NaN
     Lateral_Trace_BK_2_firstClear(Lateral_Trace_BK_2_firstClear==0)=NaN;
     % plane fitting
@@ -155,15 +155,15 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_I
     DataXdistribution= {Lateral_Trace_corrPlane_BK_1,'corrected PlaneFitt BK'; ...
                         Lateral_Trace_corrPlane_FR_1,'corrected PlaneFitt FR'};
     DataXSingleLine={Lateral_Trace_corrPlane,'corrected by planeFitting'};
-    figDistr=checkDistributionDataLD(idCall,SeeMe,secondMonitorMain,DataXdistribution,'prevFig',figDistr);
-    figSingleLine=plotSingleLineCheck(idCall,secondMonitorMain,DataXSingleLine,idxLine,'prevFig',figSingleLine);
+    figDistr=checkDistributionDataLD(idCall,SeeMe,idxMon,DataXdistribution,'prevFig',figDistr);
+    figSingleLine=plotSingleLineCheck(idCall,idxMon,DataXSingleLine,idxLine,'prevFig',figSingleLine);
     idCall=idCall+1;
 
     % plot
     titleData1='Plane Fitted Background';
     titleData2={'Lateral Deflection - Trace'; '(removed fitted plane and shifted)'};
     nameFig='resultA5_2_planeBKfit_LateralDeflection';
-    showData(secondMonitorMain,true,1,correction_plane,false,titleData1,'Voltage [V]',newFolder,nameFig,'data2',Lateral_Trace_corrPlane,'titleData2',titleData2)    
+    showData(idxMon,true,1,correction_plane,false,titleData1,'Voltage [V]',newFolder,nameFig,'data2',Lateral_Trace_corrPlane,'titleData2',titleData2)    
     if getValidAnswer('Keep the Lateral Deflection with the plane-fitted background removed?','',{'Yes','No'})
         Lateral_Trace_firstCorr = Lateral_Trace_corrPlane;
         text='(Plane fitted BK removed)';
@@ -295,7 +295,7 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_I
                         % +2 because second and/or third colors are used for the prev iteration
                         idxColor=numPrevRows+2;
                         plot(fittedline,'DisplayName',sprintf('Best Fitted curve - fitOrder: %d - %d° iteration',bestFitOrder,iteration),'Color',globalColor(1),'LineWidth',2,'LineStyle','--')                    
-                        objInSecondMonitor(secondMonitorMain,ftmp)
+                        objInSecondMonitor(ftmp,idxMon)
                         legend('FontSize',18), xlim padded, ylim padded, title(sprintf('Line %d',i),'FontSize',14)
                         question=sprintf(['The avg of one of the borders (%d elements over %d) of the first\nfitted %d-line is higher then the avg of true exp BK borders' ...
                             '(%d elements)\nChoose the best option to manage the current line.'],round(length(yData)*10/100),length(yData),i,round(length(yData)*5/100));
@@ -354,7 +354,7 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_I
             % Plot the fitted backround:
             titleData1='Line x Line Fitted Background'; titleData2={'Lateral Deflection - Trace';text};
             nameFig='resultA5_3_LineBKfit_LateralDeflection';
-            showData(secondMonitorMain,true,2,Bk_iterative,true,titleData1,'',newFolder,nameFig,'data2',Lateral_Trace_secondCorr,'titleData2',titleData2)
+            showData(idxMon,true,2,Bk_iterative,true,titleData1,'',newFolder,nameFig,'data2',Lateral_Trace_secondCorr,'titleData2',titleData2)
             if getValidAnswer('Satisfied of the fitting?','',{'y','n'})
                 break
             end
@@ -369,8 +369,8 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_I
         DataXdistribution= {Lateral_Trace_corrLine_BK_2,'corrected LineXline BK'; ...
                             Lateral_Trace_corrLine_FR_2,'corrected LineXline FR'};
         DataXSingleLine={Lateral_Trace_secondCorr,'corrected by LineXLineFitted'};
-        figDistr=checkDistributionDataLD(idCall,SeeMe,secondMonitorMain,DataXdistribution,'prevFig',figDistr);        
-        figSingleLine=plotSingleLineCheck(idCall,secondMonitorMain,DataXSingleLine,idxLine,'prevFig',figSingleLine);
+        figDistr=checkDistributionDataLD(idCall,SeeMe,idxMon,DataXdistribution,'prevFig',figDistr);        
+        figSingleLine=plotSingleLineCheck(idCall,idxMon,DataXSingleLine,idxLine,'prevFig',figSingleLine);
     else
         Lateral_Trace_secondCorr = Lateral_Trace_firstCorr;
     end
@@ -416,7 +416,7 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_I
                 if ~exist(fullfile(mainPath,'HoverMode_OFF'),"dir")
                     error('The directory HoverMode_OFF doesn''t exist. Select another option')
                 end
-                avg_fc = A5_featureFrictionCalcFromSameScanHVOFF(secondMonitorMain,mainPath);
+                avg_fc = A5_featureFrictionCalcFromSameScanHVOFF(idxMon,mainPath);
                 if isempty(avg_fc)
                     fprintf('For some reasons, the scan in HoverMode OFF is messed up. Choose a standard value if possible')
                     continue
@@ -442,18 +442,18 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_I
     title(sprintf("(FORCE) fast scan line # %d",idxLine),'FontSize',20)
     xlabel('fast scan line [pixel]','FontSize',15)
     ylabel('Lateral Force [nN]','FontSize',15)
-    objInSecondMonitor(secondMonitorMain,figSingleLineForce);
+    objInSecondMonitor(figSingleLineForce,idxMon);
     nameFig='resultA5_6_singleFastScanLineLD_FORCE';
     saveFigures(figSingleLineForce,newFolder,nameFig)
 
     % plot the definitive corrected lateral force
     titleData='Fitted and corrected Lateral Force';
     nameFig='resultA5_7_ResultsDefinitiveLateralDeflectionsNewton_normalized';
-    showData(secondMonitorMain,SeeMe,3,Corrected_LD_Trace,true,titleData,'',newFolder,nameFig)
+    showData(idxMon,SeeMe,3,Corrected_LD_Trace,true,titleData,'',newFolder,nameFig)
     titleData='Fitted and corrected Lateral Force';
     nameFig='resultA5_7_ResultsDefinitiveLateralDeflectionsNewton';
     labelFig='Force [nN]';
-    showData(secondMonitorMain,SeeMe,3,Corrected_LD_Trace*1e9,false,titleData,labelFig,newFolder,nameFig)
+    showData(idxMon,SeeMe,3,Corrected_LD_Trace*1e9,false,titleData,labelFig,newFolder,nameFig)
 
     % save the corrected lateral force into cropped AFM image
     AFM_Elab=AFM_cropped_Images;    
@@ -467,7 +467,7 @@ end
 %%%%% FUNCTIONS %%%%%
 %%%%%%%%%%%%%%%%%%%%%
 
-function figDistr=checkDistributionDataLD(idCall,SeeMe,secondMonitorMain,Data,varargin)
+function figDistr=checkDistributionDataLD(idCall,SeeMe,idxMon,Data,varargin)
     p=inputParser();
     argName = 'prevFig';    defaultVal = [];    addOptional(p,argName,defaultVal);   
     parse(p,varargin{:});
@@ -481,7 +481,7 @@ function figDistr=checkDistributionDataLD(idCall,SeeMe,secondMonitorMain,Data,va
         legend('FontSize',15), grid on, grid minor
         xlabel('Lateral Deflection [V]','FontSize',15)
         title("Distribution Lateral Deflection and minimum values","FontSize",20)
-        objInSecondMonitor(secondMonitorMain,figDistr);
+        objInSecondMonitor(figDistr,idxMon);
        
     else
         figDistr=p.Results.prevFig;
@@ -515,7 +515,7 @@ function figDistr=checkDistributionDataLD(idCall,SeeMe,secondMonitorMain,Data,va
     xline(absMinFR,'.-','LineWidth',1.5,    'Color',globalColor(idCall),'DisplayName',sprintf('Absolute Min FR:       %.2e',absMinFR))
 end
 
-function figSingleLine=plotSingleLineCheck(idCall,secondMonitorMain,data,idxLine,varargin)
+function figSingleLine=plotSingleLineCheck(idCall,idxMon,data,idxLine,varargin)
     p=inputParser();
     argName = 'prevFig';    defaultVal = [];    addOptional(p,argName,defaultVal);
     parse(p,varargin{:});
@@ -525,7 +525,7 @@ function figSingleLine=plotSingleLineCheck(idCall,secondMonitorMain,data,idxLine
         figSingleLine=figure;
         % adjust pic
         legend('FontSize',15), grid on, grid minor
-        objInSecondMonitor(secondMonitorMain,figSingleLine);
+        objInSecondMonitor(figSingleLine,idxMon);
         title(sprintf("fast scan line # %d",idxLine),'FontSize',20)
         xlabel('fast scan line [pixel]','FontSize',15)
         ylabel('Lateral Deflection [V]','FontSize',15)

@@ -20,7 +20,7 @@ function varargout=A0_main_friction(varargin)
             'E:\1_mixingPCinTRCDA\AFM data\october-november-december 2024 sample 80x80 random align\1_3_1 TRCDA\friction\5_bkonly'   
             'E:\1_mixingPCinTRCDA\AFM data\october-november-december 2024 sample 80x80 random align\1_3_1 TRCDA\friction\6_bkonly'   };
     %}
-    secondMonitorMain=objInSecondMonitor;    
+    idxMon=objInSecondMonitor;    
     % to extract the friction coefficient, choose which method use.
     question=sprintf('Which method perform to extract the background friction coefficient? (NOTE: AFM data with Hover Mode OFF)');
     options={ ...
@@ -42,15 +42,15 @@ function varargout=A0_main_friction(varargin)
             [pixData,fOutlierRemoval,fOutlierRemoval_text]=prepareSettingsPixel;
     end
     
-    [AFM_onlyBK,metadata_onlyBK,AFM_heightIO_onlyBK,filePath,nameScan,idxRemovedPortion_onlyBK]=prepareData(nameOperation,secondMonitorMain,filePath,filesDirs);        
+    [AFM_onlyBK,metadata_onlyBK,AFM_heightIO_onlyBK,filePath,nameScan,idxRemovedPortion_onlyBK]=prepareData(nameOperation,idxMon,filePath,filesDirs);        
     clear i filesDirs
     if method == 3
         fileResultPath=prepareDirResults(filePath,method,fOutlierRemoval,fOutlierRemoval_text);
-        [resFit_friction,definitiveFrictionCoeff]=A1_frictionCalc_method_1_2_3(AFM_onlyBK,metadata_onlyBK,AFM_heightIO_onlyBK,secondMonitorMain,fileResultPath,method,nameScan,idxRemovedPortion_onlyBK,pixData,fOutlierRemoval,fOutlierRemoval_text);
+        [resFit_friction,definitiveFrictionCoeff]=A1_frictionCalc_method_1_2_3(AFM_onlyBK,metadata_onlyBK,AFM_heightIO_onlyBK,idxMon,fileResultPath,method,nameScan,idxRemovedPortion_onlyBK,pixData,fOutlierRemoval,fOutlierRemoval_text);
         fOutlierRemovalXfile=sprintf('_%d',fOutlierRemoval);
     else    
         fileResultPath=prepareDirResults(filePath,method);
-        resFit_friction=A1_frictionCalc_method_1_2_3(AFM_onlyBK,metadata_onlyBK,AFM_heightIO_onlyBK,secondMonitorMain,fileResultPath,method,nameScan,idxRemovedPortion_onlyBK);
+        resFit_friction=A1_frictionCalc_method_1_2_3(AFM_onlyBK,metadata_onlyBK,AFM_heightIO_onlyBK,idxMon,fileResultPath,method,nameScan,idxRemovedPortion_onlyBK);
         fOutlierRemovalXfile='';
     end
     close all    
@@ -60,7 +60,7 @@ function varargout=A0_main_friction(varargin)
     end
     nameFiledata=fullfile(fileResultPath,sprintf('dataResults_method%d%s',method,fOutlierRemovalXfile));
     save(nameFiledata,"resFit_friction",'-v7.3')
-    clear AFM_onlyBK metadata_onlyBK AFM_heightIO_onlyBK nameScan secondMonitorMain fileResultPath method fOutlierRemoval* pixData idxRemovedPortion_onlyBK filePath nameOperation nameFiledata filesDirs
+    clear AFM_onlyBK metadata_onlyBK AFM_heightIO_onlyBK nameScan idxMon fileResultPath method fOutlierRemoval* pixData idxRemovedPortion_onlyBK filePath nameOperation nameFiledata filesDirs
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%

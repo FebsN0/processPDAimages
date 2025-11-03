@@ -10,7 +10,7 @@
 %           varargin =      Data2 and titleData2 for a figure with two subplots
 %                           Binarized = true / false
 %                           closeImmediately = true / false
-function showData(secondMonitorMain,SeeMe,i,data1,norm,titleData1,labelBar,nameDir,nameFig,varargin)
+function showData(idxMon,SeeMe,i,data1,norm,titleData1,labelBar,nameDir,nameFig,varargin)
     p=inputParser();    %init instance of inputParser
     %Add default parameters. When call the function, use 'argName' as well you use 'LineStyle' in plot! And
     %then the values
@@ -45,7 +45,7 @@ function showData(secondMonitorMain,SeeMe,i,data1,norm,titleData1,labelBar,nameD
     else
         showSingleData(data1, norm, titleData1, labelBar,bin,bk,pixmeter,rangeScale)
     end    
-    objInSecondMonitor(secondMonitorMain,eval(sprintf('f%d',i)));
+    objInSecondMonitor(eval(sprintf('f%d',i)),idxMon);
     
     if ~exist(sprintf('%s/tiffImages',nameDir),"dir") 
         mkdir(sprintf('%s/tiffImages',nameDir))
