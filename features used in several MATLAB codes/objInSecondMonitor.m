@@ -3,10 +3,11 @@ function idMon=objInSecondMonitor(varargin)
 % - object to handle (window)
 % - idMon = which ID monitor to put figures. Generated after first empty call function
 %%% OUTPUT first call function.
-% - Get the choosen ID of the monitor where to show figs
-    
+% - idMon = Get the choosen ID of the monitor where to show figs from the first call
+
     % identify all the monitors
     screens = get(0, 'MonitorPositions'); % get the position of the monitors and their size  
+
     % first function call, empty input. Identify monitors and choose which
     % one use for showing figures
     if isempty(varargin)
