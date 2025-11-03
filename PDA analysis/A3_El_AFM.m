@@ -299,7 +299,7 @@ function [AFM_Images,IO_Image]=A3_El_AFM(filtData,iterationMain,idxMon,filepath,
         % plot the resulting corrected data
         title1='Height (measured) channel - Single Line Fitted';        
         showData(idxMon,SeeMe,3,AFM_noBk*1e9,false,title1,'Height (nm)',filepath,'resultA3_3_HeightLineFitted_noNorm')    
-        showData(idxMon,true,3,AFM_noBk,true,title1,'',filepath,'resultA3_3_HeightLineFitted_norm','closeImmediately',false)    
+        showData(idxMon,true,3,AFM_noBk,true,title1,'',filepath,'resultA3_3_HeightLineFitted_norm')    
         if getValidAnswer('Satisfied of the fitting?','',{'y','n'}) == 1
             close gcf, break
         end

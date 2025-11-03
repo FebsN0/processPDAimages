@@ -24,7 +24,7 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_cropped_Images,AFM_height_I
     if strcmp(p.Results.FitOrder,'Low'); limit=3; elseif strcmp(p.Results.FitOrder,'Medium'), limit=6; else, limit=9; end
     
     % select a single line manually to check the LD
-    figure, imagesc(AFM_height_IO), objInSecondMonitor(idxMon,gcf)
+    figure, imagesc(AFM_height_IO), objInSecondMonitor(gcf,idxMon)
     uiwait(msgbox(sprintf('Select a point on the mask where analyze the single fast scan line'),''));
     idxLine=selectRangeGInput(1,1,1:size(AFM_height_IO,2),1:size(AFM_height_IO,1));
     close gcf

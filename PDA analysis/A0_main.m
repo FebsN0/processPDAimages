@@ -113,7 +113,7 @@ end
 % includes A6 and A7
 if flagExeA1 || flagExeA5 || flagExeA6_A7_A8
     fprintf('\nAFM data is taken from the following experiment:\n\tEXPERIMENT: %s\t\tSCAN i-th:\t %s\n\n',nameExperiment,nameScan) 
-    [metaData_BF,BF_Mic_Image_aligned,Tritic_Mic_Image_After_aligned,Tritic_Mic_Image_Before,mainPathOpticalData,timeExp]=A6_prepareBFandTRITIC(folderResultsImg,idxMon);
+    [metaDataNIKON,BF_Mic_Image_aligned,Tritic_Mic_Image_After_aligned,Tritic_Mic_Image_Before,mainPathOpticalData,timeExp]=A6_prepareBFandTRITIC(folderResultsImg,idxMon,nameExperiment,nameScan);
     % Produce the binary IO of Brightfield
     [BF_Mic_Image_IO,Tritic_Mic_Image_Before,Tritic_Mic_Image_After_aligned,~]=A8_Mic_to_Binary(BF_Mic_Image_aligned,idxMon,folderResultsImg,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned); 
     clear BF_Mic_Image_aligned 
@@ -122,7 +122,7 @@ if flagExeA1 || flagExeA5 || flagExeA6_A7_A8
 end
 %% Align AFM to BF and extract the coordinates for alignment to be transferred to the other data
 if flagExeA1 || flagExeA5 || flagExeA6_A7_A8 || flagExeA9
-    [AFM_A10_IO_final,AFM_A10_data_final,results_AFM_BF_aligment,offset]=A9_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_BF,AFM_height_IO,metaData_AFM,AFM_A5_LatDeflecFitted,folderResultsImg,idxMon,'Margin',150);
+    [AFM_A10_IO_final,AFM_A10_data_final,results_AFM_BF_aligment,offset]=A9_alignment_AFM_Microscope(BF_Mic_Image_IO,metaDataNIKON,AFM_height_IO,metaData_AFM,AFM_A5_LatDeflecFitted,folderResultsImg,idxMon,'Margin',150);
     % adjust size BF and TRITIC
     BF_Mic_Image_IO=fixSize(BF_Mic_Image_IO,offset);
     Tritic_Mic_Image_Before=fixSize(Tritic_Mic_Image_Before,offset);  
@@ -131,7 +131,8 @@ if flagExeA1 || flagExeA5 || flagExeA6_A7_A8 || flagExeA9
     save(fullfile(mainPath,'HoverMode_ON\resultsData_4_postProcessA9.mat'))
 end
 %% correlation FLUORESCENCE AND AFM DATA
-Data_finalResults=A10_correlation_AFM_BF(AFM_A10_data_final,AFM_A10_IO_final,metaData_BF.ImageHeight_umeterXpixel,setpoints,idxMon,folderResultsImg,mainPathOpticalData,timeExp,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned,'innerBorderCalc',false);
+
+Data_finalResults=A10_correlation_AFM_BF(AFM_A10_data_final,AFM_A10_IO_final,metaDataNIKON.BF.ImageHeight_umeterXpixel,setpoints,idxMon,folderResultsImg,mainPathOpticalData,timeExp,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned,'innerBorderCalc',false);
 
 %Data_finalResults=A10_correlation_AFM_BF__OLDVERSION(AFM_A10_data_final,AFM_A10_IO_final,metaData_BF.ImageHeight_umeterXpixel,setpoints,secondMonitorMain,folderResultsImg,mainPathOpticalData,timeExp,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned,'innerBorderCalc',false);
 

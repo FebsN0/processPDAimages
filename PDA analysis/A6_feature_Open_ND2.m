@@ -236,13 +236,11 @@ function [IOI,complete_path_to_afm_file,metadataND2]=A6_feature_Open_ND2(varargi
                        globalMetadata, seriesMetadata, 'Global ');
             result{s, 2} = seriesMetadata;
             result{s, 3} = colorMaps;
-            result{s, 4} = r.getMetadataStore();
-            %fprintf('\n');
+            result{s, 4} = r.getMetadataStore();          %  OME-standard
+            result{s, 5} = r.getMetadataValue('Gain');    %  proprietary Nikon metadata ( uses r.getGlobalMetadata() )
         end
         r.close();
-    end
-    
-
+    end   
     
     if(~exist('complete_path_to_afm_file','var'))
         [afm_file_name,afm_file_path,afm_file_index]=uigetfile('*.nd2','Choose AFM File');
@@ -255,8 +253,6 @@ function [IOI,complete_path_to_afm_file,metadataND2]=A6_feature_Open_ND2(varargi
         end
         clearvars afm_file_name afm_file_path afm_file_index
     end
-
-
 
     file_info=bfopen(complete_path_to_afm_file);
     IOI=im2double(file_info{1,1}{1,1});
@@ -282,6 +278,7 @@ function [IOI,complete_path_to_afm_file,metadataND2]=A6_feature_Open_ND2(varargi
     voxelSizeXdouble = voxelSizeX.doubleValue();                                        % The numeric value represented by this object after conversion to type double
     voxelSizeY = omeMeta.getPixelsPhysicalSizeY(0).value(ome.units.UNITS.MICROMETER);   % in µm
     voxelSizeYdouble = voxelSizeY.doubleValue();                                        % The numeric value represented by this object after conversion to type double
+    gain=file_info{1,5};
 
     metadataND2=struct(...
                     'ExposureTime', exposureTime, ...
@@ -289,8 +286,8 @@ function [IOI,complete_path_to_afm_file,metadataND2]=A6_feature_Open_ND2(varargi
                     'ImageHeightPixels',stackSizeY, ...
                     'pixelSizeUnit', voxelSizeXdefaultUnit, ...
                     'ImageWidth_umeterXpixel', voxelSizeXdouble, ...
-                    'ImageHeight_umeterXpixel', voxelSizeYdouble);
-
+                    'ImageHeight_umeterXpixel', voxelSizeYdouble,...
+                    'Gain',gain);
 end
 
 
