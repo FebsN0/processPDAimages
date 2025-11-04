@@ -7,6 +7,8 @@ function idMon=objInSecondMonitor(varargin)
 
     % identify all the monitors
     screens = get(0, 'MonitorPositions'); % get the position of the monitors and their size  
+    % The root origin (bottom-left of the primary monitor)
+    primaryOrigin = screens(end, 1:2);   % MATLAB puts the *primary* monitor last
 
     % first function call, empty input. Identify monitors and choose which
     % one use for showing figures
@@ -23,12 +25,13 @@ function idMon=objInSecondMonitor(varargin)
             winWidth  = round(0.2 * width);
             winHeight = round(0.2 * height);    
          % Center the window on the screen
-            winLeft   = left + round((width - winWidth) / 2);
-            winBottom = bottom + round((height - winHeight) / 2);
+            winLeft   = left - primaryOrigin(1) + round((width - winWidth) / 2);
+            winBottom = bottom - primaryOrigin(2) + round((height - winHeight) / 2);
+        
         % Create the small windows and put at the center showing which
         % monitor they correspond
             figure('Name', ['Monitor ' num2str(i)], 'NumberTitle', 'off',...
-                'Position', [winLeft, winBottom, winWidth, winHeight]);
+                'Position', [winLeft, winBottom, winWidth, winHeight]);          
             uicontrol('Style', 'text', 'String', ['This is Monitor ' num2str(i)], ...
                        'FontSize', 14, 'Units', 'normalized', ...
                        'Position', [0.2 0.4 0.6 0.2]);
