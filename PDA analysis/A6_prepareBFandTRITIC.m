@@ -23,16 +23,15 @@ function varargout=A6_prepareBFandTRITIC(folderResultsImg,idxMon,nameExperiment,
                 flag_PRE_POST = 0;
             else
                 mode='After'; filenameND2='resultA6_1_2_BrightField_postAFM'; titleImage='BrightField - original - postAFM';
-                BF_ImagePOST=selectND2file(folderResultsImg,filenameND2,titleImage,idxMon,fullfilePath);
+                BF_ImagePOST=selectND2file(folderResultsImg,filenameND2,titleImage,idxMon,'BrightField',mode);
                 flag_PRE_POST = 1;
-            end
-            
+            end            
             if getValidAnswer("End the selection of BF files?",'',{'y','n'}) || i>2
                 break
             end
         end
     else
-        fileBF={fileList(idxBF).name}; folderBF={fileList(idxBF).folder};
+        fileBF={fileList(idxBF).name};
         % extract preAFM BF acquisition 
         if isscalar(fileBF)
             beforeFiles=fileBF;
@@ -91,17 +90,26 @@ function varargout=A6_prepareBFandTRITIC(folderResultsImg,idxMon,nameExperiment,
     beforeFiles=fullfile(filePathND2,beforeFiles{:});
     afterFiles=fullfile(filePathND2,afterFiles{:});        
     filenameND2='resultA6_2_1_TRITIC_Before_Stimulation'; titleImage=sprintf('TRITIC Before Stimulation - timeExp: %s',timeExp);
-    [Tritic_Mic_Image_Before,metaData_TRITIC]=selectND2file(folderResultsImg,filenameND2,titleImage,idxMon,beforeFiles);               
+    [TRITIC_ImagePRE,metaData_TRITIC]=selectND2file(folderResultsImg,filenameND2,titleImage,idxMon,beforeFiles);               
     filenameND2='resultA6_2_2_TRITIC_After_Stimulation'; titleImage=sprintf('TRITIC After Stimulation - timeExp: %s',timeExp);
-    Tritic_Mic_Image_After=selectND2file(folderResultsImg,filenameND2,titleImage,idxMon,afterFiles);
+    TRITIC_ImagePOST=selectND2file(folderResultsImg,filenameND2,titleImage,idxMon,afterFiles);
     close all       
     metadata.TRITIC=metaData_TRITIC;
     % correct the tilted effect of BF
-    BF_ImagePRE = A6_feature_correctBFtilted(BF_ImagePRE,folderResultsImg,idxMon,1);
+    pathFile=sprintf('%s/tiffImages/resultA6_3_1_comparisonOriginalCorrected_beforeAFM',folderResultsImg);
+    BF_ImagePRE = A6_feature_correctBFtilted(BF_ImagePRE,idxMon,pathFile);
     if exist("BF_ImagePOST","var")
-        BF_ImagePOST = A6_feature_correctBFtilted(BF_ImagePOST,folderResultsImg,idxMon,2);
+        pathFile=sprintf('%s/tiffImages/resultA6_3_2_comparisonOriginalCorrected_afterAFM',folderResultsImg);
+        BF_ImagePOST = A6_feature_correctBFtilted(BF_ImagePOST,idxMon,pathFile);
     end
-        
+    % original images are not aligned
+    showAlignOriginalImages(BF_ImagePRE,TRITIC_ImagePRE,folderResultsImg,'BF preAFM and TRITIC preAFM - pre alignement with postAFM','resultA7_0_1_BFpre_TRITICpre_preAlign',idxMon)    
+    showAlignOriginalImages(TRITIC_ImagePRE,TRITIC_ImagePOST,folderResultsImg,'TRITIC preAFM and TRITIC postAFM - Not Aligned','resultA7_0_2_TRITIC_prePost_NotAligned',idxMon)
+    showAlignOriginalImages(BF_ImagePRE,TRITIC_ImagePOST,folderResultsImg,'BF preAFM and TRITIC postAFM - Not Aligned','resultA7_0_3_BFpre_TRITICpost_NotAligned',idxMon)
+    if exist('BF_ImagePOST','var')
+        showAlignOriginalImages(BF_ImagePRE,BF_ImagePOST,folderResultsImg,'BF preAFM and BF postAFM - Not Aligned','resultA7_0_4_BF_prePost_NotAligned',idxMon)
+    end
+
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%% ALIGN BF-TRITIC IMAGES PRE AND POST AFM %%%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -109,44 +117,54 @@ function varargout=A6_prepareBFandTRITIC(folderResultsImg,idxMon,nameExperiment,
     % keep the original method (i.e. two separate alignments) 
     %       TRITIC_After WITH TRITIC_Before
     %       BF with TRITIC_Before
-    if flag_PRE_POST
-        [Tritic_Mic_Image_After_aligned,offset]=A7_limited_registration(BF_ImagePOST,BF_ImagePRE,folderResultsImg,idxMon);
-    end
-
     
-    while true          
-        BF_Mic_Image_original=BF_Mic_Image;            
-        % Align the fluorescent images After with the BEFORE stimulation
-        [Tritic_Mic_Image_After_aligned,offset]=A7_limited_registration(Tritic_Mic_Image_After,Tritic_Mic_Image_Before,folderResultsImg,idxMon);
-        % adjust BF and Tritic_Before depending on the offset
-        BF_Mic_Image=fixSize(BF_Mic_Image,offset);
-        Tritic_Mic_Image_Before=fixSize(Tritic_Mic_Image_Before,offset);   
-        % Align the Brightfield to TRITIC Before Stimulation
-        if flag_PRE_POST
-            [BF_Mic_Image_aligned,offset]=A7_limited_registration(BF_Mic_Image,Tritic_Mic_Image_After_aligned,folderResultsImg,idxMon,'Brightfield','Yes','Moving','Yes','typeTritic',flag_PRE_POST);                
-        else
-            [BF_Mic_Image_aligned,offset]=A7_limited_registration(BF_Mic_Image,Tritic_Mic_Image_Before,folderResultsImg,idxMon,'Brightfield','Yes','Moving','Yes');                
-        end
-        Tritic_Mic_Image_After_aligned=fixSize(Tritic_Mic_Image_After_aligned,offset);
-        Tritic_Mic_Image_Before=fixSize(Tritic_Mic_Image_Before,offset);
-        varargout{1}=metadata;
-        varargout{2}=BF_Mic_Image_aligned;                
-        varargout{3}=Tritic_Mic_Image_After_aligned;        
-        varargout{4}=Tritic_Mic_Image_Before;
-
-        [mainPathOpticalData,~]=fileparts(fileparts(fileparts(filePathData)));
-        varargout{5}=mainPathOpticalData;
-        varargout{6}=timeExp;
-        if getValidAnswer(sprintf('Satisfied of all the registration of BF and fluorescence image?\nIf not, change time exposure for better alignment'),'',{'Yes','No'})
+    flagRepeatAlignWithTRITIC=true;
+    if flag_PRE_POST
+        % align BF_post to BF_pre. Then shift TRITIC_post with the obtained
+        % offset. Required BF_ImagePRE_adjusted because of cutting borders
+        % of BF_ImagePOST_aligned for alignment
+        [BF_ImagePOST_aligned,BF_ImagePRE_aligned,offset]=A7_BF_TRITIC_imageAlignment(BF_ImagePOST,BF_ImagePRE,folderResultsImg,idxMon,'Brightfield','Yes');
+        % fix TRITIC pre to BF pre
+        TRITIC_ImagePRE_aligned=fixSize(TRITIC_ImagePRE,offset);
+        TRITIC_ImagePOST_aligned=fixSize(TRITIC_ImagePOST,-offset);   % for some reason, put minus sign return correct alignment. Not sure if it works always
+        showAlignOriginalImages(TRITIC_ImagePRE_aligned,TRITIC_ImagePOST_aligned,folderResultsImg,'TRITIC preAFM and TRITIC postAFM - PostAlignement','resultA7_1_2_TRITICpre_TRITICpost_postAlign',idxMon,'visible',true,'closeImmediately',false)           
+        if any(size(TRITIC_ImagePOST_aligned)~=size(BF_ImagePOST_aligned))
+            uiwait(msgbox('Something wrong in the correction matrix of TRITICpost because its matrix size is not the same as BFpost. Repeat the alignment using TRITICpre and TRITICpost','Warning','warn'));
+        elseif getValidAnswer(sprintf('Is the registration of TRITICpre and TRITICpost postAlign ok?'),'',{'Yes','No'})
             close gcf
-            break
+            flagRepeatAlignWithTRITIC=false;        
         end
-        % in case of no satisfaction, restore original data
-        BF_Mic_Image=BF_Mic_Image_original;
-        close all
     end
-end
+    if ~flag_PRE_POST && flagRepeatAlignWithTRITIC
+        % Align the fluorescent images After with the BEFORE stimulation
+        [TRITIC_ImagePOST_aligned,TRITIC_ImagePRE_aligned,offset]=A7_BF_TRITIC_imageAlignment(TRITIC_ImagePOST,TRITIC_ImagePRE,folderResultsImg,idxMon);        
+        BF_ImagePRE_aligned=fixSize(BF_ImagePRE,offset);
+        if flag_PRE_POST
+            BF_ImagePOST_aligned=fixSize(BF_ImagePOST,-offset);
+            showAlignOriginalImages(BF_ImagePRE_aligned,BF_ImagePOST_aligned,folderResultsImg,'BF preAFM and BF postAFM - PostAlignement','resultA7_1_2_BFpre_BFpost_postAlign',idxMon)                                   
+        end
+    end
+    % END ALIGNMENT!
+    showAlignOriginalImages(BF_ImagePRE_aligned,TRITIC_ImagePRE_aligned,folderResultsImg,'BF preAFM and TRITIC preAFM - PostAlignement','resultA7_2_1_BFpre_TRITICpre_postAlign',idxMon)               
+    showAlignOriginalImages(BF_ImagePRE_aligned,TRITIC_ImagePOST_aligned,folderResultsImg,'BF preAFM and TRITIC postAFM - PostAlignement','resultA7_2_2_BFpre_TRITICpost_postAlign',idxMon)               
 
+    if flag_PRE_POST
+        showAlignOriginalImages(BF_ImagePOST_aligned,TRITIC_ImagePOST_aligned,folderResultsImg,'BF postAFM and TRITIC postAFM - PostAlignement','resultA7_2_3_BFpost_TRITICpost_postAlign',idxMon)                                     
+    end
+    
+    
+    % prepare the output data
+    [mainPathOpticalData,~]=fileparts(fileparts(fileparts(filePathND2)));
+    varargout{1}=metadata;      varargout{2}=mainPathOpticalData;       varargout{3}=timeExp;
+    % put BF and TRITIC data in struct
+    data_TRITIC.PRE=TRITIC_ImagePRE_aligned;        data_TRITIC.POST=TRITIC_ImagePOST_aligned;    
+    data_BF.PRE=BF_ImagePRE_aligned;    
+    if flag_PRE_POST
+        data_BF.POST=BF_ImagePOST_aligned;
+    end
+    varargout{4}=data_TRITIC;
+    varargout{5}=data_BF;
+end
 
 
 function [Image,metaData]=selectND2file(folderResultsImg,filenameND2,titleImage,idxMon,varargin)
@@ -173,3 +191,27 @@ function [Image,metaData]=selectND2file(folderResultsImg,filenameND2,titleImage,
     fullfileName=fullfile(folderResultsImg,'figImages',filenameND2);
     saveas(f1,fullfileName)
 end
+
+function showAlignOriginalImages(image1,image2,folderResultsImg,titleText,fileText,idxMon,varargin)
+    p=inputParser();
+    argName = 'visible';            defaultVal = false;      addParameter(p, argName, defaultVal);
+    argName = 'closeImmediately';   defaultVal = true;      addParameter(p, argName, defaultVal);
+    parse(p,varargin{:})
+    
+    if p.Results.visible
+        f2=figure('Visible','on');
+    else
+        f2=figure('Visible','off');
+    end
+    imshow(imfuse(imadjust(image1),imadjust(image2)))
+    title(titleText,'FontSize',15)
+    objInSecondMonitor(f2,idxMon);
+    fullfileName=fullfile(folderResultsImg,'tiffImages',fileText);
+    saveas(f2,fullfileName,'tif')
+    fullfileName=fullfile(folderResultsImg,'figImages',fileText);
+    saveas(f2,fullfileName)
+    if p.Results.closeImmediately
+        close(f2)
+    end    
+end
+       

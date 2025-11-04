@@ -1,4 +1,4 @@
-function [image_of_interest] = A6_feature_correctBFtilted(image_of_interest,newFolder,idxMon,idFig)
+function [image_of_interest] = A6_feature_correctBFtilted(image_of_interest,idxMon,pathFile)
 % run the polynomial fitting on the Brightfield image since it is likely to be "tilted"
     wb=waitbar(0/1,sprintf('Correction of Tilted effects: removing Polynomial Baseline . . .'),'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
     setappdata(wb,'canceling',0);       
@@ -31,15 +31,9 @@ function [image_of_interest] = A6_feature_correctBFtilted(image_of_interest,newF
     imshow(imadjust(el_image)),title('Corrected BF Image','FontSize',14)
     objInSecondMonitor(f1,idxMon);
     question=sprintf('Use the Background Subtracted Image?\nIf not, it will be used the original BF data'); 
-    if getValidAnswer(question,'',{'Yes','No'})
-        if idFig==1
-            label="Before";
-        else
-            label="After";
-        end
-        text=sprintf('%s/tiffImages/resultA6_3_%d_comparisonOriginalCorrected_%sAFM',newFolder,idFig,label);
-        saveas(f1,text,'tif')
-        saveas(f1,text)   
+    if getValidAnswer(question,'',{'Yes','No'})        
+        saveas(f1,pathFile,'tif')        
+        %saveas(f1,pathFile)   
         image_of_interest=el_image;
     end
     close(f1)
