@@ -8,11 +8,14 @@
 % 
 % INPUT: OUTPUT of A1_open_JPK (single struct data)
 
-function [varargout]=A2_CleanUpData2_AFM(data,setpoints,idxMon,newFolder,varargin)
+function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
            
     %init instance of inputParser
     p=inputParser();
     addRequired(p, 'data', @(x) isstruct(x));
+    argName = 'setpointsList';  defaultVal = [];        addParameter(p,argName,defaultVal);
+    argName = 'idxMon';         defaultVal = [];        addParameter(p,argName,defaultVal);
+    argName = 'newFolder';      defaultVal = [];        addParameter(p,argName,defaultVal);
     argName = 'cleanOnly';      defaultVal = 'No';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     argName = 'Silent';         defaultVal = 'Yes';     addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     argName = 'imageType';      defaultVal = 'Entire';  addParameter(p,argName,defaultVal, @(x) ismember(x,{'Entire','SingleSection','Assembled'}));
@@ -31,6 +34,9 @@ function [varargout]=A2_CleanUpData2_AFM(data,setpoints,idxMon,newFolder,varargi
         if(strcmp(p.Results.Silent,'Yes'));     SeeMe=0; else, SeeMe=1; end                    
         imageTyp=p.Results.imageType;
         if p.Results.Normalization; norm=1; else, norm=0; end
+        setpoints=p.Results.setpointsList;
+        idxMon=p.Results.idxMon;
+        newFolder=p.Results.newFolder;        
     end
     
     if cleanOnly
@@ -97,82 +103,85 @@ function [varargout]=A2_CleanUpData2_AFM(data,setpoints,idxMon,newFolder,varargi
         nameFig=sprintf('resultA2_6_Raw_VDChannel_retrace_%s',imageTyp);
         showData(idxMon,SeeMe,5,data,norm,titleData,labelBar,newFolder,nameFig)           
         
-        % show distribution of vertical forces (data_VD_trace). If good, it should coincide approximately with the setpoint
-        data=data_VD_trace*1e9;
-        colors={"#0072BD","#D95319","#EDB120","#7E2F8E","#77AC30","#4DBEEE","#A2142F",'k','#FF00FF','#00FF00'};
-        if SeeMe
-            f0=figure('Visible','on');
-        else
-            f0=figure('Visible','off');
-        end
-        axes1 = axes('Parent',f0);
-        hold(axes1,'on');
-        % EXTRACT ALL DATA
-        % why flip? because the data has previously been flipped to coindide with the Fluorescence imaging. So
-        % needed to flip also the setpoint vector (left high - right low)
-        setpoints=flip(setpoints); numSetpoints=length(setpoints); 
-        setN=cell(1,numSetpoints); avgN=cell(1,numSetpoints); h=cell(1,numSetpoints);
-        for i=1:numSetpoints
-            % plot lines of setpoint
-            setN{i}=xline(setpoints(i)*1e9,'LineWidth',4,'DisplayName',sprintf('setpoint section %d',i),'Color',colors{i});
-        end
-        vertForceAVG=zeros(1,numSetpoints);
-        for i=1:numSetpoints
-            % in case of more files of single section scans, we know prior the size of single
-            % sections other than how much was the setpoint
-            if ~isempty(p.Results.sectionSize)
-                sizeSingleSection=p.Results.sectionSize(i); % already expressed in nanoNewton
-            else
-            % in case of single file, then divide the image in sections according to the number of used setpoint.
-            % IMPORTANT: this method is not accurate because when you change the setpoint manually, it is very
-            % likely that the "new" section has not same size as well as the previous one
-                sizeSingleSection=round(size(data,2)/numSetpoints);
-            end
-            % extract the vertical force data. Although this step could be made before the assembly, I
-            % found optimal put here so it can be made even in case of single entire scan
-            verticalForceSingleSection= data(:,(i-1)*sizeSingleSection+1:i*sizeSingleSection);
-            vertForceAVG(i)=mean(mean(verticalForceSingleSection));
-            avgN{i}=xline(vertForceAVG(i),'--','LineWidth',2,'DisplayName',sprintf('avg vertical force section %d',i),'Color',colors{i});
-            h{i}=histogram(verticalForceSingleSection,400,'DisplayName',sprintf('raw vertical force section %d',i),'FaceColor',colors{i});
-        end
-        legend1 = legend('FontSize',15);
-        set(legend1,'Location','bestoutside');
-        title('Distribution Raw Vertical Forces','FontSize',18), xlabel('Force [nN]','FontSize',15)
-        objInSecondMonitor(f0,idxMon);
-        saveas(f0,sprintf('%s/tiffImages/resultA2_1_distributionVerticalForces.tif',newFolder))
-        saveas(f0,sprintf('%s/figImages/resultA2_1_distributionVerticalForces',newFolder))
-        vertForceAVG=unique(round(vertForceAVG));
-        if length(vertForceAVG)~=numSetpoints
-            warndlg('Number of rounded vertical forces is less than number of setpoint!')
-        end
-        close(f0)
-        % plot the baseline trend
-        if ~isempty(p.Results.metadata)
-            metadata=p.Results.metadata;
-            totTimeScan = (metadata.x_scan_pixels/metadata.Scan_Rate_Hz)/60;
-            totTimeSection = totTimeScan/numSetpoints;
+        %%%%% perform the following step ONLY after assembly %%%%%
+        if ~strcmp(imageTyp,"SingleSection")
+            % show distribution of vertical forces (data_VD_trace). If good, it should coincide approximately with the setpoint
+            data=data_VD_trace*1e9;
+            colors={"#0072BD","#D95319","#EDB120","#7E2F8E","#77AC30","#4DBEEE","#A2142F",'k','#FF00FF','#00FF00'};
             if SeeMe
-                f1=figure('Visible','on');
+                f0=figure('Visible','on');
             else
-                f1=figure('Visible','off');
+                f0=figure('Visible','off');
             end
-            % we dont have the baseline info at the end of the scan. It is saved only in the baseline.txt file
-            arrayTime=0:totTimeSection:totTimeScan-totTimeSection;
-            baselineN=metadata.Baseline_N*1e9;
-            if length(baselineN) > 1
-                if abs(baselineN(2) - baselineN(1)) > 10 
-                    warning('\n\tThe baseline of the first section varies by more than 10nN from the first one!!\n\tThe current scan is not really realiable... ')
+            axes1 = axes('Parent',f0);
+            hold(axes1,'on');
+            % EXTRACT ALL DATA
+            % why flip? because the data has previously been flipped to coindide with the Fluorescence imaging. So
+            % needed to flip also the setpoint vector (left high - right low)
+            setpoints=flip(setpoints); numSetpoints=length(setpoints); 
+            setN=cell(1,numSetpoints); avgN=cell(1,numSetpoints); h=cell(1,numSetpoints);
+            for i=1:numSetpoints
+                % plot lines of setpoint
+                setN{i}=xline(setpoints(i)*1e9,'LineWidth',4,'DisplayName',sprintf('setpoint section %d',i),'Color',colors{i});
+            end
+            vertForceAVG=zeros(1,numSetpoints);
+            for i=1:numSetpoints
+                % in case of more files of single section scans, we know prior the size of single
+                % sections other than how much was the setpoint
+                if ~isempty(p.Results.sectionSize)
+                    sizeSingleSection=p.Results.sectionSize(i); % already expressed in nanoNewton
+                else
+                % in case of single file, then divide the image in sections according to the number of used setpoint.
+                % IMPORTANT: this method is not accurate because when you change the setpoint manually, it is very
+                % likely that the "new" section has not same size as well as the previous one
+                    sizeSingleSection=round(size(data,2)/numSetpoints);
                 end
-                plot(arrayTime,metadata.Baseline_N*1e9,'-*','LineWidth',2,'MarkerSize',15,'MarkerEdgeColor','red')
-                title('Baseline Trend among the sections','FontSize',18)
-                ylabel('Baseline shift [nN]','FontSize',15), xlabel('Time [min]','FontSize',15), grid on, grid minor
-                objInSecondMonitor(f1,idxMon);
-                saveas(f1,sprintf('%s/tiffImages/resultA2_0_baselineTrend.tif',newFolder))
-                saveas(f1,sprintf('%s/figImages/resultA2_0_baselineTrend',newFolder))
-            else
-                warning('\n\tPlotting the baseline trend is not possible because only one baseline value is stored in the metadata (Scan = Section)')
+                % extract the vertical force data. Although this step could be made before the assembly, I
+                % found optimal put here so it can be made even in case of single entire scan
+                verticalForceSingleSection= data(:,(i-1)*sizeSingleSection+1:i*sizeSingleSection);
+                vertForceAVG(i)=mean(mean(verticalForceSingleSection));
+                avgN{i}=xline(vertForceAVG(i),'--','LineWidth',2,'DisplayName',sprintf('avg vertical force section %d',i),'Color',colors{i});
+                h{i}=histogram(verticalForceSingleSection,400,'DisplayName',sprintf('raw vertical force section %d',i),'FaceColor',colors{i});
             end
-            close(f1)
+            legend1 = legend('FontSize',15);
+            set(legend1,'Location','bestoutside');
+            title('Distribution Raw Vertical Forces','FontSize',18), xlabel('Force [nN]','FontSize',15)
+            objInSecondMonitor(f0,idxMon);
+            saveas(f0,sprintf('%s/tiffImages/resultA2_1_distributionVerticalForces.tif',newFolder))
+            saveas(f0,sprintf('%s/figImages/resultA2_1_distributionVerticalForces',newFolder))
+            vertForceAVG=unique(round(vertForceAVG));
+            if length(vertForceAVG)~=numSetpoints
+                warndlg('Number of rounded vertical forces is less than number of setpoint!')
+            end
+            close(f0)
+            % plot the baseline trend
+            if ~isempty(p.Results.metadata)
+                metadata=p.Results.metadata;
+                totTimeScan = (metadata.x_scan_pixels/metadata.Scan_Rate_Hz)/60;
+                totTimeSection = totTimeScan/numSetpoints;
+                if SeeMe
+                    f1=figure('Visible','on');
+                else
+                    f1=figure('Visible','off');
+                end
+                % we dont have the baseline info at the end of the scan. It is saved only in the baseline.txt file
+                arrayTime=0:totTimeSection:totTimeScan-totTimeSection;
+                baselineN=metadata.Baseline_N*1e9;
+                if length(baselineN) > 1
+                    if abs(baselineN(2) - baselineN(1)) > 10 
+                        warning('\n\tThe baseline of the first section varies by more than 10nN from the first one!!\n\tThe current scan is not really realiable... ')
+                    end
+                    plot(arrayTime,metadata.Baseline_N*1e9,'-*','LineWidth',2,'MarkerSize',15,'MarkerEdgeColor','red')
+                    title('Baseline Trend among the sections','FontSize',18)
+                    ylabel('Baseline shift [nN]','FontSize',15), xlabel('Time [min]','FontSize',15), grid on, grid minor
+                    objInSecondMonitor(f1,idxMon);
+                    saveas(f1,sprintf('%s/tiffImages/resultA2_0_baselineTrend.tif',newFolder))
+                    saveas(f1,sprintf('%s/figImages/resultA2_0_baselineTrend',newFolder))
+                else
+                    warning('\n\tPlotting the baseline trend is not possible because only one baseline value is stored in the metadata (Scan = Section)')
+                end
+                close(f1)
+            end
         end
     end
 end
