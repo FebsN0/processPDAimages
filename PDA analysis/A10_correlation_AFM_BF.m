@@ -17,7 +17,7 @@
 %               NOTE: it doesn't matter if before or after scanning
 %       3) process only AFM data
 
-function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,size_umeterXpix,setpoints,idxMon,newFolder,mainPathOpticalData,timeExp,varargin)
+function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,metadataNIKON,setpoints,idxMon,newFolder,mainPathOpticalData,timeExp,varargin)
     
     p=inputParser();
     addRequired(p,'AFM_data');
@@ -48,6 +48,10 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,size_umet
     % in case one of the two is missing, substract by min value
     if p.Results.afterHeating; flag_heat=true; else, flag_heat=false; end
     
+    % extract the required values from metadata
+    size_umeterXpix=metadataNIKON.BF.ImageHeight_umeterXpixel;
+    gainTRITIC=metadataNIKON.TRITIC.Gain;
+
     % init var where store results
     dataResultsPlot=struct();
     numBins=100; %default
@@ -73,11 +77,11 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,size_umet
     % extract the normalization factor from post heated sample scans. The
         % factor will be used later.
         [~,nameExperiment]=fileparts(mainPathOpticalData);
-        normFactor=A10_feature_normFluorescenceHeat(mainPathOpticalData,timeExp,nameExperiment,idxMon);         
+        normFactor=A10_feature_normFluorescenceHeat(mainPathOpticalData,timeExp,gainTRITIC,nameExperiment,idxMon);         
     end    
     % plot original Delta
     labelBar={'Absolute fluorescence increase (A.U.)'}; % in case of no normalization
-    showData(idxMon,SeeMe,1,Delta,false,'Delta Fluorescence (After-Before, original)',labelBar,newFolder,'resultA10_1_DeltaFluorescenceOriginal','meterUnit',size_umeterXpix)
+    showData(idxMon,SeeMe,Delta,false,'Delta Fluorescence (After-Before, original)',labelBar,newFolder,'resultA10_1_DeltaFluorescenceOriginal','meterUnit',size_umeterXpix)
    
     % find the idx of Height and Lateral/vertical Deflection in Trace Mode
     idx_LD = strcmp([AFM_data.Channel_name],'Lateral Deflection') & strcmp([AFM_data.Trace_type],'Trace');
@@ -160,7 +164,7 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,size_umet
         if ~flag_heat
             titleD1='Delta Fluorescence (Shifted)';
             titleD2='Delta Fluorescence background (Masked and Shifted)';            
-            showData(idxMon,SeeMe,2,Delta_ADJ,false,titleD1,labelBar,newFolder,'resultA10_3_Fluorescence_PDA_BackGround','data2',Delta_glass_ADJ,'titleData2',titleD2,'background',true,'meterUnit',size_umeterXpix)
+            showData(idxMon,SeeMe,Delta_ADJ,false,titleD1,labelBar,newFolder,'resultA10_3_Fluorescence_PDA_BackGround','data2',Delta_glass_ADJ,'titleData2',titleD2,'background',true,'meterUnit',size_umeterXpix)
         end
     end
     % obtain the mask from each channel 
@@ -207,9 +211,9 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,size_umet
     masking.mask_third_setpointLimit_99percRemoval_totElements = nnz(mask_third);
     dataResultsPlot.maskingResults = masking;
     % show the plots
-    showData(idxMon,SeeMe,3,mask_first,true,'First Mask (Delta)','',newFolder,'resultA10_4_FirstMask','Binarized',true,'meterUnit',size_umeterXpix)
-    showData(idxMon,SeeMe,4,mask_second,true,'Second Mask (each AFM channel)','',newFolder,'resultA10_5_SecondMask','Binarized',true,'meterUnit',size_umeterXpix)
-    showData(idxMon,SeeMe,5,mask_third,true,'Third Mask (99perc + <maxSP)','',newFolder,'resultA10_6_ThirdMask','Binarized',true,'meterUnit',size_umeterXpix)   
+    showData(idxMon,SeeMe,mask_first,true,'First Mask (Delta)','',newFolder,'resultA10_4_FirstMask','Binarized',true,'meterUnit',size_umeterXpix)
+    showData(idxMon,SeeMe,mask_second,true,'Second Mask (each AFM channel)','',newFolder,'resultA10_5_SecondMask','Binarized',true,'meterUnit',size_umeterXpix)
+    showData(idxMon,SeeMe,mask_third,true,'Third Mask (99perc + <maxSP)','',newFolder,'resultA10_6_ThirdMask','Binarized',true,'meterUnit',size_umeterXpix)   
     clear masking mask_validValues 
     
     % Finally, applying the mask_definitive to all the data!
@@ -246,9 +250,9 @@ function dataResultsPlot=A10_correlation_AFM_BF(AFM_data,AFM_IO_Padded,size_umet
     end   
     
     % Delta with the first mask to show how really Delta is.
-    showData(idxMon,SeeMe,6,Delta_ADJ_firstMasking,false,'Delta Fluorescence (1st mask)',labelBar,newFolder,'resultA10_7_DeltaFluorescenceFirstMask','meterUnit',size_umeterXpix)
-    showData(idxMon,SeeMe,7,Delta_ADJ_secondMasking,false,'Delta Fluorescence (2nd mask)',labelBar,newFolder,'resultA10_8_DeltaFluorescenceDefinitiveMasked','meterUnit',size_umeterXpix)            
-    showData(idxMon,SeeMe,8,Delta_ADJ_thirdMasking,false,'Delta Fluorescence (3rd mask)',labelBar,newFolder,'resultA10_9_DeltaFluorescenceDefinitiveMasked','meterUnit',size_umeterXpix)            
+    showData(idxMon,SeeMe,Delta_ADJ_firstMasking,false,'Delta Fluorescence (1st mask)',labelBar,newFolder,'resultA10_7_DeltaFluorescenceFirstMask','meterUnit',size_umeterXpix)
+    showData(idxMon,SeeMe,Delta_ADJ_secondMasking,false,'Delta Fluorescence (2nd mask)',labelBar,newFolder,'resultA10_8_DeltaFluorescenceDefinitiveMasked','meterUnit',size_umeterXpix)            
+    showData(idxMon,SeeMe,Delta_ADJ_thirdMasking,false,'Delta Fluorescence (3rd mask)',labelBar,newFolder,'resultA10_9_DeltaFluorescenceDefinitiveMasked','meterUnit',size_umeterXpix)            
        
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%% NORMALIZE DELTA DATA %%%
@@ -372,7 +376,7 @@ function calcBorders(AFM_data,AFM_IO_Padded,idx_H,idx_LD,idx_VD,DeltaData,flag_h
     AFM_IO_Borders= edge(AFM_IO_Padded_Borders,'approxcanny');
     se = strel('square',5); % this value results a border of 3! pixels in the later images(as the outer dilation (2px) is gonna be subtracted later)
     AFM_IO_Borders_Grow=imdilate(AFM_IO_Borders,se); 
-    showData(secondMonitorMain,SeeMe,9,AFM_IO_Borders_Grow,false,'Borders','',newFolder,'resultA10_10_Borders','Binarized',true)
+    showData(secondMonitorMain,SeeMe,AFM_IO_Borders_Grow,false,'Borders','',newFolder,'resultA10_10_Borders','Binarized',true)
 
     % Elaboration of Height to extract inner and border regions
     AFM_Height_Border=AFM_data(idx_H).AFM_padded;
@@ -388,7 +392,7 @@ function calcBorders(AFM_data,AFM_IO_Padded,idx_H,idx_LD,idx_VD,DeltaData,flag_h
     titleD1='AFM Height Border';
     titleD2='AFM Height Inner';
     labelBar=sprintf('Height (\x03bcm)');
-    showData(secondMonitorMain,SeeMe,10,AFM_Height_Border*1e6,false,titleD1,labelBar,newFolder,'resultA10_11_BorderAndInner_AFM_Height','data2',AFM_Height_Inner*1e6,'titleData2',titleD2,'background',true)
+    showData(secondMonitorMain,SeeMe,AFM_Height_Border*1e6,false,titleD1,labelBar,newFolder,'resultA10_11_BorderAndInner_AFM_Height','data2',AFM_Height_Inner*1e6,'titleData2',titleD2,'background',true)
 
     % Elaboration of LD to extract inner and border regions
     AFM_LD_Border=AFM_data(idx_LD).AFM_padded;
@@ -404,7 +408,7 @@ function calcBorders(AFM_data,AFM_IO_Padded,idx_H,idx_LD,idx_VD,DeltaData,flag_h
     titleD1='AFM LD Border';
     titleD2='AFM LD Inner';
     labelBar='Force [nN]';  
-    showData(secondMonitorMain,SeeMe,11,AFM_LD_Border*1e9,false,titleD1,labelBar,newFolder,'resultA10_12_BorderAndInner_AFM_LateralDeflection','data2',AFM_LD_Inner*1e9,'titleData2',titleD2,'background',true)
+    showData(secondMonitorMain,SeeMe,AFM_LD_Border*1e9,false,titleD1,labelBar,newFolder,'resultA10_12_BorderAndInner_AFM_LateralDeflection','data2',AFM_LD_Inner*1e9,'titleData2',titleD2,'background',true)
 
     % Elaboration of VD to extract inner and border regions
     AFM_VD_Border=AFM_data(idx_VD).AFM_padded;
@@ -420,7 +424,7 @@ function calcBorders(AFM_data,AFM_IO_Padded,idx_H,idx_LD,idx_VD,DeltaData,flag_h
     titleD1='AFM VD Border';
     titleD2='AFM VD Inner';
     labelBar='Force [nN]';  
-    showData(secondMonitorMain,SeeMe,12,AFM_VD_Border*1e9,false,titleD1,labelBar,newFolder,'resultA10_13_BorderAndInner_AFM_VerticalDeflection','data2',AFM_VD_Inner*1e9,'titleData2',titleD2,'background',true)
+    showData(secondMonitorMain,SeeMe,AFM_VD_Border*1e9,false,titleD1,labelBar,newFolder,'resultA10_13_BorderAndInner_AFM_VerticalDeflection','data2',AFM_VD_Inner*1e9,'titleData2',titleD2,'background',true)
     
     % Elaboration of Fluorescent Images to extract inner and border regions
     if ~flag_heat           
@@ -431,7 +435,7 @@ function calcBorders(AFM_data,AFM_IO_Padded,idx_H,idx_LD,idx_VD,DeltaData,flag_h
         titleD1='Tritic Border Delta';
         titleD2='Tritic Inner Delta';
         labelBar='Absolute Fluorescence';  
-        showData(secondMonitorMain,SeeMe,13,TRITIC_Border_Delta,false,titleD1,labelBar,newFolder,'resultA10_14_BorderAndInner_TRITIC_DELTA','data2',TRITIC_Inner_Delta,'titleData2',titleD2,'background',true)     
+        showData(secondMonitorMain,SeeMe,TRITIC_Border_Delta,false,titleD1,labelBar,newFolder,'resultA10_14_BorderAndInner_TRITIC_DELTA','data2',TRITIC_Inner_Delta,'titleData2',titleD2,'background',true)     
     end
     close all 
 end

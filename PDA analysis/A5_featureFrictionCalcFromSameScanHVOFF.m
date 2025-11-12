@@ -1,4 +1,4 @@
-function avg_fc = A5_featureFrictionCalcFromSameScanHVOFF(secondMonitorMain,mainPath)
+function avg_fc = A5_featureFrictionCalcFromSameScanHVOFF(secondMonitorMain,mainPath,flagSingleSectionProcess)
     % to extract the friction coefficient, choose which method use.
     question=sprintf('Which method perform to extract the background friction coefficient? (NOTE: AFM data with Hover Mode OFF)');
     options={ ...
@@ -12,8 +12,23 @@ function avg_fc = A5_featureFrictionCalcFromSameScanHVOFF(secondMonitorMain,main
         case 2
             [pixData,fOutlierRemoval,fOutlierRemoval_text]=prepareSettingsPixel;
     end
-%    folderResultsImg=prepareDirResults(mainPath,method,fOutlierRemoval,fOutlierRemoval_text)
-    [AFM,metadata,AFM_heightIO,maskRemoval,filePathResults]=prepareData(secondMonitorMain,fullfile(mainPath,'HoverMode_OFF'));        
+    % prepare the data , or if already extracted, upload
+    if ~exist(fullfile(mainPath,'HoverMode_OFF\resultsData_1_extractAFMdata.mat'),"file")
+        HVoffPath=fullfile(mainPath,'HoverMode_OFF');
+        [allData,otherParameters,SaveFigFolder]=A1_openANDprepareAFMdata('filePath',HVoffPath,'frictionData',"Yes");
+        save(fullfile(mainPath,'HoverMode_OFF\resultsData_1_extractAFMdata'));
+    else
+        load(fullfile(mainPath,'HoverMode_OFF\resultsData_1_extractAFMdata.mat')); %#ok<LOAD>
+    end
+
+
+
+    if flagSingleSectionProcess
+        pathFilesHVoff=fullfile(mainPath,'HoverMode_OFF',"dataSingleSections");
+    else
+        pathFilesHVoff=fullfile(mainPath,'HoverMode_OFF');
+    end
+    [AFM,metadata,AFM_heightIO,maskRemoval,filePathResults]=prepareData(secondMonitorMain,pathFilesHVoff);        
     if method == 2
         avg_fc=A5_featureFrictionCalc_method_1_2(AFM,metadata,AFM_heightIO,secondMonitorMain,filePathResults,method,maskRemoval,pixData,fOutlierRemoval,fOutlierRemoval_text);
     else    
@@ -44,7 +59,7 @@ function varargout=prepareData(secondMonitorMain,pathSingleScan)
     end
         % if never processed, then pre process the AFM data and save the results
     if flag_exeA1
-        [AFM_data,AFM_heightIO,metaData,filepathResults,setpointN]=A1_openANDassembly_JPK(secondMonitorMain,'backgroundOnly','Yes','filePath',pathSingleScan);
+        [AFM_data,AFM_heightIO,metaData,filepathResults,setpointN]=A1_openANDassembly_JPK(secondMonitorMain,'frictionCalc','Yes','filePath',pathSingleScan);
         % remove manually regions
         [AFM_data,AFM_heightIO,maskRemoval] = featureRemovePortions(AFM_data,AFM_heightIO,secondMonitorMain);
         % in case of removal, save the final images
@@ -52,15 +67,15 @@ function varargout=prepareData(secondMonitorMain,pathSingleScan)
             % show the results  
             titleData='Yellow = Removed Portions';
             nameFig=fullfile(filepathResults,"resultA4_5_RemovedPortions.tif");
-            showData(secondMonitorMain,false,4,maskRemoval,false,titleData,'',nameFig,'Binarized','Yes')
+            showData(secondMonitorMain,false,maskRemoval,false,titleData,'',nameFig,'Binarized','Yes')
             AFM_height_cleared=AFM_data(1).AFM_image;
             titleData='Height (measured) channel - Masked, Fitted, Optimized, portions removed';
             nameFig=fullfile(filepathResults,"resultA4_6_OptFittedHeightChannel_PortionRemoved.tif");
             textColorLabel='Height (nm)'; 
-            showData(secondMonitorMain,false,5,AFM_height_cleared,true,titleData,textColorLabel,nameFig)
+            showData(secondMonitorMain,false,AFM_height_cleared,true,titleData,textColorLabel,nameFig)
             titleData='Baseline and foreground processed - portions removed';
             nameFig=fullfile(filepathResults,"resultA4_7_BaselineForeground_PortionRemoved.tif");
-            showData(secondMonitorMain,false,6,AFM_heightIO,false,titleData,'',nameFig,'Binarized','Yes')
+            showData(secondMonitorMain,false,AFM_heightIO,false,titleData,'',nameFig,'Binarized','Yes')
         end
         save(fullfile(pathSingleScan,"resultsData_1_postProcessA4_HVoff"),"metaData","AFM_data","AFM_heightIO","setpointN","maskRemoval","filepathResults")
     end                        

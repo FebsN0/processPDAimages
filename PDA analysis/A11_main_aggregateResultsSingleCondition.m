@@ -290,7 +290,7 @@ for i=1:length(allDelta)
     labelBar='Absolute Fluorescence';
     Delta=allDelta{i};
     singleFolder=subfolder_allscanFolder{i};
-    showData(idxMon,false,1,Delta,false,titleD1,labelBar,singleFolder,filename,'meterUnit',allDelta_pixScale(i),'scale',rangeScale)
+    showData(idxMon,false,Delta,false,titleD1,labelBar,singleFolder,filename,'meterUnit',allDelta_pixScale(i),'scale',rangeScale)
 end
 clear allValues filename titleD1 labelBar singleFolder rangeScale
 %%

@@ -81,29 +81,29 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
         idimg=2;
         nameFig=sprintf('resultA2_%d_HeightChannel_%s',idimg,imageType);
         labelBar=sprintf('height (nm)');
-        showData(idxMon,SeeMe,1,data,norm,titleData,labelBar,folderSaveFig,nameFig)
+        showData(idxMon,SeeMe,data,norm,titleData,labelBar,folderSaveFig,nameFig)
         % Lateral Deflection Trace
         data=data_LD_trace;
         titleData=sprintf('Lateral Deflection Trace channel (Raw - %s)',imageType);
         nameFig=sprintf('resultA2_3_Raw_LDChannel_trace_%s',imageType);
         labelBar='Voltage [V]';
-        showData(idxMon,SeeMe,2,data,norm,titleData,labelBar,folderSaveFig,nameFig)
+        showData(idxMon,SeeMe,data,norm,titleData,labelBar,folderSaveFig,nameFig)
         % Lateral Deflection ReTrace
         data=data_LD_retrace;
         titleData=sprintf('Lateral Deflection Retrace channel (Raw - %s)',imageType);
         nameFig=sprintf('resultA2_4_Raw_LDChannel_retrace_%s',imageType);
-        showData(idxMon,SeeMe,3,data,norm,titleData,labelBar,folderSaveFig,nameFig)
+        showData(idxMon,SeeMe,data,norm,titleData,labelBar,folderSaveFig,nameFig)
         % Vertical Deflection trace
         data=data_VD_trace*1e9;
         titleData=sprintf('Vertical Deflection trace channel (Raw - %s)',imageType);
         nameFig=sprintf('resultA2_5_Raw_VDChannel_trace_%s',imageType);
         labelBar='Force [nN]';
-        showData(idxMon,SeeMe,4,data,norm,titleData,labelBar,folderSaveFig,nameFig)
+        showData(idxMon,SeeMe,data,norm,titleData,labelBar,folderSaveFig,nameFig)
         % Vertical Deflection Retrace
         data=data_VD_retrace*1e9;
         titleData=sprintf('Vertical Deflection retrace channel (Raw - %s)',imageType);
         nameFig=sprintf('resultA2_6_Raw_VDChannel_retrace_%s',imageType);
-        showData(idxMon,SeeMe,5,data,norm,titleData,labelBar,folderSaveFig,nameFig)           
+        showData(idxMon,SeeMe,data,norm,titleData,labelBar,folderSaveFig,nameFig)           
         
         %%%%% perform the following step ONLY after assembly %%%%%
         if ~strcmp(imageType,"SingleSection")

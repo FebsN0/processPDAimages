@@ -116,9 +116,8 @@ function [AFM_Images,IO_Image]=A2_feature_process_1_fitHeightChannel(filtData,it
     end
     
     titleData='Height (measured) channel - Line Tilted effect removed';
-    idImg=1;
     nameFile='resultA3_1_HeightRemovedTiltLine';
-    showData(idxMon,SeeMe,idImg,poly_filt_data,true,titleData,'',filepath,nameFile)
+    showData(idxMon,SeeMe,poly_filt_data,true,titleData,'',filepath,nameFile)
     if SeeMe
         uiwait(msgbox('Click to continue'))
     end
@@ -181,9 +180,8 @@ function [AFM_Images,IO_Image]=A2_feature_process_1_fitHeightChannel(filtData,it
     filt_data_no_Bk=filt_data_no_Bk-min(min(filt_data_no_Bk));
     % show the results
     titleData='Height (measured) channel - Surface Tilted effect removed';
-    idImg=1;
     nameFile='resultA3_2_HeightRemovedTiltSurface';
-    showData(idxMon,SeeMe,idImg,filt_data_no_Bk,true,titleData,'',filepath,nameFile)
+    showData(idxMon,SeeMe,filt_data_no_Bk,true,titleData,'',filepath,nameFile)
     if SeeMe
         uiwait(msgbox('Click to continue'))
     end
@@ -298,8 +296,8 @@ function [AFM_Images,IO_Image]=A2_feature_process_1_fitHeightChannel(filtData,it
         AFM_noBk=AFM_noBk-min(AFM_noBk(:));
         % plot the resulting corrected data
         title1='Height (measured) channel - Single Line Fitted';        
-        showData(idxMon,SeeMe,3,AFM_noBk*1e9,false,title1,'Height (nm)',filepath,'resultA3_3_HeightLineFitted_noNorm')    
-        showData(idxMon,true,3,AFM_noBk,true,title1,'',filepath,'resultA3_3_HeightLineFitted_norm')    
+        showData(idxMon,SeeMe,AFM_noBk*1e9,false,title1,'Height (nm)',filepath,'resultA3_3_HeightLineFitted_noNorm')    
+        showData(idxMon,true,AFM_noBk,true,title1,'',filepath,'resultA3_3_HeightLineFitted_norm')    
         if getValidAnswer('Satisfied of the fitting?','',{'y','n'}) == 1
             close gcf, break
         end
@@ -398,9 +396,8 @@ function [AFM_Images,IO_Image]=A2_feature_process_1_fitHeightChannel(filtData,it
      
     % show data
     titleData=sprintf('Baseline and foreground processed - Iteration %d',iterationMain);
-    idImg=5;
     nameFile=sprintf('resultA3_4_BaselineForeground_iteration%d',iterationMain);
-    showData(idxMon,SeeMe,idImg,seg_binarized,false,titleData,'',filepath,nameFile,'Binarized',true)
+    showData(idxMon,SeeMe,seg_binarized,false,titleData,'',filepath,nameFile,'Binarized',true)
     if SeeMe
         uiwait(msgbox('Click to continue'))
     end

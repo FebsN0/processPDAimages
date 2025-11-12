@@ -45,10 +45,9 @@ function [AFM_Images_Bk,AFM_height_IO]=A2_feature_process_2_fitHeightChannelWith
     image_height_glass=image_height;
     if iterationMain==1
         textTitle='Height (measured) channel - Pre-Optimization';
-        idImg=1;
         textColorLabel='Height (nm)';
         textNameFile='resultA4_1_height_preOptimization';
-        showData(idxMon,false,idImg,image_height_glass,true,textTitle,textColorLabel,filepath,textNameFile)
+        showData(idxMon,false,image_height_glass,true,textTitle,textColorLabel,filepath,textNameFile)
         % fig is invisible
         close gcf
     end
@@ -80,20 +79,18 @@ function [AFM_Images_Bk,AFM_height_IO]=A2_feature_process_2_fitHeightChannelWith
     AFM_noBk=AFM_noBk-min(min(AFM_noBk));
     
     textTitle='Height (measured) channel - Masked, Fitted, Optimized';
-    idImg=3;
     textColorLabel='Normalized Height';
     textNameFile=sprintf('resultA4_2_OptFittedHeightChannel_Norm_iteration%d',iterationMain);
-    showData(idxMon,SeeMe,idImg,AFM_noBk,true,textTitle,textColorLabel,filepath,textNameFile)
+    showData(idxMon,SeeMe,AFM_noBk,true,textTitle,textColorLabel,filepath,textNameFile)
     if SeeMe
         uiwait(msgbox('Click to continue'))
     end
     close gcf
 
     textTitle='Height (measured) channel - Masked, Fitted, Optimized';
-    idImg=4;
     textColorLabel='Height (nm)';
     textNameFile=sprintf('resultA4_3_OptFittedHeightChannel_iteration%d',iterationMain);
-    showData(idxMon,false,idImg,AFM_noBk*1e9,false,textTitle,textColorLabel,filepath,textNameFile)
+    showData(idxMon,false,AFM_noBk*1e9,false,textTitle,textColorLabel,filepath,textNameFile)
     % fig is invisible
     close gcf   
 
