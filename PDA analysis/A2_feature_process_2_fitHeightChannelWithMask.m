@@ -1,4 +1,4 @@
-function [AFM_Images_Bk,AFM_height_IO]=A4_El_AFM_masked(AFM_Images,AFM_height_IO,iterationMain,idxMon,filepath,varargin)
+function [AFM_Images_Bk,AFM_height_IO]=A2_feature_process_2_fitHeightChannelWithMask(AFM_Images,AFM_height_IO,iterationMain,idxMon,filepath,varargin)
 %%
 % The function extracts the original Height Images from the experiments.
 % It removes baseline and extracts foreground from the AFM image.
@@ -28,13 +28,13 @@ function [AFM_Images_Bk,AFM_height_IO]=A4_El_AFM_masked(AFM_Images,AFM_height_IO
     p=inputParser();    %init instance of inputParser
     % Add required parameter and also check if it is a struct by a inner function end if the Trace_type are all Trace
     addRequired(p, 'Cropped_Images', @(x) isstruct(x));
-    argName = 'Silent';     defaultVal = 'No';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+    argName = 'SeeMe';     defaultVal = 'No';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     
     % validate and parse the inputs
     parse(p,AFM_Images,varargin{:});
     clearvars argName defaultVal
 
-    if(strcmp(p.Results.Silent,'Yes')); SeeMe=0; else, SeeMe=1; end
+    if(strcmp(p.Results.SeeMe,'Yes')); SeeMe=0; else, SeeMe=1; end
 
     % using the 0/1 height image, new fitting by excluding those information
     % which correspond to the PDA crystals. Put value 5 to exclude in corrispondence

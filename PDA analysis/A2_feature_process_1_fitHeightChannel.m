@@ -1,4 +1,4 @@
-function [AFM_Images,IO_Image]=A3_El_AFM(filtData,iterationMain,idxMon,filepath,varargin)
+function [AFM_Images,IO_Image]=A2_feature_process_1_fitHeightChannel(filtData,iterationMain,idxMon,filepath,varargin)
 
 % The function extracts Images from the experiments.
 % It removes baseline and extracts foreground from the AFM image.
@@ -37,8 +37,8 @@ function [AFM_Images,IO_Image]=A3_El_AFM(filtData,iterationMain,idxMon,filepath,
     %Add default parameters. When call the function, use 'argName' as well you use 'LineStyle' in plot! And
 
     %then the values                                
-    argName = 'fitOrder';   defaultVal = 'Low';        addParameter(p, argName, defaultVal, @(x) ismember(x, {'Low', 'Medium', 'High'}));
-    argName = 'Silent';     defaultVal = 'Yes';     addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+    argName = 'fitOrder';  defaultVal = 'Low';        addParameter(p, argName, defaultVal, @(x) ismember(x, {'Low', 'Medium', 'High'}));
+    argName = 'SeeMe';     defaultVal = 'Yes';         addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     % validate and parse the inputs
     parse(p,filtData,varargin{:});
     clearvars argName defaultVal
@@ -384,16 +384,16 @@ function [AFM_Images,IO_Image]=A3_El_AFM(filtData,iterationMain,idxMon,filepath,
         for i=1:length(varBase)            
             text=sprintf('%s',varBase{i});
             var = evalin('base', text);
-            figure
+            ftmp=figure;
             imshow(var), colormap parula            
             if getValidAnswer('Is the current figure the right binarized AFM?','',{'Yes','No'})
-                close gcf
+                close(ftmp)
                 seg_binarized=var;
                 break
             end
-            close gcf
+            close(ftmp)
         end
-        clear tmp* vtmp var
+        clear tmp* vtmp var ftmp
     end
      
     % show data
