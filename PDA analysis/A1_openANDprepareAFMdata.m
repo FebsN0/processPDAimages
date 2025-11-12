@@ -188,13 +188,13 @@ function [allData,otherParameters,SaveFigFolder] = A1_openANDprepareAFMdata(vara
         end
                
         % remove not useful channels before processing. Not show the figures. It will be done later
-        filtData=A1_feature_CleanOrPrepFiguresRawData(data,'cleanOnly','Yes');
+        filtData=A1_feature_CleanOrPrepFiguresRawData(data,'cleanOnly',true);
         
         % store the data in a big struct var
-        allData(i).filenameSection=fileNameSections{i};
-        allData(i).AFMImage_Raw=filtData;
+        allData(i).filenameSection=fileNameSections{i};        
         allData(i).metadata=metaData;
         allData(i).setpointN=setpointN(i);
+        allData(i).AFMImage_Raw=filtData;
 
         %%%%%% Extract important parameters from metadata to check the integrity of the data %%%%%%
         % y slow direction (rows) | x fast direction (columns)

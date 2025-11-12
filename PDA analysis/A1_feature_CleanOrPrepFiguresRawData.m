@@ -15,30 +15,32 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
     addRequired(p, 'data', @(x) isstruct(x));
     argName = 'setpointsList';  defaultVal = [];        addParameter(p,argName,defaultVal);
     argName = 'idxMon';         defaultVal = [];        addParameter(p,argName,defaultVal);
-    argName = 'newFolder';      defaultVal = [];        addParameter(p,argName,defaultVal);
-    argName = 'cleanOnly';      defaultVal = 'No';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
-    argName = 'Silent';         defaultVal = 'Yes';     addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+    argName = 'folderSaveFig';  defaultVal = [];        addParameter(p,argName,defaultVal);
+    argName = 'cleanOnly';      defaultVal = false;     addParameter(p,argName,defaultVal, @(x) islogical(x));
+    argName = 'SeeMe';          defaultVal = false;     addParameter(p,argName,defaultVal, @(x) islogical(x));
     argName = 'imageType';      defaultVal = 'Entire';  addParameter(p,argName,defaultVal, @(x) ismember(x,{'Entire','SingleSection','Assembled'}));
     argName = 'Normalization';  defaultVal = false;     addParameter(p,argName,defaultVal, @(x) islogical(x));
-    argName = 'sectionSize';    defaultVal = [];        addParameter(p,argName,defaultVal);
     argName = 'metadata';       defaultVal = [];        addParameter(p,argName,defaultVal);
     % validate and parse the inputs
     parse(p,data,varargin{:});
 
-    clearvars argName defaultVal
 
-    if(strcmp(p.Results.cleanOnly,'Yes'))
+    if p.Results.cleanOnly
         cleanOnly=1;
     else
         cleanOnly=0;
-        if(strcmp(p.Results.Silent,'Yes'));     SeeMe=0; else, SeeMe=1; end                    
-        imageTyp=p.Results.imageType;
-        if p.Results.Normalization; norm=1; else, norm=0; end
-        setpoints=p.Results.setpointsList;
+        if p.Results.SeeMe, SeeMe=1; else, SeeMe=0; end       
         idxMon=p.Results.idxMon;
-        newFolder=p.Results.newFolder;        
+        folderSaveFig=p.Results.folderSaveFig;
+        imageType=p.Results.imageType;
+        if p.Results.Normalization; norm=1; else, norm=0; end
+        if imageType
+            metadata=p.Results.metadata;        
+            setpoints=p.Results.setpointsList;
+        end    
     end
-    
+    clearvars argName defaultVal p
+
     if cleanOnly
         % Check if the data struct has exactly the specific fields and 5 or 10 rows (removed not useful data)
         fieldNames=fieldnames(data);
@@ -75,36 +77,36 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
         data_VD_retrace=flip(rot90(data_VD_retrace),2);
         % start to show the data
         data=data_Height*1e9;
-        titleData=sprintf('Height (measured) channel (Raw - %s)',imageTyp);
+        titleData=sprintf('Height (measured) channel (Raw - %s)',imageType);
         idimg=2;
-        nameFig=sprintf('resultA2_%d_HeightChannel_%s',idimg,imageTyp);
+        nameFig=sprintf('resultA2_%d_HeightChannel_%s',idimg,imageType);
         labelBar=sprintf('height (nm)');
-        showData(idxMon,SeeMe,1,data,norm,titleData,labelBar,newFolder,nameFig)
+        showData(idxMon,SeeMe,1,data,norm,titleData,labelBar,folderSaveFig,nameFig)
         % Lateral Deflection Trace
         data=data_LD_trace;
-        titleData=sprintf('Lateral Deflection Trace channel (Raw - %s)',imageTyp);
-        nameFig=sprintf('resultA2_3_Raw_LDChannel_trace_%s',imageTyp);
+        titleData=sprintf('Lateral Deflection Trace channel (Raw - %s)',imageType);
+        nameFig=sprintf('resultA2_3_Raw_LDChannel_trace_%s',imageType);
         labelBar='Voltage [V]';
-        showData(idxMon,SeeMe,2,data,norm,titleData,labelBar,newFolder,nameFig)
+        showData(idxMon,SeeMe,2,data,norm,titleData,labelBar,folderSaveFig,nameFig)
         % Lateral Deflection ReTrace
         data=data_LD_retrace;
-        titleData=sprintf('Lateral Deflection Retrace channel (Raw - %s)',imageTyp);
-        nameFig=sprintf('resultA2_4_Raw_LDChannel_retrace_%s',imageTyp);
-        showData(idxMon,SeeMe,3,data,norm,titleData,labelBar,newFolder,nameFig)
+        titleData=sprintf('Lateral Deflection Retrace channel (Raw - %s)',imageType);
+        nameFig=sprintf('resultA2_4_Raw_LDChannel_retrace_%s',imageType);
+        showData(idxMon,SeeMe,3,data,norm,titleData,labelBar,folderSaveFig,nameFig)
         % Vertical Deflection trace
         data=data_VD_trace*1e9;
-        titleData=sprintf('Vertical Deflection trace channel (Raw - %s)',imageTyp);
-        nameFig=sprintf('resultA2_5_Raw_VDChannel_trace_%s',imageTyp);
+        titleData=sprintf('Vertical Deflection trace channel (Raw - %s)',imageType);
+        nameFig=sprintf('resultA2_5_Raw_VDChannel_trace_%s',imageType);
         labelBar='Force [nN]';
-        showData(idxMon,SeeMe,4,data,norm,titleData,labelBar,newFolder,nameFig)
+        showData(idxMon,SeeMe,4,data,norm,titleData,labelBar,folderSaveFig,nameFig)
         % Vertical Deflection Retrace
         data=data_VD_retrace*1e9;
-        titleData=sprintf('Vertical Deflection retrace channel (Raw - %s)',imageTyp);
-        nameFig=sprintf('resultA2_6_Raw_VDChannel_retrace_%s',imageTyp);
-        showData(idxMon,SeeMe,5,data,norm,titleData,labelBar,newFolder,nameFig)           
+        titleData=sprintf('Vertical Deflection retrace channel (Raw - %s)',imageType);
+        nameFig=sprintf('resultA2_6_Raw_VDChannel_retrace_%s',imageType);
+        showData(idxMon,SeeMe,5,data,norm,titleData,labelBar,folderSaveFig,nameFig)           
         
         %%%%% perform the following step ONLY after assembly %%%%%
-        if ~strcmp(imageTyp,"SingleSection")
+        if ~strcmp(imageType,"SingleSection")
             % show distribution of vertical forces (data_VD_trace). If good, it should coincide approximately with the setpoint
             data=data_VD_trace*1e9;
             colors={"#0072BD","#D95319","#EDB120","#7E2F8E","#77AC30","#4DBEEE","#A2142F",'k','#FF00FF','#00FF00'};
@@ -128,8 +130,8 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
             for i=1:numSetpoints
                 % in case of more files of single section scans, we know prior the size of single
                 % sections other than how much was the setpoint
-                if ~isempty(p.Results.sectionSize)
-                    sizeSingleSection=p.Results.sectionSize(i); % already expressed in nanoNewton
+                if  ~isempty(metadata)
+                    sizeSingleSection=metadata.y_scan_pixels(i); % already expressed in nanoNewton
                 else
                 % in case of single file, then divide the image in sections according to the number of used setpoint.
                 % IMPORTANT: this method is not accurate because when you change the setpoint manually, it is very
@@ -147,16 +149,15 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
             set(legend1,'Location','bestoutside');
             title('Distribution Raw Vertical Forces','FontSize',18), xlabel('Force [nN]','FontSize',15)
             objInSecondMonitor(f0,idxMon);
-            saveas(f0,sprintf('%s/tiffImages/resultA2_1_distributionVerticalForces.tif',newFolder))
-            saveas(f0,sprintf('%s/figImages/resultA2_1_distributionVerticalForces',newFolder))
+            saveas(f0,sprintf('%s/tiffImages/resultA2_1_distributionVerticalForces.tif',folderSaveFig))
+            saveas(f0,sprintf('%s/figImages/resultA2_1_distributionVerticalForces',folderSaveFig))
             vertForceAVG=unique(round(vertForceAVG));
             if length(vertForceAVG)~=numSetpoints
                 warndlg('Number of rounded vertical forces is less than number of setpoint!')
             end
             close(f0)
             % plot the baseline trend
-            if ~isempty(p.Results.metadata)
-                metadata=p.Results.metadata;
+            if ~isempty(metadata)
                 totTimeScan = (metadata.x_scan_pixels/metadata.Scan_Rate_Hz)/60;
                 totTimeSection = totTimeScan/numSetpoints;
                 if SeeMe
@@ -175,8 +176,8 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
                     title('Baseline Trend among the sections','FontSize',18)
                     ylabel('Baseline shift [nN]','FontSize',15), xlabel('Time [min]','FontSize',15), grid on, grid minor
                     objInSecondMonitor(f1,idxMon);
-                    saveas(f1,sprintf('%s/tiffImages/resultA2_0_baselineTrend.tif',newFolder))
-                    saveas(f1,sprintf('%s/figImages/resultA2_0_baselineTrend',newFolder))
+                    saveas(f1,sprintf('%s/tiffImages/resultA2_0_baselineTrend.tif',folderSaveFig))
+                    saveas(f1,sprintf('%s/figImages/resultA2_0_baselineTrend',folderSaveFig))
                 else
                     warning('\n\tPlotting the baseline trend is not possible because only one baseline value is stored in the metadata (Scan = Section)')
                 end
