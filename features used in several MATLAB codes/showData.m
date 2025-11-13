@@ -100,15 +100,10 @@ function showSingleData(ax,data, norm, titleData, labelBar,bin,bk,pixelSize,rang
     
     colormap parula,  
     if iscell(titleData)
-        title(titleData{1}, 'FontSize', 18, 'Units', 'normalized', 'Position', [0.5, 1.04, 0]); % move upward
-        subtitle(titleData{2},'FontSize',13,'Units', 'normalized', 'Position', [0.5, 1.01, 0])
+        title(titleData{1}, 'FontSize', 16, 'Units', 'normalized', 'Position', [0.5, 1.04, 0]); % move upward
+        subtitle(titleData{2},'FontSize',11,'Units', 'normalized', 'Position', [0.5, 1.01, 0])
     else
-        t = title(titleData, 'FontSize', 18);
-        % Slightly move it up in data units (safe range)
-        t.Units = 'normalized';
-        pos = t.Position;
-        pos(2) = min(pos(2) + 0.03, 1);  % Move up by 3% but stay inside [0,1]
-        t.Position = pos;
+        title(titleData, 'FontSize', 17,'Units', 'normalized', 'Position', [0.5, 1.02, 0]);
     end
 
     if pixelSize ~= 1
