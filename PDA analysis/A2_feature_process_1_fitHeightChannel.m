@@ -1,4 +1,4 @@
-function [AFM_Images,IO_Image]=A2_feature_process_1_fitHeightChannel(filtData,iterationMain,idxMon,filepath,varargin)
+function [AFM_Images,IO_Image,varargout]=A2_feature_process_1_fitHeightChannel(filtData,iterationMain,idxMon,filepath,varargin)
 
 % The function extracts Images from the experiments.
 % It removes baseline and extracts foreground from the AFM image.
@@ -37,18 +37,27 @@ function [AFM_Images,IO_Image]=A2_feature_process_1_fitHeightChannel(filtData,it
     %Add default parameters. When call the function, use 'argName' as well you use 'LineStyle' in plot! And
 
     %then the values                                
-    argName = 'fitOrder';  defaultVal = 'Low';        addParameter(p, argName, defaultVal, @(x) ismember(x, {'Low', 'Medium', 'High'}));
-    argName = 'SeeMe';     defaultVal = 'Yes';         addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+    argName = 'fitOrder';       defaultVal = 'Low';       addParameter(p, argName, defaultVal, @(x) ismember(x, {'Low', 'Medium', 'High'}));
+    argName = 'SeeMe';          defaultVal = true;        addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
+    argName = 'Normalized';     defaultVal = false;        addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
+
     % validate and parse the inputs
     parse(p,filtData,varargin{:});
     clearvars argName defaultVal
     
     % if this is seconf time that the A3 is called, like for the second AFM section, keep the accuracy of
     % first section
+    norm=p.Results.Normalized;
+    if norm, labelHeight=""; factor=1; else, labelHeight="Height (nm)"; factor=1e9; end
     accuracy=p.Results.fitOrder;
-
-    if(strcmp(p.Results.Silent,'Yes'));  SeeMe=0; else, SeeMe=1; end
-    
+    SeeMe=p.Results.SeeMe;
+    if strcmp(accuracy,'Low')
+        limit=3;
+    elseif strcmp(accuracy,'Medium')
+        limit=6;
+    else
+        limit=9;
+    end
     % Extract the height channel
     raw_data_Height=filtData(strcmp([filtData.Channel_name],'Height (measured)')).AFM_image;
     % Orient the image by counterclockwise 180° and flip to coencide with the Microscopy image through rotations
@@ -76,16 +85,46 @@ function [AFM_Images,IO_Image]=A2_feature_process_1_fitHeightChannel(filtData,it
                     'AFM_image', temp_img); %#ok<AGROW>
         end
     end
+    height_1_original=AFM_Images(1).AFM_image;
 
-    height_image=AFM_Images(1).AFM_image;
-    wb=waitbar(0/size(height_image,1),sprintf('Removing Polynomial Baseline %.0f of %.0f',0,size(height_image,1)),...
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%% FIRST FITTING: FIRST ORDER PLANE FITTING ON ENTIRE DATA %%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    [xGrid, yGrid] = meshgrid(1:size(height_1_original,2), 1:size(height_1_original,1));
+    % Extract background points without outliers
+    [xData, yData, zData] = prepareSurfaceData(xGrid, yGrid, height_1_original);
+    % Plane fit setup
+    opts = fitoptions('Method', 'LinearLeastSquares');
+    opts.Robust = 'LAR'; % robust fitting to reduce outlier effects
+    % Fit a 1st-order plane (poly11)
+    ft = fittype('poly11');
+    [fitresult, gof] = fit([xData, yData], zData, ft, opts);
+    % Compute metrics (optional)
+    residuals = zData - feval(fitresult, xData, yData);
+    SSE = sum(residuals.^2);
+    n = length(yData);
+    k = numel(coeffnames(fitresult));
+    AIC = n * log(SSE / n) + 2 * k;
+    % Store results
+    firstFit_plane.fitOrder = 'poly11'; firstFit_plane.SSE = gof.sse; firstFit_plane.R2 = gof.adjrsquare; firstFit_plane.AIC = AIC;
+    varargout{1} = firstFit_plane;
+    % Obtain fitted correction plane
+    correction_plane = feval(fitresult, xGrid, yGrid);
+    % Apply correction
+    height_image_2_corrPlane = height_1_original - correction_plane;
+    
+    %%%%% END PLANE FITTING
+    wb=waitbar(0/size(height_image_2_corrPlane,1),sprintf('Removing Polynomial Baseline %.0f of %.0f',0,size(height_image_2_corrPlane,1)),...
         'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
     setappdata(wb,'canceling',0);
-    N_Cycluse_waitbar=size(height_image,2);    
-    
-    % Polynomial baseline fitting (line by line) ==> remove the "tilted" effect, which is order 1
-    poly_filt_data=zeros(size(height_image,1),size(height_image,2));
-    for i=1:size(height_image,2)
+    N_Cycluse_waitbar=size(height_image_2_corrPlane,2);    
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%% SECOND FITTING: FIRST ORDER LINExLINE FITTING %%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    height_3_fitLine=zeros(size(height_image_2_corrPlane,1),size(height_image_2_corrPlane,2));
+    for i=1:size(height_3_fitLine,2)
         if(exist('wb','var'))
             %if cancel is clicked, stop
             if getappdata(wb,'canceling'), error('Process cancelled'), end
@@ -94,12 +133,12 @@ function [AFM_Images,IO_Image]=A2_feature_process_1_fitHeightChannel(filtData,it
         % prepareCurveData function clean the data like Removing NaN or Inf, converting nondouble to double,
         % converting complex to  real and returning data as columns regardless of the input shapes.
         % extract the i-th column of the image ==> fitting on single column (fast lines)
-        [xData,yData] = prepareCurveData((1:size(height_image,1))',height_image(:,i));
+        [xData,yData] = prepareCurveData((1:size(height_image_2_corrPlane,1))',height_image_2_corrPlane(:,i));
         % in case of insufficient number of values for a given line (like entire line removed previously), skip the fitting
         % find better solution to manage these lines...
         if length(xData) <= 2 || length(yData) <= 2
             warning("The %d-th line has not enough data for fitting ==> skipped",i)
-            poly_filt_data(:,i)=height_image(:,i);
+            height_3_fitLine(:,i)=height_image_2_corrPlane(:,i);
             continue
         end
         % Linear polynomial curve
@@ -107,57 +146,108 @@ function [AFM_Images,IO_Image]=A2_feature_process_1_fitHeightChannel(filtData,it
         % group of coefficients: p1 and p2 ==> val(x) = p1*x + p2
         fitresult=fit(xData,yData, ft );
         % like the plan fitting, create new vector of same length as well as line of the height image
-        xData = 1:size(height_image,1); xData=xData';
+        xData = 1:size(height_image_2_corrPlane,1); xData=xData';
         % dont use the offset p2, rather the first value of the i-th column
-        baseline_y=(fitresult.p1*xData+height_image(1,i));
+        baseline_y=(fitresult.p1*xData+height_image_2_corrPlane(1,i));
         % substract the baseline_y and then substract by the minimum ==> get the 0 value in height 
-        flag_poly_filt_data=height_image(:,i)-baseline_y;
-        poly_filt_data(:,i)=flag_poly_filt_data-min(min(flag_poly_filt_data));
+        height_3_fitLine(:,i)=height_image_2_corrPlane(:,i)-baseline_y;
     end
+    % Display and save result
     
-    titleData='Height (measured) channel - Line Tilted effect removed';
-    nameFile='resultA3_1_HeightRemovedTiltLine';
-    showData(idxMon,SeeMe,poly_filt_data,true,titleData,'',filepath,nameFile)
-    if SeeMe
-        uiwait(msgbox('Click to continue'))
+    % Display and save result
+    titleData1 = {'Height channel';'First Correction: 1st order plane fitting'};
+    titleData2 = {'Height channel';'Second Correction: 1st order LineByLine fitting'};
+
+    nameFile = 'resultA2_1_HeightPlane_and_LineXLine_Correction';    
+    showData(idxMon,SeeMe,height_image_2_corrPlane*factor,norm,titleData1,labelHeight,filepath,nameFile,'data2',height_3_fitLine*factor,'titleData2',titleData2);
+    clear i n opts SSE k fitresult ft gof residuals xGrid yGrid xData yData zData titleData nameFile
+ 
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%% REMOVE OUTLIERS THAT CAN NEGATIVELY AFFECT THE FITTING %%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % remove outliers line by line (single entire array with all the lines takes too much time) before plane
+    % fitting using the masked AFM data containing only background. Change them with NaN       
+    num_lines = size(height_3_fitLine, 2);
+    height_4_outliersRemoved=zeros(size(height_3_fitLine));
+    for i=1:num_lines
+        yData = height_3_fitLine(:, i);
+        [pos_outlier] = isoutlier(yData, 'gesd');
+        while any(pos_outlier)
+            yData(pos_outlier) = NaN;
+            [pos_outlier] = isoutlier(yData, 'gesd');
+        end
+        height_4_outliersRemoved(:,i) = yData;
     end
-    close gcf
+    % plot. To better visual, change NaN into 0
+    %height_4_outliersRemoved(isnan(height_4_outliersRemoved))=0;
+    countOutliers=nnz(isnan(height_4_outliersRemoved));
+    titleData1={'Height Deflection';'After 1st and 2nd fitting'}; titleData2={"Height Deflection";sprintf("%d Outliers removed (TOT: %d)",countOutliers,numel(height_4_outliersRemoved))};
+    nameFig='resultA2_2_Height_RemovedOutliers';
+    showData(idxMon,false,height_3_fitLine*factor,norm,titleData1,labelHeight,filepath,nameFig,'data2',height_4_outliersRemoved*factor,'titleData2',titleData2);
+    
 
     waitbar(0/N_Cycluse_waitbar,wb,sprintf('Optimizing Butterworth Filter...'));
-    % distribute the fitted data among bins using N bins. OUTUPUT: Y=bin counts; E= bin edges
-    % many will be zero (background), whereas other will be low to high height
-    [Y,E] = histcounts(poly_filt_data,10000);
+    
+
+
+%%%%% MAYBE BETTER AVOID THIS AND ADD THE MANUAL SEPARATION AFTER HISTCOUNT
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%% BUTTERWORTH FILTERING %%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % After polynomial flattening, the image should have an average plane removed, but there can still be low-level background 
+    % offsets or uneven residuals. The goal of this snippet is to automatically detect a "background" height threshold — a level 
+    % that separates the flat background from the sample features — and to mask out (NaN) all pixels above that threshold.
+    %
+    % APPROACH: Rather than looking at the image spatially, the script looks at the statistical distribution of height values — i.e., the histogram.
+    % The histogram often looks like this in AFM height maps:
+    %   - a large peak at low height → background plane,
+    %   - smaller counts at higher heights → real surface features
+    % A low-pass Butterworth filter is applied to the histogram to smooth it and remove noise/spikes from pixel quantization or roughness variations.
+    % Butterworth because it provides a smooth, monotonic response (flat in passband, no oscillations).
+    % Ideal for cleaning noisy histogram data to identify peaks.
+    
+    % Original code uses 10'000 bins, which may be too fine for most AFM height ranges
+    % Therefore, automatically adapt the number of bins based on data range and image size.
+    numBins = min(5000, max(100, round(numel(height_4_outliersRemoved)/100))); % adaptive bin count
+    % distribute the fitted data among bins using N bins and Normalize Y before filtering to make it scale-independent.
+    [Y,E] = histcounts(height_4_outliersRemoved,numBins,'Normalization', 'pdf');
     % set the parameters for Butterworth filter ==> little recap: it is a low-pass filter with a frequency
     % response that is as flat as possible in the passband
-    fc = 5; % Cut off frequency
-    fs = size(height_image,2); % Sampling rate
+    
     % Butterworth filter of order 6 with normalized cutoff frequency Wn
-    % Return transfer function coefficients to be used in the filter function
-    [b,a] = butter(6,fc/(fs/2)); 
-    Y_filtered = filter(b,a,Y); % filtered signal using the Butterworth coefficients
-    Y_filered_diff=diff(diff(Y_filtered));      % substract twice the right next element in array
+    % Return transfer function coefficients to be used in the filter function and then filter the data
+    % ORIGINAL LINE: [b,a] = butter(order, fc/(fs/2)); where
+    % - fc = 5                                      ==> Cut off frequency
+    % - fs = fs = size(height_image_1_original,2)   ==> sampling frequency (number of pixels per line)
+    % IMPROVED VERSION: Define fc as a fraction of Nyquist, directly specifying Wn (0–1 scale, where 1 corresponds to the Nyquist frequency).    
+    Wn = 0.02;            % normalized cutoff (2% of Nyquist)
+    [b,a] = butter(4, Wn);  % 4th order is usually enough
+    Y_filtered = filtfilt(b,a,Y); % zero-phase filtering (better symmetry)
+
+    % Second derivative of the filtered histogram to detect the inflection point — the point where the curvature changes sign.
+    % That inflection marks the transition from the main background peak to the tail of higher-height values
+    % ORIGINAL LINE: Y_filered_diff=diff(diff(Y_filtered)) ==> this approach is crude
+    % it just looks for one zero crossing of the second derivative, which can fail if the histogram is multimodal or noisy.
+    % IMPROVED VERSION: Use gradient-based peak analysis or findpeaks on the smoothed histogram derivative:
+    % This finds the largest negative-to-positive transition, i.e., where the histogram slope changes most sharply
+    dY = gradient(Y_filtered);
+    [~, locs] = findpeaks(-dY, 'NPeaks', 1, 'SortStr', 'descend');
+    bk_limit = locs(1);
+    % all pixels above this height (i.e., part of the actual structure) are
+    % masked (NaN), leaving only the flat background. add a small margin (e.g. 1–2 bins)
+    backgrownd_th = E(bk_limit) + (E(2)-E(1)); % shift 1 bin up
+    Bk_poly_filt_data = height_3_fitLine;
+    Bk_poly_filt_data(Bk_poly_filt_data > backgrownd_th) = NaN;
     
-    bk_limit=1;
-    N_Cycluse_waitbar=size(Y_filered_diff,2);
-    % Identifying Backgrownd value
-    for i=2:size(Y_filered_diff,2)
-        waitbar(i/N_Cycluse_waitbar,wb,sprintf('Optimizing Butterworth Filter ... Identifying Backgrownd %2.1f %%',i/N_Cycluse_waitbar*100));
-        if(Y_filered_diff(1,i-1)<=0)&&(Y_filered_diff(1,i)>0)
-            bk_limit=i;
-            waitbar(1,wb,sprintf('Backgrownd Identified!'));
-            break
-        end
-    end
-    
-    %%% MAYBE NOT NECESSARY ANYMORE: not really clear how much useful it is... it is like what have done
-    %%% before, but 3dimensional to remove tilted plane instead of from single fast line.
-    %%% I have compared the figures of before and after the following snippet and there are apparently no
-    %%% difference (of course the matric are different)
-    % Fitting of linear polynomial surface to the result of Poly1 fit
-    backgrownd_th=E(1,bk_limit);
-    Bk_poly_filt_data=poly_filt_data;
-    Bk_poly_filt_data(Bk_poly_filt_data>backgrownd_th)=NaN;
-    
+    figure; hold on
+    plot(E(1:end-1), Y_filtered, 'b', 'LineWidth', 1.5);
+    xline(backgrownd_th, 'r--', 'LineWidth', 1);
+    title('Butterworth-filtered height histogram with detected background limit');
+    xlabel('Height'); ylabel('PDF');
+
+
     % suppress warning about removing NaN values
     id='curvefit:prepareFittingData:removingNaNAndInf';
     warning('off',id)
@@ -176,16 +266,14 @@ function [AFM_Images,IO_Image]=A2_feature_process_1_fitHeightChannel(filtData,it
     fit_surf=plus(y_Bk_surf,fit_surf);
     fit_surf=plus(x_Bk_surf,fit_surf);
     % Subtraction of fitted polynomial background
-    filt_data_no_Bk=minus(poly_filt_data,fit_surf);
+    filt_data_no_Bk=minus(height_image_2_corrPlane,fit_surf);
     filt_data_no_Bk=filt_data_no_Bk-min(min(filt_data_no_Bk));
     % show the results
     titleData='Height (measured) channel - Surface Tilted effect removed';
-    nameFile='resultA3_2_HeightRemovedTiltSurface';
-    showData(idxMon,SeeMe,filt_data_no_Bk,true,titleData,'',filepath,nameFile)
-    if SeeMe
-        uiwait(msgbox('Click to continue'))
-    end
-    close gcf
+    nameFile='resultA2_3_HeightRemovedTiltSurface';
+    showData(idxMon,SeeMe,filt_data_no_Bk,norm,titleData,'',filepath,nameFile);
+
+
 
     warning ('off','all');
     % For each different fitting depending on the accuracy (poly1 to poly9), extract 3 information:
@@ -193,13 +281,7 @@ function [AFM_Images,IO_Image]=A2_feature_process_1_fitHeightChannel(filtData,it
     %   - Sum of squares due to error
     %   - Degree-of-freedom adjusted coefficient of determination
     while true      
-        if strcmp(accuracy,'Low')
-            limit=3;
-        elseif strcmp(accuracy,'Medium')
-            limit=6;
-        else
-            limit=9;
-        end
+        
         % Initialize variables
         fit_decision_final = nan(size(filt_data_no_Bk, 2), 4 + limit);
         % create a zero matrix with the same size of the original data
@@ -296,8 +378,8 @@ function [AFM_Images,IO_Image]=A2_feature_process_1_fitHeightChannel(filtData,it
         AFM_noBk=AFM_noBk-min(AFM_noBk(:));
         % plot the resulting corrected data
         title1='Height (measured) channel - Single Line Fitted';        
-        showData(idxMon,SeeMe,AFM_noBk*1e9,false,title1,'Height (nm)',filepath,'resultA3_3_HeightLineFitted_noNorm')    
-        showData(idxMon,true,AFM_noBk,true,title1,'',filepath,'resultA3_3_HeightLineFitted_norm')    
+        showData(idxMon,SeeMe,AFM_noBk*1e9,false,title1,'Height (nm)',filepath,'resultA2_4_HeightLineFitted_noNorm')    
+        showData(idxMon,true,AFM_noBk,true,title1,'',filepath,'resultA2_4_HeightLineFitted_norm')    
         if getValidAnswer('Satisfied of the fitting?','',{'y','n'}) == 1
             close gcf, break
         end
@@ -396,7 +478,7 @@ function [AFM_Images,IO_Image]=A2_feature_process_1_fitHeightChannel(filtData,it
      
     % show data
     titleData=sprintf('Baseline and foreground processed - Iteration %d',iterationMain);
-    nameFile=sprintf('resultA3_4_BaselineForeground_iteration%d',iterationMain);
+    nameFile=sprintf('resultA2_5_BaselineForeground_iteration%d',iterationMain);
     showData(idxMon,SeeMe,seg_binarized,false,titleData,'',filepath,nameFile,'Binarized',true)
     if SeeMe
         uiwait(msgbox('Click to continue'))

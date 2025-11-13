@@ -71,7 +71,7 @@ function [dataAFM_assembled,AFM_height_IO_assembled,metadata,setpointN]=A2_proce
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             if ~flagEnd && ~frictionCalc
                 metaData_AFM=allData(i).metadata; 
-                AFM_LatDeflecFitted_Force=A5_LD_Baseline_Adaptor_masked(AFM_HeightFittedMasked,AFM_height_IO,metaData_AFM.Alpha,idxMon,SaveFigIthSectionFolder,mainPath,'FitOrder',accuracyLateral,'Silent','No');
+                AFM_LatDeflecFitted_Force=A5_LD_Baseline_Adaptor_masked(AFM_HeightFittedMasked,AFM_height_IO,metaData_AFM.Alpha,idxMon,SaveFigIthSectionFolder,mainPath,'FitOrder',accuracyLateral,'SeeMe',true,'idxSectionHVon',i);
                 save(fullfile(pathDataSingleSections,sprintf("%s_lateralChannelProcessed.mat",nameSection)),"AFM_LatDeflecFitted_Force") 
             end  
 

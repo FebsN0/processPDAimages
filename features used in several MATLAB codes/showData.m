@@ -19,12 +19,12 @@ function fig=showData(idxMon,SeeMe,data1,norm,titleData1,labelBar,nameDir,nameFi
     argName = 'background';         defaultVal = false;   addOptional(p,argName,defaultVal, @(x) islogical(x));
     argName = 'meterUnit';          defaultVal = [];      addOptional(p,argName,defaultVal);
     argName = 'scale';              defaultVal = [];      addOptional(p,argName,defaultVal);
-    argName = 'saveFig';            defaultVal = "Yes";   addOptional(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+    argName = 'saveFig';            defaultVal = true;    addOptional(p,argName,defaultVal, @(x) islogical(x));
     
     parse(p,varargin{:});
     if p.Results.Binarized,  bin=true; else, bin=false; end
     if p.Results.background, bk=true; else, bk=false; end
-    if strcmp(p.Results.saveFig,"No"), saveFig=false; else, saveFig=true; end
+    if p.Results.saveFig,    saveFig=true; else, saveFig=false; end
     
     if SeeMe
         fig = figure('Visible', 'on'); 
@@ -44,10 +44,11 @@ function fig=showData(idxMon,SeeMe,data1,norm,titleData1,labelBar,nameDir,nameFi
         ax2 = subplot(1,2,2,'Parent',fig);
         showSingleData(ax2,p.Results.data2, norm, p.Results.titleData2,labelBar,bin,bk,pixmeter,rangeScale)
     else
+        ax = axes('Parent',fig);
         showSingleData(ax,data1, norm, titleData1, labelBar,bin,bk,pixmeter,rangeScale)
     end    
     objInSecondMonitor(fig,idxMon);
-    pause(1)
+    pause(2)
     if ~exist(sprintf('%s/tiffImages',nameDir),"dir") 
         mkdir(sprintf('%s/tiffImages',nameDir))
         mkdir(sprintf('%s/figImages',nameDir))
@@ -61,6 +62,7 @@ function fig=showData(idxMon,SeeMe,data1,norm,titleData1,labelBar,nameDir,nameFi
     end
     if ~SeeMe
         close(fig)
+        clear fig
     end
 end
 
@@ -98,10 +100,15 @@ function showSingleData(ax,data, norm, titleData, labelBar,bin,bk,pixelSize,rang
     
     colormap parula,  
     if iscell(titleData)
-        title(titleData{1},'FontSize',20)
-        subtitle(titleData{2},'FontSize',15)
+        title(titleData{1}, 'FontSize', 18, 'Units', 'normalized', 'Position', [0.5, 1.04, 0]); % move upward
+        subtitle(titleData{2},'FontSize',13,'Units', 'normalized', 'Position', [0.5, 1.01, 0])
     else
-        title(titleData,'FontSize',20)
+        t = title(titleData, 'FontSize', 18);
+        % Slightly move it up in data units (safe range)
+        t.Units = 'normalized';
+        pos = t.Position;
+        pos(2) = min(pos(2) + 0.03, 1);  % Move up by 3% but stay inside [0,1]
+        t.Position = pos;
     end
 
     if pixelSize ~= 1
