@@ -16,10 +16,10 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
     argName = 'setpointsList';  defaultVal = [];        addParameter(p,argName,defaultVal);
     argName = 'idxMon';         defaultVal = [];        addParameter(p,argName,defaultVal);
     argName = 'folderSaveFig';  defaultVal = [];        addParameter(p,argName,defaultVal);
-    argName = 'cleanOnly';      defaultVal = false;     addParameter(p,argName,defaultVal, @(x) islogical(x));
-    argName = 'SeeMe';          defaultVal = false;     addParameter(p,argName,defaultVal, @(x) islogical(x));
+    argName = 'cleanOnly';      defaultVal = false;     addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
+    argName = 'SeeMe';          defaultVal = false;     addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
     argName = 'imageType';      defaultVal = 'Entire';  addParameter(p,argName,defaultVal, @(x) ismember(x,{'Entire','SingleSection','Assembled'}));
-    argName = 'Normalization';  defaultVal = false;     addParameter(p,argName,defaultVal, @(x) islogical(x));
+    argName = 'Normalization';  defaultVal = false;     addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
     argName = 'metadata';       defaultVal = [];        addParameter(p,argName,defaultVal);
     % validate and parse the inputs
     parse(p,data,varargin{:});
@@ -78,32 +78,31 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
         % start to show the data
         data=data_Height*1e9;
         titleData=sprintf('Height (measured) channel (Raw - %s)',imageType);
-        idimg=2;
-        nameFig=sprintf('resultA2_%d_HeightChannel_%s',idimg,imageType);
+        nameFig=sprintf('resultA1_1_Raw_HeightChannel_%s',imageType);
         labelBar=sprintf('height (nm)');
-        showData(idxMon,SeeMe,data,norm,titleData,labelBar,folderSaveFig,nameFig)
+        showData(idxMon,SeeMe,data,norm,titleData,labelBar,folderSaveFig,nameFig);
         % Lateral Deflection Trace
         data=data_LD_trace;
         titleData=sprintf('Lateral Deflection Trace channel (Raw - %s)',imageType);
-        nameFig=sprintf('resultA2_3_Raw_LDChannel_trace_%s',imageType);
+        nameFig=sprintf('resultA1_2_Raw_LDChannel_trace_%s',imageType);
         labelBar='Voltage [V]';
-        showData(idxMon,SeeMe,data,norm,titleData,labelBar,folderSaveFig,nameFig)
+        showData(idxMon,SeeMe,data,norm,titleData,labelBar,folderSaveFig,nameFig);
         % Lateral Deflection ReTrace
         data=data_LD_retrace;
         titleData=sprintf('Lateral Deflection Retrace channel (Raw - %s)',imageType);
-        nameFig=sprintf('resultA2_4_Raw_LDChannel_retrace_%s',imageType);
-        showData(idxMon,SeeMe,data,norm,titleData,labelBar,folderSaveFig,nameFig)
+        nameFig=sprintf('resultA1_3_Raw_LDChannel_retrace_%s',imageType);
+        showData(idxMon,SeeMe,data,norm,titleData,labelBar,folderSaveFig,nameFig);
         % Vertical Deflection trace
         data=data_VD_trace*1e9;
         titleData=sprintf('Vertical Deflection trace channel (Raw - %s)',imageType);
-        nameFig=sprintf('resultA2_5_Raw_VDChannel_trace_%s',imageType);
+        nameFig=sprintf('resultA1_4_Raw_VDChannel_trace_%s',imageType);
         labelBar='Force [nN]';
-        showData(idxMon,SeeMe,data,norm,titleData,labelBar,folderSaveFig,nameFig)
+        showData(idxMon,SeeMe,data,norm,titleData,labelBar,folderSaveFig,nameFig);
         % Vertical Deflection Retrace
         data=data_VD_retrace*1e9;
         titleData=sprintf('Vertical Deflection retrace channel (Raw - %s)',imageType);
-        nameFig=sprintf('resultA2_6_Raw_VDChannel_retrace_%s',imageType);
-        showData(idxMon,SeeMe,data,norm,titleData,labelBar,folderSaveFig,nameFig)           
+        nameFig=sprintf('resultA1_5_Raw_VDChannel_retrace_%s',imageType);
+        showData(idxMon,SeeMe,data,norm,titleData,labelBar,folderSaveFig,nameFig);          
         
         %%%%% perform the following step ONLY after assembly %%%%%
         if ~strcmp(imageType,"SingleSection")

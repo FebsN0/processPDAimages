@@ -86,116 +86,41 @@ function [AFM_Images,IO_Image,varargout]=A2_feature_process_1_fitHeightChannel(f
         end
     end
     height_1_original=AFM_Images(1).AFM_image;
-
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%% REMOVE OUTLIERS (remove anomalies like high spikes) %%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % this solution is more adaptive and less aggressive than removing 99.5
+    % percentile. Remove outliers line by line ==> more prone to remove spikes!
+    num_lines = size(height_1_original, 2);
+    height_2_outliersRemoved=zeros(size(height_1_original));
+    countOutliers=0;
+    for i=1:num_lines
+        yData = height_1_original(:, i);
+        [pos_outlier] = isoutlier(yData, 'gesd');        
+        while any(pos_outlier)
+            countOutliers=countOutliers+nnz(pos_outlier);
+            yData(pos_outlier) = NaN;
+            [pos_outlier] = isoutlier(yData, 'gesd');
+        end
+        height_2_outliersRemoved(:,i) = yData;
+    end
+    fprintf("\nBefore First 1st order plan fitting, %d outliers have been removed!\n",countOutliers)
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%% FIRST FITTING: FIRST ORDER PLANE FITTING ON ENTIRE DATA %%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    [xGrid, yGrid] = meshgrid(1:size(height_1_original,2), 1:size(height_1_original,1));
-    % Extract background points without outliers
-    [xData, yData, zData] = prepareSurfaceData(xGrid, yGrid, height_1_original);
-    % Plane fit setup
-    opts = fitoptions('Method', 'LinearLeastSquares');
-    opts.Robust = 'LAR'; % robust fitting to reduce outlier effects
-    % Fit a 1st-order plane (poly11)
-    ft = fittype('poly11');
-    [fitresult, gof] = fit([xData, yData], zData, ft, opts);
-    % Compute metrics (optional)
-    residuals = zData - feval(fitresult, xData, yData);
-    SSE = sum(residuals.^2);
-    n = length(yData);
-    k = numel(coeffnames(fitresult));
-    AIC = n * log(SSE / n) + 2 * k;
-    % Store results
-    firstFit_plane.fitOrder = 'poly11'; firstFit_plane.SSE = gof.sse; firstFit_plane.R2 = gof.adjrsquare; firstFit_plane.AIC = AIC;
-    varargout{1} = firstFit_plane;
-    % Obtain fitted correction plane
-    correction_plane = feval(fitresult, xGrid, yGrid);
-    % Apply correction
-    height_image_2_corrPlane = height_1_original - correction_plane;
-    
-    %%%%% END PLANE FITTING
-    wb=waitbar(0/size(height_image_2_corrPlane,1),sprintf('Removing Polynomial Baseline %.0f of %.0f',0,size(height_image_2_corrPlane,1)),...
-        'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
-    setappdata(wb,'canceling',0);
-    N_Cycluse_waitbar=size(height_image_2_corrPlane,2);    
-
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%% SECOND FITTING: FIRST ORDER LINExLINE FITTING %%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    height_3_fitLine=zeros(size(height_image_2_corrPlane,1),size(height_image_2_corrPlane,2));
-    for i=1:size(height_3_fitLine,2)
-        if(exist('wb','var'))
-            %if cancel is clicked, stop
-            if getappdata(wb,'canceling'), error('Process cancelled'), end
-        end
-        waitbar(i/N_Cycluse_waitbar,wb,sprintf('Removing Polynomial Baseline ... Completed %2.1f %%',i/N_Cycluse_waitbar*100));
-        % prepareCurveData function clean the data like Removing NaN or Inf, converting nondouble to double,
-        % converting complex to  real and returning data as columns regardless of the input shapes.
-        % extract the i-th column of the image ==> fitting on single column (fast lines)
-        [xData,yData] = prepareCurveData((1:size(height_image_2_corrPlane,1))',height_image_2_corrPlane(:,i));
-        % in case of insufficient number of values for a given line (like entire line removed previously), skip the fitting
-        % find better solution to manage these lines...
-        if length(xData) <= 2 || length(yData) <= 2
-            warning("The %d-th line has not enough data for fitting ==> skipped",i)
-            height_3_fitLine(:,i)=height_image_2_corrPlane(:,i);
-            continue
-        end
-        % Linear polynomial curve
-        ft = fittype( 'poly1' );
-        % group of coefficients: p1 and p2 ==> val(x) = p1*x + p2
-        fitresult=fit(xData,yData, ft );
-        % like the plan fitting, create new vector of same length as well as line of the height image
-        xData = 1:size(height_image_2_corrPlane,1); xData=xData';
-        % dont use the offset p2, rather the first value of the i-th column
-        baseline_y=(fitresult.p1*xData+height_image_2_corrPlane(1,i));
-        % substract the baseline_y and then substract by the minimum ==> get the 0 value in height 
-        height_3_fitLine(:,i)=height_image_2_corrPlane(:,i)-baseline_y;
-    end
+    [height_image_3_corrPlane,planeFit] = planeFitting_N_Order(height_2_outliersRemoved,1);  
+    height_image_3_corrPlane=height_image_3_corrPlane-min(height_image_3_corrPlane(:));
     % Display and save result
-    
-    % Display and save result
-    titleData1 = {'Height channel';'First Correction: 1st order plane fitting'};
-    titleData2 = {'Height channel';'Second Correction: 1st order LineByLine fitting'};
-
-    nameFile = 'resultA2_1_HeightPlane_and_LineXLine_Correction';    
-    showData(idxMon,SeeMe,height_image_2_corrPlane*factor,norm,titleData1,labelHeight,filepath,nameFile,'data2',height_3_fitLine*factor,'titleData2',titleData2);
-    clear i n opts SSE k fitresult ft gof residuals xGrid yGrid xData yData zData titleData nameFile
- 
-    
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%% REMOVE OUTLIERS THAT CAN NEGATIVELY AFFECT THE FITTING %%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % remove outliers line by line (single entire array with all the lines takes too much time) before plane
-    % fitting using the masked AFM data containing only background. Change them with NaN       
-    num_lines = size(height_3_fitLine, 2);
-    height_4_outliersRemoved=zeros(size(height_3_fitLine));
-    for i=1:num_lines
-        yData = height_3_fitLine(:, i);
-        [pos_outlier] = isoutlier(yData, 'gesd');
-        while any(pos_outlier)
-            yData(pos_outlier) = NaN;
-            [pos_outlier] = isoutlier(yData, 'gesd');
-        end
-        height_4_outliersRemoved(:,i) = yData;
-    end
-    % plot. To better visual, change NaN into 0
-    %height_4_outliersRemoved(isnan(height_4_outliersRemoved))=0;
-    countOutliers=nnz(isnan(height_4_outliersRemoved));
-    titleData1={'Height Deflection';'After 1st and 2nd fitting'}; titleData2={"Height Deflection";sprintf("%d Outliers removed (TOT: %d)",countOutliers,numel(height_4_outliersRemoved))};
-    nameFig='resultA2_2_Height_RemovedOutliers';
-    showData(idxMon,false,height_3_fitLine*factor,norm,titleData1,labelHeight,filepath,nameFig,'data2',height_4_outliersRemoved*factor,'titleData2',titleData2);
-    
-
-    waitbar(0/N_Cycluse_waitbar,wb,sprintf('Optimizing Butterworth Filter...'));
-    
-
-
-%%%%% MAYBE BETTER AVOID THIS AND ADD THE MANUAL SEPARATION AFTER HISTCOUNT
-
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%% BUTTERWORTH FILTERING %%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    titleData1 = {'First Order Plane';'Fitted on Raw Height Channel'};
+    titleData2 = {'Height channel';'First Correction: 1st order plane fitting and shifted toward zero'};
+    nameFile = 'resultA2_1_Plane1order_correctedHeight';    
+    showData(idxMon,SeeMe,planeFit*factor,norm,titleData1,labelHeight,filepath,nameFile,'data2',height_image_3_corrPlane*factor,'titleData2',titleData2);   
+           
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%% BUTTERWORTH FILTERING : an automatic binarization but not for binarize the image, rather for better fitting %%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % After polynomial flattening, the image should have an average plane removed, but there can still be low-level background 
     % offsets or uneven residuals. The goal of this snippet is to automatically detect a "background" height threshold — a level 
     % that separates the flat background from the sample features — and to mask out (NaN) all pixels above that threshold.
@@ -210,9 +135,9 @@ function [AFM_Images,IO_Image,varargout]=A2_feature_process_1_fitHeightChannel(f
     
     % Original code uses 10'000 bins, which may be too fine for most AFM height ranges
     % Therefore, automatically adapt the number of bins based on data range and image size.
-    numBins = min(5000, max(100, round(numel(height_4_outliersRemoved)/100))); % adaptive bin count
+    numBins = min(5000, max(100, round(numel(height_image_3_corrPlane)/100))); % adaptive bin count
     % distribute the fitted data among bins using N bins and Normalize Y before filtering to make it scale-independent.
-    [Y,E] = histcounts(height_4_outliersRemoved,numBins,'Normalization', 'pdf');
+    [Y,E_height] = histcounts(height_image_3_corrPlane,numBins,'Normalization', 'pdf');
     % set the parameters for Butterworth filter ==> little recap: it is a low-pass filter with a frequency
     % response that is as flat as possible in the passband
     
@@ -232,161 +157,78 @@ function [AFM_Images,IO_Image,varargout]=A2_feature_process_1_fitHeightChannel(f
     % it just looks for one zero crossing of the second derivative, which can fail if the histogram is multimodal or noisy.
     % IMPROVED VERSION: Use gradient-based peak analysis or findpeaks on the smoothed histogram derivative:
     % This finds the largest negative-to-positive transition, i.e., where the histogram slope changes most sharply
-    dY = gradient(Y_filtered);
+    dY = gradient(Y_filtered);    
     [~, locs] = findpeaks(-dY, 'NPeaks', 1, 'SortStr', 'descend');
     bk_limit = locs(1);
+    E_height=E_height*1e9;
+    background_th = E_height(bk_limit);     % express in nm
+    thresholdApproach="Automatic";
+    % HOWEVER, it doesnt work always, so also manual selection
+    fbutter=figure; hold on
+    plot(E_height(1:end-1), Y_filtered, 'b', 'LineWidth', 2,'DisplayName','Butterworth-filtered Height');
+    xline(background_th, 'r--', 'LineWidth', 1.5,'DisplayName','Background Automatic (2nd derivative) threshold');       
+    title('First background detection with butterworth-filtered Height','FontSize',16); legend('FontSize',15)
+    xlabel('Height (nm)','FontSize',14); ylabel('PDF (Probability Density Function on Count','FontSize',14);
+    xlim tight, grid on
+    objInSecondMonitor(fbutter,idxMon)
+    pause(2)
+    question=sprintf(['Is the threshold to separate Background from Foreground good enough?\n'...
+        'NOTE: it is not necessary to be precise because this step is not for binarization,\nbut at least should approximately separate the two regions.']);
+    if ~getValidAnswer(question,"",{'Yes','No'})
+        uiwait(msgbox('Click on the plot to define the threshld to separate Background from Foreground',''));
+        closest_indices=selectRangeGInput(1,1,E_height(1:end-1), Y_filtered);
+        background_th=E_height(closest_indices);
+        xline(background_th, 'g--', 'LineWidth', 1.5,'DisplayName','Background Manual threshold'); 
+        thresholdApproach="Manual";
+    end        
+    saveFigures_FigAndTiff(fbutter,filepath,'resultA2_3_ButterworthFilteredHeight_backgroundDetection')   
     % all pixels above this height (i.e., part of the actual structure) are
-    % masked (NaN), leaving only the flat background. add a small margin (e.g. 1–2 bins)
-    backgrownd_th = E(bk_limit) + (E(2)-E(1)); % shift 1 bin up
-    Bk_poly_filt_data = height_3_fitLine;
-    Bk_poly_filt_data(Bk_poly_filt_data > backgrownd_th) = NaN;
-    
-    figure; hold on
-    plot(E(1:end-1), Y_filtered, 'b', 'LineWidth', 1.5);
-    xline(backgrownd_th, 'r--', 'LineWidth', 1);
-    title('Butterworth-filtered height histogram with detected background limit');
-    xlabel('Height'); ylabel('PDF');
-
-
+    % masked (NaN), leaving only the flat background    
+    BK_butterworthFiltered = height_image_3_corrPlane;
+    BK_butterworthFiltered(BK_butterworthFiltered > background_th*1e-9) = NaN;
+    clear fbutter closest_indices background_th numBins Y E_height Wn b a Y_filtered dY locs bk_limit
+    titleData=sprintf('Background Height - Butterworth Filtered Height and separated by %s threshold',thresholdApproach);     
+    nameFile='resultA2_4_BackgroundHeight_butterworth';   
+    showData(idxMon,SeeMe,BK_butterworthFiltered*factor,norm,titleData,labelHeight,filepath,nameFile);
+  
     % suppress warning about removing NaN values
-    id='curvefit:prepareFittingData:removingNaNAndInf';
-    warning('off',id)
-    
-    x_Bk=1:size(Bk_poly_filt_data,2);
-    y_Bk=1:size(Bk_poly_filt_data,1);
-    [xData, yData, zData] = prepareSurfaceData( x_Bk, y_Bk, Bk_poly_filt_data );
-    ft = fittype( 'poly11' );
-    [fitresult, ~] = fit( [xData, yData], zData, ft );
-    
-    fit_surf=zeros(size(y_Bk,2),size(x_Bk,2));
-    a=max(max(Bk_poly_filt_data));
-    y_Bk_surf=repmat(y_Bk',1,size(x_Bk,2))*fitresult.p01;
-    x_Bk_surf=repmat(x_Bk,size(y_Bk,2),1)*fitresult.p10;
-    fit_surf=plus(a,fit_surf);
-    fit_surf=plus(y_Bk_surf,fit_surf);
-    fit_surf=plus(x_Bk_surf,fit_surf);
-    % Subtraction of fitted polynomial background
-    filt_data_no_Bk=minus(height_image_2_corrPlane,fit_surf);
-    filt_data_no_Bk=filt_data_no_Bk-min(min(filt_data_no_Bk));
+    %  id='curvefit:prepareFittingData:removingNaNAndInf';
+    %  warning('off',id)
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%% THIRD FITTING: N ORDER PLANE FITTING ON BUTTERWORTH FILTERED BACKGROUND %%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
+    [BK_butterworthFiltered_Fitted,planeCorrection,metrics] = planeFitting_N_Order(BK_butterworthFiltered,limit);
+    height_4_firstBKfit=height_image_3_corrPlane-planeCorrection;       
+    % shift the entire data toward zero (background should be zero)
+    height_4_firstBKfit=height_4_firstBKfit-(min(height_4_firstBKfit(:)));
     % show the results
-    titleData='Height (measured) channel - Surface Tilted effect removed';
-    nameFile='resultA2_3_HeightRemovedTiltSurface';
-    showData(idxMon,SeeMe,filt_data_no_Bk,norm,titleData,'',filepath,nameFile);
-
-
-
-    warning ('off','all');
-    % For each different fitting depending on the accuracy (poly1 to poly9), extract 3 information:
-    %   - Sum of squares due to error / Degree-of-freedom adjusted coefficient of determination
-    %   - Sum of squares due to error
-    %   - Degree-of-freedom adjusted coefficient of determination
-    while true      
+    titleData1={'Plane fitted';sprintf('Order Plane: %s',metrics.fitOrder)};
+    titleData2={'Background Height';'Butterworth Filtered Height and Plan Fitted'};     
+    nameFile='resultA2_4_Plane_Background';   
+    showData(idxMon,SeeMe,planeCorrection*factor,norm,titleData1,labelHeight,filepath,nameFile,'data2',BK_butterworthFiltered_Fitted*factor,'titleData2',titleData2);
+    titleData={'Height Channel corrected';'Butterworth-filtered, BK detection, fitted Height shifted toward zero.'};  
+    nameFile='resultA2_5_correctedHeight_afterButterworthBKfit';
+    showData(idxMon,SeeMe,height_4_firstBKfit*factor,norm,titleData,labelHeight,filepath,nameFile);
+    clear titleData* nameFile
         
-        % Initialize variables
-        fit_decision_final = nan(size(filt_data_no_Bk, 2), 4 + limit);
-        % create a zero matrix with the same size of the original data
-        Bk_iterative = zeros(size(filt_data_no_Bk));
-        N_Cycluse_waitbar = size(filt_data_no_Bk,2);
-        % build array abscissas for the fitting
-        x = (1:size(filt_data_no_Bk,1))';
-        % Polynomial baseline fitting (line by line) - Linear least squares fitting to the results. GOAL:
-        % extract the background to remove from the data
-        for i=1:size(filt_data_no_Bk,2)
-            if(exist('wb','var')) && getappdata(wb, 'canceling')
-                   error('Process cancelled')
-            end
-            % First remove outliers (i.e. exclude the true data which represents the features of interest of
-            % PDA). Indeed, baseline fitting should only use low-intensity (i.e. background) values. The
-            % presence of such outliers create wrong bias during the fitting and can distort polynomial fitting. 
-            % Removing them ensures a smoother and more reliable baseline correction!           
-            flag_signal_y = filt_data_no_Bk(:,i); % Take the i-th fast scan line           
-            % STEP 1: Initial Low-Order Polynomial Fit (e.g., Quadratic)
-            % this is new and another way to use a dynamic threshold instead of a fixed value.
-            % The initial polynomial fit provides a better guess for outlier removal, preventing extreme peaks from affecting the final polynomial fit.
-            % It makes the baseline correction more stable and less affected by noise.
-            xData = (1:length(flag_signal_y))';
-            validIdx = ~isnan(flag_signal_y);
-            polyInit = polyfit(xData(validIdx), flag_signal_y(validIdx), 2);
-            baselineInit = polyval(polyInit, xData); % Estimated baseline
-            % Step 2: Remove Points Above This Estimated Baseline
-            threshold = baselineInit + std(flag_signal_y(validIdx)); % 1 standard deviation above baseline                   
-            % The baseline usually lies below the median, so this step removes higher values that may belong to the real signal rather than the baseline.
-            %%%%    threshold = median(flag_signal_y);
-            % Exclude top 20% instead of median  
-            %%%%    threshold = prctile(flag_signal_y, 80);   
-            % first round of outliers removal
-            flag_signal_y(flag_signal_y >= threshold) = NaN;                      
-            % STEP 3: Remove remaining outliers Iteratively, not just the most extreme one.
-            % GESD test is useful when the number of outliers is unknown
-            [pos_outlier] = isoutlier(flag_signal_y, 'gesd');
-            while any(pos_outlier)
-                flag_signal_y(pos_outlier) = NaN;
-                [pos_outlier] = isoutlier(flag_signal_y, 'gesd');
-            end
-            % Step 4: Fit Final Polynomial Using AIC-Optimized Degree
-            % Prepare valid data for fitting            
-            xData = x(~isnan(flag_signal_y));
-            yData = flag_signal_y(~isnan(flag_signal_y));
-            % Handle insufficient data. Leave empty the i-th bk fast scan line (maybe because the line is
-            % entirely made of crystal PDA)
-            if length(xData) <= 3
-                Bk_iterative(:,i) = NaN;
-                continue;
-            end            
-            % Initialize AIC results
-            aic_values = nan(1, limit);
-            models = cell(1, limit);            
-            % Test polynomial fits up to the limit
-            for z = 1:limit
-                polyModel = polyfitn(xData, yData, z);
-                models{z} = polyModel;            
-                % Compute AIC
-                n = length(yData);
-                sse = sum((yData - polyval(polyModel.Coefficients, xData)).^2);
-                k = length(polyModel.Coefficients); % Number of parameters
-                aic_values(z) = n * log(sse / n) + 2 * k;
-            end            
-            % Select best model using AIC
-            [~, bestIdx] = min(aic_values);
-            bestModel = models{bestIdx};            
-            % Save fitting decisions
-            fit_decision_final(i, 1) = bestIdx;
-            fit_decision_final(i, 2) = aic_values(bestIdx);
-            fit_decision_final(i, 3) = sum((yData - polyval(bestModel.Coefficients, xData)).^2); % SSE
-            fit_decision_final(i, 4:4 + bestIdx) = bestModel.Coefficients;            
-            % Generate baseline using the best polynomial fit
-            Bk_iterative(:, i) = polyval(bestModel.Coefficients, x);
-            % Progress update
-            waitbar(i/N_Cycluse_waitbar, wb, sprintf('AIC-based background fitting - Line %.0f completed %.1f%%', i, i/N_Cycluse_waitbar*100));
-        end
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%% FORTH FITTING: N ORDER LINE-BY-LINE FITTING THE NEW PLANE-FITTED HEIGHT %%%%
+    %%%  (Note: not masked. It turned out using the previous BK as mask is worse) %%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
+    height_5_lineXlineFIT = lineByLineFitting_N_Order(height_4_firstBKfit,limit);
+    height_5_lineXlineFIT = height_5_lineXlineFIT-min(height_5_lineXlineFIT(:));
+    % plot the resulting corrected data
+    title1='Height (measured) channel - Single Line Fitted and shifted toward zero';        
+    showData(idxMon,SeeMe,height_5_lineXlineFIT*1e9,false,title1,'Height (nm)',filepath,'resultA2_6_HeightLineFitted_noNorm');
+    showData(idxMon,SeeMe,height_5_lineXlineFIT,true,title1,'',filepath,'resultA2_6_HeightLineFitted_norm');  
 
-        % Handle NaN lines by interpolation. In case of those lines entirely made of NaN
-        nan_lines = find(isnan(Bk_iterative(1, :)));
-        for i = nan_lines
-            left_idx = find(~isnan(Bk_iterative(1, 1:i-1)), 1, 'last');
-            right_idx = find(~isnan(Bk_iterative(1, i+1:end)), 1, 'first') + i;
-            % adiacent interpolation
-            if ~isempty(left_idx) && ~isempty(right_idx)
-                Bk_iterative(:, i) = (Bk_iterative(:, left_idx) + Bk_iterative(:, right_idx)) / 2;
-            elseif ~isempty(left_idx)
-                Bk_iterative(:, i) = Bk_iterative(:, left_idx);
-            elseif ~isempty(right_idx)
-                Bk_iterative(:, i) = Bk_iterative(:, right_idx);
-            end
-        end 
-        AFM_noBk=filt_data_no_Bk-Bk_iterative;
-        AFM_noBk=AFM_noBk-min(AFM_noBk(:));
-        % plot the resulting corrected data
-        title1='Height (measured) channel - Single Line Fitted';        
-        showData(idxMon,SeeMe,AFM_noBk*1e9,false,title1,'Height (nm)',filepath,'resultA2_4_HeightLineFitted_noNorm')    
-        showData(idxMon,true,AFM_noBk,true,title1,'',filepath,'resultA2_4_HeightLineFitted_norm')    
-        if getValidAnswer('Satisfied of the fitting?','',{'y','n'}) == 1
-            close gcf, break
-        end
-    end
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% BINARIZATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % start the binarization to create the 0/1 height image. At the same time show normal and logical image
     % for better comparison
-    AFM_noBk_visible_data=imadjust(AFM_noBk/max(AFM_noBk(:))); % normalize for better show data
+    AFM_noBk_visible_data=imadjust(height_5_lineXlineFIT/max(height_5_lineXlineFIT(:))); % normalize for better show data
     f4=figure;
     subplot(121), imshow(AFM_noBk_visible_data),colormap parula, axis on
     title('Height (measured) channel - Single Line Fitted', 'FontSize',16)
@@ -402,8 +244,8 @@ function [AFM_Images,IO_Image,varargout]=A2_feature_process_1_fitHeightChannel(f
         kernel=strel('square',3); % can be modified
         if(first_In==1)
             % original
-            T = adaptthresh(mat2gray(AFM_noBk));
-            seg_AFM = imbinarize(mat2gray(AFM_noBk),T);
+            T = adaptthresh(mat2gray(height_5_lineXlineFIT));
+            seg_AFM = imbinarize(mat2gray(height_5_lineXlineFIT),T);
         else
             clearvars seg_AFM th_segmentation seg_binarized           
             imhistfig=figure('visible','on');hold on,plot(Y)
@@ -415,9 +257,9 @@ function [AFM_Images,IO_Image,varargout]=A2_feature_process_1_fitHeightChannel(f
             uiwait(msgbox('Before click to continue the binarization, zoom or pan on the image for a better view',''));
             zoom off; pan off;
             closest_indices=selectRangeGInput(1,1,1:no_sub_div,Y);
-            th_segmentation=E(closest_indices);
+            th_segmentation=E_height(closest_indices);
             close(imhistfig)
-            seg_AFM=AFM_noBk;
+            seg_AFM=height_5_lineXlineFIT;
             seg_AFM(seg_AFM<th_segmentation)=0;
             seg_AFM(seg_AFM>=th_segmentation)=1;
         end       
@@ -435,7 +277,7 @@ function [AFM_Images,IO_Image,varargout]=A2_feature_process_1_fitHeightChannel(f
         satisfied=questdlg('Keep automatic threshold selection or turn to Manual?', 'Manual Selection', 'Keep Current','Manual Selection','Keep Current');
         if(first_In==1)
             if(strcmp(satisfied,'Manual Selection'))
-                [Y,E] = histcounts(AFM_noBk,no_sub_div);
+                [Y,E_height] = histcounts(height_5_lineXlineFIT,no_sub_div);
                 first_In=0;
             end
         end
@@ -478,7 +320,7 @@ function [AFM_Images,IO_Image,varargout]=A2_feature_process_1_fitHeightChannel(f
      
     % show data
     titleData=sprintf('Baseline and foreground processed - Iteration %d',iterationMain);
-    nameFile=sprintf('resultA2_5_BaselineForeground_iteration%d',iterationMain);
+    nameFile=sprintf('resultA2_7_BaselineForeground_iteration%d',iterationMain);
     showData(idxMon,SeeMe,seg_binarized,false,titleData,'',filepath,nameFile,'Binarized',true)
     if SeeMe
         uiwait(msgbox('Click to continue'))
@@ -490,4 +332,214 @@ function [AFM_Images,IO_Image,varargout]=A2_feature_process_1_fitHeightChannel(f
     end
 end
 
+
+%%%%%%%%%%%%%%%%%
+%%% FUNCTIONS %%%
+%%%%%%%%%%%%%%%%%
+
+function varargout = planeFitting_N_Order(data,limit)
+    allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
+    delete(allWaitBars)
+    wb=waitbar(1/(limit*limit),sprintf('Removing Plane Polynomial Baseline orderX: %d orderY: %d',0,0),...
+            'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
+    setappdata(wb,'canceling',0);
+    
+    % PREPARE THE DATA FOR FITTING
+    [xGrid, yGrid] = meshgrid(1:size(data,2), 1:size(data,1));
+    [xData, yData, zData] = prepareSurfaceData(xGrid,yGrid,data);  
+   
+    % init and prepare the setting for the fitting
+    models = cell(limit+1, limit+1);
+    opts = fitoptions('Method', 'LinearLeastSquares');
+    opts.Robust = 'LAR';        % robust fitting to reduce outlier effects
+    fit_decision = cell(limit+1,limit+1,4);
+    fit_decision_final_plane = struct();
+    % Test polynomial fits up to the limit
+    i=1;
+    for px = 0:limit
+        for py = 0:limit
+            waitbar(i/(limit+1)/(limit+1), wb, sprintf('Removing Plane Polynomial Baseline orderX: %d orderY: %d',px,py));    
+            % Check for cancellation
+            if getappdata(wb, 'canceling')
+                delete(wb);
+                error('Process cancelled');
+            end 
+            if (px == 0 && py == 0) || px>=6 || py>=6
+                fit_decision{px+1,py+1,1} = inf; % prevent to take these indexes by finding the min to identify the bestIdx
+                continue; % Avoid constant fit
+            end
+            % Define polynomial fit type for 2D surface
+            fitTypeM=sprintf('poly%d%d', px, py);
+            ft = fittype(fitTypeM);
+            [fitresult, gof] = fit( [xData, yData], zData, ft, opts );
+            if gof.adjrsquare < 0
+                gof.adjrsquare = 0.001;
+            end     
+            % Compute SSE and AIC
+            residuals = zData - feval(fitresult,xData,yData);
+            SSE = sum(residuals.^2);
+            n = length(yData);
+            k = numel(coeffnames(fitresult)); % Number of parameters; % Number of parameters (polynomial degree + 1)
+            aic_values = n * log(SSE / n) + 2 * k;           
+            % Store model and statistics
+            models{px+1,py+1} = fitresult;
+            fit_decision{px + 1, py + 1,1} = aic_values;
+            fit_decision{px + 1, py + 1,2} = gof.sse;
+            fit_decision{px + 1, py + 1,3} = gof.adjrsquare;
+            fit_decision{px + 1, py + 1,4} = fitTypeM;
+            i=i+1;                   
+        end
+    end    
+    % Select best model using AIC
+    allAICvalues=cell2mat(fit_decision(:,:,1));
+    [~, bestIdx] = min(allAICvalues,[],'all');
+    [bestPx, bestPy] = ind2sub(size(allAICvalues), bestIdx);
+    bestModel = models{bestPx, bestPy};
+    % Save fitting decisions
+    fit_decision_final_plane.fitOrder = fit_decision{bestPx, bestPy,4};     % fitTypeM
+    fit_decision_final_plane.AIC_value = fit_decision{bestPx, bestPy,1};    % AIC
+    fit_decision_final_plane.SSE = fit_decision{bestPx, bestPy,2};          % SSE
+    fit_decision_final_plane.R2 = fit_decision{bestPx, bestPy,3};           % Adjusted R^2    
+    % obtain the fitted plane which will be applied to the raw data
+    correction_plane = feval(bestModel, xGrid,yGrid);
+    % apply the correction plane to the data.
+    dataCorrected = data - correction_plane;
+    % prepare the output
+    varargout{1}=dataCorrected;
+    varargout{2}=correction_plane;
+    varargout{3}=fit_decision_final_plane;
+    delete(wb)
+    % Note: previous versions applied also the shifting by min value of the entire lateral deflection matrix.
+    % After proper investigation, it has been found out that it is wrong shifting both before and after
+    % applying any tipe of correction (plane or lineXline fitting), because the fitting "implies" already the shifting.
+    % The following lines are examples of wrong shifting ==> NO SHIFT AT ALL
+    % Lateral_Trace_preShift_1                  = Lateral_Trace -min(Lateral_Trace(:));    
+    % Lateral_Trace_corrPlane_preShift_2        = Lateral_Trace_preShift_1 - correction_plane;
+    % Lateral_Trace_corrPlane_prePostShift_3    = Lateral_Trace_corrPlane_preShift_2-min(Lateral_Trace_corrPlane_preShift_2(:));
+    %
+    % apply correction plane to raw data
+    % Lateral_Trace_corrPlane = Lateral_Trace - correction_plane;
+end
+
+function  varargout = lineByLineFitting_N_Order(data,limit)
+% Polynomial baseline fitting (line by line) - Linear least squares fitting to the results.
+% GOAL: extract the background to remove from the data
+    
+    % warning ('off','all');
+
+    allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
+    delete(allWaitBars)
+    N_Cycluse_waitbar = size(data,2);
+    wb=waitbar(0/N_Cycluse_waitbar,sprintf('AIC-based background fitting - Line %d of %d completed',0,N_Cycluse_waitbar),...
+            'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
+    setappdata(wb,'canceling',0);
+   
+    % Initialize variables
+    fit_decision_final = struct();     % var where to store results of the bestFit model for each fast scan line
+    % For each different fitting depending on the accuracy (poly1 to poly9), extract 3 information:
+    %   - Sum of squares due to error / Degree-of-freedom adjusted coefficient of determination
+    %   - Sum of squares due to error
+    %   - Degree-of-freedom adjusted coefficient of determination
+    allBaseline = zeros(size(data));                        % matrix which will contain the baseline of each fast scan line
+    x = (1:size(data,1))';                                  % build array abscissas to calc y=f(x)
+    for i=1:size(data,2)
+        if(exist('wb','var')) && getappdata(wb, 'canceling')
+               error('Process cancelled')
+        end
+
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%% REMOVE OUTLIERS %%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%
+        % exclude the true data which represents the features of interest of PDA. 
+        % Indeed, baseline fitting should ONLY use low-intensity (i.e. background) values. The
+        % presence of such outliers create wrong bias during the fitting and can distort polynomial fitting. 
+        % Removing them ensures a smoother and more reliable baseline correction!           
+        fastScanLine = data(:,i); % Take the i-th fast scan line          
+        xData=(1:length(fastScanLine))';
+        % STEP 1: Initial Low-Order Polynomial Fit (e.g., Quadratic)
+        % this is new and another way to use a dynamic threshold instead of a fixed value.
+        % The initial polynomial fit provides a better guess for outlier removal, preventing extreme peaks from affecting the final polynomial fit.
+        % It makes the baseline correction more stable and less affected by noise.
+        validIdx = ~isnan(fastScanLine);
+        polyInit = polyfit(xData(validIdx), fastScanLine(validIdx), 2);     % 2nd order coefficients p1*x^2 + p2*x + p3
+        % Estimated baseline
+        baselineInit = polyval(polyInit, xData); 
+        % Step 2: Remove Points Above This Estimated Baseline + 1 standard deviation above baseline
+        threshold = baselineInit + std(fastScanLine(validIdx));                     
+        % first round of outliers removal
+        fastScanLine(fastScanLine >= threshold) = NaN;                      
+        % STEP 3: Remove remaining outliers Iteratively, not just the most extreme one.
+        % GESD test is useful when the number of outliers is unknown
+        [pos_outlier] = isoutlier(fastScanLine, 'gesd');
+        while any(pos_outlier)
+            fastScanLine(pos_outlier) = NaN;
+            [pos_outlier] = isoutlier(fastScanLine, 'gesd');
+        end
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%% START FITTING %%%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%
+        % now the fastScanLine is enriched with NaN values and it is ready for the baseline fitting
+        % prepareCurveData function clean the data like Removing NaN or Inf, converting nondouble to double,
+        % converting complex to  real and returning data as columns regardless of the input shapes.
+        [xData,yData] = prepareCurveData(x,fastScanLine);
+
+        % Handle insufficient data. Leave empty the i-th bk fast scan line (maybe because the line is          
+        % entirely made of crystal PDA). Whenever there are few datapoints,
+        % the line is almost insignificant, so transform it into NaN
+        % vector. SKIP the metric calculations
+        if length(xData) <= 3
+            allBaseline(:,i) = NaN; % <============= CHECK!!!! interpolation is wrong if in the fast scan line there is PDA values
+            % dataCorrected(:,i)=height_image_2_corrPlane(:,i);
+            continue;
+        end      
+
+        % Initialize AIC results
+        aic_values = nan(1, limit);
+        models = cell(1, limit);            
+        % Test polynomial fits up to the limit for the specific line
+        for z = 1:limit
+            polyModel = polyfitn(xData, yData, z);
+            models{z} = polyModel;            
+            % Compute AIC
+            n = length(yData);
+            sse = sum((yData - polyval(polyModel.Coefficients, xData)).^2);
+            k = length(polyModel.Coefficients); % Number of parameters
+            aic_values(z) = n * log(sse / n) + 2 * k;
+        end            
+        % Select best model using AIC
+        [~, bestIdx] = min(aic_values);
+        bestModel = models{bestIdx};            
+        % Save fitting decisions
+        fit_decision_final(i).bestIdx = bestIdx;
+        fit_decision_final(i).AIC_bestValue = aic_values(bestIdx);
+        fit_decision_final(i).SSE = sum((yData - polyval(bestModel.Coefficients, xData)).^2); % SSE
+        fit_decision_final(i).coefficients = bestModel.Coefficients;            
+        % Generate baseline using the best polynomial fit
+        allBaseline(:, i) = polyval(bestModel.Coefficients, x);
+        % Progress update
+        waitbar(i/N_Cycluse_waitbar, wb, sprintf('AIC-based background fitting - Line %d of %d completed',i, N_Cycluse_waitbar));
+    end
+    delete(wb)
+    %%%%% MAYBE BETTER DELETE IT!!! 
+    
+    % Handle NaN lines by interpolation. In case of those lines entirely made of NaN
+    nan_lines = find(isnan(allBaseline(1, :)));
+    for i = nan_lines
+        left_idx = find(~isnan(allBaseline(1, 1:i-1)), 1, 'last');
+        right_idx = find(~isnan(allBaseline(1, i+1:end)), 1, 'first') + i;
+        % adiacent interpolation
+        if ~isempty(left_idx) && ~isempty(right_idx)
+            allBaseline(:, i) = (allBaseline(:, left_idx) + allBaseline(:, right_idx)) / 2;
+        elseif ~isempty(left_idx)
+            allBaseline(:, i) = allBaseline(:, left_idx);
+        elseif ~isempty(right_idx)
+            allBaseline(:, i) = allBaseline(:, right_idx);
+        end
+    end 
+    dataCorrected=data-allBaseline;     
+    % PREPARE OUTPUT
+    varargout{1}=dataCorrected;
+    varargout{2}=allBaseline;
+    varargout{3}=fit_decision_final;
+end
 
