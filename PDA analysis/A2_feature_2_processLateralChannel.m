@@ -4,7 +4,7 @@
 % Check manually the processed image afterwards and compare with the AFM VD
 % image!
 
-function varargout=A5_LD_Baseline_Adaptor_masked(AFM_data,AFM_height_IO,alpha,idxMon,newFolder,mainPath,varargin)
+function varargout=A2_feature_processLateralChannel(AFM_data,AFM_height_IO,alpha,idxMon,newFolder,mainPath,varargin)
     % in case of code error, the waitbar won't be removed. So the following command force its closure
     warning ('off','all'); 
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
@@ -13,17 +13,19 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_data,AFM_height_IO,alpha,id
     p=inputParser();    %init instance of inputParser
     %Add default parameters. When call the function, use 'argName' as well you use 'LineStyle' in plot! And
     %then the values
-    argName = 'FitOrder';          defaultVal = 'Low';     addOptional(p,argName,defaultVal, @(x) ismember(x,{'Low','Medium','High'}));
-    argName = 'Silent';            defaultVal = 'Yes';     addOptional(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
-    argName = 'Normalization';     defaultVal = 'No';     addOptional(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
-    argName = 'flagSingleSectionProcess';     defaultVal = 'No';     addOptional(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+    argName = 'FitOrder';                   defaultVal = 'Low';     addOptional(p,argName,defaultVal, @(x) ismember(x,{'Low','Medium','High'}));
+    argName = 'SeeMe';                      defaultVal = true;      addOptional(p,argName,defaultVal, @(x) islogical(x));
+    argName = 'Normalization';              defaultVal = false;     addOptional(p,argName,defaultVal, @(x) islogical(x));
+    argName = 'flagSingleSectionProcess';   defaultVal = false;     addOptional(p,argName,defaultVal, @(x) islogical(x));
+    argName = 'idxSectionHVon';             defaultVal = [];        addOptional(p,argName,defaultVal);
 
     parse(p,varargin{:});
     % setup optional input
-    if strcmp(p.Results.Silent,'Yes'); SeeMe=0; else, SeeMe=1; end
+    if p.Results.SeeMe; SeeMe=1; else, SeeMe=0; end    
+    if p.Results.Normalization, norm=1; unitData="" ;else, norm=0; unitData='Voltage [V]'; end
+    if p.Results.flagSingleSectionProcess, flagSingleSectionProcess=1; else, flagSingleSectionProcess=0; end
+    if ~isempty(p.Results.idxSectionHVon), idxSectionHVon=p.Results.idxSectionHVon; end  
     if strcmp(p.Results.FitOrder,'Low'); limit=3; elseif strcmp(p.Results.FitOrder,'Medium'), limit=6; else, limit=9; end
-    if strcmp(p.Results.Normalization,'No'); norm=0; unitData='Voltage [V]' ;else, norm=1; unitData=""; end
-    if strcmp(p.Results.flagSingleSectionProcess,'No'); flagSingleSectionProcess=0; else, flagSingleSectionProcess=1; end
     clearvars argName defaultVal p varargin
     
     % select a single line manually to check the LD
@@ -170,7 +172,7 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_data,AFM_height_IO,alpha,id
     titleData1='Plane Fitted Background';
     titleData2={'Lateral Deflection - Trace'; '(removed fitted plane and shifted)'};
     nameFig='resultA5_2_planeBKfit_LateralDeflection';
-    figTmp=showData(idxMon,true,correction_plane,norm,titleData1,unitData,newFolder,nameFig,'data2',Lateral_Trace_corrPlane,'titleData2',titleData2,"saveFig","No");
+    figTmp=showData(idxMon,true,correction_plane,norm,titleData1,unitData,newFolder,nameFig,'data2',Lateral_Trace_corrPlane,'titleData2',titleData2,'saveFig',false);
     pause(1)
     if getValidAnswer('Keep the Lateral Deflection with the plane-fitted background removed?','',{'Yes','No'})
         Lateral_Trace_firstCorr = Lateral_Trace_corrPlane;
@@ -369,7 +371,7 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_data,AFM_height_IO,alpha,id
         % Plot the fitted backround:            
         titleData1='Line x Line Fitted Background'; titleData2={'Lateral Deflection - Trace';sprintf("(%s - lineXline fitted)",text)};
         nameFig='resultA5_3_LineBKfit_LateralDeflection';
-        figTmp=showData(idxMon,true,Bk_iterative,norm,titleData1,unitData,newFolder,nameFig,'data2',Lateral_Trace_secondCorr,'titleData2',titleData2,"saveFig","No");
+        figTmp=showData(idxMon,true,Bk_iterative,norm,titleData1,unitData,newFolder,nameFig,'data2',Lateral_Trace_secondCorr,'titleData2',titleData2,'saveFig',false);
         answ=getValidAnswer('Satisfied of the fitting? If not, keep the original and skip to the next part.','',{'y','n'});
         close(figTmp)
         pause(1)
@@ -388,7 +390,6 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_data,AFM_height_IO,alpha,id
         else
            titleData1='Line x Line Fitted Background'; titleData2={'Lateral Deflection - Trace';sprintf("(%s - lineXline fitted (NOT TAKEN))",text)};
         end
-        pause(1)
         showData(idxMon,false,Bk_iterative,norm,titleData1,unitData,newFolder,nameFig,'data2',Lateral_Trace_secondCorr,'titleData2',titleData2)    
     end
     
@@ -442,7 +443,7 @@ function varargout=A5_LD_Baseline_Adaptor_masked(AFM_data,AFM_height_IO,alpha,id
                 if ~exist(fullfile(mainPath,'HoverMode_OFF'),"dir")
                     error('The directory HoverMode_OFF doesn''t exist. Select another option')
                 end
-                avg_fc = A5_featureFrictionCalcFromSameScanHVOFF(idxMon,mainPath,flagSingleSectionProcess);
+                avg_fc = A5_featureFrictionCalcFromSameScanHVOFF(idxMon,mainPath,flagSingleSectionProcess,idxSectionHVon);
                 if isempty(avg_fc)
                     fprintf('For some reasons, the scan in HoverMode OFF is messed up. Choose a standard value if possible')
                     continue

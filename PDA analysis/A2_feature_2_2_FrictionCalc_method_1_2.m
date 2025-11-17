@@ -31,7 +31,7 @@
 %           6) averaged values of fast scan lines of force used for the fitting
 %           7) averaged values of fast scan lines of vertical force used for the fitting
 
-function avg_fc=A5_featureFrictionCalc_method_1_2(AFM,metadata,mask,idxMon,newFolder,method,maskRemoval,varargin)
+function avg_fc=A2_feature_2_2_FrictionCalc_method_1_2(AFM,metadata,mask,idxMon,newFolder,method,maskRemoval,varargin)
     % in case of code error, the waitbar won't be removed. So the following command force its closure
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)
