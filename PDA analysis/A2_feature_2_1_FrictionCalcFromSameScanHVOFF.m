@@ -69,7 +69,7 @@ function avg_fc = A2_feature_2_1_FrictionCalcFromSameScanHVOFF(idxMon,mainPath,f
             clear pathDirectoryFigSingleSectionsHV_ON files_figHV_ON_mask file_figHV_ON_mask_lastIteration
            
             dataPreProcess=allData(idxSectionHVon).AFMImage_Raw;
-            [AFM_HeightFittedMasked,AFM_height_IO]=A2_feature_processHeightChannel(dataPreProcess,SaveFigIthSectionFolder,idxMon,"Low",'imageType','SingleSection');                
+            [AFM_HeightFittedMasked,AFM_height_IO]=A2_feature_1_processHeightChannel(dataPreProcess,idxMon,SaveFigIthSectionFolder,'fitOrder',"Low",'imageType','SingleSection','SeeMe',false);                
             % save the results for the specific section, to avoid to perform manual binarization
             save(fullfile(pathDataSingleSectionsHV_OFF,sprintf("%s_heightChannelProcessed.mat",nameSection)),"AFM_HeightFittedMasked","AFM_height_IO") 
         end
@@ -81,7 +81,7 @@ function avg_fc = A2_feature_2_1_FrictionCalcFromSameScanHVOFF(idxMon,mainPath,f
     end
     
     [AFM_data,AFM_heightIO,maskRemoval] = featureRemovePortions(AFM_HeightFittedMasked,AFM_height_IO,idxMon);
-    avg_fc=A5_featureFrictionCalc_method_1_2(AFM_data,metadata,AFM_heightIO,idxMon,filePathResults,method,maskRemoval,pixData,fOutlierRemoval,fOutlierRemoval_text);    
+    avg_fc=A2_feature_2_2_FrictionCalc_method_1_2(AFM_data,metadata,AFM_heightIO,idxMon,filePathResults,method,maskRemoval,pixData,fOutlierRemoval,fOutlierRemoval_text);    
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%

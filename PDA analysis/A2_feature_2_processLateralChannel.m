@@ -4,7 +4,7 @@
 % Check manually the processed image afterwards and compare with the AFM VD
 % image!
 
-function varargout=A2_feature_processLateralChannel(AFM_data,AFM_height_IO,alpha,idxMon,newFolder,mainPath,varargin)
+function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alpha,idxMon,newFolder,mainPath,varargin)
     % in case of code error, the waitbar won't be removed. So the following command force its closure
     warning ('off','all'); 
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
@@ -172,26 +172,17 @@ function varargout=A2_feature_processLateralChannel(AFM_data,AFM_height_IO,alpha
     titleData1='Plane Fitted Background';
     titleData2={'Lateral Deflection - Trace'; '(removed fitted plane and shifted)'};
     nameFig='resultA5_2_planeBKfit_LateralDeflection';
-    figTmp=showData(idxMon,true,correction_plane,norm,titleData1,unitData,newFolder,nameFig,'data2',Lateral_Trace_corrPlane,'titleData2',titleData2,'saveFig',false);
+    figTmp=showData(idxMon,true,correction_plane,norm,titleData1,unitData,newFolder,nameFig,'data2',Lateral_Trace_corrPlane,'titleData2',titleData2);
     pause(1)
-    if getValidAnswer('Keep the Lateral Deflection with the plane-fitted background removed?','',{'Yes','No'})
-        Lateral_Trace_firstCorr = Lateral_Trace_corrPlane;
-        text='Plane fitted';
-        varargout{2}=fit_decision_final_plane;
-    else
-        Lateral_Trace_firstCorr = Lateral_Trace;
-        text='Plane Not fitted';
-        titleData2={'Lateral Deflection - Trace'; '(removed fitted plane and shifted - NOT TAKEN)'};
-    end
-    close(figTmp)
-    showData(idxMon,false,correction_plane,norm,titleData1,unitData,newFolder,nameFig,'data2',Lateral_Trace_corrPlane,'titleData2',titleData2);
-    pause(1)
+    text='Plane fitted';
+    varargout{2}=fit_decision_final_plane;
     answ=getValidAnswer('Continue with LineXLine fitting?','',{'Yes','No'});
-    Lateral_Trace_secondCorr = Lateral_Trace_firstCorr;
+    close(figTmp)
+    Lateral_Trace_secondCorr = Lateral_Trace_corrPlane;
     % fit lineXline
     if answ        
         % apply the PDA mask, so the PDA data  will be ignored. Use now the background        
-        Lateral_Trace_BK_1_maskOnly = Lateral_Trace_firstCorr;
+        Lateral_Trace_BK_1_maskOnly = Lateral_Trace_corrPlane;
         Lateral_Trace_BK_1_maskOnly(AFM_height_IO==1)=5;          
         % Init
         f1='fitOrder';f2='SSE';f3='R2';f4='coeffs';
@@ -367,7 +358,7 @@ function varargout=A2_feature_processLateralChannel(AFM_data,AFM_height_IO,alpha
             end
         end    
         % Remove background
-        Lateral_Trace_secondCorr = Lateral_Trace_firstCorr - Bk_iterative;
+        Lateral_Trace_secondCorr = Lateral_Trace_corrPlane - Bk_iterative;
         % Plot the fitted backround:            
         titleData1='Line x Line Fitted Background'; titleData2={'Lateral Deflection - Trace';sprintf("(%s - lineXline fitted)",text)};
         nameFig='resultA5_3_LineBKfit_LateralDeflection';
@@ -443,7 +434,7 @@ function varargout=A2_feature_processLateralChannel(AFM_data,AFM_height_IO,alpha
                 if ~exist(fullfile(mainPath,'HoverMode_OFF'),"dir")
                     error('The directory HoverMode_OFF doesn''t exist. Select another option')
                 end
-                avg_fc = A5_featureFrictionCalcFromSameScanHVOFF(idxMon,mainPath,flagSingleSectionProcess,idxSectionHVon);
+                avg_fc = A2_feature_2_1_FrictionCalcFromSameScanHVOFF(idxMon,mainPath,flagSingleSectionProcess,idxSectionHVon);
                 if isempty(avg_fc)
                     fprintf('For some reasons, the scan in HoverMode OFF is messed up. Choose a standard value if possible')
                     continue

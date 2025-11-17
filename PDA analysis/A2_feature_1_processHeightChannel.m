@@ -1,5 +1,4 @@
-function [AFM_Images,IO_Image,varargout]=A2_feature_process_1_fitHeightChannel(filtData,iterationMain,idxMon,filepath,varargin)
-
+function [AFM_Images,AFM_height_IO]=A2_feature_1_processHeightChannel(filtData,idxMon,SaveFigFolder,varargin)
 % The function extracts Images from the experiments.
 % It removes baseline and extracts foreground from the AFM image.
 %
@@ -14,321 +13,394 @@ function [AFM_Images,IO_Image,varargout]=A2_feature_process_1_fitHeightChannel(f
 %   3) Poly11: linear polynomial surface is fitted to results of Poly1 fitting, the fitted surface is subtracted from
 %      the results of Poly1 fitting (poly_filt_data), yielding filt_data_no_Bk_visible_data
 %   4) iterative backgrownd removal, in which R^2 and RMS residuals are used to calculate the final backgrownd
-% The output is binary image of the height (background + foreground)
 %
-% Author: Dr. R.D.Ortuso, Levente Juhasz
-% University of Geneva, Switzerland.
 %
-% Author modifications: Altieri F.
+% Author: Altieri F.
 % University of Tokyo
-%
-% Last update 27/08/2024
-%
+
     % in case of code error, the waitbar won't be removed. So the following command force its closure
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)
+    clear allWaitBars
     
-    % A tool for handling and validating function inputs.  define expected inputs, set default values, and validate the types
-    % and properties of inputs. This helps to make functions more robust and user-friendly.
-    p=inputParser();    %init instance of inputParser
-    % Add required parameter and also check if it is a struct by a inner function end if the Trace_type are
-    % all Trace
+    % A tool for handling and validating function inputs.  define expected inputs, set default values, and validate the types and properties of inputs.
+    p=inputParser();    % init instance of inputParser
+    % Add required and default parameters and also check conditions
     addRequired(p, 'filtData', @(x) isstruct(x));
-    %Add default parameters. When call the function, use 'argName' as well you use 'LineStyle' in plot! And
-
-    %then the values                                
-    argName = 'fitOrder';       defaultVal = 'Low';       addParameter(p, argName, defaultVal, @(x) ismember(x, {'Low', 'Medium', 'High'}));
-    argName = 'SeeMe';          defaultVal = true;        addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
-    argName = 'Normalized';     defaultVal = false;        addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
+    argName = 'setpointsList';  defaultVal = [];        addParameter(p,argName,defaultVal);
+    argName = 'SeeMe';          defaultVal = true;      addParameter(p,argName,defaultVal, @(x) islogical(x));
+    argName = 'imageType';      defaultVal = 'Entire';  addParameter(p,argName,defaultVal, @(x) ismember(x,{'Entire','SingleSection','Assembled'}));
+    argName = 'Normalization';  defaultVal = false;     addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
+    argName = 'fitOrder';       defaultVal = 'Low';     addParameter(p, argName, defaultVal, @(x) ismember(x, {'Low', 'Medium', 'High'}));
+    argName = 'metadata';       defaultVal = [];        addParameter(p,argName,defaultVal);
 
     % validate and parse the inputs
     parse(p,filtData,varargin{:});
-    clearvars argName defaultVal
-    
-    % if this is seconf time that the A3 is called, like for the second AFM section, keep the accuracy of
-    % first section
-    norm=p.Results.Normalized;
-    if norm, labelHeight=""; factor=1; else, labelHeight="Height (nm)"; factor=1e9; end
-    accuracy=p.Results.fitOrder;
+    metadata=p.Results.metadata;        
+    setpointN=p.Results.setpointsList;
+    typeProcess=p.Results.imageType;
     SeeMe=p.Results.SeeMe;
-    if strcmp(accuracy,'Low')
+    norm=p.Results.Normalization;
+    if norm, labelHeight=""; factor=1; else, labelHeight="Height (nm)"; factor=1e9; end    
+    if strcmp(p.Results.fitOrder,'Low')
         limit=3;
-    elseif strcmp(accuracy,'Medium')
+    elseif strcmp(p.Results.fitOrder,'Medium')
         limit=6;
     else
         limit=9;
-    end
-    % Extract the height channel
-    raw_data_Height=filtData(strcmp([filtData.Channel_name],'Height (measured)')).AFM_image;
+    end     
+    clearvars argName defaultVal p
+
+    % show the data prior the adjustments
+    A1_feature_CleanOrPrepFiguresRawData(filtData,'idxMon',idxMon,'folderSaveFig',SaveFigFolder,'metadata',metadata,'imageType',typeProcess,'SeeMe',SeeMe,"setpointsList",setpointN,'Normalization',norm);
+  
     % Orient the image by counterclockwise 180° and flip to coencide with the Microscopy image through rotations
-    % if the process is the first time, dont rotate again because the pre processed image is already rotated
-    if iterationMain==1
-        raw_data_Height=flip(rot90(raw_data_Height),2);
-    end
-    rawH=raw_data_Height;
-    
     for i=1:size(filtData,2)
-        if i==1             % put the fixed raw height data channel
-            AFM_Images(i)=struct(...
+        temp_img=flip(rot90(filtData(i).AFM_image),2);
+        AFM_Images(i)=struct(...
                 'Channel_name', filtData(i).Channel_name,...
                 'Trace_type', filtData(i).Trace_type, ...
-                'AFM_image', rawH); %#ok<AGROW>
-        else
-            if iterationMain==1
-                temp_img=flip(rot90(filtData(i).AFM_image),2);
-            else
-                temp_img=filtData(i).AFM_image;
-            end
-            AFM_Images(i)=struct(...
-                    'Channel_name', filtData(i).Channel_name,...
-                    'Trace_type', filtData(i).Trace_type, ...
-                    'AFM_image', temp_img); %#ok<AGROW>
-        end
+                'AFM_image', temp_img); %#ok<AGROW>
     end
-    height_1_original=AFM_Images(1).AFM_image;
+    clear filtData
+    % Extract the height channel
+    height_1_original=AFM_Images(strcmp([AFM_Images.Channel_name],'Height (measured)')).AFM_image;
     
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%% REMOVE OUTLIERS (remove anomalies like high spikes) %%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % this solution is more adaptive and less aggressive than removing 99.5
-    % percentile. Remove outliers line by line ==> more prone to remove spikes!
-    num_lines = size(height_1_original, 2);
-    height_2_outliersRemoved=zeros(size(height_1_original));
-    countOutliers=0;
-    for i=1:num_lines
-        yData = height_1_original(:, i);
-        [pos_outlier] = isoutlier(yData, 'gesd');        
-        while any(pos_outlier)
-            countOutliers=countOutliers+nnz(pos_outlier);
-            yData(pos_outlier) = NaN;
-            [pos_outlier] = isoutlier(yData, 'gesd');
-        end
-        height_2_outliersRemoved(:,i) = yData;
-    end
-    fprintf("\nBefore First 1st order plan fitting, %d outliers have been removed!\n",countOutliers)
-
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%% FIRST FITTING: FIRST ORDER PLANE FITTING ON ENTIRE DATA %%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    [height_image_3_corrPlane,planeFit] = planeFitting_N_Order(height_2_outliersRemoved,1);  
-    height_image_3_corrPlane=height_image_3_corrPlane-min(height_image_3_corrPlane(:));
-    % Display and save result
-    titleData1 = {'First Order Plane';'Fitted on Raw Height Channel'};
-    titleData2 = {'Height channel';'First Correction: 1st order plane fitting and shifted toward zero'};
-    nameFile = 'resultA2_1_Plane1order_correctedHeight';    
-    showData(idxMon,SeeMe,planeFit*factor,norm,titleData1,labelHeight,filepath,nameFile,'data2',height_image_3_corrPlane*factor,'titleData2',titleData2);   
-           
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%% BUTTERWORTH FILTERING : an automatic binarization but not for binarize the image, rather for better fitting %%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % After polynomial flattening, the image should have an average plane removed, but there can still be low-level background 
-    % offsets or uneven residuals. The goal of this snippet is to automatically detect a "background" height threshold — a level 
-    % that separates the flat background from the sample features — and to mask out (NaN) all pixels above that threshold.
-    %
-    % APPROACH: Rather than looking at the image spatially, the script looks at the statistical distribution of height values — i.e., the histogram.
-    % The histogram often looks like this in AFM height maps:
-    %   - a large peak at low height → background plane,
-    %   - smaller counts at higher heights → real surface features
-    % A low-pass Butterworth filter is applied to the histogram to smooth it and remove noise/spikes from pixel quantization or roughness variations.
-    % Butterworth because it provides a smooth, monotonic response (flat in passband, no oscillations).
-    % Ideal for cleaning noisy histogram data to identify peaks.
-    
-    % Original code uses 10'000 bins, which may be too fine for most AFM height ranges
-    % Therefore, automatically adapt the number of bins based on data range and image size.
-    numBins = min(5000, max(100, round(numel(height_image_3_corrPlane)/100))); % adaptive bin count
-    % distribute the fitted data among bins using N bins and Normalize Y before filtering to make it scale-independent.
-    [Y,E_height] = histcounts(height_image_3_corrPlane,numBins,'Normalization', 'pdf');
-    % set the parameters for Butterworth filter ==> little recap: it is a low-pass filter with a frequency
-    % response that is as flat as possible in the passband
-    
-    % Butterworth filter of order 6 with normalized cutoff frequency Wn
-    % Return transfer function coefficients to be used in the filter function and then filter the data
-    % ORIGINAL LINE: [b,a] = butter(order, fc/(fs/2)); where
-    % - fc = 5                                      ==> Cut off frequency
-    % - fs = fs = size(height_image_1_original,2)   ==> sampling frequency (number of pixels per line)
-    % IMPROVED VERSION: Define fc as a fraction of Nyquist, directly specifying Wn (0–1 scale, where 1 corresponds to the Nyquist frequency).    
-    Wn = 0.02;            % normalized cutoff (2% of Nyquist)
-    [b,a] = butter(4, Wn);  % 4th order is usually enough
-    Y_filtered = filtfilt(b,a,Y); % zero-phase filtering (better symmetry)
-
-    % Second derivative of the filtered histogram to detect the inflection point — the point where the curvature changes sign.
-    % That inflection marks the transition from the main background peak to the tail of higher-height values
-    % ORIGINAL LINE: Y_filered_diff=diff(diff(Y_filtered)) ==> this approach is crude
-    % it just looks for one zero crossing of the second derivative, which can fail if the histogram is multimodal or noisy.
-    % IMPROVED VERSION: Use gradient-based peak analysis or findpeaks on the smoothed histogram derivative:
-    % This finds the largest negative-to-positive transition, i.e., where the histogram slope changes most sharply
-    dY = gradient(Y_filtered);    
-    [~, locs] = findpeaks(-dY, 'NPeaks', 1, 'SortStr', 'descend');
-    bk_limit = locs(1);
-    E_height=E_height*1e9;
-    background_th = E_height(bk_limit);     % express in nm
-    thresholdApproach="Automatic";
-    % HOWEVER, it doesnt work always, so also manual selection
-    fbutter=figure; hold on
-    plot(E_height(1:end-1), Y_filtered, 'b', 'LineWidth', 2,'DisplayName','Butterworth-filtered Height');
-    xline(background_th, 'r--', 'LineWidth', 1.5,'DisplayName','Background Automatic (2nd derivative) threshold');       
-    title('First background detection with butterworth-filtered Height','FontSize',16); legend('FontSize',15)
-    xlabel('Height (nm)','FontSize',14); ylabel('PDF (Probability Density Function on Count','FontSize',14);
-    xlim tight, grid on
-    objInSecondMonitor(fbutter,idxMon)
-    pause(2)
-    question=sprintf(['Is the threshold to separate Background from Foreground good enough?\n'...
-        'NOTE: it is not necessary to be precise because this step is not for binarization,\nbut at least should approximately separate the two regions.']);
-    if ~getValidAnswer(question,"",{'Yes','No'})
-        uiwait(msgbox('Click on the plot to define the threshld to separate Background from Foreground',''));
-        closest_indices=selectRangeGInput(1,1,E_height(1:end-1), Y_filtered);
-        background_th=E_height(closest_indices);
-        xline(background_th, 'g--', 'LineWidth', 1.5,'DisplayName','Background Manual threshold'); 
-        thresholdApproach="Manual";
-    end        
-    saveFigures_FigAndTiff(fbutter,filepath,'resultA2_3_ButterworthFilteredHeight_backgroundDetection')   
-    % all pixels above this height (i.e., part of the actual structure) are
-    % masked (NaN), leaving only the flat background    
-    BK_butterworthFiltered = height_image_3_corrPlane;
-    BK_butterworthFiltered(BK_butterworthFiltered > background_th*1e-9) = NaN;
-    clear fbutter closest_indices background_th numBins Y E_height Wn b a Y_filtered dY locs bk_limit
-    titleData=sprintf('Background Height - Butterworth Filtered Height and separated by %s threshold',thresholdApproach);     
-    nameFile='resultA2_4_BackgroundHeight_butterworth';   
-    showData(idxMon,SeeMe,BK_butterworthFiltered*factor,norm,titleData,labelHeight,filepath,nameFile);
-  
-    % suppress warning about removing NaN values
-    %  id='curvefit:prepareFittingData:removingNaNAndInf';
-    %  warning('off',id)
-
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%% THIRD FITTING: N ORDER PLANE FITTING ON BUTTERWORTH FILTERED BACKGROUND %%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
-    [BK_butterworthFiltered_Fitted,planeCorrection,metrics] = planeFitting_N_Order(BK_butterworthFiltered,limit);
-    height_4_firstBKfit=height_image_3_corrPlane-planeCorrection;       
-    % shift the entire data toward zero (background should be zero)
-    height_4_firstBKfit=height_4_firstBKfit-(min(height_4_firstBKfit(:)));
-    % show the results
-    titleData1={'Plane fitted';sprintf('Order Plane: %s',metrics.fitOrder)};
-    titleData2={'Background Height';'Butterworth Filtered Height and Plan Fitted'};     
-    nameFile='resultA2_4_Plane_Background';   
-    showData(idxMon,SeeMe,planeCorrection*factor,norm,titleData1,labelHeight,filepath,nameFile,'data2',BK_butterworthFiltered_Fitted*factor,'titleData2',titleData2);
-    titleData={'Height Channel corrected';'Butterworth-filtered, BK detection, fitted Height shifted toward zero.'};  
-    nameFile='resultA2_5_correctedHeight_afterButterworthBKfit';
-    showData(idxMon,SeeMe,height_4_firstBKfit*factor,norm,titleData,labelHeight,filepath,nameFile);
-    clear titleData* nameFile
-        
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%% FORTH FITTING: N ORDER LINE-BY-LINE FITTING THE NEW PLANE-FITTED HEIGHT %%%%
-    %%%  (Note: not masked. It turned out using the previous BK as mask is worse) %%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
-    height_5_lineXlineFIT = lineByLineFitting_N_Order(height_4_firstBKfit,limit);
-    height_5_lineXlineFIT = height_5_lineXlineFIT-min(height_5_lineXlineFIT(:));
-    % plot the resulting corrected data
-    title1='Height (measured) channel - Single Line Fitted and shifted toward zero';        
-    showData(idxMon,SeeMe,height_5_lineXlineFIT*1e9,false,title1,'Height (nm)',filepath,'resultA2_6_HeightLineFitted_noNorm');
-    showData(idxMon,SeeMe,height_5_lineXlineFIT,true,title1,'',filepath,'resultA2_6_HeightLineFitted_norm');  
-
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% BINARIZATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % start the binarization to create the 0/1 height image. At the same time show normal and logical image
-    % for better comparison
-    AFM_noBk_visible_data=imadjust(height_5_lineXlineFIT/max(height_5_lineXlineFIT(:))); % normalize for better show data
-    f4=figure;
-    subplot(121), imshow(AFM_noBk_visible_data),colormap parula, axis on
-    title('Height (measured) channel - Single Line Fitted', 'FontSize',16)
-    objInSecondMonitor(f4,idxMon);
-    c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
-    ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
-
-    first_In=1;
-    closest_indices=[];
-    no_sub_div=1000;
-    % Binarisation of the bg-subtracted image
+    % after the first iteration, a mask and definitive corrected height
+    % image have been generated. However, although the the definitive
+    % height may be ok, the mask could be still not perfect. Since the mask
+    % is the most important element for the lateral deflection section and
+    % it highly depends on the height channel, it is suggested to
+    % re-iterate the mask generation with a new and cleaner height channel
+    iterationMain=1;
     while true
-        kernel=strel('square',3); % can be modified
-        if(first_In==1)
-            % original
-            T = adaptthresh(mat2gray(height_5_lineXlineFIT));
-            seg_AFM = imbinarize(mat2gray(height_5_lineXlineFIT),T);
-        else
-            clearvars seg_AFM th_segmentation seg_binarized           
-            imhistfig=figure('visible','on');hold on,plot(Y)
-            if any(closest_indices)
-                scatter(closest_indices,Y(closest_indices),40,'r*')
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%%% REMOVE OUTLIERS (remove anomalies like high spikes) %%%%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        % this solution is more adaptive and less aggressive than removing 99.5
+        % percentile. Remove outliers line by line ==> more prone to remove spikes!
+        num_lines = size(height_1_original, 2);
+        countOutliers=0;
+        height_2_outliersRemoved=zeros(size(height_1_original));
+        for i=1:num_lines
+            yData = height_1_original(:, i);
+            [pos_outlier] = isoutlier(yData, 'gesd');        
+            while any(pos_outlier)
+                countOutliers=countOutliers+nnz(pos_outlier);
+                yData(pos_outlier) = NaN;
+                [pos_outlier] = isoutlier(yData, 'gesd');
             end
-            pan on; zoom on;
-            % show dialog box before continue. Select the thresholding
-            uiwait(msgbox('Before click to continue the binarization, zoom or pan on the image for a better view',''));
-            zoom off; pan off;
-            closest_indices=selectRangeGInput(1,1,1:no_sub_div,Y);
-            th_segmentation=E_height(closest_indices);
-            close(imhistfig)
-            seg_AFM=height_5_lineXlineFIT;
-            seg_AFM(seg_AFM<th_segmentation)=0;
-            seg_AFM(seg_AFM>=th_segmentation)=1;
-        end       
-        seg_binarized=imerode(seg_AFM,kernel);
-        seg_binarized=imdilate(seg_binarized,kernel);
-        if exist('h1', 'var') && ishandle(h1)
-            delete(h1);
+            height_2_outliersRemoved(:,i)=yData;
         end
-        h1=subplot(122);
-        imshow(seg_binarized); title('Baseline and foreground processed', 'FontSize',16), colormap parula
-        colorbar('Ticks',[0 1],...
-         'TickLabels',{'Background','Foreground'},'FontSize',13)
-
+        fprintf("\nBefore First 1st order plan fitting, %d outliers have been removed!\n",countOutliers)
+        clear num_lines countOutliers
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%% FIRST FITTING: FIRST ORDER PLANE FITTING ON ENTIRE DATA %%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        [height_3_corrPlane,planeFit] = planeFitting_N_Order(height_2_outliersRemoved,1);  
+        height_3_corrPlane=height_3_corrPlane-min(height_3_corrPlane(:));
+        % Display and save result
+        titleData1 = {'First Order Plane';'Fitted on Raw Height Channel'};
+        titleData2 = {'Height channel';'First Correction: 1st order plane fitting and shifted toward zero'};
+        nameFile = sprintf('resultA2_1_Plane1order_correctedHeight_iteration%d',iterationMain);    
+        showData(idxMon,SeeMe,planeFit*factor,norm,titleData1,labelHeight,SaveFigFolder,nameFile,'data2',height_3_corrPlane*factor,'titleData2',titleData2);   
+               
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%%%%% BUTTERWORTH FILTERING : an automatic binarization but not for binarize the image, rather for better fitting %%%%%%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        % After polynomial flattening, the image should have an average plane removed, but there can still be low-level background 
+        % offsets or uneven residuals. The goal of this snippet is to automatically detect a "background" height threshold — a level 
+        % that separates the flat background from the sample features — and to mask out (NaN) all pixels above that threshold.
+        %
+        % APPROACH: Rather than looking at the image spatially, the script looks at the statistical distribution of height values — i.e., the histogram.
+        % The histogram often looks like this in AFM height maps:
+        %   - a large peak at low height → background plane,
+        %   - smaller counts at higher heights → real surface features
+        % A low-pass Butterworth filter is applied to the histogram to smooth it and remove noise/spikes from pixel quantization or roughness variations.
+        % Butterworth because it provides a smooth, monotonic response (flat in passband, no oscillations).
+        % Ideal for cleaning noisy histogram data to identify peaks.
         
-        satisfied=questdlg('Keep automatic threshold selection or turn to Manual?', 'Manual Selection', 'Keep Current','Manual Selection','Keep Current');
-        if(first_In==1)
-            if(strcmp(satisfied,'Manual Selection'))
-                [Y,E_height] = histcounts(height_5_lineXlineFIT,no_sub_div);
-                first_In=0;
+        % Original code uses 10'000 bins, which may be too fine for most AFM height ranges
+        % Therefore, automatically adapt the number of bins based on data range and image size.
+        numBins = min(5000, max(100, round(numel(height_3_corrPlane)/100))); % adaptive bin count
+        % distribute the fitted data among bins using N bins and Normalize Y before filtering to make it scale-independent.
+        [Y,E_height] = histcounts(height_3_corrPlane,numBins,'Normalization', 'pdf');
+        % set the parameters for Butterworth filter ==> little recap: it is a low-pass filter with a frequency
+        % response that is as flat as possible in the passband
+        
+        % Butterworth filter of order 6 with normalized cutoff frequency Wn
+        % Return transfer function coefficients to be used in the filter function and then filter the data
+        % ORIGINAL LINE: [b,a] = butter(order, fc/(fs/2)); where
+        % - fc = 5                                      ==> Cut off frequency
+        % - fs = fs = size(height_image_1_original,2)   ==> sampling frequency (number of pixels per line)
+        % IMPROVED VERSION: Define fc as a fraction of Nyquist, directly specifying Wn (0–1 scale, where 1 corresponds to the Nyquist frequency).    
+        Wn = 0.02;            % normalized cutoff (2% of Nyquist)
+        [b,a] = butter(4, Wn);  % 4th order is usually enough
+        Y_filtered = filtfilt(b,a,Y); % zero-phase filtering (better symmetry)
+    
+        % Second derivative of the filtered histogram to detect the inflection point — the point where the curvature changes sign.
+        % That inflection marks the transition from the main background peak to the tail of higher-height values
+        % ORIGINAL LINE: Y_filered_diff=diff(diff(Y_filtered)) ==> this approach is crude
+        % it just looks for one zero crossing of the second derivative, which can fail if the histogram is multimodal or noisy.
+        % IMPROVED VERSION: Use gradient-based peak analysis or findpeaks on the smoothed histogram derivative:
+        % This finds the largest negative-to-positive transition, i.e., where the histogram slope changes most sharply
+        dY = gradient(Y_filtered);    
+        [~, locs] = findpeaks(-dY, 'NPeaks', 1, 'SortStr', 'descend');
+        bk_limit = locs(1);
+        E_height=E_height*1e9;
+        background_th = E_height(bk_limit);     % express in nm
+        thresholdApproach="Automatic";
+        % HOWEVER, it doesnt work always, so also manual selection
+        fbutter=figure; hold on
+        plot(E_height(1:end-1), Y_filtered, 'b', 'LineWidth', 2,'DisplayName','Butterworth-filtered Height');
+        xline(background_th, 'r--', 'LineWidth', 1.5,'DisplayName','Background Automatic (2nd derivative) threshold');       
+        title('First background detection with butterworth-filtered Height','FontSize',16); legend('FontSize',15)
+        xlabel('Height (nm)','FontSize',14); ylabel('PDF (Probability Density Function on Count','FontSize',14);
+        xlim tight, grid on
+        objInSecondMonitor(fbutter,idxMon)
+        pause(2)
+        question=sprintf(['Is the threshold to separate Background from Foreground good enough?\n'...
+            'NOTE: it is not necessary to be precise because this step is not for binarization,\nbut at least should approximately separate the two regions.']);
+        if ~getValidAnswer(question,"",{'Yes','No'})
+            uiwait(msgbox('Click on the plot to define the threshold to separate Background from Foreground',''));
+            closest_indices=selectRangeGInput(1,1,E_height(1:end-1), Y_filtered);
+            background_th=E_height(closest_indices);
+            xline(background_th, 'g--', 'LineWidth', 1.5,'DisplayName','Background Manual threshold'); 
+            thresholdApproach="Manual";
+        end        
+        saveFigures_FigAndTiff(fbutter,SaveFigFolder,sprintf('resultA2_2_ButterworthFilteredHeight_backgroundDetection_iteration%d',iterationMain'))   
+        % all pixels above this height (i.e., part of the actual structure) are
+        % masked (NaN), leaving only the flat background    
+        BK_butterworthFiltered = height_3_corrPlane;
+        BK_butterworthFiltered(BK_butterworthFiltered > background_th*1e-9) = NaN;
+        clear fbutter closest_indices background_th numBins Y E_height Wn b a Y_filtered dY locs bk_limit
+        titleData=sprintf('Background Height - Butterworth Filtered Height and separated by %s threshold',thresholdApproach);     
+        nameFile=sprintf('resultA2_4_BackgroundHeight_butterworth_iteration%d',iterationMain);   
+        showData(idxMon,SeeMe,BK_butterworthFiltered*factor,norm,titleData,labelHeight,SaveFigFolder,nameFile);
+          
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%% SECOND FITTING: N ORDER PLANE FITTING ON BUTTERWORTH FILTERED BACKGROUND %%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
+        [BK_butterworthFiltered_Fitted,planeCorrection,metrics] = planeFitting_N_Order(BK_butterworthFiltered,limit);
+        height_4_firstBKfit=height_3_corrPlane-planeCorrection;  
+        % shift the entire data toward zero (background should be zero)
+        height_4_firstBKfit=height_4_firstBKfit-(min(height_4_firstBKfit(:)));
+        % show the results
+        titleData1={'Plane fitted';sprintf('Order Plane: %s',metrics.fitOrder)};
+        titleData2={'Background Height';'Butterworth Filtered Height and Plan Fitted'};     
+        nameFile=sprintf('resultA2_3_Plane_Background_iteration%d',iterationMain);   
+        showData(idxMon,SeeMe,planeCorrection*factor,norm,titleData1,labelHeight,SaveFigFolder,nameFile,'data2',BK_butterworthFiltered_Fitted*factor,'titleData2',titleData2);
+        titleData={'Height Channel corrected';'Butterworth-filtered, BK detection, fitted Height shifted toward zero.'};  
+        nameFile=sprintf('resultA2_4_correctedHeight_afterButterworthBKfit_iteration%d',iterationMain);
+        showData(idxMon,SeeMe,height_4_firstBKfit*factor,norm,titleData,labelHeight,SaveFigFolder,nameFile);
+        clear titleData* nameFile BK_butterworthFiltered* countOutliers 
+            
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%% THIRD FITTING: N ORDER LINE-BY-LINE FITTING THE NEW PLANE-FITTED HEIGHT %%%%
+        %%%  (Note: not masked. It turned out using the previous BK as mask is worse) %%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
+        height_5_lineXlineFIT = lineByLineFitting_N_Order(height_4_firstBKfit,limit);
+        height_5_lineXlineFIT = height_5_lineXlineFIT-min(height_5_lineXlineFIT(:));
+        % plot the resulting corrected data
+        title1='Height (measured) channel - Single Line Fitted and shifted toward zero';        
+        showData(idxMon,SeeMe,height_5_lineXlineFIT*1e9,false,title1,'Height (nm)',SaveFigFolder,sprintf('resultA2_5_HeightLineFitted_noNorm_iteration%d',iterationMain));
+        showData(idxMon,SeeMe,height_5_lineXlineFIT,true,title1,'',SaveFigFolder,sprintf('resultA2_5_HeightLineFitted_norm_iteration%d',iterationMain));  
+    
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% BINARIZATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        % start the binarization to create the mask, i.e. the 0/1 height image (0 = Background, 1 = Foreground). 
+
+        IO_Image=binarization_autoAndManualHist(height_5_lineXlineFIT,idxMon);
+        binarizationMethod="Original method Binarization";
+        
+        
+        % PYTHON BINARIZATION TECHNIQUES. It requires other options, when I
+        % will have more time. Especially for DeepLearning technique
+        question="Satisfied of the first binarization method? If not, run the Python Binarization tools!";
+        if ~getValidAnswer(question,"",{"Yes","No"},2)
+            modulePython=extractBinarizationPYmodule();
+            % show height image for help
+            titletext={'Height (measured) channel';'After LineByLine Fitting with Butterworth-filtered Height'};
+            ftmp=showData(idxMon,true,height_5_lineXlineFIT,true,titletext,'Normalized','','','saveFig',false);            
+            % NOTE, output from python function are py.numpy.ndarray, not MATLAB arrays. Therefore, take BW and corrected directly appear unusable.
+            options={'otsu','multi-otsu','sauvola','niblack','bradley-roth','adaptive-gaussian','yen','li','triangle','isodata','watershed'};
+            BW_allMethods=cell(1,length(options));
+            for i=1:length(options)
+                method=options{i};
+                result=modulePython.binarize_stripe_image(height_5_lineXlineFIT,method);
+                % Convert to MATLAB arrays
+                BW = double(result);
+                figure, imagesc(BW), axis equal, xlim tight, title(sprintf("METHOD BINARIZATION: %s",method),"Fontsize",16)
+                BW_allMethods{i}=BW;
             end
+            choice=getValidAnswer('Which Binarization method do you choose?',"",options);
+            IO_Image=BW_allMethods{choice};
+            binarizationMethod=sprintf("Python Binarization - method %s",options{choice});
+            close(ftmp), clear ftmp
         end
-        if strcmp(satisfied,'Keep Current')
-            break
-        end
-    end
-    % often the 
-    question='Satisfied of the effective binarization? If not, run ImageSegmenter ToolBox for better manual binarization';
-    options={'Yes','No'};
-    if ~getValidAnswer(question,'',options)
-        close(f4)
-        f5=figure;
-        imshow(AFM_noBk_visible_data),colormap parula, axis on
-        title('Height (measured) channel - CLOSE THIS WINDOW WHEN SEGMENTATION TERMINATED', 'FontSize',16)
-        objInSecondMonitor(f5,idxMon);
-        c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
-        ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
-        % for some reasons, the exported variable is stored in the base workspace, outside the current
-        % function. So take it from there. Save the workspace of before and after and take the new variables.
-        tmp1=evalin('base', 'who');
-        imageSegmenter(AFM_noBk_visible_data), colormap parula
-        waitfor(f5)
-        tmp2=evalin('base', 'who');
-        varBase=setdiff(tmp2,tmp1);
-        for i=1:length(varBase)            
-            text=sprintf('%s',varBase{i});
-            var = evalin('base', text);
-            ftmp=figure;
-            imshow(var), colormap parula            
-            if getValidAnswer('Is the current figure the right binarized AFM?','',{'Yes','No'})
+        
+        % show data and if it is not okay, start toolbox segmentation
+        textTitleIO=sprintf('Binary Height Image - iteration %d\n%s',iterationMain,binarizationMethod);                
+        question=sprintf('Satisfied of the binarization of the iteration %d? If not, run ImageSegmenter ToolBox for better manual binarization',iterationMain);        
+        if iterationMain>1 && ~getValidAnswer(question,'',{'Yes','No'})            
+            % Run ImageSegmenter Toolbox if at end of the second iteration, the mask is still not good enough
+            textTitle='Height (measured) channel - CLOSE THIS WINDOW WHEN SEGMENTATION TERMINATED';
+            showData(idxMon,true,height_5_lineXlineFIT,true,textTitle,'','','','saveFig',false)
+            % ImageSegmenter return vars and stores in the base workspace, outside the current
+            % function. So take it from there. Save the workspace of before and after and take
+            % the new variables by checking the differences of workspace
+            tmp1=evalin('base', 'who');
+            imageSegmenter(AFM_noBk_visible_data), colormap parula
+            waitfor(f5)
+            tmp2=evalin('base', 'who');
+            varBase=setdiff(tmp2,tmp1);
+            for i=1:length(varBase)            
+                text=sprintf('%s',varBase{i});
+                var = evalin('base', text);
+                ftmp=figure;
+                imshow(var), colormap parula            
+                if getValidAnswer('Is the current figure the right binarized AFM?','',{'Yes','No'})
+                    close(ftmp)
+                    IO_Image=var;
+                    break
+                end
                 close(ftmp)
-                seg_binarized=var;
-                break
             end
-            close(ftmp)
+            clear tmp* vtmp var ftmp
+            binarizationMethod="ImageSegmenter Toolbox";
+            textTitleIO=sprintf('Binary Height Image - iteration %d\n%s',iterationMain,binarizationMethod);            
         end
-        clear tmp* vtmp var ftmp
-    end
-     
-    % show data
-    titleData=sprintf('Baseline and foreground processed - Iteration %d',iterationMain);
-    nameFile=sprintf('resultA2_7_BaselineForeground_iteration%d',iterationMain);
-    showData(idxMon,SeeMe,seg_binarized,false,titleData,'',filepath,nameFile,'Binarized',true)
+        % SAVE THE DEFINITIVE MASK        
+        nameFile=sprintf('resultA2_6_BaselineForeground_iteration%d',iterationMain);
+        showData(idxMon,false,IO_Image,false,textTitleIO,'',SaveFigFolder,nameFile,'Binarized',true)
+        AFM_height_IO=logical(IO_Image);
+        
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%% MASK GENERATED ==> MASK ORIGINAL HEIGHT IMAGE AND REMOVE PLANE BASELINE %%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%             
+        % Once the mask has been created, next step is remove new baseline by using the mask. This because is now easier to distinguish 
+        % background from foreground, therefore a better plane-baseline fitting can be made, thus a more accurate AFM height image 
+        % can be obtained directly from original AFM height image      
+        heightBackground=height_1_original;
+        % mask original AFM height image
+        heightBackground(AFM_height_IO)=NaN;
+
+
+
+        height_5_lineXlineFIT = lineByLineFitting_N_Order(heightBackground,1);
+
+        % Polynomial baseline fitting (line by line) to remove tilted effect
+        poly_filt_data=zeros(size(heightBackground,1),size(heightBackground,2));
+        for i=1:size(heightBackground,2)
+            [xData,yData] = prepareCurveData((1:size(heightBackground,1))',heightBackground(:,i));
+            ft = fittype( 'poly1' );
+            [fitresult,~]=fit(xData,yData, ft,'Exclude', yData > 1 ); % exclude PDA crystals
+             % dont use the offset p2, rather the first value of the i-th column to normalize
+            xData_mod=xData-1;
+            baseline_y=(fitresult.p1*xData_mod+heightBackground(1,i));
+            % substract the baseline_y and then substract by the minimum ==> get the 0 value in height 
+            flag_poly_filt_data=image_height(:,i)-baseline_y;
+            poly_filt_data(:,i)=flag_poly_filt_data-min(min(flag_poly_filt_data));
+        end
+      
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%% FORTH FITTING: FIRST ORDER PLANE FITTING ON MASKED DATA %%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        % Using the AFM_height_IO, fit the background again, yielding a more accurate height image by using the 0\1 height image
+        [height_3_corrPlane,planeFit] = planeFitting_N_Order(height_2_outliersRemoved,1);  
+        height_3_corrPlane=height_3_corrPlane-min(height_3_corrPlane(:));
+        % Display and save result
+        titleData1 = {'First Order Plane';'Fitted on Raw Height Channel'};
+        titleData2 = {'Height channel';'First Correction: 1st order plane fitting and shifted toward zero'};
+        showData(idxMon,SeeMe,planeFit*factor,norm,titleData1,labelHeight,SaveFigFolder,nameFile,'data2',height_3_corrPlane*factor,'titleData2',titleData2);   
+ 
+
+         textTitle='Height (measured) channel - Pre-Optimization';
+            textColorLabel='Height (nm)';
+            textNameFile=sprintf('resultA2_8_heightOptimized_afterMasking_iteration%d',iterationMain);
+            showData(idxMon,false,heightBackground,true,textTitle,textColorLabel,SaveFigFolder,textNameFile)
+
+
+        AFM_noBk=poly_filt_data;
+        AFM_noBk=AFM_noBk-min(min(AFM_noBk));
+      
+
+
+
+
+         textTitle='Height (measured) channel - Masked, Fitted, Optimized';
+    textColorLabel='Normalized Height';
+    textNameFile=sprintf('resultA4_2_OptFittedHeightChannel_Norm_iteration%d',iterationMain);
+    showData(idxMon,SeeMe,AFM_noBk,true,textTitle,textColorLabel,SaveFigFolder,textNameFile)
     if SeeMe
         uiwait(msgbox('Click to continue'))
     end
-    close gcf    
-    IO_Image=logical(seg_binarized);
+    close gcf
+
+    textTitle='Height (measured) channel - Masked, Fitted, Optimized';
+    textColorLabel='Height (nm)';
+    textNameFile=sprintf('resultA4_3_OptFittedHeightChannel_iteration%d',iterationMain);
+    showData(idxMon,false,AFM_noBk*1e9,false,textTitle,textColorLabel,SaveFigFolder,textNameFile)
+    % fig is invisible
+    close gcf   
+
     if(exist('wb','var'))
-        delete (wb)
+        delete(wb)
+    end
+    
+    % show the definitive height distribution. Better distinction between PDA and BK by using the mask
+    if SeeMe
+        f4=figure('Visible','on');
+    else
+        f4=figure('Visible','off');
+    end
+    percentile=99;
+    AFM_noBk_dataBKonly=AFM_noBk(AFM_height_IO==0);
+    AFM_noBk_dataPDAonly=AFM_noBk(AFM_height_IO==1);    
+    thresholdBK = prctile(AFM_noBk_dataBKonly(:), percentile);
+    thresholdPDA = prctile(AFM_noBk_dataPDAonly(:), percentile);
+    % outliers removal
+    AFM_noBk_dataBKonly(AFM_noBk_dataBKonly >= thresholdBK) = NaN; 
+    AFM_noBk_dataPDAonly(AFM_noBk_dataPDAonly >= thresholdPDA) = NaN; 
+    AFM_noBk_dataBKonly = AFM_noBk_dataBKonly(~isnan(AFM_noBk_dataBKonly))*1e9;
+    AFM_noBk_dataPDAonly = AFM_noBk_dataPDAonly(~isnan(AFM_noBk_dataPDAonly))*1e9;
+    edgesBK=min(AFM_noBk_dataBKonly):1:max(AFM_noBk_dataBKonly);
+    edgesPDA=min(AFM_noBk_dataPDAonly):1:max(AFM_noBk_dataPDAonly);
+    hold on    
+    histogram(AFM_noBk_dataBKonly,edgesBK,'DisplayName','Distribution height','Normalization','percentage');
+    histogram(AFM_noBk_dataPDAonly,edgesPDA,'DisplayName','Distribution height','Normalization','percentage');
+    legend({'Background','Foreground'},'FontSize',15)
+    xlabel(sprintf('Feature height (nm)'),'FontSize',15), ylabel('Percentage %','FontSize',15), grid minor, grid on
+    title(sprintf('Distribution Height (Percentile %d°)',percentile),'FontSize',20)
+    objInSecondMonitor(f4,idxMon);
+
+    fullfileFig=fullfile(SaveFigFolder,'tiffImages',sprintf('resultA4_4_OptHeightDistribution_iteration%d',iterationMain));
+    saveas(f4,fullfileFig,'tif')
+    fullfileFig=fullfile(SaveFigFolder,'figImages',sprintf('resultA4_4_OptHeightDistribution_iteration%d',iterationMain));
+    saveas(f4,fullfileFig)
+    close(f4)
+    % substitutes to the original height image with the new opt fitted heigh
+    AFM_Images_Bk=AFM_Images;
+    AFM_Images_Bk(strcmp([AFM_Images_Bk.Channel_name],'Height (measured)')).AFM_image=AFM_noBk;
+
+
+
+
+    %%%%%%%%%%%%%%%%%%%%
+
+    
+    
+    
+        % stop the iteration of the mask and height channel generation and keep
+        % those have been generated in the last iteration    
+        question={"Satisfied of the definitive Height image and mask?";"If not, repeat again the process with the last height image to generate again a new mask.";"NOTE: ImageSegmenter Toolbox (Manual Binarization) is available at the second iteration)"};
+        if ~getValidAnswer(question,'',{'y','n'},2)
+            break
+        else
+            iterationMain=iterationMain+1;
+            height_1_original=AFM_HeightFittedMasked;
+        end 
     end
 end
 
@@ -543,3 +615,102 @@ function  varargout = lineByLineFitting_N_Order(data,limit)
     varargout{3}=fit_decision_final;
 end
 
+function IO_Image= binarization_autoAndManualHist(height_5_lineXlineFIT,idxMon)
+% original script used this approach which is not really great
+    % for better comparison, first subplot there is height image (normalized for better show data)
+    AFM_noBk_visible_data=imadjust(height_5_lineXlineFIT/max(height_5_lineXlineFIT(:))); 
+    f1 = figure('Name','Binarization Tool');
+    tiledlayout(f1,2,2,'TileSpacing','compact');
+    % --- Subplot 1: Original AFM image (always visible) ---
+    nexttile(1,[2 1]);
+    imshow(AFM_noBk_visible_data),colormap parula, axis on
+    title({'Height (measured) channel';'After LineByLine Fitting with Butterworth-filtered Height'}, 'FontSize',15)
+    objInSecondMonitor(f1,idxMon);
+    c = colorbar; c.Label.String = 'normalized Height'; c.Label.FontSize=15;
+    ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
+    % allocate histogram + preview axes
+    axHist = nexttile(2); cla(axHist); title(axHist,'Histogram (manual mode)');
+    axBinImage = nexttile(4); cla(axBinImage); title(axBinImage,'Binarized preview'); colormap(axBinImage,parula);
+    % start the binarization
+    first_In=true;
+    closest_indices=[];
+    no_sub_div=1000;
+    kernel = strel('square',3);   % constant morphological kernel    
+    prevXLine = [];
+    while true
+        % ---- Automatic thresholding (first iteration) ----
+        if first_In
+            T = adaptthresh(mat2gray(height_5_lineXlineFIT));
+            segAFM = imbinarize(mat2gray(height_5_lineXlineFIT),T);
+        else            
+        % ---- Manual thresholding (subsequent iterations) ----
+            % Compute histogram ONLY once
+            if ~exist('Y','var')
+                [Y,E_height] = histcounts(height_5_lineXlineFIT, no_sub_div);
+                binCenters = (E_height(1:end-1) + diff(E_height)/2)*1e9;  % compute center of each bin, convert it into nm
+                axes(axHist); cla(axHist); %#ok<LAXES>
+                plot(axHist, binCenters,Y,'LineWidth',1.3,'DisplayName','Height Distribution'), hold(axHist,'on')
+                title(axHist,'Manual Threshold Selection'); xlabel(axHist,'Height (nm)'); ylabel(axHist,'Count')
+            end
+            
+            % --- Plot histogram in upper-right subplot ---
+            if any(closest_indices)
+                prevXLine=xline(axHist,binCenters(closest_indices),'r--','LineWidth',2,'DisplayName','Previous selection');
+            end
+            % --- Let user click on histogram ---
+            zoom(axHist,'on'); pan(axHist,'on');
+            uiwait(msgbox('Zoom/pan if needed, then click OK to pick threshold'));
+            zoom(axHist,'off'); pan(axHist,'off');
+            closest_indices=selectRangeGInput(1,1,binCenters,Y);
+            % eventually, delete previous existing line (two iterations earlier)
+            if ~isempty(prevXLine) && isvalid(prevXLine)
+                delete(prevXLine);
+            end
+            thSeg=E_height(closest_indices);
+            % Apply threshold
+            segAFM = height_5_lineXlineFIT >= thSeg;                
+        end
+        % ---- Morphological cleaning ----
+        segBin = imerode(segAFM, kernel);
+        segBin = imdilate(segBin, kernel);
+
+        % -------- Update preview subplot --------
+        axes(axBinImage); cla(axBinImage); %#ok<LAXES>
+        imshow(segBin,'Parent',axBinImage);
+        title(axBinImage,'Binarized Image','FontSize',12); colormap(axBinImage,parula(2))
+        colorbar(axBinImage,'Ticks',[0 1],'TickLabels',{'Background','Foreground'},'FontSize',10);
+
+        choice=questdlg('Keep the current binarized image or select the threshold from the histogram?', 'Manual Selection', 'Keep Current','Manual Selection','Keep Current');
+        % If first iteration and user wants manual mode → prepare histogram
+        if strcmp(choice, 'Manual Selection')               
+            first_In = false;
+        else
+            IO_Image=segBin;
+            break
+        end
+    end
+    close(f1)
+end
+
+function mod=extractBinarizationPYmodule()
+% the python file is assumed to be in a directory called "PythonCodes". Find it to a max distance of 4 upper
+    % folders
+    % Maximum levels to search
+    maxLevels = 4; originalPos=pwd;
+    for i=1:maxLevels
+        if isfolder(fullfile(pwd, 'PythonCodes'))
+            cd 'PythonCodes'
+            % Call the Python function
+            mod = py.importlib.import_module("binarize_stripe_image");
+            py.importlib.reload(mod);
+                    
+            break
+        elseif i==4
+            error("file python not found")
+        else
+            cd ..        
+        end            
+    end 
+    % return to original position
+    cd(originalPos)  
+end
