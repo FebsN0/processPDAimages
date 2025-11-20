@@ -16,11 +16,22 @@ function closest_indices = selectRangeGInput(n_points,dimension,axFig)
         error('The selected dimension is two, but the second input data is missing!')
     end
     %--------------------------------------------------------------
-    % Force the axis to be current and get the first child object
+    % Force the axis to be current and get the first child object.
     %--------------------------------------------------------------
+    
+    if ~isa(axFig, 'matlab.graphics.axis.Axes')
+        error('A figure handler has been provided. It must be an axis handler for better management');          
+    end
     axes(axFig);
     hold(axFig, 'on');
-    obj = axFig.Children(1);
+    children = axFig.Children;
+    for k = 1:numel(children)
+        if ~strcmp(children(k).Type, 'constantline')
+            obj = children(k);
+            break;
+        end
+    end
+
     %--------------------------------------------------------------
     % Determine the type of object and then extract data depending on it
     %--------------------------------------------------------------

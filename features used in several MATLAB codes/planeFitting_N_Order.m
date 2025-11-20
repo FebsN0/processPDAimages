@@ -1,4 +1,14 @@
 function varargout = planeFitting_N_Order(data,limit)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%% plane fitting by exploring 1==>limit (1,2,3,..,limit) %%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% INPUT:    data = matrix (example a specific channel image)
+%           limit = scalar value, max fitOrder of plane fitting exploration (example: limit=3 ==> 1=>2=>3)
+%
+% OUTPUT:   varargout{1} =  dataCorrected               => original data MINUS correction_plane
+%           varargout{2} =  correction_plane            => best generated plane
+%           varargout{3} =  fit_decision_final_plane    => metrics of the best generated plane
+    
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)
     wb=waitbar(1/(limit*limit),sprintf('Removing Plane Polynomial Baseline orderX: %d orderY: %d',0,0),...
@@ -70,6 +80,7 @@ function varargout = planeFitting_N_Order(data,limit)
     varargout{2}=correction_plane;
     varargout{3}=fit_decision_final_plane;
     delete(wb)
+    
     % Note: previous versions applied also the shifting by min value of the entire lateral deflection matrix.
     % After proper investigation, it has been found out that it is wrong shifting both before and after
     % applying any tipe of correction (plane or lineXline fitting), because the fitting "implies" already the shifting.
@@ -78,6 +89,6 @@ function varargout = planeFitting_N_Order(data,limit)
     % Lateral_Trace_corrPlane_preShift_2        = Lateral_Trace_preShift_1 - correction_plane;
     % Lateral_Trace_corrPlane_prePostShift_3    = Lateral_Trace_corrPlane_preShift_2-min(Lateral_Trace_corrPlane_preShift_2(:));
     %
-    % apply correction plane to raw data
+    % just apply correction plane to raw data. it is already shifting
     % Lateral_Trace_corrPlane = Lateral_Trace - correction_plane;
 end

@@ -2,10 +2,26 @@
 % tip is not scanning anymore or it is not properly scanning). Such regions can negatively affects both
 % regular scans used for fluorescence-force experiments and scans from which extrapolate the definitive
 % background friction coefficient.
-%
-% NOTE: the removed region will substituted with NaN. Therefore, for any
-% type of fitting, lineByLine or Plane, they will be ignored
-%
+% The values in the removed regions are substituted with NaN. Therefore, for any type of fitting, lineByLine or Plane, they will be ignored.
+% Exception is in case of binary image: to prevent nan incompatibility in next steps, the values are changed into 0 or 1 depending on the
+% user choice.
+%  
+% INPUT:
+%   -dataToShow1 :  first data image (matrix or struct) to show
+%   -textTitle1 :   title for dataToShow1 figure
+%   -idxMon  :      idx for additional monitor
+%   -varargin :     additional optional inputs
+%                       - channelToShow :                   choose a specific channel (lateral,vertical,height) in case one of the given data is a struct data  
+%                       - additionalImagesToShow :          additional image to show. It can be a matrix (single additional image only) or
+%                                                                   cell array containing one or more additional images
+%                       - additionalImagesTitleToShow :     similar to textTitle1, but for additionalImagesTitleToShow
+%                       - maskRemoval :                     mask containing the already removed portions. If the function is called for the first time, 
+%                                                                   it will be empty matrix
+% OUTPUT:
+%   maskRemoval :   updated mask containing the removed portions
+%   varargout :     cell array containing the original data with removed portions
+%                       (varargout{i}=allDataToShow{i} ==> allDataToShow = dataToShow1 + additionalImagesToShow)
+
 % several approaches to remove data has been explore and each showed a problem
 % sol 1 (USED): the removed values became NaN
 % problem: during the next fitting, preparecurve function remove all NaN values so the
@@ -29,20 +45,8 @@
 % true problem: in case of normal scans, the alignment of IOimage with fluorescence images will
 % fail...            
 % data=[data(:,1:xstart-1) data(:,xend+1:end)];
-%
-%
-% INPUT:
-%   dataToShow :            data image (matrix) to show to understand where clean
-%   dataToClear :           struct (in case of more channel) or matrix (in case of single channel) of the image containing the AFM data
-%   dataIO  :               previous binarized AFM height image
-%   maskPrev :              mask containing the already removed portions. If the function is called for the first time, it will be empty matrix
-%   secondMonitorMain :     show better
 
-% OUTPUT:
-%   dataCleaned :           updated struct (in case of more channel) or matrix (in case of single channel)
-%   dataIOCleaned :         updated binarized AFM height image
-%   maskRemoval :              updated mask containing the removed portions
-%                              
+                          
 function [maskRemoval,varargout] = featureRemovePortions(dataToShow1,textTitle1,idxMon,varargin)
     %init instance of inputParser
     p=inputParser();
@@ -50,7 +54,7 @@ function [maskRemoval,varargout] = featureRemovePortions(dataToShow1,textTitle1,
     addRequired(p, 'dataShow1', @(x) (isstruct(x) || ismatrix(x)));
     addRequired(p, 'idxMon', @(x) isnumeric(x));
     % Optional parameters
-    addParameter(p, 'channelShow1','',@(x) (isempty(x) || (ismember(x,{'Height (measured)','Lateral Deflection','Vertical Deflection'}))))
+    addParameter(p, 'channelToShow','',@(x) (isempty(x) || (ismember(x,{'Height (measured)','Lateral Deflection','Vertical Deflection'}))))
     addParameter(p, 'additionalImagesToShow', [],       @(x) (ismatrix(x) || isempty(x)|| iscell(x)));
     addParameter(p, 'additionalImagesTitleToShow', [],  @(x) (isstring(x) || ischar(x) || isempty(x) || iscell(x)));
     addParameter(p, 'maskRemoval', [], @(x) (ismatrix(x) || isempty(x)));
@@ -63,7 +67,7 @@ function [maskRemoval,varargout] = featureRemovePortions(dataToShow1,textTitle1,
         error('The given existing mask has not the same size of the given data. Make sure it is the right mask!')
     end
     % by default take the height channel in case of struct and if not specified by user      
-    if ~isempty(p.Results.channelShow1), channel=p.Results.channelShow1; else, channel = 'Height (measured)'; end
+    if ~isempty(p.Results.channelToShow), channel=p.Results.channelToShow; else, channel = 'Height (measured)'; end
     [flagStructDataToShow1,dataToShow1]=isstructImage2Show(dataToShow1,channel);
     % check if the image is binary, so the figure can be adapted
     isDataToShow1Bin=isbinaryImage(dataToShow1);
@@ -78,6 +82,10 @@ function [maskRemoval,varargout] = featureRemovePortions(dataToShow1,textTitle1,
         % in case of cell, very likely that there are multiple data to show
         if iscell(p.Results.additionalImagesToShow)            
             nExtra = numel(p.Results.additionalImagesToShow);
+            nExtraTitle = numel(p.Results.additionalImagesTitleToShow);
+            if nExtraTitle~=nExtra
+                error("Number of titles for additional images is not the same with the number of additional images! Check out")
+            end
             % init
             dataToShowK=cell(1,nExtra);
             titleExtraK=cell(1,nExtra);
