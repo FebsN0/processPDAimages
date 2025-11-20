@@ -47,9 +47,16 @@ function idMon=objInSecondMonitor(varargin)
         close all
     else
         idMon = varargin{2};
+        fig=varargin{1};
+        % Move the figure to the new position and maximized.
+        % NOTE: In invisible state, MATLAB does not create a real window, so: it has no position, it cannot be moved to a monitor, it cannot be maximized
         monitorXfig = screens(idMon, :);
-        % Move the figure to the new position and maximized
-        set(varargin{1},'WindowState','maximized','Position', monitorXfig);
+        % Move to the target monitor manually
+        left   = monitorXfig(1);
+        bottom = monitorXfig(2);
+        width  = monitorXfig(3);
+        height = monitorXfig(4);
+        set(fig, 'Position', [left bottom width height*0.95]);
         clear idMon % Prevent output from being returned
     end
 end

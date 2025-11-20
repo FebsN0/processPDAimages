@@ -26,13 +26,28 @@ function user_choice = getValidAnswer(question, title, options, default_choice)
     catch
         error('Options must be either strings or scalar numeric values.');
     end
+    % the size depends on the fontsize too.
+    FontsizeQuestion= 14;
+    FontsizeOptions = 12;
 
     % Default dialog box size
-    base_width = 450; button_height = 40; spacing = 10;
-    % Check the longest string in the question and how many rows
-    max_question_length = max(cellfun(@length, strsplit(question, '\n')));
-    num_lines_question = length(strsplit(question, '\n'));
+    button_height = 40; spacing = 15; spacingBorders=20;
     
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%% PREPARE THE SIZE OF THE QUESTION DIALOG %%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % Check the longest string in the question and how many rows
+    [lines, num_lines_question, max_question_length] = splitLines(question);
+    % Compute results
+    widthQuestion  = max_question_length*FontsizeQuestion*0.9;    
+    heightQuestion = (num_lines_question*FontsizeQuestion)*1.2;
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%% PREPARE THE SIZE OF THE OPTION DIALOG %%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % First, need to check how many options rows and measure the length of each string line.
+    % In case of options different from Yes/No, there may be options containing \n, therefore, check the length better
+
     % Check if it's a yes/no dialog
     yesStrings = ["yes", "y", "1","true"];
     noStrings = ["no", "n", "0","false"];    
@@ -52,13 +67,12 @@ function user_choice = getValidAnswer(question, title, options, default_choice)
     end
     if all(flagYesNo)
         flagYesNo=1;
-        max_option_length = 3;
-        num_lines_options = 1;
+        max_option_length = 3; % Yes = 3 chars, longer than No = 2 chars
+        num_lines_options = 1; % for more compact visual, just put the two options in a line instead of multiple rows
     else
         flagYesNo=0;
     end
     if ~flagYesNo
-    % check how many options rows. Since the options may contains \n, check the length better
         num_lines_options = length(options);
         num_lines_options_split = 0;
         lengthRow=[];
@@ -75,44 +89,44 @@ function user_choice = getValidAnswer(question, title, options, default_choice)
         end
         max_option_length = max(max(lengthRow));
     end
-    % check what is the longest string among question and options
-    max_length = max(max_question_length, max_option_length);
+    
+    % calc the definitive option dialog size
+    
+    if flagYesNo
+        widthOption  =   2*button_height + spacing;
+        heightOption =   button_height;
+    else
+        % width of the longest Option string + button size + space between string and button
+        widthOption  =   (FontsizeOptions*max_option_length)+ button_height + spacing;
+        % height of entire option section
+        heightOption =   (num_lines_options)*max(button_height,FontsizeOptions) + spacing*(num_lines_options-1); 
+    end
+    % check what is the longest width between question and option sections,
+    % considering space for RIGHT/LEFT borders
+    maxWidth = max(widthQuestion, widthOption);
 
-    % the size depends on the fontsize too.
-    FontsizeQuestion= 14;
-    FontsizeOptions = 12;
-    % check the best height size
-    sizeRowOptions                  =  num_lines_options*FontsizeOptions;
-    sizeRowDistanceBetweenOptions   = (num_lines_options)* (button_height + spacing);
-    sizeRowQuestion                 = num_lines_question*FontsizeQuestion;
-    % Calc height based on number of options. If too small, than take the base_height.
-    dialog_height = (sizeRowQuestion + sizeRowOptions + sizeRowDistanceBetweenOptions);
-    dialog_width = max(base_width, FontsizeQuestion * max_length / 1.4);
+    % TOT HEIGHT: UP/BOTTOM SPACING BORDERS + questionDialogSize + spacing
+    % between question and option dialogs + optionDialogSize
+    tot_height = heightQuestion + heightOption + 2*spacingBorders + spacing;
+    % TOT WIDTH: LEFT/RIGHT SPACING BORDERS + biggest size between option and question dialogs
+    tot_width = maxWidth+2*spacingBorders;
 
     % Locate the dialog box in the center
     screenSize = get(0, 'ScreenSize');
-    screen_width = screenSize(3);
-    screen_height = screenSize(4);
-    dialog_x = (screen_width - dialog_width) / 2;
-    dialog_y = (screen_height - dialog_height) / 2;
+    center_screen_width = screenSize(3)/2;
+    center_screen_height = screenSize(4)/2;
+    dialog_x = (center_screen_width - tot_width/2);
+    dialog_y = (center_screen_height - tot_height/2);
         
     % Open dialog box and associate the buttons and close button
     dialog_fig = figure('Name', title, 'NumberTitle', 'off', 'MenuBar', 'none', ...
-        'ToolBar', 'none', 'Resize', 'off', 'Position', [dialog_x, dialog_y, dialog_width, dialog_height*1.3], ...
-        'WindowStyle', 'modal','KeyPressFcn', @keyPressCallback,...
+        'ToolBar', 'none', 'Resize', 'off', 'Position', [dialog_x, dialog_y, tot_width, tot_height], ...
+        'KeyPressFcn', @keyPressCallback,...
         'CloseRequestFcn',@closeRequestCallback);
-
-    % Insert the question in the dialog box
-    textHeight = sizeRowQuestion*2;
-    textWidth = dialog_width - 2*spacing;
-    fromLeft = spacing;
-    fromBottom = dialog_height*1.3 -(spacing + textHeight);
-    uicontrol('Style', 'text', 'Position', [fromLeft, fromBottom, textWidth , textHeight], ...
-        'String', question, 'FontSize', FontsizeQuestion, 'HorizontalAlignment', 'center','ForegroundColor', 'red');
-
+  
+    figPos = dialog_fig.Position;
     % store the user choice
     user_choice = 0;
-
     % create object for each button
     button_handles = gobjects(1, numel(options));
     if flagYesNo
@@ -122,7 +136,7 @@ function user_choice = getValidAnswer(question, title, options, default_choice)
         for i=1:2
          % Name button = first char of the given option ( 1) bla bla ==> 1, Yes ==> Y
             button_handles(i)= uicontrol('Style', 'pushbutton',...
-                'Position', [dialog_width/3*i-10, button_start_y, 50, 30], ...
+                'Position', [tot_width/3*i-10, button_start_y, 50, 30], ...
                 'String', opts{i}, 'FontSize', FontsizeOptions,...
                 'Callback', @(src, event) buttonCallback(i));
         end
@@ -133,9 +147,10 @@ function user_choice = getValidAnswer(question, title, options, default_choice)
             '^\d+\)\s', ...                 % <number>)
             '^\s\(\d+\)\s', ...             % <whiteSpace>(<number>)
             '^\s\d+\)\s'};                  % <whiteSpace><number>)
-        spacing = 15;
-        % create buttons and texts from the bottom
-        button_start_y = spacing;    
+        % create buttons and texts from the bottom        
+        fromLeft_button=spacingBorders;
+        fromLeft_textOption=fromLeft_button+button_height+spacing;        
+
         for i = num_lines_options:-1:1
             % find the pattern           
             [startIdx,endIdx]=regexp(options{num_lines_options-i+1}, pattern);
@@ -154,23 +169,42 @@ function user_choice = getValidAnswer(question, title, options, default_choice)
                 text= options{num_lines_options-i+1}(endIdx+1:end);
             end
             % Calc button vertical position 
-            button_position_y = button_start_y + (button_height+spacing)*(i-1);
+            fromBottom = spacingBorders + (button_height+spacing)*(i-1);
             
             % Name button = first char of the given option ( 1) bla bla ==> 1              % cubic button
             button_handles(i)=uicontrol('Style', 'pushbutton',...
-                'Position', [spacing, button_position_y, button_height, button_height], ...
+                'Position', [fromLeft_button, fromBottom, button_height, button_height], ...
                 'String', icon, 'FontSize', FontsizeOptions,...
                 'Callback', @(src, event) buttonCallback(num_lines_options-i+1));
-            
+            % add 1.1 margin in the width
+            textWidth=length(text)*FontsizeOptions*1.1;
+            textHeight=button_height;
             % insert label of each button with the entire text option
-            uicontrol('Style', 'text',...
-                'Position', [70 + spacing, button_position_y, dialog_width - 80 - 2*spacing, button_height], ...
-                'String', text, 'FontSize', 12, 'HorizontalAlignment', 'left');
+            nx = fromLeft_textOption / figPos(3);
+            ny = fromBottom / figPos(4);
+            nw = textWidth / figPos(3);
+            nh = textHeight / figPos(4);
+            % NOTE: annotation position is always normalized
+            annotation('textbox','Units','normalized','Position', [nx, ny, nw, nh], 'String', text,'FontSize', FontsizeOptions, ...
+                'HorizontalAlignment', 'left','VerticalAlignment', 'middle','EdgeColor', 'none','FitBoxToText', 'on');
         end
         % flipped because the for cycle before is inverted
         button_handles=flip(button_handles);
     end
     
+    % PREPARE THE QUESTION DIALOG
+    fromLeft = spacingBorders;
+    fromBottom = tot_height -(spacingBorders+heightQuestion);
+    textWidth = widthQuestion;
+    textHeight = heightQuestion;
+    % Convert absolute pixel coordinates -> normalized coordinates   
+    nx = fromLeft / figPos(3);
+    ny = fromBottom / figPos(4);
+    nw = textWidth / figPos(3);
+    nh = textHeight / figPos(4);
+    % NOTE: annotation position is always normalized
+    annotation('textbox','Units', 'normalized','Position', [nx, ny, nw, nh*1.4], 'String', lines, 'FontWeight','bold','interpreter','none','FontSize', FontsizeQuestion, ...
+        'HorizontalAlignment', 'center','VerticalAlignment', 'middle', 'Color', 'red','EdgeColor', 'none');
     % Make bold the default button
     set(button_handles(default_choice), 'FontWeight', 'bold');
 
@@ -257,5 +291,46 @@ function user_choice = getValidAnswer(question, title, options, default_choice)
         uiresume(dialog_fig);
         delete(dialog_fig);
         user_choice = NaN;        
+    end
+end
+
+
+
+% Robust splitting of 'question' into individual lines (handles cells, string arrays, char arrays,
+% literal '\n' sequences and actual newline characters).
+function [lines, num_lines_question, max_question_length] = splitLines(question)
+
+    lines = string.empty(0,1);  % will collect all lines as a column string array
+
+    if iscell(question)
+        for i = 1:numel(question)
+            elem = question{i};
+            sarr = string(elem);   % convert char / string / string-array -> string array
+            for k = 1:numel(sarr)
+                % split on literal backslash-n OR real newline(s) (handle CRLF too)
+                parts = regexp(char(sarr(k)), '\\n|\r\n|\n', 'split');
+                % convert parts to string array and append
+                lines = [lines; string(parts(:))];
+            end
+        end
+
+    else
+        % question is not a cell (could be char, string, numeric)
+        sarr = string(question);    % convert to string array
+        for k = 1:numel(sarr)
+            parts = regexp(char(sarr(k)), '\\n|\r\n|\n', 'split');
+            lines = [lines; string(parts(:))];
+        end
+    end
+
+    % remove possible empty lines (optional)
+    lines = lines(strlength(strtrim(lines)) > 0);
+
+    % final metrics
+    num_lines_question = numel(lines);
+    if num_lines_question == 0
+        max_question_length = 0;
+    else
+        max_question_length = max(strlength(lines));
     end
 end

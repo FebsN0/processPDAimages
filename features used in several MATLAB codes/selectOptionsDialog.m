@@ -1,4 +1,4 @@
-function selectedOptions = selectOptionsDialog(question,varargin)
+function selectedOptions = selectOptionsDialog(question,multipleSelection,varargin)
 % INPUT : 
 %           - question : text printed on the figure
 %           - varargin : cell or string array containing the list of which the user has to select.
@@ -14,14 +14,23 @@ function selectedOptions = selectOptionsDialog(question,varargin)
     EntireWidthWindow= baseWidthInnerWindow*nOptionTypes+(nOptionTypes+1)*20; % 20 (left border space) + 260 (list 1) + 20 (right border space OR space between lists) + 260 (eventually list 2) + 20 (right border space OR space between lists)
     fig = uifigure('Name',question, 'Position', [100 100 EntireWidthWindow 400], ...
                    'WindowStyle', 'modal');
-    % listbox for option selection
+    % --- Create listboxes ---
+    lb = gobjects(nOptionTypes, 1);
     for i=1:nOptionTypes
         startInnerWindow=20+(i-1)*280;
         lb(i) = uilistbox(fig, ...
-        'Items', varargin{i}, ...
-        'Multiselect', 'on', ...
-        'FontSize',15, ...
-        'Position', [startInnerWindow 50 260 330]);
+            'Items', varargin{i}, ...              % displayed text
+            'ItemsData', 1:numel(varargin{i}), ... % underlying numeric value
+            'FontSize',15, ...
+            'Position', [startInnerWindow 50 260 330]);
+        % multiselect ON only when allowed
+        if ~multipleSelection
+            lb(i).Multiselect = 'off';
+            % override selection callback to enforce only one item
+            lb(i).ValueChangedFcn = @(src, event) enforceSingle(src);
+        else
+            lb(i).Multiselect = 'on';
+        end
     end
     % Create OK button
     startButton=(EntireWidthWindow/2)-50; % center entire window - half width of the button
@@ -35,4 +44,14 @@ function selectedOptions = selectOptionsDialog(question,varargin)
         selectedOptions{i} = lb(i).Value;
     end
     close(fig);
+end
+
+
+% --- Helper function to enforce single choice ---
+function enforceSingle(listHandle)
+    % Make sure the value is always stored as a single item
+    if iscell(listHandle.Value)
+        % Keep only last clicked item
+        listHandle.Value = listHandle.Value{end};
+    end
 end
