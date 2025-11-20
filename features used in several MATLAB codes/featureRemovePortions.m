@@ -194,7 +194,7 @@ function [maskRemoval,varargout] = featureRemovePortions(dataToShow1,textTitle1,
         % START THE REMOVAL EXE
         else          
             question='Choose the removal type. Then double click on the selected marked object to terminate the drawing.';
-            selectedOptions = selectOptionsDialog(question,false,allMethodsRemoval,allOnWhichFigure);
+            selectedOptions = selectOptionsDialog(question,false,allMethodsRemoval,allOnWhichFigure,'Titles',{'Select which removal method.','Select on which figure draw.'});
             methodRemoval=selectedOptions{1};
             onWhichFigure= selectedOptions{2}; 
             % get all the axes (subfigures) from the main figure

@@ -20,9 +20,9 @@ function fig=showData(idxMon,SeeMe,data1,titleData1,nameDir,nameFig,varargin)
     argName = 'labelBar';           defaultVal='';      addOptional(p,argName,defaultVal, @(x) (isstring(x) || ischar(x)))
     % for extra data
     argName = 'extraData';          defaultVal={};      addOptional(p,argName,defaultVal, @(x) iscell(x))
-    argName = 'extraNorm';          defaultVal={};      addOptional(p,argName,defaultVal, @(x) (iscell(x) || isnumeric(x)))
-    argName = 'extraBinary';        defaultVal={};      addOptional(p,argName,defaultVal, @(x) (iscell(x) || isnumeric(x)))    
-    argName = 'extraPixelSizeUnit'; defaultVal={};      addOptional(p,argName,defaultVal, @(x) iscell(x))
+    argName = 'extraNorm';          defaultVal={};      addOptional(p,argName,defaultVal, @(x) (iscell(x) || isnumeric(x) || islogical(x)))
+    argName = 'extraBinary';        defaultVal={};      addOptional(p,argName,defaultVal, @(x) (iscell(x) || isnumeric(x) || islogical(x)))    
+    argName = 'extraPixelSizeUnit'; defaultVal={};      addOptional(p,argName,defaultVal, @(x) (iscell(x) || isnumeric(x)))
     argName = 'extraTitles';        defaultVal={};      addOptional(p,argName,defaultVal, @(x) iscell(x))
     argName = 'extraLabel';         defaultVal={};      addOptional(p,argName,defaultVal, @(x) iscell(x))   
     % in case the fig already exist and the user just want to update the internal figures
