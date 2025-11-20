@@ -2,22 +2,12 @@
 % tip is not scanning anymore or it is not properly scanning). Such regions can negatively affects both
 % regular scans used for fluorescence-force experiments and scans from which extrapolate the definitive
 % background friction coefficient.
-% 
-% IMPORTANT: in any case (friction or regular scans), DO NOT REMOVE PORTIONS BY POLYGONS OR RECT BEFORE A5 
-% (fitting lateral/height data) to avoid fitting errors, BUT ONLY PORTIONS BY LINE (entire fast scan lines removal)
 %
-% NOTE: technically, the removed region will considered background because the values within the removed regions
-% will be substituted with the minimum value of the entire image (not with NaN or 0 to avoid unreadable image
-% by imshow/imagesc). In case of regular scans, this is not an issue at all and it not requires any further check;
-% however, in case of friction coefficient calculation, it is technically wrong because the values of removed areas
-% will be considered in the fitting.
-% i.e. in correspondence of the PDA regions, the mask "says" they are background, therefore, the
-% lateral deflection values are actually corresponding with the PDA and not with the background          
-% For this reason, the code for friction coefficient calculations have additional snippets to manage this
-% situation by using the variable maskRemoval in order to totally exclude such values.
+% NOTE: the removed region will substituted with NaN. Therefore, for any
+% type of fitting, lineByLine or Plane, they will be ignored
 %
 % several approaches to remove data has been explore and each showed a problem
-% sol 1: the removed values became NaN
+% sol 1 (USED): the removed values became NaN
 % problem: during the next fitting, preparecurve function remove all NaN values so the
 % corresponding line will be empty ==> FAILURE FITTING (the error is like not possible to perform
 % fitting because there are no enough values..
@@ -26,7 +16,7 @@
 % more close to BK while the true BK is higher rather than being close to zero
 % data(:,xstart:xend)=nan; 
 
-% sol 2 (USED): the removed values became the minimum value in the matrix outside the removed regions
+% sol 2: the removed values became the minimum value in the matrix outside the removed regions
 % problem: the values in correspondence of crystal are considered background in the background/foreground
 % separation to create the mask, so in the optimization process (A4_El_AFM_masked), the values in PDA 
 % regions will be considered because the mask "says" it is background...
@@ -53,121 +43,169 @@
 %   dataIOCleaned :         updated binarized AFM height image
 %   maskRemoval :              updated mask containing the removed portions
 %                              
-function [dataCleaned,dataIOCleaned,maskRemoval] = featureRemovePortions(dataToClear,dataIO,idxMon,varargin)
+function [maskRemoval,varargout] = featureRemovePortions(dataToShow1,textTitle1,idxMon,varargin)
     %init instance of inputParser
     p=inputParser();
     % Required arguments
-    addRequired(p, 'dataToClear', @(x) (isstruct(x) || ismatrix(x)));
-    addRequired(p, 'dataIO', @(x) ismatrix(x));
-    addRequired(p, 'secondMonitorMain', @(x) islogical(x) || isnumeric(x));
+    addRequired(p, 'dataShow1', @(x) (isstruct(x) || ismatrix(x)));
+    addRequired(p, 'idxMon', @(x) isnumeric(x));
     % Optional parameters
-    addParameter(p, 'imageToShow', [], @(x) (ismatrix(x) || isempty(x)));
+    addParameter(p, 'channelShow1','',@(x) (isempty(x) || (ismember(x,{'Height (measured)','Lateral Deflection','Vertical Deflection'}))))
+    addParameter(p, 'additionalImagesToShow', [],       @(x) (ismatrix(x) || isempty(x)|| iscell(x)));
+    addParameter(p, 'additionalImagesTitleToShow', [],  @(x) (isstring(x) || ischar(x) || isempty(x) || iscell(x)));
     addParameter(p, 'maskRemoval', [], @(x) (ismatrix(x) || isempty(x)));
-    addParameter(p, 'Normalization', false, @(x) islogical(x));   
     % validate and parse the inputs
-    parse(p, dataToClear, dataIO, idxMon, varargin{:});                                                                     
-    % extract the data to show in the figure where select the areas to remove
-    if isempty(p.Results.imageToShow)
-        % by default take the height channel in case of struct
-        if isstruct(dataToClear)
-            channel='Height (measured)';
-            matchIdx = strcmp([dataToClear.Channel_name],channel) & strcmp([dataToClear.Trace_type],'Trace');
-            dataToShow1=dataToClear(matchIdx).AFM_image; 
-            flagSingleImageShow=false;            
-        else
-            dataToShow1=dataToClear;   
-            flagSingleImageShow=true;
-        end
-    else
-        dataToShow1=p.Results.imageToShow;
-        flagSingleImageShow=true;
-    end
+    parse(p, dataToShow1, idxMon, varargin{:});  
 
-    if flagSingleImageShow
-        options={'Height (measured)','Lateral Deflection','Vertical Deflection'};
-        question='What channel is the given ''imageToShow'' or the single matrix ''dataToClear''?';
-        answer=getValidAnswer(question,'',options);
-        channel=options{answer};
-    end
     % check if the mask has the same size of the data. The mask represents the already removed regions
     maskRemoval=p.Results.maskRemoval;
     if ~isempty(maskRemoval) && size(maskRemoval)~=size(dataToShow1)
         error('The given existing mask has not the same size of the given data. Make sure it is the right mask!')
     end
-    % normalization
-    norm=p.Results.Normalization;
-    dataCleaned=dataToClear;
-    dataIOCleaned=dataIO;
-    f1=figure;     
-    text='Not Corrected'; flagFirst=true;        
+    % by default take the height channel in case of struct and if not specified by user      
+    if ~isempty(p.Results.channelShow1), channel=p.Results.channelShow1; else, channel = 'Height (measured)'; end
+    [flagStructDataToShow1,dataToShow1]=isstructImage2Show(dataToShow1,channel);
+    % check if the image is binary, so the figure can be adapted
+    isDataToShow1Bin=isbinaryImage(dataToShow1);
+    normDataToShow1=false;
+    if ~isDataToShow1Bin
+        normDataToShow1=true;
+    end
+    % redo the same operations to additional figures whenever they are present
+    flagAdditionalImageToShow=false;    
+    if ~isempty(p.Results.additionalImagesToShow)
+        flagAdditionalImageToShow=true;
+        % in case of cell, very likely that there are multiple data to show
+        if iscell(p.Results.additionalImagesToShow)            
+            nExtra = numel(p.Results.additionalImagesToShow);
+            % init
+            dataToShowK=cell(1,nExtra);
+            titleExtraK=cell(1,nExtra);
+            binaryFormatImage=zeros(1,nExtra);
+            normDataToShowK=zeros(1,nExtra);
+            flagStructDataToShowK=zeros(1,nExtra);
+            for k=1:nExtra
+                tmp=p.Results.additionalImagesToShow{k};
+                % check if struct
+                [flagStructTmp,tmp]=isstructImage2Show(tmp,channel);
+                dataToShowK{k}=tmp;
+                flagStructDataToShowK(k)=flagStructTmp;
+                % check if binary, if not, then normalize
+                binaryFormatImage(k)=isbinaryImage(tmp);
+                if ~binaryFormatImage(k), normDataToShowK(k)=1; end
+                % prep the titles
+                titleExtraK{k}=string(p.Results.additionalImagesTitleToShow{k});
+            end
+        elseif ismatrix(p.Results.additionalImagesToShow)
+            % in case it is just one image
+            nExtra=1;
+            % init
+            dataToShowK=cell(1,1);
+            titleExtraK=cell(1,1);                        
+            tmp=p.Results.additionalImagesToShow;
+            [flagStructTmp,tmp]=isstructImage2Show(tmp,channel);
+            dataToShowK{1}=tmp;
+            flagStructDataToShowK=flagStructTmp;
+            titleExtraK{1}=string(p.Results.additionalImagesTitleToShow);
+            binaryFormatImage=isbinaryImage(tmp);
+            if ~binaryFormatImage, normDataToShowK=1; else, normDataToShowK=0; end
+        end
+        nTotData=nExtra+1;
+        % merge in a cell array all the given data to easily identify and other flags
+        allDataToShow= [{dataToShow1}; dataToShowK(:)];
+        allData_binaryFormat=[isDataToShow1Bin binaryFormatImage];
+        allData_normalizedFormat=[normDataToShow1 normDataToShowK];
+        allData_titles=[{textTitle1}; titleExtraK(:)];
+    else
+        nTotData=1;
+        allDataToShow={dataToShow1};
+        allData_binaryFormat=isDataToShow1Bin;
+        allData_normalizedFormat=normDataToShow1;
+        allData_titles={textTitle1};
+    end
+    % check if one of the given data is struct
+    flagStructDataArray=[flagStructDataToShow1,flagStructDataToShowK];
+    if any(flagStructDataArray)
+        flagStructData=true;
+        % find the data which is a struct so the user can change channel
+        idxStructData=find(flagStructDataArray,1);        
+    else
+        flagStructData=false;
+    end
+    clear tmp flagStructDataArray varargin p dataTo* flagStructDataArray flagStructDataToShow* flagStructTmp isDataToShow1Bin binaryFormatImage k nExtra normDataToShow* textTitle1 titleExtraK
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%% all the data is now ready to show and start the removal %%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%   
+    flagFirstIt=true; 
+    fcomparisonRemoval=[];
+    
+    % prep removal settings for the question
+    allMethodsRemoval={'All fast scan lines';'Rectangle area';'Polygon area'};
+    allOnWhichFigure=cell(1,nTotData);
+    for i=1:nTotData
+        allOnWhichFigure{i}=sprintf('Figure %d',i);
+    end
+    
     while true
-        subplot(121)
-        if strcmp(channel,'Height (measured)')
-            textBar='Height [nm]';
-            multiplier=1e9;
+        if flagAdditionalImageToShow
+            fcomparisonRemoval=showData(idxMon,true,allDataToShow{1},allData_titles{1},'','','saveFig',false,'normalized',allData_normalizedFormat(1),'binary',allData_binaryFormat(1),...
+                'extraData',{allDataToShow{2:end}},'extraTitles',{allData_titles{2:end}}, ...
+                'extraBinary',allData_binaryFormat(2:end),'extraNorm',allData_normalizedFormat(2:end), ...
+                'prevFig',fcomparisonRemoval);
         else
-            textBar='Voltage [V]';
-            multiplier=1;
+            fcomparisonRemoval=showData(idxMon,true,allDataToShow,allData_titles{1},'','','saveFig',false,'normalized',normDataToShow1,'binary',allData_binaryFormat,'prevFig',fcomparisonRemoval);
         end
-        if norm
-            imshow(imadjust(dataToShow1/max(dataToShow1(:))))
+        pause(1)
+        % if the first cycle, skip the question and start the removal. In case of struct in the data, ask if change channel for different visual
+        if ~flagFirstIt 
+            if flagStructData                                           
+                options = {'Yes','No',sprintf('Change into height channel for the %d-th figure',idxStructData),sprintf('Change into lateral deflection channel for the %d-th figure',idxStructData)};
+            else
+                options = {'Yes','No'};
+            end
+            question = 'Remove lines or portions?';
+            answer=getValidAnswer(question,'',options,2);
         else
-            imagesc(dataToShow1*multiplier)
-        end        
-        axis on, axis equal
-        xlim([0 size(dataToShow1,2)]), ylim([0 size(dataToShow1,1)])
-        ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
-        colormap parula, c = colorbar; c.Label.String = textBar; c.Label.FontSize=15;
-        title(sprintf('%s channel',channel),'FontSize',17)
-        subplot(122)
-        imagesc(dataIOCleaned)
-        axis on, axis equal
-        xlim([0 size(dataIOCleaned,2)]), ylim([0 size(dataIOCleaned,1)])
-        title('Background (blue) - Foreground (yellow)','FontSize',17)
-        ylabel('fast scan line direction','FontSize',12), xlabel('slow scan line direction','FontSize',12)
-        if flagFirst, objInSecondMonitor(f1,idxMon); flagFirst=false; end
-        sgtitle(sprintf('%s images',text),'Fontsize',20,'interpreter','none')
-        question = 'Remove lines or portions?';
-        if ~flagSingleImageShow
-            options = {'Yes','No','Change into height channel for the 1st figure','Change into lateral deflection channel for the 1st figure'};
-        else
-            options = {'Yes','No'};
+            flagFirstIt=false;
+            answer=true;
         end
-        answer=getValidAnswer(question,'',options,2);
+        % STOP THE REMOVAL EXE
         if answer==2 || answer == false
             break
-        elseif answer==3
-            channel='Height (measured)';
-            matchIdx = strcmp([dataCleaned.Channel_name],channel) & strcmp([dataCleaned.Trace_type],'Trace');
-            dataToShow1=dataCleaned(matchIdx).AFM_image; 
-        elseif answer==4
-            channel='Lateral Deflection';
-            matchIdx = strcmp([dataCleaned.Channel_name],channel) & strcmp([dataCleaned.Trace_type],'Trace');
-            dataToShow1=dataCleaned(matchIdx).AFM_image; 
-        elseif answer == 1 || answer == true
-            hold on            
-            sgtitle('Select the figures to remove portions. Double click on the selection to terminate','FontSize',17)
-            question='Choose the removal type';
-            options={'All fast scan lines - 1st figure';
-                     'Rectangle area - 1st figure';
-                     'Polygon area - 1st figure';
-                     'All fast scan lines - 2nd figure';
-                     'Rectangle area - 2nd figure';
-                     'Polygon area - 2st figure'};
-            answer=getValidAnswer(question,'',options);
-            if answer == 1 || answer == 2 || answer == 3
-                subplot(121)
+        elseif answer~=1 || answer ~= true     
+            % CHANGE CHANNEL
+            if answer==3 
+                channel='Height (measured)';
             else
-                subplot(122)
+                channel='Lateral Deflection';
             end
-            if answer == 1 || answer == 4
+            dataStruct = allDataToShow{idxStructData};
+            matchIdx = strcmp([dataStruct.Channel_name],channel) & strcmp([dataStruct.Trace_type],'Trace');
+            dataStructUpdated=dataStruct(matchIdx).AFM_image;
+            allDataToShow{idxStructData}=dataStructUpdated;
+        % START THE REMOVAL EXE
+        else          
+            question='Choose the removal type';
+            selectedOptions = selectOptionsDialog(question,false,allMethodsRemoval,allOnWhichFigure);
+            methodRemoval=selectedOptions{1};
+            onWhichFigure= selectedOptions{2}; 
+            uiwait(msgbox(sprintf('Choosen method: %s\nClick on the %s-th figure to remove portions/lines.\nDouble click on the selected object to terminate',allMethodsRemoval{methodRemoval},allOnWhichFigure{onWhichFigure})))
+            % get all the axes (subfigures) from the main figure
+            axAll = findall(fcomparisonRemoval, 'type', 'axes');
+            % Sort left-to-right
+            [~, idx] = sort(arrayfun(@(ax) ax.Position(1), axAll));
+            axAll = axAll(idx);
+            axSelected=axAll(onWhichFigure);
+            axes(axSelected) %#ok<LAXES>
+            hold(axSelected, 'on');
+            if methodRemoval == 1
                 modeRemoval='line';
-                roi=drawline('Color','red');
+                roi=drawline(axSelected,'Color','red');
                 pos = round(customWait(roi));
                 removedElementLine=[pos(1,1) pos(2,1)];
-            elseif answer == 2 || answer == 5
+            elseif methodRemoval == 2
                 modeRemoval='rect';
-                roi=drawrectangle('Color','red');
+                roi=drawrectangle(axSelected,'Color','red');
                 pos = round(customWait(roi));
                 % take the coordinates along slow scan direction.
                 xstart = pos(1);     xend = xstart+pos(3);
@@ -176,7 +214,7 @@ function [dataCleaned,dataIOCleaned,maskRemoval] = featureRemovePortions(dataToC
                 removedElementLine=[xstart ystart xstart yend xend yend xend ystart];
             else
                 modeRemoval='polygon';
-                roi=drawpolygon('Color','red');
+                roi=drawpolygon(axSelected,'Color','red');
                 pos = customWait(roi);
                 removedElementLine=round(reshape(pos',[1 size(pos,1)*2]));
             end            
@@ -184,9 +222,9 @@ function [dataCleaned,dataIOCleaned,maskRemoval] = featureRemovePortions(dataToC
             if isempty(roi.Position)
                 break
             end
-            hold off           
+            hold(axSelected, 'off');          
             % manage the coordinates to create the mask depending on the choosen removal method
-            [rows, cols] = size(dataToShow1);
+            [rows, cols] = size(allDataToShow{onWhichFigure});
             if ~strcmp(modeRemoval,'line')
                 xCoords = removedElementLine(1:2:end);
                 yCoords = removedElementLine(2:2:end);            
@@ -197,33 +235,51 @@ function [dataCleaned,dataIOCleaned,maskRemoval] = featureRemovePortions(dataToC
             end
             % create the mask polygon
             mask = poly2mask(xCoords, yCoords, rows, cols);
-            % find the min value outside the polygon
-            externalValues = dataToShow1(~mask);
-            minValueOutside = min(externalValues(:));
-            % clean the image to show
-            dataToShow1(mask) = minValueOutside;
-            dataIOCleaned(mask)=0;
+            % apply NaN in every data. BUT, in case of binary image, choose if it will be considered FR or BK
+            for i=1:nTotData
+                tmp=allDataToShow{i};
+                % in case of binary image, to avoid to process nan values later and use it as definitive mask, covert the values into 0 or 1
+                % depending on the user choice
+                if allData_binaryFormat(i)
+                    choice=getValidAnswer("How to change the values of the mask in the selected area?",'',{'Background (change values to 0)','Foreground (change values to 1)'});
+                    if choice == 1
+                        tmp(mask)=0;
+                    else
+                        tmp(mask)=1;
+                    end               
+                else
+                    tmp(mask) = NaN;
+                end
+                allDataToShow{i}= tmp;
+            end
             % update the mask containing the removed elements
             if ~isempty(maskRemoval)
                 maskRemoval= maskRemoval | mask;
             else
                 maskRemoval=mask;
             end            
-            text='Portion Removed -';
-            %clean the AFM data
-            if isstruct(dataCleaned)
-                for i=1:length(dataCleaned)
-                    tmp=dataCleaned(i).AFM_image;
-                    tmp(mask)=0;
-                    dataCleaned(i).AFM_image=tmp;
+            % in case some given data was a struct, update also it
+            if flagStructData
+                dataStruct = allDataToShow{idxStructData};
+                for i=1:length(dataStruct)
+                    tmp=dataStruct(i).AFM_image;
+                    tmp(mask)=NaN;
+                    dataStruct(i).AFM_image=tmp;
                 end
-            else
-                dataCleaned(mask)=0;
-            end            
-        end       
+                allDataToShow{idxStructData}=dataStruct;
+            end                        
+        end        
     end
-    close(f1)
+    close(fcomparisonRemoval)
+    varargout=cell(1,nTotData);
+    for i=1:nTotData
+        varargout{i}=allDataToShow{i};
+    end
 end
+
+%%%%%%%%%%%%%%%%%
+%%% FUNCTIONS %%%
+%%%%%%%%%%%%%%%%%
 
 % Function to wait until completion by clicking twice. Return final pos array
 function pos = customWait(hROI)
@@ -241,4 +297,25 @@ function clickCallback(~,evt)
     if strcmp(evt.SelectionType,'double')
         uiresume;
     end
+end
+
+function [flagStructData,image2show]=isstructImage2Show(image,channel)
+    if isempty(channel)
+        channel='Height (measured)';
+    end    
+    if isstruct(image)                       
+        matchIdx = strcmp([image.Channel_name],channel) & strcmp([image.Trace_type],'Trace');
+        image2show=image(matchIdx).AFM_image; 
+        flagStructData=true;
+    else
+        image2show=image;
+        flagStructData=false;
+    end
+end
+
+function bin=isbinaryImage(image)
+% return 0 or 1 if the image is binary (contains 0/1/nan)
+    finiteVals = image(~isnan(image));       % drop NaNs before checking finite values
+    hasZeroOne = all(ismember([0 1], finiteVals));
+    if hasZeroOne, bin=1; else, bin=0; end
 end
