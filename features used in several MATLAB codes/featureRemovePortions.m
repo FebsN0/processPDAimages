@@ -193,11 +193,10 @@ function [maskRemoval,varargout] = featureRemovePortions(dataToShow1,textTitle1,
             allDataToShow{idxStructData}=dataStructUpdated;
         % START THE REMOVAL EXE
         else          
-            question='Choose the removal type';
+            question='Choose the removal type. Then double click on the selected marked object to terminate the drawing.';
             selectedOptions = selectOptionsDialog(question,false,allMethodsRemoval,allOnWhichFigure);
             methodRemoval=selectedOptions{1};
             onWhichFigure= selectedOptions{2}; 
-            uiwait(msgbox(sprintf('Choosen method: %s\nClick on the %s-th figure to remove portions/lines.\nDouble click on the selected object to terminate',allMethodsRemoval{methodRemoval},allOnWhichFigure{onWhichFigure})))
             % get all the axes (subfigures) from the main figure
             axAll = findall(fcomparisonRemoval, 'type', 'axes');
             % Sort left-to-right
