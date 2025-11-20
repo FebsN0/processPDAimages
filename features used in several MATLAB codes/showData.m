@@ -16,13 +16,13 @@ function fig=showData(idxMon,SeeMe,data1,titleData1,nameDir,nameFig,varargin)
     argName = 'saveFig';            defaultVal = true;  addOptional(p,argName,defaultVal, @(x) islogical(x))  
     argName = 'normalized';         defaultVal=false;   addOptional(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))))
     argName = 'binary';             defaultVal=false;   addOptional(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))))
-    argName = 'pixelSizeMeterUnit'; defaultVal=1;       addOptional(p,argName,defaultVal, @(x) isnumeric(x))
+    argName = 'lenghtAxis';         defaultVal=[];       addOptional(p,argName,defaultVal, @(x) isnumeric(x))   
     argName = 'labelBar';           defaultVal='';      addOptional(p,argName,defaultVal, @(x) (isstring(x) || ischar(x)))
     % for extra data
     argName = 'extraData';          defaultVal={};      addOptional(p,argName,defaultVal, @(x) iscell(x))
     argName = 'extraNorm';          defaultVal={};      addOptional(p,argName,defaultVal, @(x) (iscell(x) || isnumeric(x) || islogical(x)))
     argName = 'extraBinary';        defaultVal={};      addOptional(p,argName,defaultVal, @(x) (iscell(x) || isnumeric(x) || islogical(x)))    
-    argName = 'extraPixelSizeUnit'; defaultVal={};      addOptional(p,argName,defaultVal, @(x) (iscell(x) || isnumeric(x)))
+    argName = 'extraLengthAxis';    defaultVal={};      addOptional(p,argName,defaultVal, @(x) iscell(x))
     argName = 'extraTitles';        defaultVal={};      addOptional(p,argName,defaultVal, @(x) iscell(x))
     argName = 'extraLabel';         defaultVal={};      addOptional(p,argName,defaultVal, @(x) iscell(x))   
     % in case the fig already exist and the user just want to update the internal figures
@@ -40,7 +40,7 @@ function fig=showData(idxMon,SeeMe,data1,titleData1,nameDir,nameFig,varargin)
     if p.Results.saveFig,    saveFig=true; else, saveFig=false; end
     if p.Results.normalized, norm1=true; else, norm1=false; end
     if p.Results.binary,     bin1=true; else, bin1=false; end
-    pixmeter1=p.Results.pixelSizeMeterUnit;
+    lenghtAxis=p.Results.lenghtAxis;
     labelBar1=string(p.Results.labelBar);     
 
     % -------------------------------
@@ -50,17 +50,17 @@ function fig=showData(idxMon,SeeMe,data1,titleData1,nameDir,nameFig,varargin)
     nTotal = 1 + nExtra;   % main image + extras
     % ---- SUBPLOT 1: main data ----
     ax = subplot(1,nTotal,1,'Parent',fig);
-    showSingleData(ax,data1,norm1,titleData1,labelBar1,bin1,pixmeter1)
+    showSingleData(ax,data1,norm1,titleData1,labelBar1,bin1,lenghtAxis)
     % ---- SUBPLOTS for EXTRA DATA ----
     for k = 1:nExtra
         axk = subplot(1,nTotal,k+1,'Parent',fig);
-        dataK   = p.Results.extraData{k};
-        normK   = getOrDefault(p.Results.extraNorm,k,false); 
-        binK    = getOrDefault(p.Results.extraBinary,k,false);
-        pixK    = getOrDefault(p.Results.extraPixelSizeUnit,k,1);
-        titleK  = getOrDefault(p.Results.extraTitles, k, '');
-        labelK  = getOrDefault(p.Results.extraLabel,  k, '');                             
-        showSingleData(axk,dataK,normK,titleK,labelK,binK,pixK)
+        dataK       = p.Results.extraData{k};
+        normK       = getOrDefault(p.Results.extraNorm,k,false); 
+        binK        = getOrDefault(p.Results.extraBinary,k,false);
+        sizeAxisK   = getOrDefault(p.Results.extraLengthAxis,k,[]);
+        titleK      = getOrDefault(p.Results.extraTitles, k, '');
+        labelK      = getOrDefault(p.Results.extraLabel,  k, '');                             
+        showSingleData(axk,dataK,normK,titleK,labelK,binK,sizeAxisK)
     end   
     pause(1) 
     % in case the fig is already opened, dont re-update the position. The user may have changed location for a more comfortable area
@@ -85,11 +85,29 @@ function fig=showData(idxMon,SeeMe,data1,titleData1,nameDir,nameFig,varargin)
     end
 end
 
-function showSingleData(ax,data, norm, titleData,labelBar,bin,pixelSize)   
+function showSingleData(ax,data, norm, titleData,labelBar,bin,AxisLength)   
     %axes(ax) % Make sure plotting happens in this axes
     % Create axis vectors. In case there is no pixel size, then use meter axis
-    x = (0:size(data,2)-1)*pixelSize; 
-    y = (0:size(data,1)-1)*pixelSize;
+    if isempty(AxisLength)
+        x = 1:size(data,2);
+        y = 1:size(data,1);
+    else
+        x=linspace(0,AxisLength(2),size(data,2));
+        y=linspace(0,AxisLength(1),size(data,1));
+
+        % check axis size
+        if all(AxisLength>=1e-6) && all(AxisLength<1e-3)
+            unitsX='\mum'; unitsY='\mum';            
+        elseif all(AxisLength>=1e-9) && all(AxisLength<1e-6)
+            unitsX='nm'; unitsY='nm';
+        else
+            if AxisLength(1)>=1e-9 && AxisLength(1)<1e-6, unitsY='nm'; else, unitsY='\\mum'; end
+            if AxisLength(2)>=1e-9 && AxisLength(2)<1e-6, unitsX='nm'; else, unitsX='\\mum'; end
+        end
+        % convert x and y into proper size
+        if strcmp(unitsX,'nm'), x=x*1e9; else, x=x*1e6; end
+        if strcmp(unitsY,'nm'), y=y*1e9; else, y=y*1e6; end
+    end
     if norm
         data=data/max(max(data));
     end
@@ -129,16 +147,11 @@ function showSingleData(ax,data, norm, titleData,labelBar,bin,pixelSize)
         title(parts{1}, 'FontSize', 17,'Units', 'normalized', 'Position', [0.5, 1.02, 0]);
     end
     % change the axis from pixel to micrometer unit
-    if pixelSize ~= 1
-        if pixelSize == 1e6
-            units='um';
-        elseif pixelSize == 1e9
-            units='nm';
-        else
-            error('PixelSize different from what expected. Check out!')
-        end
-        xlabel(sprintf('slow direction (\m%s)',units),'FontSize',14); ylabel(sprintf('fast direction (\m%s)',units),'FontSize',14);
-        xticks(0:10:max(x)); yticks(0:10:max(y));
+    if ~isempty(AxisLength)
+        xlabel(sprintf('slow direction (%s)',unitsX),'FontSize',14);
+        ylabel(sprintf('fast direction (%s)',unitsY),'FontSize',14);
+        xticks(0:5:max(x));
+        yticks(0:5:max(y));
     else
         xlabel('slow direction','FontSize',14), ylabel('fast direction','FontSize',14)    
     end

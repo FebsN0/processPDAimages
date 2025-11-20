@@ -44,7 +44,8 @@ function [AFM_Images_final,mask_FINAL,fitOrderHeight]=A2_feature_1_processHeight
     norm=p.Results.Normalization;
     HVmode=p.Results.HoverModeImage;
     if norm, labelHeight=""; factor=1; else, labelHeight="Height (nm)"; factor=1e9; end    
-    
+    % pixelSize calc
+    lengthAxis=[metadata.x_scan_length_m,metadata.y_scan_length_m];
     % for the first time or first section, request the max fitOrder
     if isempty(p.Results.fitOrder)
         fitOrderHeight=chooseAccuracy(sprintf("Choose the level of fit Order for lineXline baseline (i.e. Background) of AFM Height Deflection Data (%s).",HVmode));
@@ -164,9 +165,9 @@ function [AFM_Images_final,mask_FINAL,fitOrderHeight]=A2_feature_1_processHeight
         xlim(axFbutter,"tight"), grid(axFbutter,"on")        
         pause(1)
         question=sprintf(['Is the threshold to separate Background from Foreground good enough?\n'...
-            'NOTE: it is not necessary to be precise because this step is not for binarization,\nbut at least should approximately separate the two regions.']);
-        if ~getValidAnswer(question,"",{'Yes','No'})
-            uiwait(msgbox('Click on the plot to define the threshold to separate Background from Foreground',''));
+            'If not, then click on the histogram to define the threshold to separate Background from Foreground.' ...
+            'NOTE: it is not necessary to be precise because this step is not for binarization.']);
+        if ~getValidAnswer(question,"",{'Yes','No'},2)
             closest_indices=selectRangeGInput(1,1,axFbutter);
             background_th=E_height(closest_indices);
             xline(background_th, 'g--', 'LineWidth', 1.5,'DisplayName','Background Manual threshold'); 
@@ -220,23 +221,33 @@ function [AFM_Images_final,mask_FINAL,fitOrderHeight]=A2_feature_1_processHeight
         clear titleData* nameFile            
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% BINARIZATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        % start the classic binarization to create the mask, i.e. the 0/1 height image (0 = Background, 1 = Foreground). 
-        [AFM_height_IO,binarizationMethod]=binarization_autoAndManualHist(height_5_lineXlineFIT,idxMon);      
-                
-        % PYTHON BINARIZATION TECHNIQUES. It requires other options, when I will have more time. Especially for DeepLearning technique
-        question="Satisfied of the first binarization method? If not, run the Python Binarization tools!";
-        if ~getValidAnswer(question,"",{"Yes","No"},2)
-            [AFM_height_IO,binarizationMethod]=binarization_withPythonModules(idxMon,height_5_lineXlineFIT);
-        end    
-        % show data and if it is not okay, start toolbox segmentation
-        question=sprintf('Satisfied of the binarization of the iteration %d? If not, run ImageSegmenter ToolBox for better manual binarization',iterationMain);        
-        if iterationMain>1 && ~getValidAnswer(question,'',{'Yes','No'})            
-            % Run ImageSegmenter Toolbox if at end of the second iteration, the mask is still not good enough
-            [AFM_height_IO,binarizationMethod]=binarization_ImageSegmenterToolbox(height_5_lineXlineFIT,idxMon);                  
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
+        % in case of MATLAB system failure, dont lost the work!
+        flagRestartBin=true;
+        if exist(fullfile(SaveFigFolder,sprintf("TMP_DATA_MASK_iteration%d.mat",iterationMain)),'file')
+            if getValidAnswer("Mask AFM IO data of the current iteration has been already generated. Take it?","",{"y","n"})
+                load(fullfile(SaveFigFolder,sprintf("TMP_DATA_MASK_iteration%d.mat",iterationMain)),"AFM_height_IO","textTitleIO")
+                flagRestartBin=false;
+            end
         end
-        textTitleIO=sprintf('Binary Height Image - iteration %d\n%s',iterationMain,binarizationMethod);
-        
+        if flagRestartBin 
+            % start the classic binarization to create the mask, i.e. the 0/1 height image (0 = Background, 1 = Foreground). 
+            [AFM_height_IO,binarizationMethod]=binarization_autoAndManualHist(height_5_lineXlineFIT,idxMon);                         
+            % PYTHON BINARIZATION TECHNIQUES. It requires other options, when I will have more time. Especially for DeepLearning technique
+            question="Satisfied of the first binarization method? If not, run the Python Binarization tools!";
+            if ~getValidAnswer(question,"",{"Yes","No"},2)
+                [AFM_height_IO,binarizationMethod]=binarization_withPythonModules(idxMon,height_5_lineXlineFIT);
+            end    
+            % show data and if it is not okay, start toolbox segmentation
+            question=sprintf('Satisfied of the binarization of the iteration %d? If not, run ImageSegmenter ToolBox for better manual binarization',iterationMain);        
+            if iterationMain>1 && ~getValidAnswer(question,'',{'Yes','No'})            
+                % Run ImageSegmenter Toolbox if at end of the second iteration, the mask is still not good enough
+                [AFM_height_IO,binarizationMethod]=binarization_ImageSegmenterToolbox(height_5_lineXlineFIT,idxMon);                  
+            end
+            textTitleIO=sprintf('Binary Height Image - iteration %d\n%s',iterationMain,binarizationMethod);        
+            % just for safety in case of interruption
+            save(fullfile(SaveFigFolder,sprintf("TMP_DATA_MASK_iteration%d.mat",iterationMain)),"AFM_height_IO","textTitleIO")
+        end
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%% MASK GENERATED ==> MASK ORIGINAL HEIGHT IMAGE AND REMOVE PLANE BASELINE %%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%             
@@ -244,39 +255,52 @@ function [AFM_Images_final,mask_FINAL,fitOrderHeight]=A2_feature_1_processHeight
         % background from foreground, therefore a better plane-baseline fitting can be made, thus a more accurate AFM height image 
         % can be obtained directly from original AFM height image
 
-        % FIRST, check if there are some regions that may affect negatively the fitting. If so, then remove them.
-        height_6_Background=height_1_original;
-        % mask original AFM height image
-        AFM_height_IO=double(AFM_height_IO);
-        % obtain the data of background
-        height_6_Background(AFM_height_IO==1)=NaN;
-        % show differences in mask and masked raw height
-        ftmpIO=showData(idxMon,true,AFM_height_IO,textTitleIO,'','','binary',true,'saveFig',false,...
-            'extraData',{height_6_Background*factor,height_1_original*factor}, ...
-            'extraTitles',{'Masked Raw Height Image','Raw Height Image'},...
-            'extraLabel',{labelHeight,labelHeight},'extraNorm',{norm,norm});
-        question={"Check the comparison between mask, masked raw height and original height images.";"Do you want to remove some regions/lines?"};
-        answ=getValidAnswer(question,"",{"Yes","No"},2);
-        close(ftmpIO); flagRemoval=false;
-        if answ
-            % first output is a matrix of removed regions. Return also potentially the final adjusted mask
-            [~,AFM_height_IO,height_6_Background,~] = featureRemovePortions(AFM_height_IO,'Binary Image',idxMon, ...
-                'additionalImagesToShow',{height_6_Background,height_1_original}, ...
-                'additionalImagesTitleToShow',{'Masked Raw Height Image\n(Black regions = NaN or manually removed areas)','Raw Height Image'});        
-            flagRemoval=true;            
+        % in case of MATLAB system failure, dont lost the work!
+        flagRestartRemoval=true;
+        if exist(fullfile(SaveFigFolder,sprintf("TMP_DATA_REMOVAL_iteration%d.mat",iterationMain)),'file')
+            if getValidAnswer("Data of Manually removed regions of the current iteration has been already generated. Take it?","",{"y","n"})
+                load(fullfile(SaveFigFolder,sprintf("TMP_DATA_REMOVAL_iteration%d.mat",iterationMain)),"AFM_height_IO","height_6_Background")
+                flagRestartRemoval=false;
+            end
         end
-        % prepare the plot of figures
-        if flagRemoval
-            titleData2={'Masked Raw Height Image (Background)';'Regions Manually Removed. Data that will be used for PlaneFit.'};
-        else            
-            titleData2={'Masked Raw Height Image (Background).';' Data that will be used for PlaneFit.'};
-        end
-        titleData3='Raw Height Image';
-        nameFile=sprintf('resultA2_5_DefinitiveMask_iteration%d',iterationMain);
-        showData(idxMon,false,AFM_height_IO,textTitleIO,SaveFigFolder,nameFile,'binary',true,...
+        if flagRestartRemoval 
+            % FIRST, check if there are some regions that may affect negatively the fitting. If so, then remove them.
+            height_6_Background=height_1_original;
+            % mask original AFM height image
+            AFM_height_IO=double(AFM_height_IO);
+            % obtain the data of background
+            height_6_Background(AFM_height_IO==1)=NaN;
+            % show differences in mask and masked raw height
+            ftmpIO=showData(idxMon,true,AFM_height_IO,textTitleIO,'','','binary',true,'saveFig',false,...
                 'extraData',{height_6_Background*factor,height_1_original*factor}, ...
-                'extraTitles',{titleData2,titleData3},...
-                'extraLabel',{labelHeight,labelHeight},'extraNorm',{norm,norm});  
+                'extraTitles',{'Masked Raw Height Image','Raw Height Image'},...
+                'extraLabel',{labelHeight,labelHeight},'extraNorm',{norm,norm});
+            question={"Check the comparison between mask, masked raw height and original height images.";"Do you want to remove some regions/lines?"};
+            answ=getValidAnswer(question,"",{"Yes","No"},2);
+            close(ftmpIO); flagRemoval=false;       
+    
+            if answ
+                % first output is a matrix of removed regions. Return also potentially the final adjusted mask
+                [~,AFM_height_IO,height_6_Background,~] = featureRemovePortions(AFM_height_IO,'Binary Image',idxMon, ...
+                    'additionalImagesToShow',{height_6_Background,height_1_original}, ...
+                    'additionalImagesTitleToShow',{'Masked Raw Height Image\n(Black regions = NaN or manually removed areas)','Raw Height Image'});        
+                flagRemoval=true;            
+            end
+            % prepare the plot of figures
+            if flagRemoval
+                titleData2={'Masked Raw Height Image (Background)';'Regions Manually Removed. Data that will be used for PlaneFit.'};
+            else            
+                titleData2={'Masked Raw Height Image (Background).';' Data that will be used for PlaneFit.'};
+            end
+            titleData3='Raw Height Image';
+            nameFile=sprintf('resultA2_5_DefinitiveMask_iteration%d',iterationMain);
+            showData(idxMon,false,AFM_height_IO,textTitleIO,SaveFigFolder,nameFile,'binary',true,...
+                    'extraData',{height_6_Background*factor,height_1_original*factor}, ...
+                    'extraTitles',{titleData2,titleData3},...
+                    'extraLabel',{labelHeight,labelHeight},'extraNorm',{norm,norm});  
+            % save results in case of system failure
+            save(fullfile(SaveFigFolder,sprintf("TMP_DATA_REMOVAL_iteration%d.mat",iterationMain)),"AFM_height_IO","height_6_Background")
+        end
         
         clear titleText* nameFile flagRemoval ftmpIO answ question textTitleIO binarizationMethod
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -326,14 +350,13 @@ function [AFM_Images_final,mask_FINAL,fitOrderHeight]=A2_feature_1_processHeight
             nameFile='resultA2_8_HeightFINAL';
             titleData1='Definitive Height Image';
             titleData2='Definitive Height Image - Normalized';
-            showData(idxMon,false,height_FINAL*factor,titleData1,SaveFigFolder,nameFile,'labelBar',"Height (nm)",'pixelSizeMeterUnit',1e6,...
+            showData(idxMon,false,height_FINAL*factor,titleData1,SaveFigFolder,nameFile,'labelBar',"Height (nm)",'lenghtAxis',lengthAxis,...
                 'extraData',{height_FINAL}, ...
                 'extraTitles',{titleData2},...
-                'extraNorm',true,...
-                'extraPixelSizeUnit',1e6);
+                'extraNorm',true);
             nameFile='resultA2_8_maskFINAL';
             titleData1='Definitive mask Height Image';
-            showData(idxMon,false,mask_FINAL,titleData1,SaveFigFolder,nameFile,'binary',true,'pixelSizeMeterUnit',1e6) 
+            showData(idxMon,false,mask_FINAL,titleData1,SaveFigFolder,nameFile,'binary',true,'lenghtAxis',lengthAxis) 
             % substitutes to the original height image with the new opt fitted heigh
             AFM_Images_final=AFM_Images;
             AFM_Images_final(strcmp([AFM_Images_final.Channel_name],'Height (measured)')).AFM_image=height_FINAL;
