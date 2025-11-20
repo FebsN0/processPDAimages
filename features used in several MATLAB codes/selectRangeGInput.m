@@ -1,4 +1,4 @@
-function closest_indices = selectRangeGInput(n_points,dimension,x,y)
+function closest_indices = selectRangeGInput(n_points,dimension,axFig)
 % OUTPUT:
 %   closest_indices : if dimension = 1, the output will be the index for each point on the
 %                       corrisponding x axis (1 value for each point)
@@ -10,32 +10,82 @@ function closest_indices = selectRangeGInput(n_points,dimension,x,y)
 %                       2-dimensional (x and y) Euclidean distances
 %                       if 2, also normalize x and y since they are of different
 %                       orders of magnitude!
-%   x               : x axis values 
-%   y               : y axis values 
+%   axFig           : target axis where the user must click
+    
     if dimension == 2 && ~exist('y','var')
         error('The selected dimension is two, but the second input data is missing!')
     end
-    % init
-    closest_indices=zeros(n_points,dimension);
-    % save x and y coordinates for each point
-    point_selected=zeros(1,n_points);
-    point_closest=zeros(1,n_points);
-    for j=1:size(closest_indices,1)
+    %--------------------------------------------------------------
+    % Force the axis to be current and get the first child object
+    %--------------------------------------------------------------
+    axes(axFig);
+    hold(axFig, 'on');
+    obj = axFig.Children(1);
+    %--------------------------------------------------------------
+    % Determine the type of object and then extract data depending on it
+    %--------------------------------------------------------------
+    switch obj.Type
+        case {'line','scatter'}
+            % XData/YData are arrays xMin:xMax
+            x = obj.XData(:);
+            y = obj.YData(:);
+        case 'image'
+            % For images generated through imagesc and image, XData/YData usually are limits [xMin xMax]
+            sz = size(obj.CData);
+            x = 1:sz(2);
+            y = 1:sz(1);
+        case 'surface'
+            % meshgrid style
+            x = obj.XData(:);
+            y = obj.YData(:);
+        otherwise
+            error('Unsupported object type: %s', obj.Type);
+    end
+   
+    %--------------------------------------------------------------
+    % Preallocate
+    %--------------------------------------------------------------
+    closest_indices = zeros(n_points, dimension);
+    point_selected  = gobjects(1, n_points);
+    point_closest   = gobjects(1, n_points);
+    
+    %--------------------------------------------------------------
+    % Loop over user clicks
+    %--------------------------------------------------------------
+    for j=1:n_points
+        % Force focus on the axis again (in case the user interacts elsewhere)
+        axes(axFig); %#ok<LAXES>
         [x_selected, y_selected] = ginput(1);
         pointSelected_all(1)=x_selected;
         pointSelected_all(2)=y_selected;
-        hold on
-        point_selected(j)=scatter(pointSelected_all(j,1), pointSelected_all(j,2),60, 'filled', 'MarkerFaceColor', 'red','DisplayName','Selected Point');         
+        % mark click
+        point_selected(j)=scatter(axFig,x_selected, y_selected,60, 'filled', 'MarkerFaceColor', 'red','DisplayName','Selected Point');         
         if strcmpi(string(dimension),'1')
-            [ ~, ix ] = min(abs(x-x_selected));
+            % Find closest x-value
+            if x_selected<min(x)
+                ix=1;
+            elseif x_selected>max(x)
+                ix=length(x);
+            else
+                % min distance between any point of x and x_selected
+                [ ~, ix ] = min(abs(x-x_selected));
+            end
             closest_indices(j)=ix;
-            point_closest(j)=xline(x(ix),'--','LineWidth',2,'Color','green','DisplayName','Closest x line');
+            point_closest(j)=xline(axFig,x(ix),'--','LineWidth',2,'Color','green','DisplayName','Closest x line');
         else
-            [~, ix] = min(abs(x - x_selected));
-            [~, iy] = min(abs(y - y_selected));
+            % find the closest x
+            if x_selected<min(x), ix=1;
+            elseif x_selected>max(x), ix=length(x);
+            else, [~, ix] = min(abs(x - x_selected));
+            end
+            % find the closest y
+            if y_selected<min(y), iy=1;
+            elseif y_selected>max(y), iy=length(y);
+            else, [~, iy] = min(abs(y - y_selected)); 
+            end
             closest_indices(j,1)=ix;
             closest_indices(j,2)=iy;
-            point_closest(j)=scatter(x(ix),y(iy),20,'filled','MarkerFaceColor', 'green','DisplayName','Closest Point');  
+            point_closest(j)=scatter(axFig,x(ix),y(iy),20,'filled','MarkerFaceColor', 'green','DisplayName','Closest Point');  
         end       
    end
    pause(2)
