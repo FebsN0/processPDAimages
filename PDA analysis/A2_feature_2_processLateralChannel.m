@@ -13,7 +13,8 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
     p=inputParser();    %init instance of inputParser
     %Add default parameters. When call the function, use 'argName' as well you use 'LineStyle' in plot! And
     %then the values
-    argName = 'FitOrder';                   defaultVal = 'Low';     addOptional(p,argName,defaultVal, @(x) ismember(x,{'Low','Medium','High'}));
+    argName = 'FitOrderHVON_Lat';           defaultVal = '';     addOptional(p,argName,defaultVal, @(x) (ismember(x,{'Low','Medium','High'}) || isempty(x)));
+    argName = 'FitOrderHVOFF_Height';       defaultVal = '';     addOptional(p,argName,defaultVal, @(x) (ismember(x,{'Low','Medium','High'}) || isempty(x)));
     argName = 'SeeMe';                      defaultVal = true;      addOptional(p,argName,defaultVal, @(x) islogical(x));
     argName = 'Normalization';              defaultVal = false;     addOptional(p,argName,defaultVal, @(x) islogical(x));
     argName = 'flagSingleSectionProcess';   defaultVal = false;     addOptional(p,argName,defaultVal, @(x) islogical(x));
@@ -22,16 +23,25 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
     parse(p,varargin{:});
     % setup optional input
     if p.Results.SeeMe; SeeMe=1; else, SeeMe=0; end    
-    if p.Results.Normalization, norm=1; unitData="" ;else, norm=0; unitData='Voltage [V]'; end
+    if p.Results.Normalization, norm=1; unitDataLabel="" ;else, norm=0; unitDataLabel='Voltage [V]'; end
+    unitDataLabel=string(unitDataLabel);
     if p.Results.flagSingleSectionProcess, flagSingleSectionProcess=1; else, flagSingleSectionProcess=0; end
     if ~isempty(p.Results.idxSectionHVon), idxSectionHVon=p.Results.idxSectionHVon; end  
-    if strcmp(p.Results.FitOrder,'Low'); limit=3; elseif strcmp(p.Results.FitOrder,'Medium'), limit=6; else, limit=9; end
+    
+    % for the first time or first section, request the max fitOrder
+    if isempty(p.Results.FitOrderHVON_Lat)
+        FitOrderHVON_Lat=chooseAccuracy("Choose the level of fit Order for lineXline baseline (i.e. Background) of AFM Lateral Deflection Data.");
+    else
+        FitOrderHVON_Lat=p.Results.FitOrderHVON_Lat;
+    end
+    if strcmp(FitOrderHVON_Lat,'Low'), limit=3; elseif strcmp(fitOrder,'Medium'), limit=6; else, limit=9; end       
+    FitOrderHVOFF_Height=p.Results.FitOrderHVOFF_Height;
     clearvars argName defaultVal p varargin
     
     % select a single line manually to check the LD
-    fLineChoose=figure; imagesc(AFM_height_IO), axis equal, xlim tight, ylim tight, objInSecondMonitor(gcf,idxMon)
-    uiwait(msgbox(sprintf('Select a point on the mask where analyze the single fast scan line'),''));
-    idxLine=selectRangeGInput(1,1,1:size(AFM_height_IO,2),1:size(AFM_height_IO,1));
+    fLineChoose=figure; axFig=axes('Parent',fLineChoose); imagesc(AFM_height_IO), axis equal, xlim tight, ylim tight, objInSecondMonitor(fLineChoose,idxMon)
+    uiwait(msgbox(sprintf('Select two points on the mask where analyze two different single fast scan lines'),''));
+    idxLine=sort(selectRangeGInput(2,1,axFig));
     close(fLineChoose), clear fLineChoose
     % extract data (lateral deflection Trace and Retrace, vertical deflection) and then mask (glass-PDA) elementXelement
     % ONLY in correspondence with the glass!
@@ -47,10 +57,12 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
     % fitting using the masked AFM data containing only background. Change them with NaN       
     num_lines = size(Lateral_Trace_BK_1_maskOnly, 2);
     Lateral_Trace_BK_2_firstClear=zeros(size(Lateral_Trace_BK_1_maskOnly));
+    countOutliers=0;
     for i=1:num_lines
         yData = Lateral_Trace_BK_1_maskOnly(:, i);
         [pos_outlier] = isoutlier(yData, 'gesd');
         while any(pos_outlier)
+            countOutliers=countOutliers+length(find(pos_outlier));
             yData(pos_outlier) = NaN;
             [pos_outlier] = isoutlier(yData, 'gesd');
         end
@@ -58,11 +70,12 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
     end
     % plot. To better visual, change NaN into 0
     Lateral_Trace_BK_2_firstClear(isnan(Lateral_Trace_BK_2_firstClear))=0;
-    titleData1='Raw Lateral Deflection - Trace'; titleData2={"Background";"Masked and Outliers removed"};
-    nameFig='resultA5_1_RawLateralData_BackgroundNoOutliers';
-    showData(idxMon,false,Lateral_Trace,norm,titleData1,unitData,newFolder,nameFig,'data2',Lateral_Trace_BK_2_firstClear,'titleData2',titleData2);
+    titleData1='Raw Lateral Deflection - Trace'; titleData2={"Background";sprintf("Masked and %d Outliers removed",countOutliers)};
+    nameFig='resultA2_9_RawLateralData_BackgroundNoOutliers';
+    showData(idxMon,false,Lateral_Trace,titleData1,newFolder,nameFig,'normalized',norm,'labelBar',unitDataLabel, ...
+        'extraData',{Lateral_Trace_BK_2_firstClear},'extraTitles',{titleData2},'extraNorm',{norm},'extraLabel',{unitDataLabel});
     pause(1)
-
+    
     % check distribution of the LD data
     Lateral_Trace_masked_FRonly = Lateral_Trace;
     Lateral_Trace_masked_FRonly(AFM_height_IO==0)=NaN;
@@ -70,117 +83,57 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
     DataXdistribution= {Lateral_Trace_BK_1_maskOnly,'Raw BK'; ...
                         Lateral_Trace_masked_FRonly,'Raw FR'};
     DataXSingleLine={Lateral_Trace,AFM_height_IO}; 
-    clear Lateral_Trace_masked_FRonly
-    idCall=1;
+    clear Lateral_Trace_masked_FRonly countOutliers titleData* nameFig
     % show LD value distribution of the entire matrix
-    figDistr=checkDistributionDataLD(idCall,SeeMe,idxMon,DataXdistribution);
+    figDistr=checkDistributionDataLD(SeeMe,idxMon,DataXdistribution);
     % show LD of a single fast scan line (idx manually selected previously)
-    figSingleLine=plotSingleLineCheck(idCall,idxMon,DataXSingleLine,idxLine);
-    idCall=idCall+1;
+    figSingleLine=plotSingleLineCheck(idxMon,DataXSingleLine,idxLine);
 
     % rechange to NaN
-    Lateral_Trace_BK_2_firstClear(Lateral_Trace_BK_2_firstClear==0)=NaN;
-    % plane fitting
-    [xGrid, yGrid] = meshgrid(1:size(Lateral_Trace_BK_2_firstClear,2), 1:size(Lateral_Trace_BK_2_firstClear,1));
-    % Estrarre solo i punti di background without outliers
-    [xData, yData, zData] = prepareSurfaceData(xGrid,yGrid,Lateral_Trace_BK_2_firstClear);    
-    % init and prepare the setting for the fitting
-    models = cell(limit+1, limit+1);
-    opts = fitoptions('Method', 'LinearLeastSquares');
-    opts.Robust = 'LAR';
-    fit_decision = zeros(limit+1,limit+1,3);
-    fit_decision_final_plane = struct();
-    wb=waitbar(1/(limit*limit),sprintf('Removing Plane Polynomial Baseline orderX: %d orderY: %d',0,0),...
-            'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
-    setappdata(wb,'canceling',0);
-    % init
-    varargout=cell(1,3);
-    % Test polynomial fits up to the limit
-    i=1;
-    for px = 0:limit
-        for py = 0:limit
-            waitbar(i/(limit+1)/(limit+1), wb, sprintf('Removing Plane Polynomial Baseline orderX: %d orderY: %d',px,py));    
-            % Check for cancellation
-            if getappdata(wb, 'canceling')
-                delete(wb);
-                error('Process cancelled');
-            end 
-            if (px == 0 && py == 0) || px>=6 || py>=6
-                continue; % Avoid constant fit
-            end
-            % Define polynomial fit type for 2D surface
-            fitTypeM=sprintf('poly%d%d', px, py);
-            ft = fittype(fitTypeM);
-            [fitresult, gof] = fit( [xData, yData], zData, ft, opts );
-            if gof.adjrsquare < 0
-                gof.adjrsquare = 0.001;
-            end     
-            % Compute SSE and AIC
-            residuals = zData - feval(fitresult,xData,yData);
-            SSE = sum(residuals.^2);
-            n = length(yData);
-            k = numel(coeffnames(fitresult)); % Number of parameters; % Number of parameters (polynomial degree + 1)
-            aic_values = n * log(SSE / n) + 2 * k;           
-            % Store model and statistics
-            models{px+1,py+1} = fitresult;
-            fit_decision(px + 1, py + 1,1) = aic_values;
-            fit_decision(px + 1, py + 1,2) = gof.sse;
-            fit_decision(px + 1, py + 1,3) = gof.adjrsquare;
-            i=i+1;                   
-        end
-    end
-    
-    % Select best model using AIC
-    [~, bestIdx] = min(fit_decision(:,:,1),[],'all');
-    [bestPx, bestPy] = ind2sub(size(fit_decision(:,:,1)), bestIdx);
-    bestModel = models{bestPx, bestPy};
-    % Save fitting decisions
-    fitTypeM=sprintf('poly%d%d', bestPx-1, bestPy-1);
-    fit_decision_final_plane.fitOrder = fitTypeM;
-    fit_decision_final_plane.SSE = fit_decision(bestPx, bestPy,2); % SSE
-    fit_decision_final_plane.R2 = fit_decision(bestPx, bestPy,3); % Adjusted R^2
-    % obtain the fitted plane which will be applied to the raw data
-    correction_plane = feval(bestModel, xGrid,yGrid);
-    clear i n opts SSE k aic_values fit_decision fitresult fitTypeM ft gof models pos_outlier px py residuals varargin xGrid yGrid xData yData zData titleData* nameFig
-    % apply the correction plane to the lateral data.
-    % Note: previous versions applied also the shifting by min value of the entire lateral deflection matrix.
-    % After proper investigation, it has been found out that it is wrong shifting both before and after
-    % applying any tipe of correction (plane or lineXline fitting), because the fitting "implies" already the shifting.
-    % The following lines are examples of wrong shifting ==> NO SHIFT AT ALL
-    % Lateral_Trace_preShift_1                  = Lateral_Trace -min(Lateral_Trace(:));    
-    % Lateral_Trace_corrPlane_preShift_2        = Lateral_Trace_preShift_1 - correction_plane;
-    % Lateral_Trace_corrPlane_prePostShift_3    = Lateral_Trace_corrPlane_preShift_2-min(Lateral_Trace_corrPlane_preShift_2(:));
-    %
-    % apply correction plane to raw data
-    Lateral_Trace_corrPlane = Lateral_Trace - correction_plane;
-    % even after applying correction plane at the no shifted lateral deflection data
-    % Lateral_Trace_corrPlane_postShift = Lateral_Trace_corrPlane-min(Lateral_Trace_corrPlane(:));
+    Lateral_Trace_BK_2_firstClear(Lateral_Trace_BK_2_firstClear==0)=NaN;    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%% PLANE FITTING ON LATERAL DEFLECTION BACKGROUND (masked LAT image) %%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    [~,correction_plane,metricsBestPlaneFit]=planeFitting_N_Order(Lateral_Trace_BK_2_firstClear,limit);
+    varargout{2}=metricsBestPlaneFit;
+    % correct the raw original data by applyting the correction_plane
+    Lateral_Trace_corrPlane = Lateral_Trace - correction_plane;    
     % show the results by distribution and single selected line
     Lateral_Trace_corrPlane_BK_1= Lateral_Trace_corrPlane;
     Lateral_Trace_corrPlane_BK_1(AFM_height_IO==1)=NaN;
     % check distribution of the LD data
     Lateral_Trace_corrPlane_FR_1 = Lateral_Trace_corrPlane;
-    Lateral_Trace_corrPlane_FR_1(AFM_height_IO==0)=NaN;
-    DataXdistribution= {Lateral_Trace_corrPlane_BK_1,'corrected PlaneFitt BK'; ...
-                        Lateral_Trace_corrPlane_FR_1,'corrected PlaneFitt FR'};
-    DataXSingleLine={Lateral_Trace_corrPlane,'corrected by planeFitting'};
-    figDistr=checkDistributionDataLD(idCall,SeeMe,idxMon,DataXdistribution,'prevFig',figDistr);
-    figSingleLine=plotSingleLineCheck(idCall,idxMon,DataXSingleLine,idxLine,'prevFig',figSingleLine);
-    idCall=idCall+1;
+    Lateral_Trace_corrPlane_FR_1(AFM_height_IO==0)=NaN;    
+    % plot distribution, lineAnalysis and image
+    DataXdistribution= {Lateral_Trace_corrPlane_BK_1,'1st correction - PlaneFit BK'; ...
+                        Lateral_Trace_corrPlane_FR_1,'1st correction - PlaneFit FR'};
+    DataXSingleLine={Lateral_Trace_corrPlane,'1st correction - PlaneFit'};
+    figDistr=checkDistributionDataLD(SeeMe,idxMon,DataXdistribution,'prevFig',figDistr,'idCall',2);
     pause(1)
-    % plot
+    figSingleLine=plotSingleLineCheck(idxMon,DataXSingleLine,idxLine,'prevFig',figSingleLine);
+    pause(1)
     titleData1='Plane Fitted Background';
-    titleData2={'Lateral Deflection - Trace'; '(removed fitted plane and shifted)'};
-    nameFig='resultA5_2_planeBKfit_LateralDeflection';
-    figTmp=showData(idxMon,true,correction_plane,norm,titleData1,unitData,newFolder,nameFig,'data2',Lateral_Trace_corrPlane,'titleData2',titleData2);
+    titleData2={'Lateral Deflection'; 'Removed fitted plane'};
+    nameFig='resultA2_10_planeBKfit_LateralDeflectionCorr';
+    figTmp=showData(idxMon,true,correction_plane,titleData1,newFolder,nameFig,'normalized',norm,'labelBar',unitDataLabel, ...
+        'extraData',{Lateral_Trace_corrPlane},'extraTitle',{titleData2},'extraNorm',{norm},'extraLabel',{unitDataLabel});
     pause(1)
-    text='Plane fitted';
-    varargout{2}=fit_decision_final_plane;
     answ=getValidAnswer('Continue with LineXLine fitting?','',{'Yes','No'});
     close(figTmp)
     Lateral_Trace_secondCorr = Lateral_Trace_corrPlane;
-    % fit lineXline
-    if answ        
+    % fit lineXline, with the further line check in case the border parts of a line contains significant amount of no data (i.e. no BK but only FR) 
+    % potentially bringing to wrong fit
+    varargout{3}="LineByLine Fitting not available (user skipped this step)";
+    if answ   
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%% LINE-BY-LINE FITTING ON LATERAL DEFLECTION BACKGROUND (masked LAT image) %%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
+        delete(allWaitBars)
+        wb=waitbar(1/(limit*limit),sprintf('Removing Plane Polynomial Baseline orderX: %d orderY: %d',0,0),...
+                'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
+        setappdata(wb,'canceling',0);
+    
         % apply the PDA mask, so the PDA data  will be ignored. Use now the background        
         Lateral_Trace_BK_1_maskOnly = Lateral_Trace_corrPlane;
         Lateral_Trace_BK_1_maskOnly(AFM_height_IO==1)=5;          
@@ -193,7 +146,10 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
         % build array abscissas for the fitting
         x = (1:size(Lateral_Trace_BK_1_maskOnly,1))';
         flagLineMissingDataBorder=zeros(1,num_lines);
-        
+        fAnomaliesCheck=figure;
+        objInSecondMonitor(fAnomaliesCheck,idxMon)
+        axAnomalies=axes("Parent",fAnomaliesCheck);
+        hold(axAnomalies,"on")
         for i = 1:num_lines      
             % Check for cancellation
             if getappdata(wb, 'canceling')
@@ -264,9 +220,9 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
                     flagLineMissingDataBorder(i)=1;
                     % plot the fitted line and the experimental values
                     iteration=1;
-                    ftmp=figure; plot(xValid,yValid,'*','DisplayName','Experimental Background','Color',globalColor(1))
+                    plot(axAnomalies,xValid,yValid,'*','DisplayName','Experimental Background','Color',globalColor(1))
                     pause(1)
-                    hold on
+                    
                     % plot at least two previous experimental data background to understand how they
                     % distributed along the fast scan line. In case the checker happens at the first two
                     % iteration, special cases.
@@ -296,14 +252,13 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
                             end
                             xValidtmp = xValidtmp(~isnan(yValidtmp));
                             yValidtmp = yValidtmp(~isnan(yValidtmp));    
-                            plot(xValidtmp,yValidtmp,'*','DisplayName',sprintf('ExpBK line %d',idxPrev(j)),'Color',globalColor(j+1))
-                            plot(Bk_iterative(:,idxPrev(j)),'Color',globalColor(j+1),'DisplayName',sprintf('FittedBK line %d',idxPrev(j)))
+                            plot(axAnomalies,xValidtmp,yValidtmp,'*','DisplayName',sprintf('ExpBK line %d',idxPrev(j)),'Color',globalColor(j+1))
+                            plot(axAnomalies,Bk_iterative(:,idxPrev(j)),'Color',globalColor(j+1),'DisplayName',sprintf('FittedBK line %d',idxPrev(j)))
                         end
                     end
                     % +2 because second and/or third colors are used for the prev iteration
                     idxColor=numPrevRows+2;
-                    plot(fittedline,'DisplayName',sprintf('Best Fitted curve - fitOrder: %d - %d° iteration',bestFitOrder,iteration),'Color',globalColor(1),'LineWidth',2,'LineStyle','--')                    
-                    objInSecondMonitor(ftmp,idxMon)
+                    plot(axAnomalies,fittedline,'DisplayName',sprintf('Best Fitted curve - fitOrder: %d - %d° iteration',bestFitOrder,iteration),'Color',globalColor(1),'LineWidth',2,'LineStyle','--')                                        
                     legend('FontSize',18), xlim padded, ylim padded, title(sprintf('Line %d',i),'FontSize',14)
                     question=sprintf(['The avg of one of the borders (%d elements over %d) of the first\nfitted %d-line is higher then the avg of true exp BK borders' ...
                         '(%d elements)\nChoose the best option to manage the current line.'],round(length(yData)*10/100),length(yData),i,round(length(yData)*5/100));
@@ -330,18 +285,18 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
                         [fittedline,bestFitOrder,fit_decision_final_tmp]=bestFit(x,aic_values(idxs),models(idxs),fit_decision(:,idxs));
                         if flagContinue
                             iteration=iteration+1;                            
-                            plot(fittedline,'DisplayName',sprintf('Best Fitted curve - fitOrder: %d - %d° iteration',bestFitOrder,iteration),'Color',globalColor(idxColor),'LineWidth',2,'LineStyle','--')
+                            plot(axAnomalies,fittedline,'DisplayName',sprintf('Best Fitted curve - fitOrder: %d - %d° iteration',bestFitOrder,iteration),'Color',globalColor(idxColor),'LineWidth',2,'LineStyle','--')
                             idxColor=idxColor+1;
                         end
                     end
-                    close(ftmp)
+                    % clear the figure contents
+                    cla(axAnomalies)
                 end
             end 
             fit_decision_final_line(i)=fit_decision_final_tmp;
             Bk_iterative(:, i) = fittedline;
         end        
-
-        delete(wb);    
+        close(fAnomaliesCheck)
         % Handle missing lines by interpolating from neighbors, also when more consecutive lines are totally NaN
         % If that happens, then take the closest non NaN vectors and interpolate
         nan_lines = find(isnan(Bk_iterative(1, :)));
@@ -359,31 +314,37 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
         end    
         % Remove background
         Lateral_Trace_secondCorr = Lateral_Trace_corrPlane - Bk_iterative;
-        % Plot the fitted backround:            
-        titleData1='Line x Line Fitted Background'; titleData2={'Lateral Deflection - Trace';sprintf("(%s - lineXline fitted)",text)};
-        nameFig='resultA5_3_LineBKfit_LateralDeflection';
-        figTmp=showData(idxMon,true,Bk_iterative,norm,titleData1,unitData,newFolder,nameFig,'data2',Lateral_Trace_secondCorr,'titleData2',titleData2,'saveFig',false);
-        answ=getValidAnswer('Satisfied of the fitting? If not, keep the original and skip to the next part.','',{'y','n'});
-        close(figTmp)
+        % Plot the fitted backround:               
+        titleData1='Line x Line Fitted Background'; titleData2={"Lateral Deflection - Trace";"Plane+LineByLine Fitted"};
+        nameFig='resultA2_11_LineBKfit_LateralDeflection';
+        figTmp=showData(idxMon,true,Bk_iterative,titleData1,'','','normalized',norm,'labelBar',unitDataLabel,'saveFig',false, ...
+            'extraData',{Lateral_Trace_secondCorr},'extraTitle',{titleData2},'extraNorm',{norm},'extraLabel',{unitDataLabel});
+        % plot distribution and lineAnalysis
+        Lateral_Trace_corrLine_BK_2= Lateral_Trace_secondCorr;
+        Lateral_Trace_corrLine_BK_2(AFM_height_IO==1)=NaN;
+        % check distribution of the LD data
+        Lateral_Trace_corrLine_FR_2 = Lateral_Trace_secondCorr;
+        Lateral_Trace_corrLine_FR_2(AFM_height_IO==0)=NaN;
+        DataXdistribution= {Lateral_Trace_corrLine_BK_2,'2nd correction - LineXLineFit BK'; ...
+                            Lateral_Trace_corrLine_FR_2,'2nd correction - LineXLineFit FR'};
+        DataXSingleLine={Lateral_Trace_secondCorr,'2nd correction - LineXLineFit'};
+        figDistrTmp=checkDistributionDataLD(SeeMe,idxMon,DataXdistribution,'prevFig',figDistr,'idCall',3);        
+        figSingleLineTmp=plotSingleLineCheck(idxMon,DataXSingleLine,idxLine,'prevFig',figSingleLine);
         pause(1)
-        if answ            
-            varargout{3}=fit_decision_final_line;
-            Lateral_Trace_corrLine_BK_2= Lateral_Trace_secondCorr;
-            Lateral_Trace_corrLine_BK_2(AFM_height_IO==1)=NaN;
-            % check distribution of the LD data
-            Lateral_Trace_corrLine_FR_2 = Lateral_Trace_secondCorr;
-            Lateral_Trace_corrLine_FR_2(AFM_height_IO==0)=NaN;
-            DataXdistribution= {Lateral_Trace_corrLine_BK_2,'corrected LineXline BK'; ...
-                                Lateral_Trace_corrLine_FR_2,'corrected LineXline FR'};
-            DataXSingleLine={Lateral_Trace_secondCorr,'corrected by LineXLineFitted'};
-            figDistr=checkDistributionDataLD(idCall,SeeMe,idxMon,DataXdistribution,'prevFig',figDistr);        
-            figSingleLine=plotSingleLineCheck(idCall,idxMon,DataXSingleLine,idxLine,'prevFig',figSingleLine);
+        if getValidAnswer('Satisfied of the fitting? If not, keep the original and skip to the next part.','',{'y','n'})
+            close(figTmp)                 
+            varargout{3}=fit_decision_final_line;  
+            % take the definitive last figures
+            figDistr=figDistrTmp;
+            figSingleLine=figSingleLineTmp;
         else
-           titleData1='Line x Line Fitted Background'; titleData2={'Lateral Deflection - Trace';sprintf("(%s - lineXline fitted (NOT TAKEN))",text)};
+           titleData1='Line x Line Fitted Background'; titleData2={'Lateral Deflection - Trace';"Plane+LineByLine Fitted (NOT TAKEN))"};
+           
         end
-        showData(idxMon,false,Bk_iterative,norm,titleData1,unitData,newFolder,nameFig,'data2',Lateral_Trace_secondCorr,'titleData2',titleData2)    
+        showData(idxMon,false,Bk_iterative,titleData1,newFolder,nameFig,'normalized',norm,'labelBar',unitDataLabel, ...
+        'extraData',{Lateral_Trace_secondCorr},'extraTitle',{titleData2},'extraNorm',{norm},'extraLabel',{unitDataLabel});
     end
-    
+    % Finalise the distribution and signleLineAnalysis figures
     % adjust xlim, especially show the 99.5 percentile of the data in the distribution
     ax = findobj(figDistr, 'Type', 'Axes');           % find axes inside the figure
     hList = findobj(ax, 'Type', 'Histogram');         % locate the histograms
@@ -391,12 +352,12 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
     allData = cell2mat(arrayfun(@(h) h.Data(:), hList, 'UniformOutput', false));
     pLow = prctile(allData, 1);
     pHigh = prctile(allData, 99.5);
-    xlim(ax, [min(allData)-abs(pLow), pHigh]);
+    xlim(ax, [min(allData)-abs(pLow), pHigh]); ylim(ax,"padded");
     clear allData pLow pHigh ax hList
     % save distribution and singleLine
-    nameResults='resultA5_4_DistributionLD_eachCorrectionStep';
+    nameResults='resultA2_12_DistributionLD_eachCorrectionStep';
     saveFigures(figDistr,newFolder,nameResults)
-    nameResults='resultA5_5_singleFastScanLineLD_eachCorrectionStep';
+    nameResults='resultA2_13_singleFastScanLineLD_eachCorrectionStep';
     saveFigures(figSingleLine,newFolder,nameResults)
     close all
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -434,7 +395,7 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
                 if ~exist(fullfile(mainPath,'HoverMode_OFF'),"dir")
                     error('The directory HoverMode_OFF doesn''t exist. Select another option')
                 end
-                avg_fc = A2_feature_2_1_FrictionCalcFromSameScanHVOFF(idxMon,mainPath,flagSingleSectionProcess,idxSectionHVon);
+                [avg_fc,FitOrderHVOFF_Height] = A2_feature_2_1_FrictionCalcFromSameScanHVOFF(idxMon,mainPath,flagSingleSectionProcess,idxSectionHVon,'FitOrderHVOFF_Height',FitOrderHVOFF_Height);
                 if isempty(avg_fc)
                     fprintf('For some reasons, the scan in HoverMode OFF is messed up. Choose a standard value if possible')
                     continue
@@ -466,22 +427,25 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
     xmax =  numElements+round(0.1*numElements);
     xlim([xmin xmax]);
     objInSecondMonitor(figSingleLineForce,idxMon);
-    nameFig='resultA5_6_singleFastScanLineLD_FORCE';
+    nameFig='resultA2_14_singleFastScanLineLD_FORCE';
     saveFigures(figSingleLineForce,newFolder,nameFig)
 
     % plot the definitive corrected lateral force
     titleData='Fitted and corrected Lateral Force';
-    nameFig='resultA5_7_ResultsDefinitiveLateralDeflectionsNewton_normalized';
-    showData(idxMon,SeeMe,Corrected_LD_Trace,true,titleData,'',newFolder,nameFig)
+    nameFig='resultA2_15_ResultsDefinitiveLateralDeflectionsNewton_normalized';
+    showData(idxMon,SeeMe,Corrected_LD_Trace,titleData,newFolder,nameFig,'normalized',true)
+
     titleData='Fitted and corrected Lateral Force';
-    nameFig='resultA5_7_ResultsDefinitiveLateralDeflectionsNewton';
+    nameFig='resultA2_16_ResultsDefinitiveLateralDeflectionsNewton';
     labelFig='Force [nN]';
-    showData(idxMon,SeeMe,Corrected_LD_Trace*1e9,false,titleData,labelFig,newFolder,nameFig)
+    showData(idxMon,SeeMe,Corrected_LD_Trace*1e9,titleData,newFolder,nameFig,'labelBar',labelFig)
 
     % save the corrected lateral force into cropped AFM image
     AFM_Elab=AFM_data;    
     AFM_Elab(strcmpi([AFM_data.Channel_name],'Lateral Deflection') & strcmpi([AFM_data.Trace_type],'Trace')).AFM_image=Corrected_LD_Trace;
-    varargout{1}=AFM_Elab;    
+    varargout{1}=AFM_Elab; 
+    varargout{4}=FitOrderHVON_Lat;
+    varargout{5}=FitOrderHVOFF_Height;
 end
 
 
@@ -489,11 +453,12 @@ end
 %%%%% FUNCTIONS %%%%%
 %%%%%%%%%%%%%%%%%%%%%
 
-function figDistr=checkDistributionDataLD(idCall,SeeMe,idxMon,Data,varargin)
+function figDistr=checkDistributionDataLD(SeeMe,idxMon,Data,varargin)
     p=inputParser();
-    argName = 'prevFig';    defaultVal = [];    addOptional(p,argName,defaultVal);   
+    argName = 'prevFig';    defaultVal = [];   addOptional(p,argName,defaultVal);   
+    argName = 'idCall';     defaultVal = 1;    addOptional(p,argName,defaultVal);   
     parse(p,varargin{:});
-    if idCall==1
+    if isempty(p.Results.prevFig)
         if SeeMe
             figDistr=figure('Visible','on'); 
         else
@@ -505,104 +470,124 @@ function figDistr=checkDistributionDataLD(idCall,SeeMe,idxMon,Data,varargin)
         title("Distribution Lateral Deflection and minimum values","FontSize",20)
         subtitle("(99.5 percentile of the entire data)","FontSize",15)
         objInSecondMonitor(figDistr,idxMon);        
-        pause(1)
+        pause(1)        
     else
         figDistr=p.Results.prevFig;
-        figure(figDistr)      
+        figure(figDistr)              
     end
-    pause(1)
-    hold on
+    idCall=p.Results.idCall;
+    ax = findall(figDistr, 'type', 'axes');    
+    hold(ax,"on")
     % extract the data
     DataBK=Data{1,1}; DataBK=DataBK(~isnan(DataBK)); NameBK=Data{1,2};
     DataFR=Data{2,1}; DataFR=DataFR(~isnan(DataFR)); NameFR=Data{2,2};
     % prepare histogram. round not work to excess but to nearest.
     xmin=floor(min(min(DataBK(:)),min(DataFR(:))) * 1000) / 1000;
     xmax=ceil( max(max(DataBK(:)),max(DataFR(:))) * 1000) / 1000;
-    edges=(xmin:0.02:xmax);
+    edges=(xmin:0.01:xmax);
 
     % show the original LD of BK
     DataCleaned_BK=DataBK(:); DataCleaned_BK(~isnan(DataCleaned_BK));
-    histogram(DataCleaned_BK,'BinEdges',edges,"DisplayName",NameBK)
+    histogram(ax,DataCleaned_BK,'BinEdges',edges,"DisplayName",NameBK)
     % show the original LD of FR
     DataCleaned_FR=DataFR(:); DataCleaned_FR(~isnan(DataCleaned_FR));
-    histogram(DataCleaned_FR,'BinEdges',edges,"DisplayName",NameFR)
+    histogram(ax,DataCleaned_FR,'BinEdges',edges,"DisplayName",NameFR)
     % check the abs min
     absMinBK=min(DataCleaned_BK);
     % check the min in corrispondence of 1 percentile
     percentile=1;      
     threshold = prctile(DataCleaned_BK, percentile);
     % show vertical line of different min BK
-    xline(absMinBK,':','LineWidth',1.5,     'Color',globalColor(idCall),'DisplayName',sprintf('Absolute Min BK:       %.2e',absMinBK))
-    xline(threshold,'--','LineWidth',1.5,   'Color',globalColor(idCall),'DisplayName',sprintf('Min 1 percentile BK:   %.2e',threshold))        
+    xline(ax,absMinBK,':','LineWidth',1.5,     'Color',globalColor(idCall),'DisplayName',sprintf('Absolute Min BK:       %.2e',absMinBK))
+    xline(ax,threshold,'--','LineWidth',1.5,   'Color',globalColor(idCall),'DisplayName',sprintf('Min 1 percentile BK:   %.2e',threshold))        
     % show vertical line of min FR
     absMinFR=min(DataCleaned_FR);
-    xline(absMinFR,'.-','LineWidth',1.5,    'Color',globalColor(idCall),'DisplayName',sprintf('Absolute Min FR:       %.2e',absMinFR))
+    xline(ax,absMinFR,'.-','LineWidth',1.5,    'Color',globalColor(idCall),'DisplayName',sprintf('Absolute Min FR:       %.2e',absMinFR))
     pause(2)
 end
 
-function figSingleLine=plotSingleLineCheck(idCall,idxMon,data,idxLine,varargin)
+function figSingleLine=plotSingleLineCheck(idxMon,data,idxLine,varargin)
     p=inputParser();
     argName = 'prevFig';    defaultVal = [];    addOptional(p,argName,defaultVal);
     parse(p,varargin{:});
     clearvars argName defaultVal
-    
-    if idCall==1
-        figSingleLine=figure; % dont hide, it can be useful in deciding if perform lineXline fitting
-        % adjust pic
-        legend('FontSize',15), grid on, grid minor
-        objInSecondMonitor(figSingleLine,idxMon);
-        title(sprintf("Fast scan line # %d",idxLine),'FontSize',20)
-        xlabel('Fast scan line [pixel]','FontSize',15)
-        ylabel('Lateral Deflection [V]','FontSize',15)
-        hold on
+    numberLines=length(idxLine);              
+    if isempty(p.Results.prevFig)
         Lateral_Trace=data{1};
-        AFM_height_IO=data{2};        
-        y = Lateral_Trace(:,idxLine);
-        x = 1:length(y);
-        LD_mask=AFM_height_IO(:,idxLine);
-        % Imposta limiti verticali per i rettangoli trasparenti
-        ymin = 0;        ymax = 1;
-        % Imposta limiti orizzontali per i rettangoli trasparenti
-        xmin = min(x) - round(0.1*range(x));
-        xmax = max(x) + round(0.1*range(x));
-        % Trova regioni contigue con stesso valore in LD_mask
-        LD_mask_diff = [true; diff(LD_mask(:)) ~= 0; true]; % trova cambi
-        idx_edges = find(LD_mask_diff);
-        segments = [idx_edges(1:end-1), idx_edges(2:end)-1];
-        % Colora le regioni
-        for i = 1:size(segments,1)
-            idx_start = segments(i,1);
-            idx_end = segments(i,2);
-            col = LD_mask(idx_start);  % 0 o 1
-            
-            if col == 1
-                c = [0 0 1];  % blue
-                typeIO='Foreground';
-            else
-                c = [1 0 0];  % red
-                typeIO='Background';
-            end        
-            % create rectangules on the plot to distinguish BF from FR
-            xPatch = [x(idx_start) x(idx_end) x(idx_end) x(idx_start)];
-            yPatch = [ymin ymin ymax ymax];
-            f=fill(xPatch, yPatch, c, 'FaceAlpha', 0.2, 'EdgeColor', 'none','DisplayName',typeIO);
-            if i~=1 && i~=2 
-                f.Annotation.LegendInformation.IconDisplayStyle = 'off';
+        AFM_height_IO=data{2};     
+        x = 1:size(AFM_height_IO,1);
+        % prepare the main fig
+        figSingleLine=figure('Name','Fast Scan Lines Analysis'); % dont hide, it can be useful in deciding if perform lineXline fitting
+        tiledlayout(figSingleLine,numberLines,1,'TileSpacing','compact'); % create n rows to show separately different lines
+        objInSecondMonitor(figSingleLine,idxMon);
+        %%%%%%----------------------------------
+        %%%%%% start the line plottings %%%%%%%%
+        %%%%%%----------------------------------
+        for i=1:numberLines
+            y = Lateral_Trace(:,idxLine(i));
+            % identify the masked regions so they can be easily recognised
+            y_mask=AFM_height_IO(:,idxLine(i));            
+            % prepare the subfig
+            currLine=nexttile; cla(currLine);             
+            plot(currLine,y,'DisplayName','Raw LD','LineWidth',1.5)      
+            hold(currLine,"on")       
+            % set limits for transparent rects
+            ymin = min(0,min(y) - round(0.1*range(y)));
+            ymax = max(1,max(y) + round(0.1*range(y)));
+            xmin = min(x) - round(0.1*range(x));
+            xmax = max(x) + round(0.1*range(x));
+            % Find contiguous regions with same value in the mask (find changes)
+            LD_mask_diff = [true; diff(y_mask(:)) ~= 0; true];
+            idx_edges = find(LD_mask_diff);
+            segments = [idx_edges(1:end-1), idx_edges(2:end)-1];
+            % color region for each found segment
+            for j = 1:size(segments,1)
+                idx_start = segments(j,1);
+                idx_end = segments(j,2);
+                col = y_mask(idx_start);  % 0 o 1                
+                if col == 1
+                    c = [0 0 1];  % blue
+                    typeIO='Foreground';
+                else
+                    c = [1 0 0];  % red
+                    typeIO='Background';
+                end        
+                % create rectangules on the plot to distinguish BF from FR
+                xPatch = [x(idx_start) x(idx_end) x(idx_end) x(idx_start)];
+                yPatch = [ymin ymin ymax ymax];
+                f=fill(currLine,xPatch, yPatch, c, 'FaceAlpha', 0.2, 'EdgeColor', 'none','DisplayName',typeIO);
+                if j~=1 && j~=2 
+                    f.Annotation.LegendInformation.IconDisplayStyle = 'off';
+                end
             end
-        end
-        plot(Lateral_Trace(:,idxLine),'DisplayName','Raw LD','LineWidth',1.5)
-        xlim([xmin xmax]);
-        ylim([ymin ymax]);
-        hold off
+            % adjust pic
+            title(currLine,sprintf("Fast scan line #%d",idxLine(i)), 'FontSize',15);
+            legend(currLine,'FontSize',11), grid on, grid minor 
+            xlabel(currLine,'Fast scan line [pixel]','FontSize',10)
+            ylabel(currLine,'Lateral Deflection [V]','FontSize',10)
+            xlim(currLine,[xmin xmax]);
+            ylim(currLine,[ymin ymax]);
+            hold(currLine,"off") 
+        end        
     else
-        figSingleLine=p.Results.prevFig;
-        figure(figSingleLine)
-        hold on
         Lateral_Trace=data{1};
         Lateral_Trace_name=data{2};
-        plot(Lateral_Trace(:,idxLine),'DisplayName',Lateral_Trace_name,'LineWidth',1.5)
-        hold off
-        ylim padded
+        % take the existing fig and find all axes inside
+        figSingleLine=p.Results.prevFig;
+        figure(figSingleLine)    
+        axAll = findall(figSingleLine, 'type', 'axes');
+        % Sort up-to-bottom
+        [~, idx] = sort(arrayfun(@(ax) ax.Position(2), axAll),'descend');
+        axAll = axAll(idx);        
+        for i=1:numberLines
+            y=Lateral_Trace(:,idxLine(i));
+            axSelected=axAll(i);
+            axes(axSelected) %#ok<LAXES>
+            hold(axSelected, 'on');        
+            plot(axSelected,y,'DisplayName',Lateral_Trace_name,'LineWidth',1.5)
+            hold(axSelected, 'off');
+            ylim(axSelected,'padded')
+        end
     end
     pause(1)
 end

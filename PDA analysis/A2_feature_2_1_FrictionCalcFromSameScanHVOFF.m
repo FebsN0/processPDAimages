@@ -1,4 +1,9 @@
-function avg_fc = A2_feature_2_1_FrictionCalcFromSameScanHVOFF(idxMon,mainPath,flagSingleSectionProcess,idxSectionHVon)
+function [avg_fc,FitOrderHVOFF_Height] = A2_feature_2_1_FrictionCalcFromSameScanHVOFF(idxMon,mainPath,flagSingleSectionProcess,idxSectionHVon,varargin)
+    p=inputParser();
+    argName = 'FitOrderHVOFF_Height';       defaultVal = '';     addOptional(p,argName,defaultVal, @(x) (ismember(x,{'Low','Medium','High'}) || isempty(x)));
+    parse(p,varargin{:});
+    FitOrderHVOFF_Height=p.Results.FitOrderHVOFF_Height;
+
     % to extract the friction coefficient, choose which method use.
     question=sprintf('Which method perform to extract the background friction coefficient? (NOTE: AFM data with Hover Mode OFF)');
     options={ ...
@@ -48,7 +53,7 @@ function avg_fc = A2_feature_2_1_FrictionCalcFromSameScanHVOFF(idxMon,mainPath,f
         if exist(fileName,"file")
             question=sprintf("PostHeightChannel file .mat (HoverModeOFF-FrictionPart) for the section %d already exists. Take it?",idxSection);
             if getValidAnswer(question,"",{'y','n'})
-                load(fileName,"AFM_HeightFittedMasked","AFM_height_IO")
+                load(fileName,"AFM_images_postHeightFit_HVOFF","AFM_height_IO_HVOFF","FitOrderHVOFF_Height")
                 flagStartHeightProcess=false;
             end
         end
@@ -67,20 +72,25 @@ function avg_fc = A2_feature_2_1_FrictionCalcFromSameScanHVOFF(idxMon,mainPath,f
             img = findobj(ax, 'Type', 'image');      % get image object(s)
             mask_sectionHV_ON = get(img, 'CData');   % extract matrix data
             clear pathDirectoryFigSingleSectionsHV_ON files_figHV_ON_mask file_figHV_ON_mask_lastIteration
-           
+            pause(1)
             dataPreProcess=allData(idxSectionHVon).AFMImage_Raw;
-            [AFM_HeightFittedMasked,AFM_height_IO]=A2_feature_1_processHeightChannel(dataPreProcess,idxMon,SaveFigIthSectionFolder,'fitOrder',"Low",'imageType','SingleSection','SeeMe',false);                
+            metadata=allData(idxSectionHVon).metadata;
+            [AFM_images_postHeightFit_HVOFF,AFM_height_IO_HVOFF,FitOrderHVOFF_Height]=A2_feature_1_processHeightChannel(dataPreProcess,idxMon,SaveFigIthSectionFolder, ...
+                'metadata',metadata,...
+                'fitOrder',FitOrderHVOFF_Height, ...
+                'imageType','SingleSection', ...
+                'SeeMe',false, ...
+                'HoverModeImage','HoverModeOFF');                
             % save the results for the specific section, to avoid to perform manual binarization
-            save(fullfile(pathDataSingleSectionsHV_OFF,sprintf("%s_heightChannelProcessed.mat",nameSection)),"AFM_HeightFittedMasked","AFM_height_IO") 
-        end
-        
-        metadata=allData(idxSectionHVon).metadata;
+            save(fullfile(pathDataSingleSectionsHV_OFF,sprintf("%s_heightChannelProcessed.mat",nameSection)),"AFM_images_postHeightFit_HVOFF","AFM_height_IO_HVOFF","FitOrderHVOFF_Height") 
+        end        
         filePathResults=pathDataSingleSectionsHV_OFF;
     else
         filePathResults=SaveFigFolder;
     end
     
-    [AFM_data,AFM_heightIO,maskRemoval] = featureRemovePortions(AFM_HeightFittedMasked,AFM_height_IO,idxMon);
+    %%%% CURRENT STAGE
+    [AFM_data,AFM_heightIO,maskRemoval] = featureRemovePortions(AFM_images_postHeightFit_HVOFF,AFM_height_IO_HVOFF,idxMon);
     avg_fc=A2_feature_2_2_FrictionCalc_method_1_2(AFM_data,metadata,AFM_heightIO,idxMon,filePathResults,method,maskRemoval,pixData,fOutlierRemoval,fOutlierRemoval_text);    
 end
 
