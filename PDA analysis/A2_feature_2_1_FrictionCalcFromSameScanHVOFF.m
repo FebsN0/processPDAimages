@@ -12,34 +12,36 @@ function [avg_fc,FitOrderHVOFF_Height,offsetHVonWithHVoff] = A2_feature_2_1_Fric
         load(fullfile(mainPath,'HoverMode_OFF\resultsData_2_postHeight.mat')); %#ok<LOAD>     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% CHECK LATER        
         flagStartHeightProcess=false;
     elseif exist(fullfile(mainPath,'HoverMode_OFF\resultsData_1_extractAFMdata.mat'),"file")
-        load(fullfile(mainPath,'HoverMode_OFF\resultsData_1_extractAFMdata.mat'),"allData","filePathResultsFriction","imageType");
+        load(fullfile(mainPath,'HoverMode_OFF\resultsData_1_extractAFMdata.mat'),"allData");
     % prepare the data , or if already extracted, upload. Even if this
     % function is called under specific section in HoverModeON, extract the
     % data from any section of HoverModeOFF    
     else
         HVoffPath=fullfile(mainPath,'HoverMode_OFF');
-        allData=A1_openANDprepareAFMdata('filePath',HVoffPath,'frictionData',"Yes");        
-        % in case the user chose to process single sections, create the dedicated dir
-        if flagSingleSectionProcess && ~exist(fullfile(HVoffPath,"Results singleSectionProcessing"),"dir")
-            SaveFigSingleSectionsFolder=fullfile(mainPath,'HoverMode_OFF',"Results singleSectionProcessing");     
-            % final path of the subfolder where to store figures for each section
-            SaveFigIthSectionFolder=fullfile(SaveFigSingleSectionsFolder,sprintf("section_%d",idxSectionHVon));
+        allData=A1_openANDprepareAFMdata('filePath',HVoffPath,'frictionData',"Yes");
+        save(fullfile(HVoffPath,'resultsData_1_extractAFMdata'),"allData");
+    end    
+    % in case the user chose to process single sections, create the dedicated dir
+    if flagSingleSectionProcess
+        SaveFigSingleSectionsFolder=fullfile(mainPath,'HoverMode_OFF',"Results singleSectionProcessing");     
+        % final path of the subfolder where to store figures for each section
+        SaveFigIthSectionFolder=fullfile(SaveFigSingleSectionsFolder,sprintf("section_%d",idxSectionHVon));
+        if ~exist(SaveFigIthSectionFolder,"dir")        
             % create nested folder with subfolders
-            mkdir(SaveFigIthSectionFolder)
-            % to use same name variable
-            filePathResultsFriction=SaveFigIthSectionFolder;
+            mkdir(SaveFigIthSectionFolder)           
             clear SaveFigIthSectionFolder SaveFigSingleSectionsFolder pathDataSingleSectionsHV_OFF
-            imageType='SingleSection';
-        elseif ~flagSingleSectionProcess && ~exist(fullfile(HVoffPath,"Results Processing AFM for friction coefficient"),"dir")
+        end
+        filePathResultsFriction=SaveFigIthSectionFolder;
+        imageType='SingleSection';
+    else
+        if ~exist(fullfile(HVoffPath,"Results Processing AFM for friction coefficient"),"dir")
             % create dir where store the friction results for the assembled (no single processed sections) to avoid to save them into the
             % same crowded directory of HVon results.
             filePathResultsFriction=fullfile(HVoffPath,"Results Processing AFM for friction coefficient");
             mkdir(filePathResultsFriction)
             imageType='Assembled';
         end
-        % save everything, because every var will be used
-        save(fullfile(HVoffPath,'resultsData_1_extractAFMdata'),"allData","filePathResultsFriction","imageType");
-    end
+    end           
     clear HVoffPath
     % if this function is called under the specific section of HoverMode ON (therefore, processing single section before assembling), the concept
     % of estimate friction will be different from an assembled AFM image. If the postHeight channel has been already processed, it is stored
