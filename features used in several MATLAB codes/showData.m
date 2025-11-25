@@ -1,14 +1,25 @@
 % show the data with proper title and etc etc
-% INPUT:    secondMonitorMain = 0 / 1
-%           SeeMe = true / false
-%           data1 = matrix which contains the data to show
-%           norm = true / false ==> normalize the data
-%           titleData1 = title to show in the plot
-%           labelBar = text to show in the label (in case norm = true, the text will be just 'normalized'
-%           nameFig = name of the generating file
-%           varargin =      Data2 and titleData2 for a figure with two subplots
-%                           Binarized = true / false
-%                           closeImmediately = true / false
+% INPUT:    idxMon      = monitor print out index
+%           SeeMe       = show the figure
+%           data1       = matrix which contains the data to show
+%           titleData1  = title to show in the first plot
+%           nameDir     = path where to save the figure
+%           nameFig     = namefile
+%           varargin    :
+%               - saveFig       = true/false, choose if save the figure
+%               - normalized    = true/false, choose if normalize the data
+%               - binary        = true/false, the image is binary
+%               - lenghtAxis    = numerical, in case of conversion from pixel index to meter
+%               - labelBar      = text to printed out as lateral bar
+%               - prevFig       = in case the figure should be plotted in an existing fig
+% for extra data
+%               extraData       
+%               extraNorm         
+%               extraBinary
+%               extraLengthAxis
+%               extraTitles       
+%               extraLabel  
+
 function fig=showData(idxMon,SeeMe,data1,titleData1,nameDir,nameFig,varargin)
     p=inputParser();    %init instance of inputParser
     %Add default parameters. When call the function, use 'argName' as well you use 'LineStyle' in plot! And
@@ -62,12 +73,11 @@ function fig=showData(idxMon,SeeMe,data1,titleData1,nameDir,nameFig,varargin)
         labelK      = getOrDefault(p.Results.extraLabel,  k, '');                             
         showSingleData(axk,dataK,normK,titleK,labelK,binK,sizeAxisK)
     end   
-    pause(1) 
     % in case the fig is already opened, dont re-update the position. The user may have changed location for a more comfortable area
     if ~flagPrevFig
         objInSecondMonitor(fig,idxMon);
-        pause(1)   
     end
+    pause(1)
     % save both fig (eventually for post modification) and tiff
     if saveFig
         if ~exist(sprintf('%s/tiffImages',nameDir),"dir") 

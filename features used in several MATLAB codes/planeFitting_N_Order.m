@@ -8,7 +8,7 @@ function varargout = planeFitting_N_Order(data,limit)
 % OUTPUT:   varargout{1} =  dataCorrected               => original data MINUS correction_plane
 %           varargout{2} =  correction_plane            => best generated plane
 %           varargout{3} =  fit_decision_final_plane    => metrics of the best generated plane
-    
+    warning('off', 'curvefit:prepareFittingData:removingNaNAndInf');
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)
     wb=waitbar(1/(limit*limit),sprintf('Removing Plane Polynomial Baseline orderX: %d orderY: %d',0,0),...
@@ -91,4 +91,5 @@ function varargout = planeFitting_N_Order(data,limit)
     %
     % just apply correction plane to raw data. it is already shifting
     % Lateral_Trace_corrPlane = Lateral_Trace - correction_plane;
+    warning('on', 'curvefit:prepareFittingData:removingNaNAndInf');
 end
