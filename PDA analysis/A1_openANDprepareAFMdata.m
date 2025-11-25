@@ -1,4 +1,4 @@
-function [allData,otherParameters,SaveFigFolder] = A1_openANDprepareAFMdata(varargin)
+function varargout = A1_openANDprepareAFMdata(varargin)
     %%%% prepare the directories where to store the data and figures. Then open .jpk files and prepare them. If there are more
     %%%% files than one, re-organize in cell array
         
@@ -37,35 +37,32 @@ function [allData,otherParameters,SaveFigFolder] = A1_openANDprepareAFMdata(vara
 
     %%% establish the name of >>>> nameSaveFigFolder <<<< to save the useful figures into a directory    
         % adjust name folder depending of which type of data is processing (HVon ==> normal, HVoff ==> friction)
-    if strcmp(p.Results.frictionData,'Yes')
-        nameDir='Results Processing AFM for friction coefficient';
-    else
-        nameDir='Results Processing AFM and fluorescence images';
-    end
-    if numFiles>1
-        nameDir=sprintf("%s - Assembled",nameDir);        
-    else
-        [~,nameDir]=sprintf("%s - %s",nameDir,fileparts(fileNameSections));
-    end       
-    % define the entire path of the directory where to save all figures
-    [upperFolder,~,~]=fileparts(fileparts(filePathData));
-    SaveFigFolder = fullfile(upperFolder,nameDir);
-
-    % check if dir already exists
-    if exist(SaveFigFolder, 'dir')
-        question= sprintf('Directory already exists and it may already contain previous results.\nDo you want to overwrite it or create new directory?');
-        options= {'Overwrite the existing dir','Create a new dir'};
-        if getValidAnswer(question,'',options) == 1
-            rmdir(SaveFigFolder, 's');
+    if ~strcmp(p.Results.frictionData,'Yes')       
+        nameDir='Results Processing AFM and fluorescence images';    
+        if numFiles>1
+            nameDir=sprintf("%s - Assembled",nameDir);        
         else
-            % create new directory with different name
-            nameSaveFigFolder = inputdlg('Enter the name new folder','',[1 80]);
-            SaveFigFolder = fullfile(upperFolder,nameSaveFigFolder{1});
+            [~,nameDir]=sprintf("%s - %s",nameDir,fileparts(fileNameSections));
+        end       
+        % define the entire path of the directory where to save all figures
+        [upperFolder,~,~]=fileparts(fileparts(filePathData));
+        SaveFigFolder = fullfile(upperFolder,nameDir);
+        % check if dir already exists
+        if exist(SaveFigFolder, 'dir')
+            question= sprintf('Directory already exists and it may already contain previous results.\nDo you want to overwrite it or create new directory?');
+            options= {'Overwrite the existing dir','Create a new dir'};
+            if getValidAnswer(question,'',options) == 1
+                rmdir(SaveFigFolder, 's');
+            else
+                % create new directory with different name
+                nameSaveFigFolder = inputdlg('Enter the name new folder','',[1 80]);
+                SaveFigFolder = fullfile(upperFolder,nameSaveFigFolder{1});
+            end
         end
-    end
-    mkdir(SaveFigFolder);
-    clear question options argName defaultVal upperFolder nameSaveFigFolder nameDir varargin
-    
+        mkdir(SaveFigFolder);
+        clear question options argName defaultVal upperFolder nameSaveFigFolder nameDir varargin
+        varargout{3}=SaveFigFolder;
+    end   
     % init OUTPUT vars
     allData=struct();
     otherParameters=struct();
@@ -190,12 +187,17 @@ function [allData,otherParameters,SaveFigFolder] = A1_openANDprepareAFMdata(vara
         % remove not useful channels before processing. Not show the figures. It will be done later
         filtData=A1_feature_CleanOrPrepFiguresRawData(data,'cleanOnly',true);
         
-        % store the data in a big struct var
-        allData(i).filenameSection=fileNameSections{i};        
+        % store the data in a big struct var       
+        if numFiles>1
+            allData(i).filenameSection=fileNameSections{i};
+        else
+            % if only one file, the var is not a cell
+            allData(i).filenameSection=fileNameSections;
+        end   
         allData(i).metadata=metaData;
         allData(i).setpointN=setpointN(i);
         allData(i).AFMImage_Raw=filtData;
-
+        varargout{1}=allData;
         %%%%%% Extract important parameters from metadata to check the integrity of the data %%%%%%
         % y slow direction (rows) | x fast direction (columns)
         % these parameters will be used just before the assembling, so just storing
@@ -206,7 +208,7 @@ function [allData,otherParameters,SaveFigFolder] = A1_openANDprepareAFMdata(vara
         otherParameters(i).SetP_N_AllScans=metaData.SetP_N;   
         otherParameters(i).Baseline_V_AllScans=metaData.Baseline_V;
         otherParameters(i).Baseline_N_AllScans=metaData.Baseline_N;
-
+        varargout{2}=otherParameters;
         % save other parameters (alpha, x_lengt and x_pixels) that will be used for additional
         % checks just after the end of file extraction. They are already stored in metadata in allData var       
         % if different x_length ==> no sense! slow fast scan lines should be equally long

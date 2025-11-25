@@ -35,7 +35,7 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
         folderSaveFig=p.Results.folderSaveFig;
         imageType=p.Results.imageType;
         if p.Results.Normalization; norm=1; else, norm=0; end
-        if imageType
+        if ~strcmp(imageType,"SingleSection")
             metadata=p.Results.metadata;        
             setpoints=p.Results.setpointsList;
         end
@@ -80,30 +80,30 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
         data_VD_retrace=flip(rot90(data_VD_retrace),2);
         % start to show the data
         data=data_Height*1e9;
-        titleData=sprintf('Height (measured) channel (Raw - %s)',imageType);
+        titleData=sprintf('Height (measured) channel (%s - %s)',dataStep,imageType);
         nameFig=sprintf('resultA1_1_Raw_HeightChannel_%s',imageType);
         labelBar=sprintf('height (nm)');
         showData(idxMon,SeeMe,data,titleData,folderSaveFig,nameFig,'normalized',norm,'labelBar',labelBar);
         % Lateral Deflection Trace
         data=data_LD_trace;
-        titleData=sprintf('Lateral Deflection Trace channel (Raw - %s)',imageType);
+        titleData=sprintf('Lateral Deflection Trace channel (%s - %s)',dataStep,imageType);
         nameFig=sprintf('resultA1_2_Raw_LDChannel_trace_%s',imageType);
         labelBar='Voltage [V]';
         showData(idxMon,SeeMe,data,titleData,folderSaveFig,nameFig,'normalized',norm,'labelBar',labelBar);
         % Lateral Deflection ReTrace
         data=data_LD_retrace;
-        titleData=sprintf('Lateral Deflection Retrace channel (Raw - %s)',imageType);
+        titleData=sprintf('Lateral Deflection Retrace channel (%s - %s)',dataStep,imageType);
         nameFig=sprintf('resultA1_3_Raw_LDChannel_retrace_%s',imageType);
         showData(idxMon,SeeMe,data,titleData,folderSaveFig,nameFig,'normalized',norm,'labelBar',labelBar);
         % Vertical Deflection trace
         data=data_VD_trace*1e9;
-        titleData=sprintf('Vertical Deflection trace channel (Raw - %s)',imageType);
+        titleData=sprintf('Vertical Deflection trace channel (%s - %s)',dataStep,imageType);
         nameFig=sprintf('resultA1_4_Raw_VDChannel_trace_%s',imageType);
         labelBar='Force [nN]';
         showData(idxMon,SeeMe,data,titleData,folderSaveFig,nameFig,'normalized',norm,'labelBar',labelBar);
         % Vertical Deflection Retrace
         data=data_VD_retrace*1e9;
-        titleData=sprintf('Vertical Deflection retrace channel (Raw - %s)',imageType);
+        titleData=sprintf('Vertical Deflection retrace channel (%s - %s)',dataStep,imageType);
         nameFig=sprintf('resultA1_5_Raw_VDChannel_retrace_%s',imageType);
         showData(idxMon,SeeMe,data,titleData,folderSaveFig,nameFig,'normalized',norm,'labelBar',labelBar);          
         

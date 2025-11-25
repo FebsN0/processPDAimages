@@ -165,7 +165,7 @@ function [AFM_Images_final,mask_FINAL,fitOrderHeight]=A2_feature_1_processHeight
         xlim(axFbutter,"tight"), grid(axFbutter,"on")        
         pause(1)
         question=sprintf(['Is the threshold to separate Background from Foreground good enough?\n'...
-            'If not, then click on the histogram to define the threshold to separate Background from Foreground.' ...
+            'If not, then click on the histogram to define the threshold to separate Background from Foreground.\n' ...
             'NOTE: it is not necessary to be precise because this step is not for binarization.']);
         if ~getValidAnswer(question,"",{'Yes','No'},2)
             closest_indices=selectRangeGInput(1,1,axFbutter);
@@ -197,26 +197,36 @@ function [AFM_Images_final,mask_FINAL,fitOrderHeight]=A2_feature_1_processHeight
         titleData3={'Height Channel';'1st Background correction + shifted toward zero.'}; 
 
         nameFile=sprintf('resultA2_3_FittPlaneBK_corrHeight_iteration%d',iterationMain);   
-        showData(idxMon,SeeMe,planeCorrection*factor,titleData1,SaveFigFolder,nameFile,'normalized',norm,'labelBar',labelHeight,...
+        ftmp=showData(idxMon,true,planeCorrection*factor,titleData1,SaveFigFolder,nameFile,'normalized',norm,'labelBar',labelHeight,...
             'extraData',{BK1_butterworthFiltered_PlaneFitted*factor,height_4_firstBKfit*factor}, ...
-            'extraNorm',{norm,norm},'extraTitles',{titleData2,titleData3},'extraLabel',{labelHeight,labelHeight});       
-        
-        clear titleData* nameFile BK_butterworthFiltered        
+            'extraNorm',{norm,norm},'extraTitles',{titleData2,titleData3},'extraLabel',{labelHeight,labelHeight});               
+        continueLineFit=getValidAnswer("Check the plane fitting results. Perform also LineByLine fitting?",'',{"y","n"});
+        close(ftmp)
+        clear titleData* nameFile BK_butterworthFiltered ftmp        
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        %%%% THIRD FITTING: N ORDER LINE-BY-LINE FITTING THE NEW PLANE-FITTED HEIGHT %%%%
-        %%%  (Note: NOT MASKED. It turned out using the previous BK as mask is worse) %%%
+        %%%% THIRD FITTING: N ORDER LINE-BY-LINE FITTING THE NEW PLANE-FITTED HEIGHT %%%%        
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
-        %[BK2_butterworthFiltered_PlaneFit_lineByLineFit,allBaseline] = lineByLineFitting_N_Order(BK1_butterworthFiltered_PlaneFitted,limit);
-        %height_5_lineXlineFIT=height_4_firstBKfit-allBaseline;
-        [height_5_lineXlineFIT,allBaseline] = lineByLineFitting_N_Order(height_4_firstBKfit,limit);        
-        height_5_lineXlineFIT = height_5_lineXlineFIT-min(height_5_lineXlineFIT(:));
-        % plot the resulting corrected data
-        titleData1={'Fitted LineByLine'};
-        titleData2={'Height Channel';'2nd Background correction + shifted toward zero.'}; 
-        nameFile=sprintf('resultA2_4_FittLineByLine_corrHeight_iteration%d',iterationMain);
-        showData(idxMon,SeeMe,allBaseline*factor,titleData1,SaveFigFolder,nameFile,'normalized',norm,'labelBar',labelHeight,...
-            'extraData',{height_5_lineXlineFIT*factor}, ...
-            'extraNorm',{norm},'extraTitles',{titleData2},'extraLabel',{labelHeight});
+        height_6_forBinarization=height_4_firstBKfit;
+        if continueLineFit
+            allBaseline = lineByLineFitting_N_Order(BK1_butterworthFiltered_PlaneFitted,limit);
+            BK2_butterworthFiltered_LinesFitted=BK1_butterworthFiltered_PlaneFitted-allBaseline;
+            height_5_lineXlineFIT=height_4_firstBKfit-allBaseline;
+            height_5_lineXlineFIT = height_5_lineXlineFIT-min(height_5_lineXlineFIT(:));
+            % plot the resulting corrected data
+            titleData1={'Fitted LineByLine'};
+            titleData2={'Background Height';'Butterworth Filtered Height, Plan Fitted and LineByLine Fitted'};
+            titleData3={'Height Channel';'2nd Background correction + shifted toward zero.'}; 
+            nameFile=sprintf('resultA2_4_FittLineByLine_corrHeight_iteration%d',iterationMain);
+            ftmp=showData(idxMon,true,allBaseline*factor,titleData1,"","",'normalized',norm,'labelBar',labelHeight,'saveFig',false,...
+                'extraData',{BK2_butterworthFiltered_LinesFitted*factor,height_5_lineXlineFIT*factor}, ...
+                'extraNorm',[norm,norm],'extraTitles',{titleData2,titleData3},'extraLabel',{labelHeight,labelHeight});
+            if getValidAnswer("Check the LineByLine results. Take them as final data that will be used for the binarization?",'',{"y","n"})
+                height_6_forBinarization=height_5_lineXlineFIT;
+                saveFigures_FigAndTiff(ftmp,SaveFigFolder,nameFile)
+            else
+                close(ftmp)
+            end
+        end
         
         clear titleData* nameFile            
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -232,17 +242,17 @@ function [AFM_Images_final,mask_FINAL,fitOrderHeight]=A2_feature_1_processHeight
         end
         if flagRestartBin 
             % start the classic binarization to create the mask, i.e. the 0/1 height image (0 = Background, 1 = Foreground). 
-            [AFM_height_IO,binarizationMethod]=binarization_autoAndManualHist(height_5_lineXlineFIT,idxMon);                         
+            [AFM_height_IO,binarizationMethod]=binarization_autoAndManualHist(height_6_forBinarization,idxMon);                         
             % PYTHON BINARIZATION TECHNIQUES. It requires other options, when I will have more time. Especially for DeepLearning technique
             question="Satisfied of the first binarization method? If not, run the Python Binarization tools!";
             if ~getValidAnswer(question,"",{"Yes","No"},2)
-                [AFM_height_IO,binarizationMethod]=binarization_withPythonModules(idxMon,height_5_lineXlineFIT);
+                [AFM_height_IO,binarizationMethod]=binarization_withPythonModules(idxMon,height_6_forBinarization);
             end    
             % show data and if it is not okay, start toolbox segmentation
             question=sprintf('Satisfied of the binarization of the iteration %d? If not, run ImageSegmenter ToolBox for better manual binarization',iterationMain);        
             if iterationMain>1 && ~getValidAnswer(question,'',{'Yes','No'})            
                 % Run ImageSegmenter Toolbox if at end of the second iteration, the mask is still not good enough
-                [AFM_height_IO,binarizationMethod]=binarization_ImageSegmenterToolbox(height_5_lineXlineFIT,idxMon);                  
+                [AFM_height_IO,binarizationMethod]=binarization_ImageSegmenterToolbox(height_6_forBinarization,idxMon);                  
             end
             textTitleIO=sprintf('Binary Height Image - iteration %d\n%s',iterationMain,binarizationMethod);        
             % just for safety in case of interruption
@@ -317,13 +327,14 @@ function [AFM_Images_final,mask_FINAL,fitOrderHeight]=A2_feature_1_processHeight
         showData(idxMon,SeeMe,planeFit*factor,titleData1,SaveFigFolder,nameFile,'normalized',norm,'labelBar',labelHeight,...
             'extraData',{BK2_definitive_PlaneFitted*factor,height_6_planeFitOnFinalMask*factor}, ...
             'extraNorm',{norm,norm},'extraTitles',{titleData2,titleData3},'extraLabel',{labelHeight,labelHeight});       
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        %%%% FIFTH FITTING: FIRST ORDER PLANE FITTING ON MASKED DATA %%%%
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%% FIFTH FITTING: FIRST ORDER LINExLINE FITTING ON MASKED DATA %%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%5%%%%%%%%%%%%%%%%%%%%%%%
         % use the mask to remove the foreground so the line-by-line fitting will be done by considering lines containing only background image                
         BK3_maskedHeightPlaneFit=height_6_planeFitOnFinalMask;
         BK3_maskedHeightPlaneFit(AFM_height_IO==1)=NaN;
-        [BK4_maskedHeight_LineByLineFit,allBaselines] = lineByLineFitting_N_Order(BK3_maskedHeightPlaneFit,1);            
+        allBaselines = lineByLineFitting_N_Order(BK3_maskedHeightPlaneFit,1);            
+        BK4_maskedHeight_LineByLineFit=BK3_maskedHeightPlaneFit-allBaselines;
         % obtain the corrected height image
         height_7_linebylineFit=height_6_planeFitOnFinalMask-allBaselines;
         height_7_linebylineFit=height_7_linebylineFit-min(height_7_linebylineFit(:));
