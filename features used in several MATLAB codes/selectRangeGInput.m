@@ -28,7 +28,9 @@ function closest_indices = selectRangeGInput(n_points,dimension,axFig)
     for k = 1:numel(children)
         if ~strcmp(children(k).Type, 'constantline')
             obj = children(k);
-            break;
+            if ~isscalar(obj.XData) && ~isscalar(obj.YData) % avoid single value object 
+                break;
+            end
         end
     end
 

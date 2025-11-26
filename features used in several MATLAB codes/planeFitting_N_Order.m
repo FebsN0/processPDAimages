@@ -75,6 +75,7 @@ function varargout = planeFitting_N_Order(data,limit)
     correction_plane = feval(bestModel, xGrid,yGrid);
     % apply the correction plane to the data.
     dataCorrected = data - correction_plane;
+    dataCorrected = dataCorrected-min(dataCorrected(:));
     % prepare the output
     varargout{1}=dataCorrected;
     varargout{2}=correction_plane;
