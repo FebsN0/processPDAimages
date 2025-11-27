@@ -72,14 +72,10 @@ function varargout = planeFitting_N_Order(data,limit)
     fit_decision_final_plane.SSE = fit_decision{bestPx, bestPy,2};          % SSE
     fit_decision_final_plane.R2 = fit_decision{bestPx, bestPy,3};           % Adjusted R^2    
     % obtain the fitted plane which will be applied to the raw data
-    correction_plane = feval(bestModel, xGrid,yGrid);
-    % apply the correction plane to the data.
-    dataCorrected = data - correction_plane;
-    dataCorrected = dataCorrected-min(dataCorrected(:));
+    correction_plane = feval(bestModel, xGrid,yGrid);   
     % prepare the output
-    varargout{1}=dataCorrected;
-    varargout{2}=correction_plane;
-    varargout{3}=fit_decision_final_plane;
+    varargout{1}=correction_plane;
+    varargout{2}=fit_decision_final_plane;
     delete(wb)
     
     % Note: previous versions applied also the shifting by min value of the entire lateral deflection matrix.

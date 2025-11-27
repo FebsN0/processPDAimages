@@ -82,10 +82,9 @@ function varargout = lineByLineFitting_N_Order(data,limit,varargin)
         %%%%%% START FITTING %%%%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%              
         % Handle insufficient data. Leave empty the i-th bk fast scan line (maybe because the line is          
-        % entirely made of crystal PDA). Whenever there are few datapoints,
-        % the line is almost insignificant, so transform it into NaN
-        % vector. SKIP the metric calculations
-        if length(yData) <= (limit+1)
+        % entirely made of foreground). Whenever there are few datapoints, the line is almost insignificant, so transform it into NaN vector. 
+        % SKIP the metric calculations. Consider only when there is at least 5% of the original length (FR+BK)
+        if length(yData) <= length(fastScanLine)*5/100
             allBaseline(:,i) = NaN; % <============= CHECK!!!! interpolation is wrong if in the fast scan line there is PDA values
             % dataCorrected(:,i)=height_image_2_corrPlane(:,i);
             continue;
@@ -97,12 +96,8 @@ function varargout = lineByLineFitting_N_Order(data,limit,varargin)
         for z = 1:limit
             % Define polynomial fit type.              
             ft = fittype(sprintf('poly%d', z));
-            % normalize indipendent variable x. When xData contains few but very large number, fitting can cause problems:
-            % internal least-squares matrix becomes ill-conditioned, meaning numerical precision is lost. Solution is to center x
-            x0 = mean(xData);
-            xCentered = xData - x0;
             % Fit model using LAR and exclude data where yData >= 5
-            [models, gof] = fit(xCentered, yData, ft, opts);                
+            [models, gof] = fit(xData, yData, ft, opts);                
             if gof.adjrsquare < 0
                 gof.adjrsquare = 0.001;
             end                
@@ -196,7 +191,7 @@ function  resultsCheckBorders=checkBorders(xData,yData,fit_decision,flagLineMiss
     if xData(1) > length(x)*10/100 || (length(x)-xData(end)) > length(x)*10/100
         % additional check: if the average of the last 10% elements of fitted line significantly differ 
         % by over 30% from the 10% of real data to fit        
-        startX_endBorder=xData(end-round(length(yData)*5/100));     % last border        
+        startX_endBorder=xData(end-round(length(yData)*5/100));     % last border
         endX_startBorder=xData(round(length(yData)*5/100));         % start border
     % check at least 
         if (mean(fittedline(end-round(length(yData)*10/100):end)) > mean(yData(xData>=startX_endBorder))*1.3 || ... 

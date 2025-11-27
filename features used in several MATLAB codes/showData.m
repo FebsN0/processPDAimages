@@ -30,12 +30,12 @@ function fig=showData(idxMon,SeeMe,data1,titleData1,nameDir,nameFig,varargin)
     argName = 'lenghtAxis';         defaultVal=[];       addOptional(p,argName,defaultVal, @(x) isnumeric(x))   
     argName = 'labelBar';           defaultVal='';      addOptional(p,argName,defaultVal, @(x) (isstring(x) || ischar(x)))
     % for extra data
-    argName = 'extraData';          defaultVal={};      addOptional(p,argName,defaultVal, @(x) iscell(x))
+    argName = 'extraData';          defaultVal={};      addOptional(p,argName,defaultVal, @(x) iscell(x) || ismatrix(x))
     argName = 'extraNorm';          defaultVal={};      addOptional(p,argName,defaultVal, @(x) (iscell(x) || isnumeric(x) || islogical(x)))
     argName = 'extraBinary';        defaultVal={};      addOptional(p,argName,defaultVal, @(x) (iscell(x) || isnumeric(x) || islogical(x)))    
     argName = 'extraLengthAxis';    defaultVal={};      addOptional(p,argName,defaultVal, @(x) iscell(x))
-    argName = 'extraTitles';        defaultVal={};      addOptional(p,argName,defaultVal, @(x) iscell(x))
-    argName = 'extraLabel';         defaultVal={};      addOptional(p,argName,defaultVal, @(x) iscell(x))   
+    argName = 'extraTitles';        defaultVal={};      addOptional(p,argName,defaultVal, @(x) iscell(x) || isstring(x))
+    argName = 'extraLabel';         defaultVal={};      addOptional(p,argName,defaultVal, @(x) iscell(x) || isstring(x)) 
     % in case the fig already exist and the user just want to update the internal figures
     argName = 'prevFig';            defaultVal=[];      addOptional(p,argName,defaultVal)
 
@@ -57,7 +57,11 @@ function fig=showData(idxMon,SeeMe,data1,titleData1,nameDir,nameFig,varargin)
     % -------------------------------
     % Count number of datasets
     % -------------------------------
-    nExtra = numel(p.Results.extraData);
+    if iscell(p.Results.extraData)
+        nExtra = numel(p.Results.extraData);
+    else
+        nExtra=1;
+    end
     nTotal = 1 + nExtra;   % main image + extras
     % ---- SUBPLOT 1: main data ----
     ax = subplot(1,nTotal,1,'Parent',fig);
@@ -65,7 +69,7 @@ function fig=showData(idxMon,SeeMe,data1,titleData1,nameDir,nameFig,varargin)
     % ---- SUBPLOTS for EXTRA DATA ----
     for k = 1:nExtra
         axk = subplot(1,nTotal,k+1,'Parent',fig);
-        dataK       = p.Results.extraData{k};
+        dataK       = getOrDefault(p.Results.extraData,k,[]);
         normK       = getOrDefault(p.Results.extraNorm,k,false); 
         binK        = getOrDefault(p.Results.extraBinary,k,false);
         sizeAxisK   = getOrDefault(p.Results.extraLengthAxis,k,[]);
@@ -119,7 +123,10 @@ function showSingleData(ax,data, norm, titleData,labelBar,bin,AxisLength)
         if strcmp(unitsY,'nm'), y=y*1e9; else, y=y*1e6; end
     end
     if norm
-        data=data/max(max(data));
+        % save the nan location. mat2gray convert nan into 1
+        nanPos=isnan(data);
+        data=mat2gray(data);
+        data(nanPos)=nan;
     end
     h=imagesc(ax,x,y,data);
     h.AlphaData = ~isnan(data);   % NaN → transparent
@@ -175,7 +182,11 @@ function val = getOrDefault(array,k,defaultVal)
         val = defaultVal;
     elseif iscell(array)
         if numel(array) >= k, val = array{k}; else, val = defaultVal; end
-    else  % numeric/logical arrays
+    elseif ismatrix(array)
+    % just one matrix, like just one additional image    
+        val=array;
+    else
+        % numeric/logical arrays
         if numel(array) >= k, val = array(k); else, val = defaultVal; end
     end
 end
