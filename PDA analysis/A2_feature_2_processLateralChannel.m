@@ -36,136 +36,142 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
     end
     if strcmp(FitOrderHVON_Lat,'Low'), limit=3; elseif strcmp(fitOrder,'Medium'), limit=6; else, limit=9; end       
     FitOrderHVOFF_Height=p.Results.FitOrderHVOFF_Height;
-    clearvars argName defaultVal p varargin
-    
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%% PREPARE THE PLOTTING OF THE LATERAL DATA PROCESSING %%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % select a single line manually to check the LD
-    fLineChoose=figure; axFig=axes('Parent',fLineChoose); imagesc(AFM_height_IO), axis equal, xlim tight, ylim tight, objInSecondMonitor(fLineChoose,idxMon)
-    title('Select two points on the mask to analyze two different single fast scan lines','FontSize',16);
-    idxLine=sort(selectRangeGInput(2,1,axFig));
-    close(fLineChoose), clear fLineChoose
-    % extract data (lateral deflection Trace + vertical deflection Trace)
-    Lateral_Image_1_Raw   = (AFM_data(strcmpi([AFM_data.Channel_name],'Lateral Deflection') & strcmpi([AFM_data.Trace_type],'Trace')).AFM_image);
-    vertical_Trace  = (AFM_data(strcmpi([AFM_data.Channel_name],'Vertical Deflection') & strcmpi([AFM_data.Trace_type],'Trace')).AFM_image);    
-    % Mask the Lateral Data with the mask obtained from height channel processing. 
-    % GOAL: exclude FOREGROUND data to have BACKGROUND data for which perform the fitting so the original Lateral data can be adjusted
-    Lateral_BK_1= Lateral_Image_1_Raw;
-    Lateral_BK_1(AFM_height_IO==1)=NaN;        
-    Lateral_FR_1 = Lateral_Image_1_Raw;
-    Lateral_FR_1(AFM_height_IO==0)=NaN;
-    %%%%---------------------%%%%%
-    %%%%%------- plot -------%%%%%
-    %%%%---------------------%%%%%
-    titleData1="Raw Background Lateral Deflection";
-    titleData2="Raw Lateral Deflection";    
-    nameFig='resultA2_9_RawLateralData_BackgroundNoOutliers';
-    showData(idxMon,false,Lateral_BK_1,titleData1,newFolder,nameFig,'normalized',norm,'labelBar',unitDataLabel, ...
-        'extraData',{Lateral_Image_1_Raw},'extraTitles',{titleData2},'extraNorm',{norm},'extraLabel',{unitDataLabel});
-    % check distribution of the LD data between FR and BK
-    DataXdistribution= {Lateral_BK_1,'Raw BK'; ...
-                        Lateral_FR_1,'Raw FR'};
-    figDistr=checkDistributionDataLD(SeeMe,idxMon,DataXdistribution);
-    % show LD of a single fast scan line (idx manually selected previously)
-    figSingleLine=plotSingleLineCheck(idxMon,Lateral_Image_1_Raw,idxLine,'mask',AFM_height_IO);
-    
-    clear Lateral_FR_1 titleData* nameFig   
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%% PLANE FITTING ON LATERAL DEFLECTION BACKGROUND (masked LAT image) %%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % For better fitting, remove outliers line by line before planeFit using the masked AFM data containing only background
-    [~,Lateral_BK_1]=dynamicOutliersRemoval(Lateral_BK_1);        
-    % obtain the planeFit and save fitting's metrics
-    [~,correction_plane,metricsBestPlaneFit]=planeFitting_N_Order(Lateral_BK_1,limit);
-    varargout{2}=metricsBestPlaneFit;
-    % correct the raw original data by applyting the correction_plane
-    Lateral_Image_2_planeFit = Lateral_Image_1_Raw - correction_plane;    
-    % prepare the new updated background data
-    Lateral_BK_2= Lateral_Image_2_planeFit;
-    Lateral_BK_2(AFM_height_IO==1)=NaN;
-    Lateral_FR_2 = Lateral_Image_2_planeFit;
-    Lateral_FR_2(AFM_height_IO==0)=NaN;        
-    %%%%---------------------%%%%%
-    %%%%%------- plot -------%%%%%
-    %%%%---------------------%%%%%      
-    titleData1='PlaneFit Background Lateral Deflection';
-    titleData2={'Lateral Deflection'; 'After PlaneFit correction'};
-    nameFig='resultA2_10_planeBKfit_LateralDeflectionCorr';    
-    figTmp=showData(idxMon,true,correction_plane,titleData1,newFolder,nameFig,'normalized',norm,'labelBar',unitDataLabel, ...
-        'extraData',{Lateral_Image_2_planeFit},'extraTitle',{titleData2},'extraNorm',{norm},'extraLabel',{unitDataLabel});    
-    % check distribution of the LD data between FR and BK
-    DataXdistribution= {Lateral_BK_2,'1st correction - PlaneFit BK'; ...
-                        Lateral_FR_2,'1st correction - PlaneFit FR'};    
-    figDistr=checkDistributionDataLD(SeeMe,idxMon,DataXdistribution,'prevFig',figDistr,'idCall',2);
-    % show LD of a single fast scan line (idx manually selected previously)
-    figSingleLine=plotSingleLineCheck(idxMon,Lateral_Image_2_planeFit,idxLine,'prevFig',figSingleLine,'nameLine','1st correction - PlaneFit');
-    
-    clear Lateral_BK_1 Lateral_FR_2    
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%% LINE-BY-LINE FITTING ON LATERAL DEFLECTION BACKGROUND (masked LAT image) %%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % fit lineXline, with the further line check in case the border parts of a line contains significant amount of no data (i.e. no BK but only FR) 
-    % potentially bringing to wrong fit          
-    answ=getValidAnswer('Continue with LineXLine fitting?','',{'Yes','No'});
-    close(figTmp), clear figTmp                
-    if ~answ
-        noFitLine=true;
-    else       
-        % outliers removal in the background data
-        [~,Lateral_BK_2]=dynamicOutliersRemoval(Lateral_BK_2);                 
-        [baselineFit,metricsBestLineFit]=lineByLineFitting_N_Order(Lateral_BK_2,limit,'CheckBordersLine',true,'idxMon',idxMon);              
-        % Remove background
-        Lateral_Image_3_lineFit = Lateral_Image_2_planeFit - baselineFit;
-        % Plot the fitted backround:               
-        titleData1='Line x Line Fitted Background'; titleData2={"Lateral Deflection - Trace";"Plane+LineByLine Fitted"};
-        nameFig='resultA2_11_LineBKfit_LateralDeflection';
-        figTmp=showData(idxMon,true,baselineFit,titleData1,'','','normalized',norm,'labelBar',unitDataLabel,'saveFig',false, ...
-            'extraData',{Lateral_Image_3_lineFit},'extraTitle',{titleData2},'extraNorm',{norm},'extraLabel',{unitDataLabel});
-        % plot distribution and lineAnalysis
-        Lateral_Trace_corrLine_BK_2= Lateral_Image_3_lineFit;
-        Lateral_Trace_corrLine_BK_2(AFM_height_IO==1)=NaN;
-        % check distribution of the LD data
-        Lateral_Trace_corrLine_FR_2 = Lateral_Image_3_lineFit;
-        Lateral_Trace_corrLine_FR_2(AFM_height_IO==0)=NaN;
-        DataXdistribution= {Lateral_Trace_corrLine_BK_2,'2nd correction - LineXLineFit BK'; ...
-                            Lateral_Trace_corrLine_FR_2,'2nd correction - LineXLineFit FR'};
-        figDistrTmp=checkDistributionDataLD(SeeMe,idxMon,DataXdistribution,'prevFig',figDistr,'idCall',3);        
-        figSingleLineTmp=plotSingleLineCheck(idxMon,Lateral_Image_3_lineFit,idxLine,'prevFig',figSingleLine,'nameLine','2nd correction - LineXLineFit');
-        pause(1)
-        if getValidAnswer('Satisfied of the fitting? If not, keep the original and skip to the next part.','',{'y','n'})
-            close(figTmp)                 
-            varargout{3}=metricsBestLineFit;  
-            % take the definitive last figures
-            figDistr=figDistrTmp;
-            figSingleLine=figSingleLineTmp;
-            showData(idxMon,false,baselineFit,titleData1,newFolder,nameFig,'normalized',norm,'labelBar',unitDataLabel, ...
+    clearvars argName defaultVal p varargin    
+    if ~exist(fullfile(newFolder,'TMP_DATA_3_LATERAL_PART.mat'),'file')
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%% PREPARE THE PLOTTING OF THE LATERAL DATA PROCESSING %%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        % select a single line manually to check the LD
+        fLineChoose=figure; axFig=axes('Parent',fLineChoose); imagesc(AFM_height_IO), axis equal, xlim tight, ylim tight, objInSecondMonitor(fLineChoose,idxMon)
+        title('Select two points on the mask to analyze two different single fast scan lines','FontSize',16);
+        idxLine=sort(selectRangeGInput(2,1,axFig));
+        close(fLineChoose), clear fLineChoose        
+        % Mask the Lateral Data with the mask obtained from height channel processing. 
+        % GOAL: exclude FOREGROUND data to have BACKGROUND data for which perform the fitting so the original Lateral data can be adjusted
+        % extract data (lateral deflection Trace + vertical deflection Trace)
+        Lateral_Image_1_Raw   = (AFM_data(strcmpi([AFM_data.Channel_name],'Lateral Deflection') & strcmpi([AFM_data.Trace_type],'Trace')).AFM_image);
+        vertical_Trace  = (AFM_data(strcmpi([AFM_data.Channel_name],'Vertical Deflection') & strcmpi([AFM_data.Trace_type],'Trace')).AFM_image);            
+        Lateral_BK_1= Lateral_Image_1_Raw;
+        Lateral_BK_1(AFM_height_IO==1)=NaN;        
+        Lateral_FR_1 = Lateral_Image_1_Raw;
+        Lateral_FR_1(AFM_height_IO==0)=NaN;
+        %%%%---------------------%%%%%
+        %%%%%------- plot -------%%%%%
+        %%%%---------------------%%%%%
+        titleData1="Raw Background Lateral Deflection";
+        titleData2="Raw Lateral Deflection";    
+        nameFig='resultA2_9_RawLateralData_BackgroundNoOutliers';
+        showData(idxMon,false,Lateral_BK_1,titleData1,newFolder,nameFig,'normalized',norm,'labelBar',unitDataLabel, ...
+            'extraData',{Lateral_Image_1_Raw},'extraTitles',{titleData2},'extraNorm',{norm},'extraLabel',{unitDataLabel});
+        % check distribution of the LD data between FR and BK
+        DataXdistribution= {Lateral_BK_1,'Raw BK'; ...
+                            Lateral_FR_1,'Raw FR'};
+        figDistr=checkDistributionDataLD(SeeMe,idxMon,DataXdistribution);
+        % show LD of a single fast scan line (idx manually selected previously)
+        figSingleLine=plotSingleLineCheck(idxMon,Lateral_Image_1_Raw,idxLine,'mask',AFM_height_IO);
+        
+        clear Lateral_FR_1 titleData* nameFig   
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%%%%% PLANE FITTING ON LATERAL DEFLECTION BACKGROUND (masked LAT image) %%%%%%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        % For better fitting, remove outliers line by line before planeFit using the masked AFM data containing only background
+        [~,Lateral_BK_1]=dynamicOutliersRemoval(Lateral_BK_1);        
+        % obtain the planeFit and save fitting's metrics
+        [correction_plane,metricsBestPlaneFit]=planeFitting_N_Order(Lateral_BK_1,limit);
+        varargout{2}=metricsBestPlaneFit;
+        % correct the raw original data by applyting the correction_plane
+        Lateral_Image_2_planeFit = Lateral_Image_1_Raw - correction_plane;
+        
+        % prepare the new updated background data
+        Lateral_BK_2= Lateral_Image_2_planeFit;
+        Lateral_BK_2(AFM_height_IO==1)=NaN;
+        Lateral_FR_2 = Lateral_Image_2_planeFit;
+        Lateral_FR_2(AFM_height_IO==0)=NaN;        
+        %%%%---------------------%%%%%
+        %%%%%------- plot -------%%%%%
+        %%%%---------------------%%%%%      
+        titleData1='PlaneFit Background Lateral Deflection';
+        titleData2={'Lateral Deflection'; 'After PlaneFit correction'};
+        nameFig='resultA2_10_planeBKfit_LateralDeflectionCorr';    
+        figTmp=showData(idxMon,true,correction_plane,titleData1,newFolder,nameFig,'normalized',norm,'labelBar',unitDataLabel, ...
+            'extraData',{Lateral_Image_2_planeFit},'extraTitle',{titleData2},'extraNorm',{norm},'extraLabel',{unitDataLabel});    
+        % check distribution of the LD data between FR and BK
+        DataXdistribution= {Lateral_BK_2,'1st correction - PlaneFit BK'; ...
+                            Lateral_FR_2,'1st correction - PlaneFit FR'};    
+        figDistr=checkDistributionDataLD(SeeMe,idxMon,DataXdistribution,'prevFig',figDistr,'idCall',2);
+        % show LD of a single fast scan line (idx manually selected previously)
+        figSingleLine=plotSingleLineCheck(idxMon,Lateral_Image_2_planeFit,idxLine,'prevFig',figSingleLine,'nameLine','1st correction - PlaneFit');
+        
+        clear Lateral_BK_1 Lateral_FR_2    
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%%%%% LINE-BY-LINE FITTING ON LATERAL DEFLECTION BACKGROUND (masked LAT image) %%%%%%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        % fit lineXline, with the further line check in case the border parts of a line contains significant amount of no data (i.e. no BK but only FR) 
+        % potentially bringing to wrong fit          
+        answ=getValidAnswer('Continue with LineXLine fitting?','',{'Yes','No'});
+        close(figTmp), clear figTmp                
+        if ~answ
+            noFitLine=true;
+        else       
+            % outliers removal in the background data
+            [~,Lateral_BK_2]=dynamicOutliersRemoval(Lateral_BK_2);                 
+            [baselineFit,metricsBestLineFit]=lineByLineFitting_N_Order(Lateral_BK_2,limit,'CheckBordersLine',true,'idxMon',idxMon);              
+            % Remove background
+            Lateral_Image_3_lineFit = Lateral_Image_2_planeFit - baselineFit;
+            % Plot the fitted backround:               
+            titleData1='Line x Line Fitted Background'; titleData2={"Lateral Deflection - Trace";"Plane+LineByLine Fitted"};
+            nameFig='resultA2_11_LineBKfit_LateralDeflection';
+            figTmp=showData(idxMon,true,baselineFit,titleData1,'','','normalized',norm,'labelBar',unitDataLabel,'saveFig',false, ...
                 'extraData',{Lateral_Image_3_lineFit},'extraTitle',{titleData2},'extraNorm',{norm},'extraLabel',{unitDataLabel});
-            noFitLine=false;
-        else
-            noFitLine=true;            
+            % plot distribution and lineAnalysis
+            Lateral_Trace_corrLine_BK_2= Lateral_Image_3_lineFit;
+            Lateral_Trace_corrLine_BK_2(AFM_height_IO==1)=NaN;
+            % check distribution of the LD data
+            Lateral_Trace_corrLine_FR_2 = Lateral_Image_3_lineFit;
+            Lateral_Trace_corrLine_FR_2(AFM_height_IO==0)=NaN;
+            DataXdistribution= {Lateral_Trace_corrLine_BK_2,'2nd correction - LineXLineFit BK'; ...
+                                Lateral_Trace_corrLine_FR_2,'2nd correction - LineXLineFit FR'};
+            figDistrTmp=checkDistributionDataLD(SeeMe,idxMon,DataXdistribution,'prevFig',figDistr,'idCall',3);        
+            figSingleLineTmp=plotSingleLineCheck(idxMon,Lateral_Image_3_lineFit,idxLine,'prevFig',figSingleLine,'nameLine','2nd correction - LineXLineFit');
+            pause(1)
+            if getValidAnswer('Satisfied of the fitting? If not, keep the original and skip to the next part.','',{'y','n'})
+                close(figTmp)                 
+                varargout{3}=metricsBestLineFit;  
+                % take the definitive last figures
+                figDistr=figDistrTmp;
+                figSingleLine=figSingleLineTmp;
+                showData(idxMon,false,baselineFit,titleData1,newFolder,nameFig,'normalized',norm,'labelBar',unitDataLabel, ...
+                    'extraData',{Lateral_Image_3_lineFit},'extraTitle',{titleData2},'extraNorm',{norm},'extraLabel',{unitDataLabel});
+                noFitLine=false;
+            else
+                noFitLine=true;            
+            end
         end
+        if noFitLine
+            varargout{3}="LineByLine Fitting not available (user skipped or refused this step)";
+            Lateral_Image_3_lineFit=Lateral_Image_2_planeFit;
+        end
+        % Finalise the distribution and signleLineAnalysis figures
+        % adjust xlim, especially show the 99.5 percentile of the data in the distribution
+        ax = findobj(figDistr, 'Type', 'Axes');           % find axes inside the figure
+        hList = findobj(ax, 'Type', 'Histogram');         % locate the histograms
+        % since there more than one histogram, store the data in cell array
+        allData = cell2mat(arrayfun(@(h) h.Data(:), hList, 'UniformOutput', false));
+        pLow = prctile(allData, 1);
+        pHigh = prctile(allData, 99.5);
+        xlim(ax, [min(allData)-abs(pLow), pHigh]); ylim(ax,"padded");
+        clear allData pLow pHigh ax hList
+        % save distribution and singleLine
+        nameResults='resultA2_12_DistributionLD_eachCorrectionStep';
+        saveFigures_FigAndTiff(figDistr,newFolder,nameResults)
+        nameResults='resultA2_13_singleFastScanLineLD_eachCorrectionStep';
+        saveFigures_FigAndTiff(figSingleLine,newFolder,nameResults)
+        close all
+        clear nameResults titleData* noFitLine
+        save(fullfile(newFolder,'TMP_DATA_3_LATERAL_PART'),"Lateral_Image_3_lineFit","idxLine",'vertical_Trace')
+    else
+        load(fullfile(newFolder,'TMP_DATA_3_LATERAL_PART.mat'),'Lateral_Image_3_lineFit','idxLine','vertical_Trace')
     end
-    if noFitLine
-        varargout{3}="LineByLine Fitting not available (user skipped or refused this step)";
-        Lateral_Image_3_lineFit=Lateral_Image_2_planeFit;
-    end
-    % Finalise the distribution and signleLineAnalysis figures
-    % adjust xlim, especially show the 99.5 percentile of the data in the distribution
-    ax = findobj(figDistr, 'Type', 'Axes');           % find axes inside the figure
-    hList = findobj(ax, 'Type', 'Histogram');         % locate the histograms
-    % since there more than one histogram, store the data in cell array
-    allData = cell2mat(arrayfun(@(h) h.Data(:), hList, 'UniformOutput', false));
-    pLow = prctile(allData, 1);
-    pHigh = prctile(allData, 99.5);
-    xlim(ax, [min(allData)-abs(pLow), pHigh]); ylim(ax,"padded");
-    clear allData pLow pHigh ax hList
-    % save distribution and singleLine
-    nameResults='resultA2_12_DistributionLD_eachCorrectionStep';
-    saveFigures_FigAndTiff(figDistr,newFolder,nameResults)
-    nameResults='resultA2_13_singleFastScanLineLD_eachCorrectionStep';
-    saveFigures_FigAndTiff(figSingleLine,newFolder,nameResults)
-    close all
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%%%%%%--------- CONVERSION LATERAL DEFLECTIO [V] ==> LATERAL FORCE [N] ---------%%%%%%%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
