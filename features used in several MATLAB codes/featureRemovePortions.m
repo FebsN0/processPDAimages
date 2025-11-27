@@ -14,11 +14,11 @@
 %                       - channelToShow :                   choose a specific channel (lateral,vertical,height) in case one of the given data is a struct data  
 %                       - additionalImagesToShow :          additional image to show. It can be a matrix (single additional image only) or
 %                                                                   cell array containing one or more additional images
-%                       - additionalImagesTitleToShow :     similar to textTitle1, but for additionalImagesTitleToShow
-%                       - maskRemoval :                     mask containing the already removed portions. If the function is called for the first time, 
-%                                                                   it will be empty matrix
+%                       - additionalImagesTitleToShow :     similar to textTitle1, but for additionalImagesTitleToShow%                       
+%                       - originalDataIndex                 which image to use to restore values. Recommended the one which has not been previously masked and not the binary image                           
+%                       - whichNaN                          which type of data convert into NaN? convert FR or BK values into NaN? By default, FR values will be converted into FR
+%                       
 % OUTPUT:
-%   maskRemoval :   updated mask containing the removed portions
 %   varargout :     cell array containing the original data with removed portions
 %                       (varargout{i}=allDataToShow{i} ==> allDataToShow = dataToShow1 + additionalImagesToShow)
 
@@ -47,7 +47,7 @@
 % data=[data(:,1:xstart-1) data(:,xend+1:end)];
 
                           
-function [maskRemoval,varargout] = featureRemovePortions(dataToShow1,textTitle1,idxMon,varargin)
+function varargout = featureRemovePortions(dataToShow1,textTitle1,idxMon,varargin)
     %init instance of inputParser
     p=inputParser();
     % Required arguments
@@ -57,15 +57,11 @@ function [maskRemoval,varargout] = featureRemovePortions(dataToShow1,textTitle1,
     addParameter(p, 'channelToShow','',@(x) (isempty(x) || (ismember(x,{'Height (measured)','Lateral Deflection','Vertical Deflection'}))))
     addParameter(p, 'additionalImagesToShow', [],       @(x) (ismatrix(x) || isempty(x)|| iscell(x)));
     addParameter(p, 'additionalImagesTitleToShow', [],  @(x) (isstring(x) || ischar(x) || isempty(x) || iscell(x)));
-    addParameter(p, 'maskRemoval', [], @(x) (ismatrix(x) || isempty(x)));
+    addParameter(p, 'originalDataIndex', 1, @(x) isnumeric(x));
+    addParameter(p, 'normalize', true, @(x) islogical(x));
     % validate and parse the inputs
     parse(p, dataToShow1, idxMon, varargin{:});  
 
-    % check if the mask has the same size of the data. The mask represents the already removed regions
-    maskRemoval=p.Results.maskRemoval;
-    if ~isempty(maskRemoval) && size(maskRemoval)~=size(dataToShow1)
-        error('The given existing mask has not the same size of the given data. Make sure it is the right mask!')
-    end
     % by default take the height channel in case of struct and if not specified by user      
     if ~isempty(p.Results.channelToShow), channel=p.Results.channelToShow; else, channel = 'Height (measured)'; end
     [flagStructDataToShow1,dataToShow1]=isstructImage2Show(dataToShow1,channel);
@@ -75,6 +71,8 @@ function [maskRemoval,varargout] = featureRemovePortions(dataToShow1,textTitle1,
     if ~isDataToShow1Bin
         normDataToShow1=true;
     end
+    % init
+    flagStructDataToShowK=[];
     % redo the same operations to additional figures whenever they are present
     flagAdditionalImageToShow=false;    
     if ~isempty(p.Results.additionalImagesToShow)
@@ -135,16 +133,44 @@ function [maskRemoval,varargout] = featureRemovePortions(dataToShow1,textTitle1,
     flagStructDataArray=[flagStructDataToShow1,flagStructDataToShowK];
     if any(flagStructDataArray)
         flagStructData=true;
-        % find the data which is a struct so the user can change channel
-        idxStructData=find(flagStructDataArray,1);        
+        idxStructInput=find(flagStructDataArray);
+        nStruct=length(idxStructInput);
+        if nStruct>1
+            question="More than one struct data has been provided as input.\nWhich one will be the original of which will be used to replace original values";
+            options=cell(1,nStruct);
+            for i=1:nStruct
+                options{i} = sprintf('Input provided # %d',idxStructInput(i));
+            end
+            choice=getValidAnswer(question,'',options);
+            idxStructOriginal=idxStructInput(choice);
+        else
+            idxStructOriginal=idxStructInput;
+        end
+        structOriginal=allDataToShow{idxStructOriginal};
+        % since it is referred as original, use it also for changing channel.
+        idxStructData=idxStructOriginal;  
     else
         flagStructData=false;
     end
-    clear tmp flagStructDataArray varargin p dataTo* flagStructDataArray flagStructDataToShow* flagStructTmp isDataToShow1Bin binaryFormatImage k nExtra normDataToShow* textTitle1 titleExtraK
+
+    originalDataIndex=p.Results.originalDataIndex;   
+    if originalDataIndex>nTotData
+        error("The index to select the original data in the dataset is higher than the number of all dataset!")
+    elseif nTotData>1
+        % if the index is the same for the binary image index, then switch image
+        if find(allData_binaryFormat,1) == originalDataIndex
+            originalDataIndex=find(~allData_binaryFormat,1);
+        end 
+    end    
+    % in case of restoring values when the user choose foreground after area selection
+    data_originalXrestoring=allDataToShow{originalDataIndex};
+    if ~p.Results.normalize
+        allData_normalizedFormat=false(1,length(allData_normalizedFormat));
+    end
+    clear tmp varargin p dataTo* flagStructDataToShow* flagStructTmp isDataToShow1Bin binaryFormatImage k nExtra normDataToShow* textTitle1 titleExtraK
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%%%%%%%%%%% all the data is now ready to show and start the removal %%%%%%%%%%%%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%   
-    flagFirstIt=true; 
     fcomparisonRemoval=[];
     
     % prep removal settings for the question
@@ -157,26 +183,21 @@ function [maskRemoval,varargout] = featureRemovePortions(dataToShow1,textTitle1,
     while true
         if flagAdditionalImageToShow
             fcomparisonRemoval=showData(idxMon,true,allDataToShow{1},allData_titles{1},'','','saveFig',false,'normalized',allData_normalizedFormat(1),'binary',allData_binaryFormat(1),...
-                'extraData',{allDataToShow{2:end}},'extraTitles',{allData_titles{2:end}}, ...
+                'extraData',allDataToShow(2:end),'extraTitles',allData_titles(2:end), ...
                 'extraBinary',allData_binaryFormat(2:end),'extraNorm',allData_normalizedFormat(2:end), ...
                 'prevFig',fcomparisonRemoval);
         else
-            fcomparisonRemoval=showData(idxMon,true,allDataToShow,allData_titles{1},'','','saveFig',false,'normalized',normDataToShow1,'binary',allData_binaryFormat,'prevFig',fcomparisonRemoval);
+            fcomparisonRemoval=showData(idxMon,true,allDataToShow{1},allData_titles{1},'','','saveFig',false,'normalized',allData_normalizedFormat,'binary',allData_binaryFormat,'prevFig',fcomparisonRemoval);
         end
-        pause(1)
-        % if the first cycle, skip the question and start the removal. In case of struct in the data, ask if change channel for different visual
-        if ~flagFirstIt 
-            if flagStructData                                           
-                options = {'Yes','No',sprintf('Change into height channel for the %d-th figure',idxStructData),sprintf('Change into lateral deflection channel for the %d-th figure',idxStructData)};
-            else
-                options = {'Yes','No'};
-            end
-            question = 'Remove lines or portions?';
-            answer=getValidAnswer(question,'',options,2);
+        % Terminate or continue. In case of struct in the data, ask if change channel for different visual
+ 
+        if flagStructData                                           
+            options = {'Yes','No',sprintf('Change into height channel for the %d-th figure',idxStructData),sprintf('Change into lateral deflection channel for the %d-th figure',idxStructData)};
         else
-            flagFirstIt=false;
-            answer=true;
+            options = {'Yes','No'};
         end
+        question = 'Remove/restore lines or portion? If not, interrupt the current step.';
+        answer=getValidAnswer(question,'',options,2);
         % STOP THE REMOVAL EXE
         if answer==2 || answer == false
             break
@@ -209,7 +230,7 @@ function [maskRemoval,varargout] = featureRemovePortions(dataToShow1,textTitle1,
                 modeRemoval='line';
                 roi=drawline(axSelected,'Color','red');
                 pos = round(customWait(roi));
-                removedElementLine=[pos(1,1) pos(2,1)];
+                coordinatesSelectedArea=[pos(1,1) pos(2,1)];
             elseif methodRemoval == 2
                 modeRemoval='rect';
                 roi=drawrectangle(axSelected,'Color','red');
@@ -218,12 +239,12 @@ function [maskRemoval,varargout] = featureRemovePortions(dataToShow1,textTitle1,
                 xstart = pos(1);     xend = xstart+pos(3);
                 % take the coordinates along fast scan direction.
                 ystart = pos(2);     yend = ystart+pos(4);            
-                removedElementLine=[xstart ystart xstart yend xend yend xend ystart];
+                coordinatesSelectedArea=[xstart ystart xstart yend xend yend xend ystart];
             else
                 modeRemoval='polygon';
                 roi=drawpolygon(axSelected,'Color','red');
                 pos = customWait(roi);
-                removedElementLine=round(reshape(pos',[1 size(pos,1)*2]));
+                coordinatesSelectedArea=round(reshape(pos',[1 size(pos,1)*2]));
             end            
             % in case of interruption
             if isempty(roi.Position)
@@ -233,48 +254,55 @@ function [maskRemoval,varargout] = featureRemovePortions(dataToShow1,textTitle1,
             % manage the coordinates to create the mask depending on the choosen removal method
             [rows, cols] = size(allDataToShow{onWhichFigure});
             if ~strcmp(modeRemoval,'line')
-                xCoords = removedElementLine(1:2:end);
-                yCoords = removedElementLine(2:2:end);            
+                xCoords = coordinatesSelectedArea(1:2:end);
+                yCoords = coordinatesSelectedArea(2:2:end);            
             else
-                removedElementLine=sort(removedElementLine);
-                yCoords=[0 0 size(dataToShow1,1) size(dataToShow1,1) ];
-                xCoords=[removedElementLine(1) removedElementLine(2) removedElementLine(2) removedElementLine(1)];
+                % in case of line, create a big rectangule occupying all fast scan lines (y coords, rows)
+                coordinatesSelectedArea=sort(coordinatesSelectedArea);
+                yCoords=[0 0 rows rows];
+                xCoords=[coordinatesSelectedArea(1) coordinatesSelectedArea(2) coordinatesSelectedArea(2) coordinatesSelectedArea(1)];
             end
             % create the mask polygon
-            mask = poly2mask(xCoords, yCoords, rows, cols);
-            % apply NaN in every data. BUT, in case of binary image, choose if it will be considered FR or BK
+            mask = poly2mask(xCoords, yCoords, rows, cols); 
+            % prepare the user choices on how to treat the data
+            question='Choose what to do';                       
+            options1={'Background (change into 0 for mask)','Foreground (change into 1 for mask)'};
+            options2={'Restore original values','Trasform into NaN'};
+            titles={'What is the selected area?','How to trasform the relative values?'};
+            selectedOptions = selectOptionsDialog(question,false,options1,options2,'Titles',titles);
+            if selectedOptions{2}==2, flagIntoNan=true; else, flagIntoNan=false; end
+            if selectedOptions{1}==1, isBK=true; else, isBK=false; end
             for i=1:nTotData
-                tmp=allDataToShow{i};
+                tmp=allDataToShow{i};    
                 % in case of binary image, to avoid to process nan values later and use it as definitive mask, covert the values into 0 or 1
-                % depending on the user choice
-                if allData_binaryFormat(i)
-                    choice=getValidAnswer("How to change the values of the mask in the selected area?",'',{'Background (change values to 0)','Foreground (change values to 1)'});
-                    if choice == 1
-                        tmp(mask)=0;
-                    else
-                        tmp(mask)=1;
-                    end               
+                if allData_binaryFormat(i)                    
+                     % Binary: 0 or 1
+                    tmp(mask) = (isBK ~= 1);             
                 else
-                    tmp(mask) = NaN;
-                end
+                % in case of normal images, convert into NaN or restore values depending on the user first choice (by default, FR values are converted into NaN in the selected areas) 
+                    if ~flagStructDataArray(i)
+                        % Apply the replacement
+                        if flagIntoNan
+                            tmp(mask) = NaN;
+                        else                            
+                            tmp(mask) = data_originalXrestoring(mask);
+                        end                                                              
+                    else
+                    % if the given data was a struct, update every channel. Note; tmp is a struct
+                        for j=1:length(tmp)
+                            tmpS=tmp(j).AFM_image;
+                            tmpOriginal=structOriginal(j).AFM_image;
+                            if flagIntoNan
+                                tmpS(mask)=NaN;
+                            else                                
+                                tmpS(mask) = tmpOriginal(mask);
+                            end
+                            dataStruct(j).AFM_image=tmpS;
+                        end                    
+                    end                    
+                end 
                 allDataToShow{i}= tmp;
             end
-            % update the mask containing the removed elements
-            if ~isempty(maskRemoval)
-                maskRemoval= maskRemoval | mask;
-            else
-                maskRemoval=mask;
-            end            
-            % in case some given data was a struct, update also it
-            if flagStructData
-                dataStruct = allDataToShow{idxStructData};
-                for i=1:length(dataStruct)
-                    tmp=dataStruct(i).AFM_image;
-                    tmp(mask)=NaN;
-                    dataStruct(i).AFM_image=tmp;
-                end
-                allDataToShow{idxStructData}=dataStruct;
-            end                        
         end        
     end
     close(fcomparisonRemoval)
