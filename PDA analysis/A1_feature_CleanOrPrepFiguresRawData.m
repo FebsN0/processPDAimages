@@ -13,7 +13,7 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
     %init instance of inputParser
     p=inputParser();
     addRequired(p, 'data', @(x) isstruct(x));
-    argName = 'setpointsList';  defaultVal = [];        addParameter(p,argName,defaultVal);
+    argName = 'AFM_IO';         defaultVal = [];        addParameter(p,argName,defaultVal, @(x) ismatrix(x));
     argName = 'idxMon';         defaultVal = [];        addParameter(p,argName,defaultVal);
     argName = 'folderSaveFig';  defaultVal = [];        addParameter(p,argName,defaultVal);
     argName = 'cleanOnly';      defaultVal = false;     addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
@@ -21,10 +21,9 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
     argName = 'imageType';      defaultVal = 'Entire';  addParameter(p,argName,defaultVal, @(x) ismember(x,{'Entire','SingleSection','Assembled'}));
     argName = 'Normalization';  defaultVal = false;     addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
     argName = 'metadata';       defaultVal = [];        addParameter(p,argName,defaultVal);
-    argName = 'dataStep';       defaultVal = 'Raw';  addParameter(p,argName,defaultVal, @(x) ismember(x,{'Raw','PostProcessedAssembled'}));
+    argName = 'postProcessed';  defaultVal = false;     addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
     % validate and parse the inputs
     parse(p,data,varargin{:});
-
 
     if p.Results.cleanOnly
         cleanOnly=1;
@@ -37,9 +36,15 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
         if p.Results.Normalization; norm=1; else, norm=0; end
         if ~strcmp(imageType,"SingleSection")
             metadata=p.Results.metadata;        
-            setpoints=p.Results.setpointsList;
         end
-        dataStep=p.Results.dataStep;
+        if p.Results.postProcessed
+            flagPostProcessed=true;
+            textTypeData='PostProcessed';
+            AFM_height_IO=p.Results.AFM_IO;
+        else
+            flagPostProcessed=false;
+            textTypeData='Raw';
+        end
     end
     clearvars argName defaultVal p
 
@@ -66,44 +71,51 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
     % part assumes they already assembled. The following part does nothing to the data but solely extract them to make figures.
     % If savFig is false, then not save. However, vertical distribution is always plotted regardless the saveFig result.
     % Therefore, the following line is outside the figure processing
-        data_VD_trace=  data(strcmp([data.Channel_name],'Vertical Deflection') & strcmp([data.Trace_type],'Trace')).AFM_image;
-        data_Height=    data(strcmp([data.Channel_name],'Height (measured)')).AFM_image;
-        data_LD_trace=  data(strcmp([data.Channel_name],'Lateral Deflection') & strcmp([data.Trace_type],'Trace')).AFM_image;
-        data_LD_retrace=data(strcmp([data.Channel_name],'Lateral Deflection') & strcmp([data.Trace_type],'ReTrace')).AFM_image;
-        data_VD_retrace=data(strcmp([data.Channel_name],'Vertical Deflection') & strcmp([data.Trace_type],'ReTrace')).AFM_image;
+        
+        if flagPostProcessed
+            fieldToUse='AFM_image_PostProcessed';
+        else
+            fieldToUse='AFM_image';
+        end
+        
+        data_VD_trace=  data(strcmp([data.Channel_name],'Vertical Deflection') & strcmp([data.Trace_type],'Trace')).(fieldToUse);
+        data_Height=    data(strcmp([data.Channel_name],'Height (measured)')).(fieldToUse);
+        data_LD_trace=  data(strcmp([data.Channel_name],'Lateral Deflection') & strcmp([data.Trace_type],'Trace')).(fieldToUse);
+        data_LD_retrace=data(strcmp([data.Channel_name],'Lateral Deflection') & strcmp([data.Trace_type],'ReTrace')).(fieldToUse);
+        data_VD_retrace=data(strcmp([data.Channel_name],'Vertical Deflection') & strcmp([data.Trace_type],'ReTrace')).(fieldToUse);
         
         % rotate so the image is aligned with BF\fluorescence images        
-        data_Height= flip(rot90(data_Height),2);
-        data_LD_trace= flip(rot90(data_LD_trace),2);
-        data_LD_retrace=flip(rot90(data_LD_retrace),2);
-        data_VD_trace= flip(rot90(data_VD_trace),2);
-        data_VD_retrace=flip(rot90(data_VD_retrace),2);
+        data_Height= flip(rot90(data_Height,2));
+        data_LD_trace= flip(rot90(data_LD_trace,2));
+        data_LD_retrace=flip(rot90(data_LD_retrace,2));
+        data_VD_trace= flip(rot90(data_VD_trace,2));
+        data_VD_retrace=flip(rot90(data_VD_retrace,2));
         % start to show the data
         data=data_Height*1e9;
-        titleData=sprintf('Height (measured) channel (%s - %s)',dataStep,imageType);
+        titleData=sprintf('Height (measured) channel (%s - %s)',textTypeData,imageType);
         nameFig=sprintf('resultA1_1_Raw_HeightChannel_%s',imageType);
-        labelBar=sprintf('height (nm)');
+        labelBar=sprintf('Height (nm)');
         showData(idxMon,SeeMe,data,titleData,folderSaveFig,nameFig,'normalized',norm,'labelBar',labelBar);
         % Lateral Deflection Trace
         data=data_LD_trace;
-        titleData=sprintf('Lateral Deflection Trace channel (%s - %s)',dataStep,imageType);
+        titleData=sprintf('Lateral Deflection Trace channel (%s - %s)',textTypeData,imageType);
         nameFig=sprintf('resultA1_2_Raw_LDChannel_trace_%s',imageType);
         labelBar='Voltage [V]';
         showData(idxMon,SeeMe,data,titleData,folderSaveFig,nameFig,'normalized',norm,'labelBar',labelBar);
         % Lateral Deflection ReTrace
         data=data_LD_retrace;
-        titleData=sprintf('Lateral Deflection Retrace channel (%s - %s)',dataStep,imageType);
+        titleData=sprintf('Lateral Deflection Retrace channel (%s - %s)',textTypeData,imageType);
         nameFig=sprintf('resultA1_3_Raw_LDChannel_retrace_%s',imageType);
         showData(idxMon,SeeMe,data,titleData,folderSaveFig,nameFig,'normalized',norm,'labelBar',labelBar);
         % Vertical Deflection trace
         data=data_VD_trace*1e9;
-        titleData=sprintf('Vertical Deflection trace channel (%s - %s)',dataStep,imageType);
+        titleData=sprintf('Vertical Deflection trace channel (%s - %s)',textTypeData,imageType);
         nameFig=sprintf('resultA1_4_Raw_VDChannel_trace_%s',imageType);
         labelBar='Force [nN]';
         showData(idxMon,SeeMe,data,titleData,folderSaveFig,nameFig,'normalized',norm,'labelBar',labelBar);
         % Vertical Deflection Retrace
         data=data_VD_retrace*1e9;
-        titleData=sprintf('Vertical Deflection retrace channel (%s - %s)',dataStep,imageType);
+        titleData=sprintf('Vertical Deflection retrace channel (%s - %s)',textTypeData,imageType);
         nameFig=sprintf('resultA1_5_Raw_VDChannel_retrace_%s',imageType);
         showData(idxMon,SeeMe,data,titleData,folderSaveFig,nameFig,'normalized',norm,'labelBar',labelBar);          
         
@@ -122,6 +134,7 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
             % EXTRACT ALL DATA
             % why flip? because the data has previously been flipped to coindide with the Fluorescence imaging. So
             % needed to flip also the setpoint vector (left high - right low)
+            setpoints=metadata.SetP_N;
             setpoints=flip(setpoints); numSetpoints=length(setpoints); 
             setN=cell(1,numSetpoints); avgN=cell(1,numSetpoints); h=cell(1,numSetpoints);
             for i=1:numSetpoints
@@ -143,12 +156,18 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
                 % extract the vertical force data. Although this step could be made before the assembly, I
                 % found optimal put here so it can be made even in case of single entire scan
                 verticalForceSingleSection= data(:,(i-1)*sizeSingleSection+1:i*sizeSingleSection);
-                vertForceAVG(i)=mean(mean(verticalForceSingleSection));
+                % exclude 99.9 percentile and 0.1
+                th=prctile(verticalForceSingleSection(:),99.9);
+                verticalForceSingleSection(verticalForceSingleSection>th)=NaN;
+                th=prctile(verticalForceSingleSection(:),0.1);
+                verticalForceSingleSection(verticalForceSingleSection<th)=NaN;
+                vertForceAVG(i)=mean(mean(verticalForceSingleSection),'omitnan');
                 avgN{i}=xline(vertForceAVG(i),'--','LineWidth',2,'DisplayName',sprintf('avg vertical force section %d',i),'Color',colors{i});
-                h{i}=histogram(verticalForceSingleSection,400,'DisplayName',sprintf('raw vertical force section %d',i),'FaceColor',colors{i});
+                h{i}=histogram(verticalForceSingleSection,200,'DisplayName',sprintf('raw vertical force section %d',i),'FaceColor',colors{i});
             end
+
             legend1 = legend('FontSize',15);
-            set(legend1,'Location','bestoutside');
+            set(legend1,'Location','bestoutside'); ylim padded
             title('Distribution Raw Vertical Forces','FontSize',18), xlabel('Force [nN]','FontSize',15)
             objInSecondMonitor(f0,idxMon);
             saveas(f0,sprintf('%s/tiffImages/resultA2_1_distributionVerticalForces.tif',folderSaveFig))
@@ -185,43 +204,40 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
                 end
                 close(f1)
             end
-            % plot height distribution
-
+            % show the definitive height distribution. Better distinction between PDA and BK by using the mask in case postProcessed
+            if flagPostProcessed
+                if SeeMe
+                    f4=figure('Visible','on');
+                else
+                    f4=figure('Visible','off');
+                end
+                percentile=99.9;
+                % prepare the data
+                H_BK=data_Height(AFM_height_IO==0);
+                H_FR=data_Height(AFM_height_IO==1);    
+                thresholdBK = prctile(H_BK(:), percentile);
+                thresholdPDA = prctile(H_FR(:), percentile);
+                % outliers removal
+                H_BK(H_BK >= thresholdBK) = NaN; 
+                H_FR(H_FR >= thresholdPDA) = NaN; 
+                H_BK = H_BK(~isnan(H_BK))*1e9;
+                H_FR = H_FR(~isnan(H_FR))*1e9;
+                edgesBK=min(H_BK):1:max(H_BK);
+                edgesPDA=min(H_FR):1:max(H_FR);
+                hold on    
+                histogram(H_BK,edgesBK,'DisplayName','Distribution height','Normalization','percentage');
+                histogram(H_FR,edgesPDA,'DisplayName','Distribution height','Normalization','percentage');
+                legend({'Background','Foreground'},'FontSize',15)
+                xlabel(sprintf('Feature height (nm)'),'FontSize',15), ylabel('Percentage %','FontSize',15), grid minor, grid on
+                title(sprintf('Distribution Height (Percentile %d°)',percentile),'FontSize',20)
+                objInSecondMonitor(f4,idxMon);
+        
+                fullfileFig=fullfile(SaveFigFolder,'tiffImages',sprintf('resultA4_4_OptHeightDistribution_iteration%d',iterationMain));
+                saveas(f4,fullfileFig,'tif')
+                fullfileFig=fullfile(SaveFigFolder,'figImages',sprintf('resultA4_4_OptHeightDistribution_iteration%d',iterationMain));
+                saveas(f4,fullfileFig)
+                close(f4)
+            end
         end
     end
-end
-
-
-%{
-    % show the definitive height distribution. Better distinction between PDA and BK by using the mask
-    if SeeMe
-        f4=figure('Visible','on');
-    else
-        f4=figure('Visible','off');
-    end
-    percentile=99;
-    AFM_noBk_dataBKonly=AFM_noBk(AFM_height_IO==0);
-    AFM_noBk_dataPDAonly=AFM_noBk(AFM_height_IO==1);    
-    thresholdBK = prctile(AFM_noBk_dataBKonly(:), percentile);
-    thresholdPDA = prctile(AFM_noBk_dataPDAonly(:), percentile);
-    % outliers removal
-    AFM_noBk_dataBKonly(AFM_noBk_dataBKonly >= thresholdBK) = NaN; 
-    AFM_noBk_dataPDAonly(AFM_noBk_dataPDAonly >= thresholdPDA) = NaN; 
-    AFM_noBk_dataBKonly = AFM_noBk_dataBKonly(~isnan(AFM_noBk_dataBKonly))*1e9;
-    AFM_noBk_dataPDAonly = AFM_noBk_dataPDAonly(~isnan(AFM_noBk_dataPDAonly))*1e9;
-    edgesBK=min(AFM_noBk_dataBKonly):1:max(AFM_noBk_dataBKonly);
-    edgesPDA=min(AFM_noBk_dataPDAonly):1:max(AFM_noBk_dataPDAonly);
-    hold on    
-    histogram(AFM_noBk_dataBKonly,edgesBK,'DisplayName','Distribution height','Normalization','percentage');
-    histogram(AFM_noBk_dataPDAonly,edgesPDA,'DisplayName','Distribution height','Normalization','percentage');
-    legend({'Background','Foreground'},'FontSize',15)
-    xlabel(sprintf('Feature height (nm)'),'FontSize',15), ylabel('Percentage %','FontSize',15), grid minor, grid on
-    title(sprintf('Distribution Height (Percentile %d°)',percentile),'FontSize',20)
-    objInSecondMonitor(f4,idxMon);
-
-    fullfileFig=fullfile(SaveFigFolder,'tiffImages',sprintf('resultA4_4_OptHeightDistribution_iteration%d',iterationMain));
-    saveas(f4,fullfileFig,'tif')
-    fullfileFig=fullfile(SaveFigFolder,'figImages',sprintf('resultA4_4_OptHeightDistribution_iteration%d',iterationMain));
-    saveas(f4,fullfileFig)
-    close(f4)
-%}
+end   
