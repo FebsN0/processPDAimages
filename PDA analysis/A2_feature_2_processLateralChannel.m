@@ -119,9 +119,9 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
             % Remove background
             Lateral_Image_3_lineFit = Lateral_Image_2_planeFit - baselineFit;
             % Plot the fitted backround:               
-            titleData1='Line x Line Fitted Background'; titleData2={"Lateral Deflection - Trace";"Plane+LineByLine Fitted"};
-            nameFig='resultA2_11_LineBKfit_LateralDeflection';
-            figTmp=showData(idxMon,true,baselineFit,titleData1,'','','normalized',norm,'labelBar',unitDataLabel,'saveFig',false, ...
+            titleData1={'Lateral Deflection'; 'After PlaneFit correction'};
+            titleData2={'Lateral Deflection'; 'After LineByLineFit correction'};
+            figTmp=showData(idxMon,true,Lateral_Image_2_planeFit,titleData1,'','','normalized',norm,'labelBar',unitDataLabel,'saveFig',false, ...
                 'extraData',{Lateral_Image_3_lineFit},'extraTitle',{titleData2},'extraNorm',{norm},'extraLabel',{unitDataLabel});
             % plot distribution and lineAnalysis
             Lateral_Trace_corrLine_BK_2= Lateral_Image_3_lineFit;
@@ -134,18 +134,21 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
             figDistrTmp=checkDistributionDataLD(SeeMe,idxMon,DataXdistribution,'prevFig',figDistr,'idCall',3);        
             figSingleLineTmp=plotSingleLineCheck(idxMon,Lateral_Image_3_lineFit,idxLine,'prevFig',figSingleLine,'nameLine','2nd correction - LineXLineFit');
             pause(1)
-            if getValidAnswer('Satisfied of the fitting? If not, keep the original and skip to the next part.','',{'y','n'})
-                close(figTmp)                 
+            answ=getValidAnswer('Satisfied of the fitting? If not, keep the original and skip to the next part.','',{'y','n'});
+            close(figTmp)
+            if answ
                 varargout{3}=metricsBestLineFit;  
                 % take the definitive last figures
                 figDistr=figDistrTmp;
                 figSingleLine=figSingleLineTmp;
+                titleData1='Line x Line Fitted Background'; titleData2={"Lateral Deflection - Trace";"Plane+LineByLine Fitted"};
+                nameFig='resultA2_11_LineBKfit_LateralDeflection';
                 showData(idxMon,false,baselineFit,titleData1,newFolder,nameFig,'normalized',norm,'labelBar',unitDataLabel, ...
                     'extraData',{Lateral_Image_3_lineFit},'extraTitle',{titleData2},'extraNorm',{norm},'extraLabel',{unitDataLabel});
                 noFitLine=false;
             else
                 noFitLine=true;            
-            end
+            end            
         end
         if noFitLine
             varargout{3}="LineByLine Fitting not available (user skipped or refused this step)";

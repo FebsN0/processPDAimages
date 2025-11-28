@@ -1,4 +1,4 @@
-function [avg_fc,FitOrderHVOFF_Height,offsetHVonWithHVoff] = A2_feature_2_1_FrictionCalcFromSameScanHVOFF(idxMon,mainPath,flagSingleSectionProcess,varargin)
+function [avg_fc,FitOrderHVOFF_Height] = A2_feature_2_1_FrictionCalcFromSameScanHVOFF(idxMon,mainPath,flagSingleSectionProcess,varargin)
     p=inputParser();
     argName = 'FitOrderHVOFF_Height';       defaultVal = '';     addOptional(p,argName,defaultVal, @(x) (ismember(x,{'Low','Medium','High'}) || isempty(x)));
     argName = 'idxSectionHVon';             defaultVal = [];     addOptional(p,argName,defaultVal, @(x) (isnumeric(x) || isempty(x)));
