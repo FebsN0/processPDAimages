@@ -172,7 +172,8 @@ function varargout = featureRemovePortions(dataToShow1,textTitle1,idxMon,varargi
     %%%%%%%%%%%%%% all the data is now ready to show and start the removal %%%%%%%%%%%%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%   
     fcomparisonRemoval=[];
-    
+    % create the definitive mask as pure zeros. Change into 1 in case of FR or NaN in case of removal data
+    entireMask=zeros(size(allDataToShow{1}));
     % prep removal settings for the question
     allMethodsRemoval={'All fast scan lines';'Rectangle area';'Polygon area'};
     allOnWhichFigure=cell(1,nTotData);
@@ -263,7 +264,7 @@ function varargout = featureRemovePortions(dataToShow1,textTitle1,idxMon,varargi
                 xCoords=[coordinatesSelectedArea(1) coordinatesSelectedArea(2) coordinatesSelectedArea(2) coordinatesSelectedArea(1)];
             end
             % create the mask polygon
-            mask = poly2mask(xCoords, yCoords, rows, cols); 
+            mask = poly2mask(xCoords, yCoords, rows, cols);             
             % prepare the user choices on how to treat the data
             question='Choose what to do';                       
             options1={'Background (change into 0 for mask)','Foreground (change into 1 for mask)'};
@@ -272,6 +273,13 @@ function varargout = featureRemovePortions(dataToShow1,textTitle1,idxMon,varargi
             selectedOptions = selectOptionsDialog(question,false,options1,options2,'Titles',titles);
             if selectedOptions{2}==2, flagIntoNan=true; else, flagIntoNan=false; end
             if selectedOptions{1}==1, isBK=true; else, isBK=false; end
+            % update the mask containing the position of selected elements. Convert into NaN according to the user choice 
+            if ~isBK
+                entireMask(mask) = 1; % change into FR info
+            elseif flagIntoNan
+                entireMask(mask)= nan;
+            end
+            % start to modify the data
             for i=1:nTotData
                 tmp=allDataToShow{i};    
                 % in case of binary image, to avoid to process nan values later and use it as definitive mask, covert the values into 0 or 1
@@ -306,9 +314,10 @@ function varargout = featureRemovePortions(dataToShow1,textTitle1,idxMon,varargi
         end        
     end
     close(fcomparisonRemoval)
-    varargout=cell(1,nTotData);
-    for i=1:nTotData
-        varargout{i}=allDataToShow{i};
+    varargout=cell(1,nTotData+1);
+    varargout{1}=entireMask;
+    for i=2:nTotData+1
+        varargout{i}=allDataToShow{i-1};
     end
 end
 
