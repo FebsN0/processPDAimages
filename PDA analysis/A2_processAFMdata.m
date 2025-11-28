@@ -1,5 +1,12 @@
-function [dataAFM_assembled,AFM_height_IO_assembled,metadata,setpointN]=A2_processAFMdata(allData,otherParameters,mainPath,SaveFigFolder,idxMon)
-  
+function [AFM_images_final,AFM_height_IO,metaData]=A2_processAFMdata(allData,otherParameters,mainPath,SaveFigFolder,idxMon,varargin)
+
+    p=inputParser(); 
+    argName = 'SeeMe';          defaultVal = true;              addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
+    argName = 'Normalization';  defaultVal = false;             addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
+    parse(p,varargin{:});
+    SeeMe=p.Results.SeeMe;
+    norm=p.Results.Normalization;
+
     % count how many sections has been generated
     numFiles=length(allData);
     % QUESTION process single sections then assembly or assembly then
@@ -12,14 +19,15 @@ function [dataAFM_assembled,AFM_height_IO_assembled,metadata,setpointN]=A2_proce
         startPathSingleSectionFolder=typeProcessChoice.folderSingleSectionData;
     end
     clear typeProcessChoice
-    for i=1:numFiles
-        if i==1
-            FitOrderHVON_Height='';
-            FitOrderHVON_Lat='';
-            FitOrderHVOFF_Height='';        
-        end
-        % if single section processing, process first the i-th section, then assembly. The assembly part is same for both methods (yes/no single section processing)
-        if flag_processSingleSection
+    % if single section processing, process first the i-th section, then assembly. The assembly part is same for both methods (yes/no single section processing)
+    if flag_processSingleSection
+        for i=1:numFiles
+            if i==1
+                FitOrderHVON_Height='';
+                FitOrderHVON_Lat='';
+                FitOrderHVOFF_Height='';        
+            end
+        
             if i~=1 && isempty(FitOrderHVOFF_Height)
                 firstFileLat=dir(fullfile(startPathSingleSectionFolder,"section_1","*_lateralChannelProcessed.mat"));
                 load(fullfile(firstFileLat.folder,firstFileLat.name),"FitOrderHVON_Height","FitOrderHVON_Lat","FitOrderHVOFF_Height");
@@ -31,15 +39,16 @@ function [dataAFM_assembled,AFM_height_IO_assembled,metadata,setpointN]=A2_proce
             SaveFigIthSectionFolder=fullfile(startPathSingleSectionFolder,sprintf("section_%d",i));
             fileName1=fullfile(SaveFigIthSectionFolder,sprintf("%s_heightChannelProcessed.mat",nameSection));
             fileName2=fullfile(SaveFigIthSectionFolder,sprintf("%s_lateralChannelProcessed.mat",nameSection));
-            flagEnd=false;
+            flagProcHeight=true;
             % if Lateral Channel has already processed, load. NOTE: only
             % for the first run (HOVER MODE ON), since the second run
             % (HOVER MODE OFF), process is different
             if exist(fileName2,"file")
                 question=sprintf("PostLateralChannel file .mat for the section %d already exists. Take it?",i);
                 if getValidAnswer(question,"",{'y','n'})
+                    % each section has allData updated to the relative section.
                     load(fileName2,"allData")
-                    flagEnd=true;
+                    continue
                 end
             elseif exist(fileName1,"file")
                 question=sprintf("PostHeightChannel file .mat (HoverModeON-normal) for the section %d already exists. Take it?",i);
@@ -49,17 +58,21 @@ function [dataAFM_assembled,AFM_height_IO_assembled,metadata,setpointN]=A2_proce
                     else
                         load(fileName1,"AFM_HeightFittedMasked","AFM_height_IO")
                     end
+                    flagProcHeight=false;
                 end
-            else
-                % in case the HeightAFMprocess and LateralAFMprocess have never been done, then start it.
-                % First, given the ith-section, create subfolder where store figures for each section and results                
-                mkdir(SaveFigIthSectionFolder)
-                % extract the data
-                dataPreProcess=allData(i).AFMImage_Raw;
-                metaDataPreProcess=allData(i).metadata;
+            end
+            fprintf("\n$$$$$-----------------$$$$\n$$ PROCESSING SECTION %d $$\n$$$$$-----------------$$$$\n",i)
+            if flagProcHeight
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 %%%%%%%% PROCESS HEIGHT CHANNEL AND GENERATE MASK %%%%%%%%
-                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%               
+                % First, given the ith-section, create subfolder where store figures for each section and results                
+                if ~exist(SaveFigIthSectionFolder,'dir')
+                    mkdir(SaveFigIthSectionFolder)
+                end
+                % extract the data
+                dataPreProcess=allData(i).AFMImage_Raw;
+                metaDataPreProcess=allData(i).metadata;                                
                 % note: setpointsList = [] because the function is processing single sections
                 [AFM_HeightFittedMasked,AFM_height_IO,FitOrderHVON_Height]=A2_feature_1_processHeightChannel(dataPreProcess,idxMon,SaveFigIthSectionFolder,'fitOrder',FitOrderHVON_Height,'imageType',TypeSectionProcess,'metadata',metaDataPreProcess,'SeeMe',false);                
                 % save the results for the specific section, to avoid to perform manual binarization
@@ -68,32 +81,38 @@ function [dataAFM_assembled,AFM_height_IO_assembled,metadata,setpointN]=A2_proce
             clear question fileName*
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             %%%%%%%% PROCESS LATERAL DEFLECTION CHANNEL (in case of HOVER MODE ON DATA) %%%%%%%%
-            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            if ~flagEnd
-                metaData_AFM=allData(i).metadata; 
-                [AFM_LatDeflecFitted_Force,~,~,FitOrderHVON_Lat,FitOrderHVOFF_Height,avg_fc]=A2_feature_2_processLateralChannel(AFM_HeightFittedMasked,AFM_height_IO,metaData_AFM.Alpha,idxMon,SaveFigIthSectionFolder,mainPath, ...
-                    'FitOrderHVON_Lat',FitOrderHVON_Lat,'FitOrderHVOFF_Height',FitOrderHVOFF_Height,'SeeMe',false,'idxSectionHVon',i,'flagSingleSectionProcess',true);
-                allData(i).metadata.frictionCoeff_Used=avg_fc;
-                allData(i).AFMImage_PostProcess=AFM_LatDeflecFitted_Force;
-                allData(i).AFMmask_heightIO=AFM_height_IO;     
-                save(fullfile(SaveFigIthSectionFolder,sprintf("%s_lateralChannelProcessed.mat",nameSection)),"allData","FitOrderHVON_Height","FitOrderHVOFF_Height","FitOrderHVON_Lat") 
-            end
-            close all
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%           
+            metaData_AFM=allData(i).metadata; 
+            [AFM_LatDeflecFitted_Force,~,~,FitOrderHVON_Lat,FitOrderHVOFF_Height,avg_fc]=A2_feature_2_processLateralChannel(AFM_HeightFittedMasked,AFM_height_IO,metaData_AFM.Alpha,idxMon,SaveFigIthSectionFolder,mainPath, ...
+                'FitOrderHVON_Lat',FitOrderHVON_Lat,'FitOrderHVOFF_Height',FitOrderHVOFF_Height,'SeeMe',false,'idxSectionHVon',i,'flagSingleSectionProcess',true);
+            allData(i).metadata.frictionCoeff_Used=avg_fc;
+            allData(i).AFMImage_PostProcess=AFM_LatDeflecFitted_Force;
+            allData(i).AFMmask_heightIO=AFM_height_IO;     
+            save(fullfile(SaveFigIthSectionFolder,sprintf("%s_lateralChannelProcessed.mat",nameSection)),"allData","FitOrderHVON_Height","FitOrderHVOFF_Height","FitOrderHVON_Lat") 
+            close all            
         end
     end
 
     % ASSEMBLY!
-
-    [dataAFM_assembled,AFM_height_IO_assembled,metadata,setpointN] = sortAndAssemblySections(allData,otherParameters,SaveFigFolder,flag_processSingleSection);
+    [AFM_images,AFM_height_IO,metaData] = A2_feature_sortAndAssemblySections(allData,otherParameters,flag_processSingleSection);  
     
-
+    % show and save figures pre or post assembly
+    A1_feature_CleanOrPrepFiguresRawData(AFM_images,'AFM_IO',AFM_height_IO,'metadata',metaData, ...
+        'idxMon',idxMon,'folderSaveFig',SaveFigFolder,'SeeMe',SeeMe, ...
+        'imageType','Assembled','Normalization',norm,'postProcessed',flag_processSingleSection)
 
     % in case of no single section processing, now process the assembled image
     if ~flag_processSingleSection
-        AFM_LatDeflecFitted=A5_LD_Baseline_Adaptor_masked(dataAFM_assembled,AFM_height_IO_assembled,metaData_AFM.Alpha,idxMon,folderResultsImg,mainPath,'FitOrder',accuracy,'Silent','No');
+        [AFM_images_postHeight,AFM_height_IO]=A2_feature_1_processHeightChannel(AFM_images,idxMon,SaveFigFolder,'SeeMe',SeeMe,'Normalization',norm, ...
+            'imageType','Assembled','metadata',metaData);
+        AFM_images_final=A2_feature_2_processLateralChannel(AFM_images_postHeight,AFM_height_IO,metaData_AFM.Alpha,idxMon,folderResultsImg,mainPath, ...
+            'FitOrder',accuracy,'SeeMe',SeeMe,'Normalization',norm);
+    else
+        AFM_images_final=AFM_images;
     end
-end
-       
+end      
+
+
     
 %%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%% FUNCTION %%%%%%%%

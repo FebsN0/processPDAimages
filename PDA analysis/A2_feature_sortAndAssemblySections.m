@@ -1,13 +1,7 @@
-function varargout = A2_feature_sortAndAssemblySections(allData,otherParameters,flag_processSingleSection,SaveFigFolder,varargin)
+function varargout = A2_feature_sortAndAssemblySections(allData,otherParameters,flag_processSingleSection)
 % First part is sorting in function of the y-position of the sections
 % Second part is assembling the sections
-    p=inputParser();    
-    argName = 'Silent';                     defaultVal = 'Yes';     addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
-    argName = 'Normalization';              defaultVal = false;     addParameter(p,argName,defaultVal, @(x) islogical(x)); 
-    % validate and parse the inputs
-    parse(p,varargin{:});
-    numFiles=length(allData);
-    
+     numFiles=length(allData);
     % check the origin offset information and properly sort data and
     % metadata. In theory, the sections are already ordered, but further
     % check always better! Note: each line of struct is
@@ -28,6 +22,7 @@ function varargout = A2_feature_sortAndAssemblySections(allData,otherParameters,
     %       SetP_V
     %       SetP_m
     %       SetP_N
+    %       (eventually) frictionCoeff_Used
     % the others don't change. 
     % since it is ordered, the first element already contains the true y_Origin        
     % in case of y lenght, just sum single y lenght of each section to have entire scan size
@@ -47,6 +42,10 @@ function varargout = A2_feature_sortAndAssemblySections(allData,otherParameters,
     metaDataAssembled.SetP_N=round(arrayfun(@(s) s.metadata.SetP_N, allDataOrdered),9);
     metaDataAssembled.Baseline_V=arrayfun(@(s) s.metadata.Baseline_V, allDataOrdered);
     metaDataAssembled.Baseline_N=round(arrayfun(@(s) s.metadata.Baseline_N, allDataOrdered),12);
+    % in case of processing single sections before assembly, additional field in the data (friction used for each section)
+    if ismember("frictionCoeff_Used",fieldnames(metaDataAssembled))
+        metaDataAssembled.frictionCoeff_Used=arrayfun(@(s) s.metadata.frictionCoeff_Used, allDataOrdered);
+    end
     clear y_scan_lengthAllScans y_OriginAllScans idx 
 
     % Init vars where store the assembled sections by copying common data fields.
@@ -54,66 +53,70 @@ function varargout = A2_feature_sortAndAssemblySections(allData,otherParameters,
     %   Channel_name
     %   Trace_type
     %   AFM data
-    dataAssembled_1Raw=allDataOrdered(1).AFMImage_Raw;
+    wantedFields = {'Channel_name','Trace_type'};
+    tmp=allDataOrdered(1).AFMImage_Raw;
+    dataAssembled = rmfield(tmp, setdiff(fieldnames(tmp), wantedFields));
+    [dataAssembled.AFM_image_RAW]=deal(zeros(0,1));   
+    [dataAssembled.AFM_image_original]=deal(zeros(0,1));
     if flag_processSingleSection
-        dataAssembled_2Processed=allDataOrdered(1).AFMImage_PostProcess;
-        maskAssembled=allDataOrdered(1).AFMmask_heightIO;
+        [dataAssembled.AFM_image_PostProcessed]=deal(zeros(0,1));        
     end
-
+        
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%% ASSEMBLY BY CONCATENATION %%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % Then, for each iteration, in case of AFM image (5 channels), take all those channel
+    % init the var where store the concatenated sections of pre and post processed sections        
     
-
-
-
-    
-    % ASSEMBLY BY CONCATENATION. Take the i-th channel and assembly
-    for i=1:size(dataAssembled_1_ORIGINAL,2)
-        % init the var where store the concatenated sections of pre and
-        % post processed sections        
-        concatenatedData_Raw_afm_image=[];
-        concatenatedData_AFM_image_START=[];
+    % assembly the mask. Since the size can be big, preallocate    
+    xpix = metaDataAssembled.x_scan_pixels;
+    ypix_total = sum(metaDataAssembled.y_scan_pixels);
+    concatenatedMask=zeros(xpix, ypix_total);
+    colStart = 1;
+    for j=numFiles:-1:1
+        tmp1=flip(allDataOrdered(j).AFMmask_heightIO);
+        yLen=size(tmp1,2);        
+        colEnd = colStart + yLen-1;
+        concatenatedMask(:,colStart:colEnd)=tmp1;
+        colStart = colEnd+1;
+    end
+    % start the assembly of the AFM images. For convenience, it is better take the i-th channel and then assembly all the sections of that
+    % specific channel    
+    for i=1:size(dataAssembled,2)
+        % for each channel, init the var containing the concatenated data
+        concatenatedData_Raw_afm_image=zeros(xpix, ypix_total);
+        concatenatedData_AFM_image_START=zeros(xpix, ypix_total);
         if flag_processSingleSection
-            concatenatedData_AFM_image_END=[];
+            concatenatedData_AFM_image_END=zeros(xpix, ypix_total);        
         end
-
-        for j=numFiles:-1:1            
-            dataRAW=flip(allScansImage_1_ORIGINAL_Ordered{j}(i).Raw_afm_image);
-            concatenatedData_Raw_afm_image      = cat(1,concatenatedData_Raw_afm_image,dataRAW);
-            dataIMAGE=flip(allScansImage_1_ORIGINAL_Ordered{j}(i).AFM_image);
-            concatenatedData_AFM_image_START    = cat(1,concatenatedData_AFM_image_START,dataIMAGE);
-            if numFiles>1
-                sizeSections(j)=size(dataRAW,1);
-            else
-                sizeSections=[];
+        colStart = 1;
+        % start the assembly of the i-th channel
+        for j=numFiles:-1:1
+            % extract the struct AFM data
+            tmp=allDataOrdered(j).AFMImage_Raw(i);
+            tmp_raw=rot90(tmp.Raw_afm_image,-1);
+            tmp_start=rot90(tmp.AFM_image,-1);
+            if flag_processSingleSection
+                tmp=allDataOrdered(j).AFMImage_PostProcess(i);
+                tmp_end=flip(tmp.AFM_image);
             end
-            if flag_processSignleSections
-                dataPOST=flip(rot90(allScans_AFMImage_2_PROCESSED_Ordered{j}(i).AFM_image));
-                concatenatedData_AFM_image_END  = cat(1,concatenatedData_AFM_image_END,dataPOST);
-                % no need to process iteratively in case of AFM Height IO image
-                if i==1
-                    dataIO=flip(rot90(allScans_AFM_HeightIO_ordered{j}));
-                    concatenated_AFM_Height_IO  = cat(1,concatenated_AFM_Height_IO,dataIO);
-                end
+            yLen=size(tmp_end,2); colEnd = colStart + yLen-1;
+            % concatenate
+            concatenatedData_Raw_afm_image(:,colStart:colEnd)=tmp_raw;
+            concatenatedData_AFM_image_START(:,colStart:colEnd)=tmp_start;
+            if flag_processSingleSection
+                concatenatedData_AFM_image_END(:,colStart:colEnd)=tmp_end;
             end
+            colStart = colEnd+1;
         end
-
-        dataAssembled_1_ORIGINAL(i).Raw_afm_image= flip(concatenatedData_Raw_afm_image);
-        dataAssembled_1_ORIGINAL(i).AFM_image=flip(concatenatedData_AFM_image_START);
-        if flag_processSignleSections
-            dataAssembled_2_PROCESSED(i).AFM_image   = flip(rot90(concatenatedData_AFM_image_END,-1));
+        % now the data has been concatenated. Store in the final var
+        dataAssembled(i).AFM_image_RAW=concatenatedData_Raw_afm_image;
+        dataAssembled(i).AFM_image_original=concatenatedData_AFM_image_START;
+        if flag_processSingleSection
+            dataAssembled(i).AFM_image_PostProcessed=concatenatedData_AFM_image_END;
         end
-    end
-    
-    % show and save figures post assembly
-    A1_feature_CleanOrPrepFiguresRawData(dataAssembled_1_ORIGINAL,setpointN,idxMon,SaveFigFolder,'metadata',metaDataAssembled,'imageType',TypeSectionProcess,'Silent',silent,'Normalization',norm,'sectionSize',sizeSections);
-    
-    varargout{1}=dataAssembled_1_ORIGINAL;
-
-    % process the data (A3 and A4 to create optimized and 0\1 height images
-    [AFM_HeightFittedMasked,AFM_height_IO]=processData_A3_A4(dataAssembled_1_ORIGINAL,idxMon,SaveFigFolder,accuracy,silent);
-    % save the outputs
-    varargout{1}=AFM_HeightFittedMasked;
-    varargout{2}=AFM_height_IO;
+    end     
+    varargout{1}=dataAssembled;
+    varargout{2}=concatenatedMask;
     varargout{3}=metaDataAssembled;
-    varargout{4}=SaveFigFolder;
-    varargout{5}=setpointN;
 end
