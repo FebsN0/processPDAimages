@@ -17,6 +17,7 @@ function [AFM_Images_final,mask_FINAL,fitOrderHeight]=A2_feature_1_processHeight
 %
 % Author: Altieri F.
 % University of Tokyo
+warning('off', 'stats:robustfit:IterationLimit');
 
     % in case of code error, the waitbar won't be removed. So the following command force its closure
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
@@ -52,22 +53,23 @@ function [AFM_Images_final,mask_FINAL,fitOrderHeight]=A2_feature_1_processHeight
     end
     if strcmp(fitOrderHeight,'Low'), limit=3; elseif strcmp(fitOrderHeight,'Medium'), limit=6; else, limit=9; end    
     clearvars argName defaultVal p varargin
-
-    % show the data prior the adjustments
-    A1_feature_CleanOrPrepFiguresRawData(filtData,'idxMon',idxMon,'folderSaveFig',SaveFigFolder,'metadata',metadata,'imageType',typeProcess,'SeeMe',SeeMe,'Normalization',norm);
-  
-    % Orient the image by counterclockwise 180° and flip to coencide with the Microscopy image through rotations
+    
+    % Orient image of every channel by clockwise 90° and flip along long axis so the image coencide with the Microscopy image direction
     for i=1:size(filtData,2)
-        temp_img=flip(rot90(filtData(i).AFM_image),2);
+        tmp_img_0=flip(rot90(filtData(i).Raw_afm_image),2);
+        tmp_img_1=flip(rot90(filtData(i).AFM_image),2);
         AFM_Images(i)=struct(...
                 'Channel_name', filtData(i).Channel_name,...
                 'Trace_type', filtData(i).Trace_type, ...
-                'AFM_image', temp_img); %#ok<AGROW>
-    end
-    clear filtData metadata temp_img
+                'AFM_images_0_raw', tmp_img_0, ...
+                'AFM_images_1_original', tmp_img_1); %#ok<AGROW>
+    end        
+    % show the data prior the height processing
+    A1_feature_CleanOrPrepFiguresRawData(AFM_Images,'idxMon',idxMon,'folderSaveFig',SaveFigFolder,'metadata',metadata,'imageType',typeProcess,'SeeMe',SeeMe,'Normalization',norm);
+    clear metadata tmp* filtData
     % Extract the height channel
-    height_1_original=AFM_Images(strcmp([AFM_Images.Channel_name],'Height (measured)')).AFM_image;
-    
+    height_1_original=AFM_Images(strcmp([AFM_Images.Channel_name],'Height (measured)')).AFM_images_1_original;
+
     % after the first iteration, a mask and definitive corrected height
     % image have been generated. However, although the the definitive
     % height may be ok, the mask could be still not perfect. Since the mask
@@ -78,12 +80,12 @@ function [AFM_Images_final,mask_FINAL,fitOrderHeight]=A2_feature_1_processHeight
     flagExeMaskGen=true;
     while true
         % in case of MATLAB system failure, dont lose the work! Also AFM_Images because it may be different in case of HV mode OFF due to resizing
-        if exist(fullfile(SaveFigFolder,"TMP_DATA_2_MASK.mat"),'file') && getValidAnswer('Mask AFM IO for the current section has been already generated. Take it definitively?','',{'y','n'})
-            load(fullfile(SaveFigFolder,"TMP_DATA_2_MASK.mat"),"AFM_height_IO","textTitleIO")
+        if exist(fullfile(SaveFigFolder,"TMP_DATA_MASK_definitive.mat"),'file') && getValidAnswer('Mask AFM IO for the current section has been already generated. Take it definitively?','',{'y','n'})
+            load(fullfile(SaveFigFolder,"TMP_DATA_MASK_definitive.mat"),"AFM_height_IO_corr","BK_5_heightMasked_corr")
             flagExeMaskGen=false;
             if strcmp(HVmode,"HoverModeOFF")
-                load(fullfile(SaveFigFolder,"TMP_DATA_2_MASK.mat"),"AFM_Images")
-                height_1_original=AFM_Images(strcmp([AFM_Images.Channel_name],'Height (measured)')).AFM_image;
+                load(fullfile(SaveFigFolder,"TMP_DATA_MASK_definitive.mat"),"AFM_Images")
+                height_1_original=AFM_Images(strcmp([AFM_Images.Channel_name],'Height (measured)')).AFM_images_1_original;
             end
         end         
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -105,7 +107,9 @@ function [AFM_Images_final,mask_FINAL,fitOrderHeight]=A2_feature_1_processHeight
             height_2_outliersRemoved(:,i)=yData;
         end
         fprintf("\nSTART HEIGHT PROCESSING ITERATION %d\nBefore 1st order plan and lineByline fitting, %d outliers have been removed!\n",iterationMain,countOutliers)
-                                     
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%% START HEIGHT PROCESS: GOAL OF THE FOLLOWING PART IS TO GENERATE THE MASK OF HEIGHT TO SEPARATE FOREGROUND AND BACKGROUND %%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         if flagExeMaskGen
         % For the first time, there are no files, so it assumes already first iteration.
         % If the generated mask is already good enough or it already exists, skip the following step to save time
@@ -135,7 +139,7 @@ function [AFM_Images_final,mask_FINAL,fitOrderHeight]=A2_feature_1_processHeight
                 showData(idxMon,SeeMe,height_2_outliersRemoved*factor,titleData1,SaveFigFolder,nameFile,'normalized',norm,'labelBar',labelHeight, ...
                     'extraData',{height_3_corrPlane*factor,height_4_corrLine*factor},'extraNorm',{norm,norm}, ...
                     'extraTitles',{titleData2,titleData3},'extraLabel',{labelHeight,labelHeight});           
-                clear countOutliers i nameFile planeFit pos_outlier num_lines titleData* yData
+                clear countOutliers i nameFile planeFit lineFit pos_outlier num_lines titleData* yData imageStart
             else
                 height_4_corrLine=height_1_original;
             end
@@ -143,7 +147,7 @@ function [AFM_Images_final,mask_FINAL,fitOrderHeight]=A2_feature_1_processHeight
             %%%% HOVER MODE OFF MASK GENERATION (skipped in case of HV ON) %%%%
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             % if HOVER MODE OFF, the data is often messed. Therefore, try to use the AFM mask of HV_ON and resize it instead of making it again,
-            % saving significant amount of time        
+            % saving significant amount of time. If not, just run the normal height process like in case of HV on     
             if strcmp(HVmode,"HoverModeOFF")         
                 question="Is the HoverModeOFF data generated in the approximately same scan area as the HoverModeON data?";
                 options={"If yes, take the mask of HOVER MODE ON and re-align to avoid to perform binarization.";
@@ -152,16 +156,12 @@ function [AFM_Images_final,mask_FINAL,fitOrderHeight]=A2_feature_1_processHeight
                     [tmp1,tmp2]=maskFromHVon(AFM_Images,height_4_corrLine,SaveFigFolder,typeProcess,idxMon);
                     if ~isempty(tmp1)
                         AFM_height_IO=tmp1;
-                        AFM_Images=tmp2;
+                        AFM_Images=tmp2; % resized channels
                         % images are now resized, update starting image
-                        height_1_original=AFM_Images(strcmp([AFM_Images.Channel_name],'Height (measured)')).AFM_image;
+                        height_1_original=AFM_Images(strcmp([AFM_Images.Channel_name],'Height (measured)')).AFM_images_1_original;
                         clear tmp*
                         binarizationMethod="Extracted from HV ON mask";
-                        textTitleIO=sprintf('Binary Height Image - iteration %d\n%s',iterationMain,binarizationMethod);
-                        save(fullfile(SaveFigFolder,'TMP_DATA_2_MASK'),'AFM_height_IO','AFM_Images','textTitleIO')
-                        if getValidAnswer("Keep the mask also for the next iterations?",'',{'y','n'})
-                            flagExeMaskGen=false;
-                        end
+                        flagExeMaskGen=false;
                     end
                 end                
             end
@@ -188,7 +188,7 @@ function [AFM_Images_final,mask_FINAL,fitOrderHeight]=A2_feature_1_processHeight
                     end
                     if restartRemoveOperation
                         % since the step is not accurate since the data is not clean yet, manually remove portions if required
-                        [maskSelectedArea,BK_2_butterworthFiltered_manualAdj] = featureRemovePortions(height_4_corrLine,"Data before ButterworthFiltering",idxMon, ...
+                        [maskSelectedArea,~,BK_2_butterworthFiltered_manualAdj] = featureRemovePortions(height_4_corrLine,"Data before ButterworthFiltering",idxMon, ...
                             'additionalImagesToShow',BK_1_butterworthFiltered,...
                             'additionalImagesTitleToShow',"Data after ButterworthFiltering",...
                             'originalDataIndex',1);        
@@ -205,7 +205,7 @@ function [AFM_Images_final,mask_FINAL,fitOrderHeight]=A2_feature_1_processHeight
                             save(fullfile(SaveFigFolder,sprintf("TMP_DATA_1_afterButterworthMASKoperations_iteration%d.mat",iterationMain)),"maskSelectedArea")
                         end
                     end                               
-                    clear restartRemoveOperation fbutter closest_indices numBins Y E_height Wn b a Y_filtered dY locs bk_limit background_th nameFile question thresholdApproach titleData* BK_1_butterworthFiltered
+                    clear maskSelectedArea restartRemoveOperation fbutter closest_indices numBins Y E_height Wn b a Y_filtered dY locs bk_limit background_th nameFile question thresholdApproach titleData*
                 
                     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                     %%%% SECOND FITTING: N ORDER PLANE FITTING ON BUTTERWORTH FILTERED BACKGROUND %%%%
@@ -223,7 +223,7 @@ function [AFM_Images_final,mask_FINAL,fitOrderHeight]=A2_feature_1_processHeight
                         'extraNorm',{norm,norm},'extraTitles',{titleData2,titleData3},'extraLabel',{labelHeight,labelHeight});               
                     continueLineFit=getValidAnswer("Check the plane fitting results using butterworth filtered background data. Perform also LineByLine fitting?",'',{"y","n"});
                     close(ftmp)
-                    clear titleData* nameFile BK_1_butterworthFiltered ftmp BK_2_butterworthFiltered_manualAdj        
+                    clear titleData* nameFile BK_1_butterworthFiltered ftmp BK_2_butterworthFiltered_manualAdj planeCorrection metrics
                     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                     %%%% THIRD FITTING: N ORDER LINE-BY-LINE FITTING THE NEW PLANE-FITTED HEIGHT %%%%        
                     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
@@ -250,8 +250,9 @@ function [AFM_Images_final,mask_FINAL,fitOrderHeight]=A2_feature_1_processHeight
                         end
                         close(ftmp)                                  
                     end        
-                    clear titleData* nameFile BK_*
+                    clear titleData* nameFile BK_* ftmp
                 end
+                
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% BINARIZATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
@@ -268,38 +269,17 @@ function [AFM_Images_final,mask_FINAL,fitOrderHeight]=A2_feature_1_processHeight
                     % Run ImageSegmenter Toolbox if at end of the second iteration, the mask is still not good enough
                     [AFM_height_IO,binarizationMethod]=binarization_ImageSegmenterToolbox(height_6_forBinarization,idxMon);                  
                 end
-                textTitleIO=sprintf('Binary Height Image - iteration %d\n%s',iterationMain,binarizationMethod);        
-                if getValidAnswer('Is the generated mask the definitive one? If not, it will be generated another one at the next step.','',{'y','n'})
-                % just for safety in case of interruption. If the mask is definitive, save it and dont restart again the entire binarization process
-                    save(fullfile(SaveFigFolder,"TMP_DATA_2_MASK"),"AFM_height_IO","textTitleIO")
-                    flagExeMaskGen=false;
-                end
             end
-        end
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        %%%% MASK GENERATED ==> MASK ORIGINAL HEIGHT IMAGE AND REMOVE PLANE BASELINE %%%%
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%             
-        % Once the mask has been created, next step is remove new baseline by using the mask. This because is now easier to distinguish 
-        % background from foreground, therefore a better plane-baseline fitting can be made, thus a more accurate AFM height image 
-        % can be obtained directly from original AFM height image
-
-        % in case of MATLAB system failure, dont lost the work!
-        flagRestartRemoval=true;
-        if exist(fullfile(SaveFigFolder,sprintf("TMP_DATA_3_afterBin_MASKoperations_iteration%d.mat",iterationMain)),'file')
-            if getValidAnswer("Data of Manually removed regions of the current iteration has been already generated. Take it?","",{"y","n"})
-                load(fullfile(SaveFigFolder,sprintf("TMP_DATA_3_afterBin_MASKoperations_iteration%d.mat",iterationMain)),"AFM_height_IO_corr","BK_5_heightMasked_corr")
-                flagRestartRemoval=false;
-            end
-        end
-        if flagRestartRemoval 
-            % FIRST, check if there are some regions that may affect negatively the fitting. If so, then remove them.
+            %%% here, both HVmode ON and OFF parts (if the user chose to use HV on MASK to generate the HV off mask) undergo the following parts
+            textTitleIO=sprintf('Binary Height Image - iteration %d\n%s',iterationMain,binarizationMethod);                        
+            % before getting the definitive mask, let the user have the option to delete some areas for better mask and consequently fitting 
+            % in case automatic/manual/python in the first iteration are still not good enough
             BK_5_heightMasked=height_1_original;
             % mask original AFM height image
             AFM_height_IO=double(AFM_height_IO);
-            % obtain the data of background
             BK_5_heightMasked(AFM_height_IO==1)=NaN;
-            % first output is a matrix of removed regions. Return also potentially the final adjusted mask
-            [~,AFM_height_IO_corr,BK_5_heightMasked_corr] = featureRemovePortions(AFM_height_IO,textTitleIO,idxMon, ...
+            % first output is a matrix of selected regions. It will not be used
+            [~,AFM_height_IO_corr,BK_5_heightMasked_corr,~] = featureRemovePortions(AFM_height_IO,textTitleIO,idxMon, ...
                 'additionalImagesToShow',{BK_5_heightMasked,height_1_original}, ...
                 'additionalImagesTitleToShow',{'Masked Raw Height Image\n(Black regions = NaN or manually removed areas)','Raw Height Image'},...
                 'originalDataIndex',3);        
@@ -308,24 +288,36 @@ function [AFM_Images_final,mask_FINAL,fitOrderHeight]=A2_feature_1_processHeight
                 titleData2={'Masked Raw Height Image (Background).';' Data that will be used for PlaneFit.'};
             else
                 titleData2={'Masked Raw Height Image (Background)';'Regions postHeightBinariz manually modified. Data that will be used for PlaneFit.'};
-                % save results in case of system failure
-                save(fullfile(SaveFigFolder,sprintf("TMP_DATA_3_afterBin_MASKoperations_iteration%d.mat",iterationMain)),"AFM_height_IO_corr","BK_5_heightMasked_corr")
-            end
+            end                
             titleData3='Raw Height Image';
             nameFile=sprintf('resultA2_5_DefinitiveMask_iteration%d',iterationMain);
             showData(idxMon,false,AFM_height_IO_corr,textTitleIO,SaveFigFolder,nameFile,'binary',true,'saveFig',true,...
                 'extraData',{BK_5_heightMasked_corr*factor,height_1_original*factor}, ...
                 'extraTitles',{titleData2,titleData3},...
-                'extraLabel',{labelHeight,labelHeight},'extraNorm',{norm,norm});           
-        end        
-        clear titleText* nameFile flagRemoval ftmpIO answ question textTitleIO binarizationMethod
-        
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        %%%% TOWARD THE END! LAST SERIES OF FITTING 1st ORDER USING MASKED BACKGROUND: ORIGINAL HEIGHT + FINAL MASKSKED DATA %%%%
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        
+                'extraLabel',{labelHeight,labelHeight},'extraNorm',{norm,norm});       
+            % save in case of system failure
+            save(fullfile(SaveFigFolder,sprintf("TMP_DATA_2_MASK_iteration%d",iterationMain)),"AFM_height_IO_corr","BK_5_heightMasked_corr")
+            % decide to stop completely the mask generation if the current one is already good enough
+            if getValidAnswer('Is the generated mask the definitive one? If not, it will be generated another one at the next step.','',{'y','n'})                
+                % delete the other tmp files since they will not be used anymore
+                tmp=dir(fullfile(SaveFigFolder,"TMP_DATA_*_iteration*"));
+                files_tmp=fullfile({tmp.folder},{tmp.name});
+                delete(files_tmp{:})
+                flagExeMaskGen=false;
+                % just for safety in case of interruption or system failure. If the mask is definitive, save it and dont restart again the entire binarization process
+                save(fullfile(SaveFigFolder,"TMP_DATA_MASK_definitive"),"AFM_height_IO_corr","BK_5_heightMasked_corr")
+            end
+            clear titleText* nameFile flagRemoval ftmpIO answ question textTitleIO binarizationMethod allBaselines continueLineFit files_tmp tmp
+        end
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%% NOW THE MASK IS OBTAINED ==> LAST SERIES OF FITTING 1st ORDER USING MASKED BACKGROUND: ORIGINAL HEIGHT + FINAL MASKSKED DATA %%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%            
+        % Once the mask has been created, next step is remove new baseline by using the mask. This because is now easier to distinguish 
+        % background from foreground, therefore a better plane-baseline fitting can be made, thus a more accurate AFM height image 
+        % can be obtained directly from original AFM height image
+
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        %%%% FORTH FITTING: N ORDER PLANE FITTING ON MASKED DATA %%%%
+        %%%% FORTH FITTING: FIRST ORDER PLANE FITTING ON MASKED DATA %%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         [planeFit,metrics] = planeFitting_N_Order(BK_5_heightMasked_corr,1);
         height_7_planeFitOnFinalMaskBK=height_1_original-planeFit;
@@ -335,12 +327,13 @@ function [AFM_Images_final,mask_FINAL,fitOrderHeight]=A2_feature_1_processHeight
     
         % Display and save result
         titleData1={'Results Plane Fitting with masked Height';sprintf('Order Plane: %s - iteration %d',metrics.fitOrder,iterationMain)};
-        titleData2 = 'Resulting Masked Height';'Background from OPT-Height Image';
+        titleData2 = 'Post PlaneFit Masked Height';'Background from OPT-Height Image';
         titleData3={'Resulting OPT-Height Image'; sprintf('Iteration %d',iterationMain)};              
         nameFile=sprintf('resultA2_6_FittPlaneBKwithFinalMask_corrHeight_iteration%d',iterationMain);           
         showData(idxMon,SeeMe,planeFit*factor,titleData1,SaveFigFolder,nameFile,'normalized',norm,'labelBar',labelHeight,...
             'extraData',{BK_6_definitive_PlaneFit*factor,height_7_planeFitOnFinalMaskBK*factor}, ...
-            'extraNorm',{norm,norm},'extraTitles',{titleData2,titleData3},'extraLabel',{labelHeight,labelHeight});       
+            'extraNorm',{norm,norm},'extraTitles',{titleData2,titleData3},'extraLabel',{labelHeight,labelHeight}); 
+        clear metrics
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%% FIFTH FITTING: FIRST ORDER LINExLINE FITTING ON MASKED DATA %%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%5%%%%%%%%%%%%%%%%%%%%%%%
@@ -352,7 +345,7 @@ function [AFM_Images_final,mask_FINAL,fitOrderHeight]=A2_feature_1_processHeight
         % Display and save result
         titleData1={'Results LineByLine Fitting  with masked Height';'(Data after fitPlane then masked again)'};
         titleData2='Post LineByLineFit Masked Height';
-        titleData3=sprintf('Resulting Height Channel. Iteration %d',iterationMain);
+        titleData3={'Resulting OPT-Height Image'; sprintf('Iteration %d',iterationMain)};   
         nameFile=sprintf('resultA2_7_LineByLineFit_heightOptimized_iteration%d',iterationMain);
         showData(idxMon,false,allBaselines*factor,titleData1,SaveFigFolder,nameFile,...
                 'extraData',{BK_7_definitive_LineFit*factor,height_8_LineFitOnFinalMaskBK*factor}, ...
@@ -383,8 +376,16 @@ function [AFM_Images_final,mask_FINAL,fitOrderHeight]=A2_feature_1_processHeight
             titleData1='Definitive mask Height Image';
             showData(idxMon,false,mask_FINAL,titleData1,SaveFigFolder,nameFile,'binary',true,'lenghtAxis',lengthAxis) 
             % substitutes to the original height image with the new opt fitted heigh
-            AFM_Images_final=AFM_Images;
-            AFM_Images_final(strcmp([AFM_Images_final.Channel_name],'Height (measured)')).AFM_image=height_FINAL;
+            AFM_Images_final=AFM_Images;            
+            for i=1:length(AFM_Images_final)
+                if strcmp(AFM_Images_final(i).Channel_name,"Height (measured)")
+                    % The height channel will be changed with the new optimized final height previosuly obtained.
+                    AFM_Images_final(i).AFM_images_2_PostProcessed=height_FINAL;
+                else
+                    % Copy the the original data as new column except height. 
+                    AFM_Images_final(i).AFM_images_2_PostProcessed=AFM_Images_final(i).AFM_images_1_original; 
+                end
+            end
             break
         else
             iterationMain=iterationMain+1;
@@ -458,9 +459,9 @@ function varargout=maskFromHVon(data_HV_OFF,height_HV_OFF,folderHVoff,typeProces
         varargout{1}=mask_HV_OFF;
         %%% === Trim AFM images (HVOFF) to the common region === %%%        
         for i = 1:length(data_HV_OFF)
-            img = data_HV_OFF(i).AFM_image;
+            img = data_HV_OFF(i).AFM_images_1_original;
             img=img(yDataStart:yDataEnd, xDataStart:xDataEnd);
-            data_HV_OFF(i).AFM_image = img;
+            data_HV_OFF(i).AFM_images_2_PostProcessed = img;
         end 
         varargout{2}=data_HV_OFF;
         saveFigures_FigAndTiff(f_maskComparison,folderHVoff,"resultA2_2_maskHVoff_fromHVon")   

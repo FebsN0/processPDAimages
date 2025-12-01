@@ -96,23 +96,27 @@ function [AFM_images_final,AFM_height_IO,metaData]=A2_processAFMdata(allData,oth
     % ASSEMBLY!
     [AFM_images,AFM_height_IO,metaData] = A2_feature_sortAndAssemblySections(allData,otherParameters,flag_processSingleSection);  
     
-    % show and save figures pre or post assembly
-    A1_feature_CleanOrPrepFiguresRawData(AFM_images,'AFM_IO',AFM_height_IO,'metadata',metaData, ...
-        'idxMon',idxMon,'folderSaveFig',SaveFigFolder,'SeeMe',SeeMe, ...
-        'imageType','Assembled','Normalization',norm,'postProcessed',flag_processSingleSection)
-
+    
+    
     % in case of no single section processing, now process the assembled image
     if ~flag_processSingleSection
         [AFM_images_postHeight,AFM_height_IO]=A2_feature_1_processHeightChannel(AFM_images,idxMon,SaveFigFolder,'SeeMe',SeeMe,'Normalization',norm, ...
             'imageType','Assembled','metadata',metaData);
-        AFM_images_final=A2_feature_2_processLateralChannel(AFM_images_postHeight,AFM_height_IO,metaData_AFM.Alpha,idxMon,folderResultsImg,mainPath, ...
-            'FitOrder',accuracy,'SeeMe',SeeMe,'Normalization',norm);
+        AFM_images_final=A2_feature_2_processLateralChannel(AFM_images_postHeight,AFM_height_IO,metaData_AFM.Alpha,idxMon,SaveFigFolder,mainPath, ...
+            'FitOrder',accuracy,'SeeMe',SeeMe,'Normalization',norm);        
     else
+        % show and save figures post assembly BEFORE processing in case of singleSection processing.
+        % In case of processing after assembling, it will be done already inside A2_feature_1_processHeightChannel
+        A1_feature_CleanOrPrepFiguresRawData(AFM_images,'AFM_IO',AFM_height_IO,'metadata',metaData, ...
+        'idxMon',idxMon,'folderSaveFig',SaveFigFolder,'SeeMe',false, ...
+        'imageType','Assembled','Normalization',norm,'postProcessed',false)
         AFM_images_final=AFM_images;
     end
+    % show results post processing. Common for both processing type (singleSection or postAssembly)
+    A1_feature_CleanOrPrepFiguresRawData(AFM_images_final,'AFM_IO',AFM_height_IO,'metadata',metaData, ...
+        'idxMon',idxMon,'folderSaveFig',SaveFigFolder,'SeeMe',false, ...
+        'imageType','Assembled','Normalization',norm,'postProcessed',true)
 end      
-
-
     
 %%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%% FUNCTION %%%%%%%%

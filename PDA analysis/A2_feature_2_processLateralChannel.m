@@ -49,8 +49,8 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
         % Mask the Lateral Data with the mask obtained from height channel processing. 
         % GOAL: exclude FOREGROUND data to have BACKGROUND data for which perform the fitting so the original Lateral data can be adjusted
         % extract data (lateral deflection Trace + vertical deflection Trace)
-        Lateral_Image_1_Raw   = (AFM_data(strcmpi([AFM_data.Channel_name],'Lateral Deflection') & strcmpi([AFM_data.Trace_type],'Trace')).AFM_image);
-        vertical_Trace  = (AFM_data(strcmpi([AFM_data.Channel_name],'Vertical Deflection') & strcmpi([AFM_data.Trace_type],'Trace')).AFM_image);            
+        Lateral_Image_1_Raw   = (AFM_data(strcmpi([AFM_data.Channel_name],'Lateral Deflection') & strcmpi([AFM_data.Trace_type],'Trace')).AFM_images_1_original);
+        vertical_Trace  = (AFM_data(strcmpi([AFM_data.Channel_name],'Vertical Deflection') & strcmpi([AFM_data.Trace_type],'Trace')).AFM_images_1_original);            
         Lateral_BK_1= Lateral_Image_1_Raw;
         Lateral_BK_1(AFM_height_IO==1)=NaN;        
         Lateral_FR_1 = Lateral_Image_1_Raw;
@@ -247,7 +247,7 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
 
     % save the corrected lateral force into cropped AFM image
     AFM_Elab=AFM_data;    
-    AFM_Elab(strcmpi([AFM_data.Channel_name],'Lateral Deflection') & strcmpi([AFM_data.Trace_type],'Trace')).AFM_image=Corrected_LD_Trace;
+    AFM_Elab(strcmpi([AFM_data.Channel_name],'Lateral Deflection') & strcmpi([AFM_data.Trace_type],'Trace')).AFM_images_2_PostProcessed=Corrected_LD_Trace;
     varargout{1}=AFM_Elab; 
     varargout{4}=FitOrderHVON_Lat;
     varargout{5}=FitOrderHVOFF_Height;

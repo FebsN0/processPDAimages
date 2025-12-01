@@ -40,9 +40,11 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
         if p.Results.postProcessed
             flagPostProcessed=true;
             textTypeData='PostProcessed';
+            stepProcess='2_end';
             AFM_height_IO=p.Results.AFM_IO;
         else
             flagPostProcessed=false;
+            stepProcess='1';
             textTypeData='Raw';
         end
     end
@@ -73,119 +75,116 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
     % Therefore, the following line is outside the figure processing
         
         if flagPostProcessed
-            fieldToUse='AFM_image_PostProcessed';
+            fieldToUse='AFM_images_2_PostProcessed';
         else
-            fieldToUse='AFM_image';
+            fieldToUse='AFM_images_1_original';
         end
         
         data_VD_trace=  data(strcmp([data.Channel_name],'Vertical Deflection') & strcmp([data.Trace_type],'Trace')).(fieldToUse);
         data_Height=    data(strcmp([data.Channel_name],'Height (measured)')).(fieldToUse);
         data_LD_trace=  data(strcmp([data.Channel_name],'Lateral Deflection') & strcmp([data.Trace_type],'Trace')).(fieldToUse);
         data_LD_retrace=data(strcmp([data.Channel_name],'Lateral Deflection') & strcmp([data.Trace_type],'ReTrace')).(fieldToUse);
-        data_VD_retrace=data(strcmp([data.Channel_name],'Vertical Deflection') & strcmp([data.Trace_type],'ReTrace')).(fieldToUse);
-        
-        % rotate so the image is aligned with BF\fluorescence images        
-        data_Height= flip(rot90(data_Height,2));
-        data_LD_trace= flip(rot90(data_LD_trace,2));
-        data_LD_retrace=flip(rot90(data_LD_retrace,2));
-        data_VD_trace= flip(rot90(data_VD_trace,2));
-        data_VD_retrace=flip(rot90(data_VD_retrace,2));
+        data_VD_retrace=data(strcmp([data.Channel_name],'Vertical Deflection') & strcmp([data.Trace_type],'ReTrace')).(fieldToUse);        
         % start to show the data
         data=data_Height*1e9;
         titleData=sprintf('Height (measured) channel (%s - %s)',textTypeData,imageType);
-        nameFig=sprintf('resultA1_1_Raw_HeightChannel_%s',imageType);
+        nameFig=sprintf('resultA%s_%s_1_HeightChannel_%s',stepProcess,textTypeData,imageType);
         labelBar=sprintf('Height (nm)');
         showData(idxMon,SeeMe,data,titleData,folderSaveFig,nameFig,'normalized',norm,'labelBar',labelBar);
         % Lateral Deflection Trace
         data=data_LD_trace;
         titleData=sprintf('Lateral Deflection Trace channel (%s - %s)',textTypeData,imageType);
-        nameFig=sprintf('resultA1_2_Raw_LDChannel_trace_%s',imageType);
+        nameFig=sprintf('resultA%s_%s_2_LDChannel_trace_%s',stepProcess,textTypeData,imageType);
         labelBar='Voltage [V]';
         showData(idxMon,SeeMe,data,titleData,folderSaveFig,nameFig,'normalized',norm,'labelBar',labelBar);
         % Lateral Deflection ReTrace
         data=data_LD_retrace;
         titleData=sprintf('Lateral Deflection Retrace channel (%s - %s)',textTypeData,imageType);
-        nameFig=sprintf('resultA1_3_Raw_LDChannel_retrace_%s',imageType);
+        nameFig=sprintf('resultA%s_%s_3_LDChannel_retrace_%s',stepProcess,textTypeData,imageType);
         showData(idxMon,SeeMe,data,titleData,folderSaveFig,nameFig,'normalized',norm,'labelBar',labelBar);
         % Vertical Deflection trace
         data=data_VD_trace*1e9;
         titleData=sprintf('Vertical Deflection trace channel (%s - %s)',textTypeData,imageType);
-        nameFig=sprintf('resultA1_4_Raw_VDChannel_trace_%s',imageType);
+        nameFig=sprintf('resultA%s_%s_4_VDChannel_trace_%s',stepProcess,textTypeData,imageType);
         labelBar='Force [nN]';
         showData(idxMon,SeeMe,data,titleData,folderSaveFig,nameFig,'normalized',norm,'labelBar',labelBar);
         % Vertical Deflection Retrace
         data=data_VD_retrace*1e9;
         titleData=sprintf('Vertical Deflection retrace channel (%s - %s)',textTypeData,imageType);
-        nameFig=sprintf('resultA1_5_Raw_VDChannel_retrace_%s',imageType);
+        nameFig=sprintf('resultA%s_%s_5_VDChannel_retrace_%s',stepProcess,textTypeData,imageType);
         showData(idxMon,SeeMe,data,titleData,folderSaveFig,nameFig,'normalized',norm,'labelBar',labelBar);          
         
         %%%%% perform the following step ONLY after assembly %%%%%
         if ~strcmp(imageType,"SingleSection")
-            % show distribution of vertical forces (data_VD_trace). If good, it should coincide approximately with the setpoint
-            data=data_VD_trace*1e9;
-            colors={"#0072BD","#D95319","#EDB120","#7E2F8E","#77AC30","#4DBEEE","#A2142F",'k','#FF00FF','#00FF00'};
-            if SeeMe
-                f0=figure('Visible','on');
-            else
-                f0=figure('Visible','off');
-            end
-            axes1 = axes('Parent',f0);
-            hold(axes1,'on');
-            % EXTRACT ALL DATA
-            % why flip? because the data has previously been flipped to coindide with the Fluorescence imaging. So
-            % needed to flip also the setpoint vector (left high - right low)
-            setpoints=metadata.SetP_N;
-            setpoints=flip(setpoints); numSetpoints=length(setpoints); 
-            setN=cell(1,numSetpoints); avgN=cell(1,numSetpoints); h=cell(1,numSetpoints);
-            for i=1:numSetpoints
-                % plot lines of setpoint
-                setN{i}=xline(setpoints(i)*1e9,'LineWidth',4,'DisplayName',sprintf('setpoint section %d',i),'Color',colors{i});
-            end
-            vertForceAVG=zeros(1,numSetpoints);
-            for i=1:numSetpoints
-                % in case of more files of single section scans, we know prior the size of single
-                % sections other than how much was the setpoint
-                if  ~isempty(metadata)
-                    sizeSingleSection=metadata.y_scan_pixels(i); % already expressed in nanoNewton
+            if ~flagPostProcessed
+                % perform the plotting VD distribution and baseline trend only once
+                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                %%% VERTICAL FORCES DISTRIBUTION %%%
+                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                % If good, it should coincide approximately with the setpoint
+                data=data_VD_trace*1e9;
+                colors={"#0072BD","#D95319","#EDB120","#7E2F8E","#77AC30","#4DBEEE","#A2142F",'k','#FF00FF','#00FF00'};
+                if SeeMe
+                    f_VDdistribution=figure('Visible','on');
                 else
-                % in case of single file, then divide the image in sections according to the number of used setpoint.
-                % IMPORTANT: this method is not accurate because when you change the setpoint manually, it is very
-                % likely that the "new" section has not same size as well as the previous one
-                    sizeSingleSection=round(size(data,2)/numSetpoints);
+                    f_VDdistribution=figure('Visible','off');
                 end
-                % extract the vertical force data. Although this step could be made before the assembly, I
-                % found optimal put here so it can be made even in case of single entire scan
-                verticalForceSingleSection= data(:,(i-1)*sizeSingleSection+1:i*sizeSingleSection);
-                % exclude 99.9 percentile and 0.1
-                th=prctile(verticalForceSingleSection(:),99.9);
-                verticalForceSingleSection(verticalForceSingleSection>th)=NaN;
-                th=prctile(verticalForceSingleSection(:),0.1);
-                verticalForceSingleSection(verticalForceSingleSection<th)=NaN;
-                vertForceAVG(i)=mean(mean(verticalForceSingleSection),'omitnan');
-                avgN{i}=xline(vertForceAVG(i),'--','LineWidth',2,'DisplayName',sprintf('avg vertical force section %d',i),'Color',colors{i});
-                h{i}=histogram(verticalForceSingleSection,200,'DisplayName',sprintf('raw vertical force section %d',i),'FaceColor',colors{i});
-            end
-
-            legend1 = legend('FontSize',15);
-            set(legend1,'Location','bestoutside'); ylim padded
-            title('Distribution Raw Vertical Forces','FontSize',18), xlabel('Force [nN]','FontSize',15)
-            objInSecondMonitor(f0,idxMon);
-            saveas(f0,sprintf('%s/tiffImages/resultA2_1_distributionVerticalForces.tif',folderSaveFig))
-            saveas(f0,sprintf('%s/figImages/resultA2_1_distributionVerticalForces',folderSaveFig))
-            vertForceAVG=unique(round(vertForceAVG));
-            if length(vertForceAVG)~=numSetpoints
-                warndlg('Number of rounded vertical forces is less than number of setpoint!')
-            end
-            close(f0)
-            % plot the baseline trend
-            if ~isempty(metadata)
+                axes1 = axes('Parent',f_VDdistribution);
+                hold(axes1,'on');
+                % EXTRACT ALL DATA
+                % why flip? because the data has previously been flipped to coindide with the Fluorescence imaging. So
+                % needed to flip also the setpoint vector (left high - right low)
+                setpoints=metadata.SetP_N;
+                setpoints=flip(setpoints); numSetpoints=length(setpoints); 
+                setN=cell(1,numSetpoints); avgN=cell(1,numSetpoints); h=cell(1,numSetpoints);
+                for i=1:numSetpoints
+                    % plot lines of setpoint
+                    setN{i}=xline(axes1,setpoints(i)*1e9,'LineWidth',4,'DisplayName',sprintf('setpoint section %d',i),'Color',colors{i});
+                end
+                vertForceAVG=zeros(1,numSetpoints);
+                for i=1:numSetpoints
+                    % in case of more files of single section scans, we know prior the size of single
+                    % sections other than how much was the setpoint
+                    if  ~isempty(metadata)
+                        sizeSingleSection=metadata.y_scan_pixels(i); % already expressed in nanoNewton
+                    else
+                    % in case of single file, then divide the image in sections according to the number of used setpoint.
+                    % IMPORTANT: this method is not accurate because when you change the setpoint manually, it is very
+                    % likely that the "new" section has not same size as well as the previous one
+                        sizeSingleSection=round(size(data,2)/numSetpoints);
+                    end
+                    % extract the vertical force data. Although this step could be made before the assembly, I
+                    % found optimal put here so it can be made even in case of single entire scan
+                    verticalForceSingleSection= data(:,(i-1)*sizeSingleSection+1:i*sizeSingleSection);
+                    % exclude 99.9 percentile and 0.1
+                    th=prctile(verticalForceSingleSection(:),99.9);
+                    verticalForceSingleSection(verticalForceSingleSection>th)=NaN;
+                    th=prctile(verticalForceSingleSection(:),0.1);
+                    verticalForceSingleSection(verticalForceSingleSection<th)=NaN;
+                    vertForceAVG(i)=mean(mean(verticalForceSingleSection),'omitnan');
+                    avgN{i}=xline(axes1,vertForceAVG(i),'--','LineWidth',2,'DisplayName',sprintf('avg vertical force section %d',i),'Color',colors{i});
+                    h{i}=histogram(axes1,verticalForceSingleSection,200,'DisplayName',sprintf('raw vertical force section %d',i),'FaceColor',colors{i});
+                end
+                legend1 = legend('FontSize',15);
+                set(legend1,'Location','bestoutside'); ylim padded                
+                title('Distribution Raw Vertical Forces','FontSize',18), xlabel('Force [nN]','FontSize',15)
+                objInSecondMonitor(f_VDdistribution,idxMon);
+                saveFigures_FigAndTiff(f_VDdistribution,folderSaveFig,'resultA1_6_distributionRawVerticalForces')
+                vertForceAVG=unique(round(vertForceAVG));
+                if length(vertForceAVG)~=numSetpoints
+                    warndlg('Number of rounded vertical forces is less than number of setpoint!')
+                end
+                %%%%%%%%%%%%%%%%%%%%%%%%%%%
+                %%% BASELINE TREND PLOT %%%
+                %%%%%%%%%%%%%%%%%%%%%%%%%%%            
                 totTimeScan = (metadata.x_scan_pixels/metadata.Scan_Rate_Hz)/60;
                 totTimeSection = totTimeScan/numSetpoints;
                 if SeeMe
-                    f1=figure('Visible','on');
+                    f_baselineTrend=figure('Visible','on');
                 else
-                    f1=figure('Visible','off');
+                    f_baselineTrend=figure('Visible','off');
                 end
+                axes1=axes('Parent',f_baselineTrend);
                 % we dont have the baseline info at the end of the scan. It is saved only in the baseline.txt file
                 arrayTime=0:totTimeSection:totTimeScan-totTimeSection;
                 baselineN=metadata.Baseline_N*1e9;
@@ -193,23 +192,23 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
                     if abs(baselineN(2) - baselineN(1)) > 10 
                         warning('\n\tThe baseline of the first section varies by more than 10nN from the first one!!\n\tThe current scan is not really realiable... ')
                     end
-                    plot(arrayTime,metadata.Baseline_N*1e9,'-*','LineWidth',2,'MarkerSize',15,'MarkerEdgeColor','red')
-                    title('Baseline Trend among the sections','FontSize',18)
-                    ylabel('Baseline shift [nN]','FontSize',15), xlabel('Time [min]','FontSize',15), grid on, grid minor
-                    objInSecondMonitor(f1,idxMon);
-                    saveas(f1,sprintf('%s/tiffImages/resultA2_0_baselineTrend.tif',folderSaveFig))
-                    saveas(f1,sprintf('%s/figImages/resultA2_0_baselineTrend',folderSaveFig))
+                    plot(axes1,arrayTime,metadata.Baseline_N*1e9,'-*','LineWidth',2,'MarkerSize',15,'MarkerEdgeColor','red')
+                    title(axes1,'Baseline Trend among the sections','FontSize',18)
+                    ylabel(axes1,'Baseline shift [nN]','FontSize',15), xlabel(axes1,'Time [min]','FontSize',15), grid on, grid minor
+                    objInSecondMonitor(f_baselineTrend,idxMon);
+                    saveFigures_FigAndTiff(f_baselineTrend,folderSaveFig,'resultA1_7_baselineTrend')   
                 else
                     warning('\n\tPlotting the baseline trend is not possible because only one baseline value is stored in the metadata (Scan = Section)')
                 end
-                close(f1)
-            end
-            % show the definitive height distribution. Better distinction between PDA and BK by using the mask in case postProcessed
-            if flagPostProcessed
+            else
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%% HEIGHT DISTRIBUTION POST PROCESSING %%%
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            % Once the postProcessing is done, masking the height is now possible, therefore, better distinction between Foreground and Background.
                 if SeeMe
-                    f4=figure('Visible','on');
+                    f_heightDistribution=figure('Visible','on');
                 else
-                    f4=figure('Visible','off');
+                    f_heightDistribution=figure('Visible','off');
                 end
                 percentile=99.9;
                 % prepare the data
@@ -229,14 +228,14 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
                 histogram(H_FR,edgesPDA,'DisplayName','Distribution height','Normalization','percentage');
                 legend({'Background','Foreground'},'FontSize',15)
                 xlabel(sprintf('Feature height (nm)'),'FontSize',15), ylabel('Percentage %','FontSize',15), grid minor, grid on
-                title(sprintf('Distribution Height (Percentile %d°)',percentile),'FontSize',20)
-                objInSecondMonitor(f4,idxMon);
-        
-                fullfileFig=fullfile(SaveFigFolder,'tiffImages',sprintf('resultA4_4_OptHeightDistribution_iteration%d',iterationMain));
-                saveas(f4,fullfileFig,'tif')
-                fullfileFig=fullfile(SaveFigFolder,'figImages',sprintf('resultA4_4_OptHeightDistribution_iteration%d',iterationMain));
-                saveas(f4,fullfileFig)
-                close(f4)
+                title(sprintf('Distribution PostProcessed Height (Percentile %d°)',percentile),'FontSize',20)
+                objInSecondMonitor(f_heightDistribution,idxMon);     
+                saveFigures_FigAndTiff(f_heightDistribution,folderSaveFig,'resultA2_end_6_OptHeightDistribution_FR_BK')
+                % Since now there is the assembled mask
+                titleData='Final Binary AFM IO Image';
+                nameFig='resultA2_end_7_mask';
+                showData(idxMon,SeeMe,AFM_height_IO,titleData,folderSaveFig,nameFig,'binary',true);
+         
             end
         end
     end
