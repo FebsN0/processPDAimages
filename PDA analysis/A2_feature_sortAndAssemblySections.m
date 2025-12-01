@@ -56,10 +56,10 @@ function varargout = A2_feature_sortAndAssemblySections(allData,otherParameters,
     wantedFields = {'Channel_name','Trace_type'};
     tmp=allDataOrdered(1).AFMImage_Raw;
     dataAssembled = rmfield(tmp, setdiff(fieldnames(tmp), wantedFields));
-    [dataAssembled.AFM_image_RAW]=deal(zeros(0,1));   
-    [dataAssembled.AFM_image_original]=deal(zeros(0,1));
+    [dataAssembled.AFM_images_0_raw]=deal(zeros(0,1));   
+    [dataAssembled.AFM_images_1_original]=deal(zeros(0,1));
     if flag_processSingleSection
-        [dataAssembled.AFM_image_PostProcessed]=deal(zeros(0,1));        
+        [dataAssembled.AFM_images_2_PostProcessed]=deal(zeros(0,1));        
     end
         
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -74,7 +74,7 @@ function varargout = A2_feature_sortAndAssemblySections(allData,otherParameters,
     concatenatedMask=zeros(xpix, ypix_total);
     colStart = 1;
     for j=numFiles:-1:1
-        tmp1=flip(allDataOrdered(j).AFMmask_heightIO);
+        tmp1=allDataOrdered(j).AFMmask_heightIO;
         yLen=size(tmp1,2);        
         colEnd = colStart + yLen-1;
         concatenatedMask(:,colStart:colEnd)=tmp1;
@@ -94,11 +94,11 @@ function varargout = A2_feature_sortAndAssemblySections(allData,otherParameters,
         for j=numFiles:-1:1
             % extract the struct AFM data
             tmp=allDataOrdered(j).AFMImage_Raw(i);
-            tmp_raw=rot90(tmp.Raw_afm_image,-1);
-            tmp_start=rot90(tmp.AFM_image,-1);
+            tmp_raw=flip(rot90(tmp.Raw_afm_image,-1),2);
+            tmp_start=flip(rot90(tmp.AFM_image,-1),2);
             if flag_processSingleSection
                 tmp=allDataOrdered(j).AFMImage_PostProcess(i);
-                tmp_end=flip(tmp.AFM_image);
+                tmp_end=flip(tmp.AFM_image,2);
             end
             yLen=size(tmp_end,2); colEnd = colStart + yLen-1;
             % concatenate
@@ -110,10 +110,10 @@ function varargout = A2_feature_sortAndAssemblySections(allData,otherParameters,
             colStart = colEnd+1;
         end
         % now the data has been concatenated. Store in the final var
-        dataAssembled(i).AFM_image_RAW=concatenatedData_Raw_afm_image;
-        dataAssembled(i).AFM_image_original=concatenatedData_AFM_image_START;
+        dataAssembled(i).AFM_images_0_raw=concatenatedData_Raw_afm_image;
+        dataAssembled(i).AFM_images_1_original=concatenatedData_AFM_image_START;
         if flag_processSingleSection
-            dataAssembled(i).AFM_image_PostProcessed=concatenatedData_AFM_image_END;
+            dataAssembled(i).AFM_images_2_PostProcessed=concatenatedData_AFM_image_END;
         end
     end     
     varargout{1}=dataAssembled;
