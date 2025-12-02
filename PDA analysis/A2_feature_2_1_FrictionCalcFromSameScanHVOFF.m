@@ -153,15 +153,15 @@ function [avg_fc,FitOrderHVOFF_Height] = A2_feature_2_1_FrictionCalcFromSameScan
         error("Process interrupted by user. Change data.")
     else
         saveFigures_FigAndTiff(figDistr,filePathResultsFriction,nameFig)
-        close all
     end
     clear edges vertical_ReTrace_masked vertical_Trace_masked forc_masked alpha W Delta mask Lateral_Trace_masked Lateral_ReTrace_masked ax figDistr allData pLow pHigh nameFig
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%%%%%% FRICTION CALCULATION %%%%%%%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
-    resFriction = A2_feature_2_2_frictionGUI(vertForce_clear,force_clear,idxSection,idxMon, filePathResultsFriction);
+    resFriction = A2_feature_2_2_FrictionGUI(vertForce_clear,force_clear,AFM_height_IO_HV_OFF,idxSection,idxMon,filePathResultsFriction);
     save(fullfile(filePathResultsFriction,"resultsDataFrictionCoefficient"),"resFriction")
     avg_fc=results.resFit(1);
+    close all
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%

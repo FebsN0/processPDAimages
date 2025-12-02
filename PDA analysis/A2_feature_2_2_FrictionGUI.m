@@ -6,16 +6,17 @@
 %
 % OUTPUT:   - results
 
-function results = A2_feature_2_2_FrictionGUI(vertForce,force,idxSection,idxMon,filePathResultsFriction)
+function results = A2_feature_2_2_FrictionGUI(vertForce,force,mask,idxSection,idxMon,filePathResultsFriction)
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)    
     % Default values
-    pixData = [20; 1; 20];
-    fOutlierRemoval = 1;
-    fOutlierRemoval_text = 'SingleSegmentsProcess';
+    pixData = [20; 1];
+    segmentProcess = 1;
+    outlierRemovalMethod=2;
+    outlierRemovalMethod_text='MAD';
+    segmentType_text = 'SingleSegmentsProcess';
     method = 1; % default method
-    
-    
+        
     % ==== GUI WINDOW ====
     hFig = figure('Name','Friction Extraction','NumberTitle','off', ...
                   'MenuBar','none','ToolBar','none');
@@ -31,146 +32,160 @@ function results = A2_feature_2_2_FrictionGUI(vertForce,force,idxSection,idxMon,
     %clear screens left bottom width height monitorXfig
     
     % ==== METHOD SELECTION ====
-    annotation(hFig,'textbox','Units','normalized','Position', [0.075 0.95 0.2 0.22], 'String', 'Select Method:','FontSize', 15, ...
-                'HorizontalAlignment', 'center','VerticalAlignment', 'baseline','EdgeColor', 'green','FitBoxToText', 'on','BackgroundColor','red');
+    hPanel_Method=uipanel(hFig,'Title','Method settings','FontSize',15,...
+        'Units','normalized','Position',[0.02 0.90 0.27 0.08],'FontSize', 15);
 
-    hMethod = uicontrol(hFig,'Style','popupmenu', ...
-        'Units','normalized','Position',[0.02 0.89 0.27 0.05], ...
-        'FontSize', 15,'BackgroundColor','blue',...
-        'String',{'1) Average fast scan lines + Mask PDA', ...
-                  '2) Method 1 + Edges & Outlier Removal'}, ...        
+    hMethod = uicontrol(hPanel_Method,'Style','popupmenu', ...
+        'Units','normalized','Position',[0.02 0.25 0.96 0.5], ...
+        'FontSize', 13,'BackgroundColor','blue',...
+        'String',{'Method 1: Average fast scan lines + Mask PDA', ...
+                  'Method 2: Method 1 + Edges & Outlier Removal'}, ...        
         'Callback',@methodChanged);
 
     % ==== OUTLIER REMOVAL PANEL (visible only for Method 2) ====
-    hPanel = uipanel(hFig,'Title','Edge & Outlier Removal Settings','FontSize',15,...
-        'Units','normalized','Position',[0.02 0.65 0.27 0.25],'Visible','off');
+    hPanel_pixOutlierSettings = uipanel(hFig,'Title','Edge & Outlier Removal Settings','FontSize',15,...
+        'Units','normalized','Position',[0.02 0.62 0.27 0.26],'Visible','off');
 
-    % Outlier Removal Type
-    annotation(hPanel,'textbox','Units','normalized','Position',[0.025 0.83 0.95 0.1],'HorizontalAlignment','center','VerticalAlignment','middle',...
-    'String','Remove outliers within:','FontSize',15,...
-     'BackgroundColor','red');
-
-    uicontrol(hPanel,'Style','popupmenu', ...
-        'String',{'1) Single segments', ...
-                  '2) Connected segment (entire fast line)', ...
-                  '3) Whole section'}, ...
-        'FontSize',15,'Units','normalized','Position',[0.025 0.68 0.95 0.15], ...
-        'Callback',@outlierChanged);
-    
-    annotation(hPanel,'textbox','Units','normalized','Position',[0.025 0.55 0.95 0.1],'HorizontalAlignment','center','VerticalAlignment','middle',...
-    'String','Pixel parameters (for both segment''s borders):','FontSize',15,...
-     'BackgroundColor','red');
-
-    % pixData inputs
-    labels = {'Max # of pixels to remove for border:', 'Step size:', 'Min elements for fitting:'};
-    ypos = [0.4, 0.25, 0.10];
-    yposBox = [0.42, 0.265, 0.105];
-    for i = 1:3
-        annotation(hPanel,'textbox','String',labels{i}, ...
-            'FontSize',15,'Units','normalized','Position',[0.025 ypos(i) 0.95 0.12],'HorizontalAlignment','left','VerticalAlignment','middle',...
-            'BackgroundColor','red');
-        hPix(i) = uicontrol(hPanel,'Style','edit','String',num2str(pixData(i)), ...
-            'FontSize',15,'Units','normalized','Position',[0.75 yposBox(i) 0.15 0.12], 'Callback',@pixChanged);
+    % type segment within Outlier will be removed
+    ha=annotation(hPanel_pixOutlierSettings,'textbox','String','Remove outliers within:','FontSize',13,...
+        'Units','normalized','Position',[0.02 0.82 0.96 0.12],'HorizontalAlignment','left','VerticalAlignment','middle','EdgeColor','none'); %#ok<*NASGU>
+    hb=uicontrol(hPanel_pixOutlierSettings,'Style','popupmenu', ...
+        'String',{'Single segments', ...
+                  'Connected segments of the same fast line', ...
+                  'Entire section-setpoint'}, ...
+        'BackgroundColor','blue',...
+        'FontSize',13,'Units','normalized','Position',[0.05 0.72 0.9 0.11], ...
+        'Callback',@segmentType);
+    % Outlier Removal Method
+    hc=annotation(hPanel_pixOutlierSettings,'textbox','String','Method Outlier Removal:','FontSize',13,...
+        'Units','normalized','Position',[0.02 0.53 0.96 0.12],'HorizontalAlignment','left','VerticalAlignment','middle','EdgeColor','none');
+    hd=uicontrol(hPanel_pixOutlierSettings,'Style','popupmenu', ...
+        'String',{'Percentile (outliers > 99°)', ...
+                  'Median Absolute Deviation (outliers > 3*MAD)'},...               % Compares each data point to the median of the dataset using Median Absolute Deviation (MAD)
+        'BackgroundColor','blue',...
+        'FontSize',13,'Units','normalized','Position',[0.05 0.43 0.9 0.11], ...
+        'Callback',@outlierMethod);
+    % PIX settings
+    he=annotation(hPanel_pixOutlierSettings,'textbox','String','Pixel parameters (for both segment''s borders):','FontSize',13,...
+        'Units','normalized','Position',[0.02 0.24 0.96 0.13],'HorizontalAlignment','left','VerticalAlignment','middle','EdgeColor','none');
+    labels = {'Max # of pixels to remove for border:', 'Step size:'};
+    ypos = [0.12, 0.01];
+    for i = 1:2    
+        uicontrol(hPanel_pixOutlierSettings,'Style','text','String',labels{i}, ...
+            'FontSize',13,'Units','normalized','Position',[0.1 ypos(i) 0.9 0.12],'HorizontalAlignment','left');
+        hPix(i) = uicontrol(hPanel_pixOutlierSettings,'Style','edit','String',num2str(pixData(i)),'BackgroundColor','blue', ...
+            'FontSize',13,'Units','normalized','Position',[0.75 ypos(i) 0.15 0.12], 'Callback',@pixChanged);
     end
 
     % ==== AXES FOR RESULT PLOT ====
     hAx_plot = axes('Parent',hFig,'Units','normalized', ...
                'Position',[0.4 0.10 0.55 0.8]);
-    title(hAx_plot,'Result will appear here');
+    title(hAx_plot,'Resulting Lateral Forces will appear here');
 
     % ==== AXES FOR PIXEL TREND ====
-    hAx_pixTrend = axes('Parent',hFig,'Units','normalized',...
-        'Position',[0.025 0.1 0.35 0.4],'Visible','off');
-    
+    pnl_pixTrend = uipanel('Parent',hFig, ...
+    'Units','normalized','Position',[0.03 0.02 0.31 0.43],'Visible','off');
+    hAx_pixTrend   = axes('Parent', pnl_pixTrend);
+        
     % ==== AXES FOR ERROR, FIT AND/OR EXPERIMENTAL PLOT (overlapped with pixelTrend) ====
-    hAx_fitResults = axes('Parent',hFig,'Units','normalized',...
-        'Position',[0.025 0.1 0.35 0.4],'Visible','off');
+    pnl_fitResults = uipanel('Parent',hFig, ...
+    'Units','normalized','Position',[0.03 0.02 0.31 0.43],'Visible','off');
+    hAx_fitResults = axes('Parent', pnl_fitResults);
+
 
     % ==== PLOT, COMPUTE AND STOP BUTTON ====
-    uicontrol(hFig,'Style','pushbutton','String','Run the selected method', ...
-        'FontSize',10,'Units','normalized','Position',[0.01 0.58 0.12 0.04],'Callback',@computeMethod);
+    btnRun=uicontrol(hFig,'Style','pushbutton','String','Run the selected method', ...
+        'FontSize',12,'Units','normalized','Position',[0.055 0.57 0.2 0.04],'Callback',@computeMethod);
     % button to update plots. This is for method 2. At first is disabled until the method 2 is computed
-    btnUpPlot=uicontrol(hFig,'Style','pushbutton','String','Update the plot', ...
-        'FontSize',10,'Units','normalized','Position',[0.14 0.58 0.1 0.04],'Callback',@computePlot,'Enable','off'); 
-    uicontrol(hFig, 'Style', 'pushbutton','String', 'Terminate',...
-        'FontSize',10, 'Units', 'normalized','Position', [0.25 0.58 0.08 0.04],'Callback', @(src,evt) uiresume(hFig));
+    btnUpPlot=uicontrol(hFig,'Style','pushbutton','String','Click on FC trend and update the plots', ...
+        'FontSize',12,'Units','normalized','Position',[0.055 0.52 0.2 0.04],'Callback',@computePlot,'Enable','off'); 
+    btnStop=uicontrol(hFig, 'Style', 'pushbutton','String', 'Terminate',...
+        'FontSize',12, 'Units', 'normalized','Position', [0.055 0.47 0.2 0.04],'Callback', @(src,evt) uiresume(hFig),'Enable','off');
 
     % ---- CALLBACK DEFINITIONS ----
     function methodChanged(~,~)
         method = get(hMethod,'Value');
         if method == 2
-            set(hPanel,'Visible','on');
+            set(hPanel_pixOutlierSettings,'Visible','on');
         else
-            set(hPanel,'Visible','off');
+            set(hPanel_pixOutlierSettings,'Visible','off');
         end
     end
 
-    function outlierChanged(src,~)
-        fOutlierRemoval = get(src,'Value');
-        switch fOutlierRemoval
-            case 1, fOutlierRemoval_text='SingleSegments';
-            case 2, fOutlierRemoval_text='ConnectedSegment';
-            case 3, fOutlierRemoval_text='EntireSection';
+    function segmentType(src,~)
+        segmentProcess = get(src,'Value');
+        switch segmentProcess
+            case 1, segmentType_text='SingleSegments';
+            case 2, segmentType_text='ConnectedSegment';
+            case 3, segmentType_text='EntireSection';
+        end
+    end
+
+    function outlierMethod(src,~)
+        outlierRemovalMethod = get(src,'Value');
+        switch outlierRemovalMethod
+            case 1, outlierRemovalMethod_text='percentile';
+            case 2, outlierRemovalMethod_text='MAD';
         end
     end
 
     function pixChanged(~,~)
-        for j = 1:3
+        for j = 1:2
             pixData(j) = str2double(get(hPix(j),'String'));
         end
     end
 
     % ==== COMPUTE & PLOT ====
     function computePlot(src,~)
+        pnl_pixTrend.Visible="on";
+        pnl_fitResults.Visible="off";
+        % select on the plot FC trend to update the fitting/median plot and resulting force data
+        % extract first the data
+        data = guidata(hFig);
+        if isfield(data, 'results_allPix')
+            results_allPix=data.results_allPix;
+            fc_allPix=data.fc_allPix;
+            pixArray=data.pixArray;
+        end
+        idx_x=selectRangeGInput(1,1,hAx_pixTrend);
+        % remove the previous selected pix
+        currScatter=findobj(hAx_pixTrend,"Type","Scatter");
+        if ~isempty(currScatter)
+            delete(currScatter)
+        end
+        scatter(hAx_pixTrend,pixArray(idx_x),fc_allPix(idx_x),300,'pentagram','filled', 'MarkerFaceColor', 'red','DisplayName','Selected pix size');    
+        pnl_pixTrend.Visible="off";
+        pnl_fitResults.Visible="on";
+        cla(hAx_plot); cla(hAx_fitResults);
+        % once clicked, show the fit plot and resulting force at that selected pix.
+        % NOTE: the selected pix also return the definitive result. Just click terminate button and it is obtained
+        results=results_allPix(idx_x);
+        plotFitResults(results,idxSection,hAx_fitResults);       
+        % plot the resulting lateral force
+        textAnomaly="";
+        if results.flagAnomalyData, textAnomaly=" (ANOMALY IN CALC FRICTION CALC)"; end
+        titleData1={sprintf(" Lateral Force - Method %s%s",results.method,textAnomaly);...
+            sprintf("Processed on %s - Outlier Removal Method: %s",results.typeSegment,results.typeOutlierMethod)};
+        force_best=results.force_data;
+        % since it takes a while, block everything
         hFig = ancestor(src,'figure');     % get figure
         allUI = findall(hFig,'Type','uicontrol');  % all controls   
         % Save original states
         origEnable = get(allUI,'Enable');
         % Disable all controls
-        set(allUI,'Enable','off');
-        % Change appearance of the pressed button
-        set(src,'BackgroundColor','green'); % green
-        drawnow;  % force refresh
-        
-        try
-            % ---------------------------------------------------------
-            % --- your long computation here ---
-            % ---------------------------------------------------------
-            runYourMethod();   % or your code
-            pause(0.2);        % (just example to show effect)
-
-        catch ME
-            % If error happens, restore UI before throwing error
-            set(allUI,{'Enable'},origEnable);
-            set(src,'BackgroundColor',[0.94 0.94 0.94]); % default gray
-            rethrow(ME);
-        end
-
-
-
-
-
-        % Clear current axes
-        cla(hAx_plot);
-        guidata(hFig, results);
-        if ~isempty(pixelTrend)
-            plot(hAx_fitResults, pixelTrend, 'LineWidth', 2);
-            title(hAx_fitResults, 'Pixel Trend');
-            xlabel(hAx_fitResults,'Iteration');
-            ylabel(hAx_fitResults,'Pixels removed');
-        else
-            title(hAx_fitResults, 'Pixel trend unavailable for Method 1');
-        end  
-        
-        % COMPUTATION IS TERMINATED
+        set(allUI,'Enable','off');        
+        % generate the fig and extract the only existing axes
+        fig_tmp=showData(idxMon,false,force_best,titleData1,"","",'saveFig',false,'labelBar','Force [nN]');
+        pause(0.1)
+        transferTempPlot(fig_tmp, hAx_plot);
+        delete(fig_tmp)   
         % Restore controls
-        set(allUI,{'Enable'},origEnable);
-        % Restore button color
-        set(src,'BackgroundColor',[0.1294 0.1294 0.1294]);
+        set(allUI,{'Enable'},origEnable);       
     end
 
     function computeMethod(src,~)
     % This button performs the FULL method computation. Heavy computation happens here.
+        clear results
         hFig = ancestor(src,'figure');     % get figure
         allUI = findall(hFig,'Type','uicontrol');  % all controls   
         % Save original states
@@ -182,64 +197,87 @@ function results = A2_feature_2_2_FrictionGUI(vertForce,force,idxSection,idxMon,
         drawnow;  % force refresh
         % SHOW THE RESULTS OF THE METHOD.
         % remove all previous plots
-        cla(hAx_plot);
-        cla(hAx_fitResults); 
+        cla(hAx_plot), cla(hAx_fitResults), cla(hAx_pixTrend)
         try
-            % ---------------------------------------------------------
-            % --- your long computation here ---
-            % ---------------------------------------------------------
             % Run your calculation
             if method == 1
-                set(btnUpPlot, 'Enable', 'off');
-                hAx_pixTrend.Visible="off";
-                hAx_fitResults.Visible="on";
+                pnl_pixTrend.Visible="off";
+                pnl_fitResults.Visible="on";
                 results = computeFriction_method1(vertForce,force, idxSection);               
                 plotFitResults(results,idxSection,hAx_fitResults);       
+                textAnomaly="";
+                if results.flagAnomalyData, textAnomaly=" (ANOMALY IN CALC FRICTION CALC)"; end
+                titleData1=sprintf(" Lateral Force - Method %s%s",results.method,textAnomaly);
+                force_best=results.force_data;
+                % generate the fig and extract the only existing axes
+                fig_tmp=showData(idxMon,false,force_best,titleData1,"","",'saveFig',false,'labelBar','Force [nN]');
+                pause(0.1)
+                transferTempPlot(fig_tmp, hAx_plot);
+                delete(fig_tmp)              
             else
-                hAx_fitResults.Visible="off";
-                hAx_pixTrend.Visible="on";
-                results_tmp = computeFriction_method2(vertForce,force,idxSection,pixData,fOutlierRemoval,fOutlierRemoval_text);
-                
-                % --- Store all results for future updates ---
-                % definitiveRes.avg_fc      = results.resFit(1);
-                % definitiveRes.slope       = results.resFit(2);
-                % % definitiveRes.pixelTrend  = pixelTrend;      % optional
-                % definitiveRes.extra       = results;
-                
-                % enables the button to update the axes when a new pix-fc is selected
-                set(btnUpPlot, 'Enable', 'on'); 
+                pnl_fitResults.Visible="off";
+                pnl_pixTrend.Visible="on";
+                results_allPix = computeFriction_method2(vertForce,force,mask,idxSection,pixData,segmentProcess,segmentType_text,outlierRemovalMethod,outlierRemovalMethod_text);
+                % after obtained the results, prepare the friction coeffcient trend data. Better store the struct inside the main figure.
+                fc_allPix=zeros(1,length(results_allPix));
+                for pix=1:length(results_allPix)
+                    res_allPix=[results_allPix(pix).resFit];
+                    fc_allPix(pix)=res_allPix.fc;
+                end                
+                pixArray=[results_allPix.pixelReductionSize];
+                % plot all the frictions coefficient in function of pixel size and show also the point in
+                % which some sections has less elements than the minimum      
+                hold(hAx_pixTrend,'on')
+                plot(hAx_pixTrend,pixArray, fc_allPix, 'x-','LineWidth',2,'MarkerSize',10,'Color','blue','DisplayName','FC post Edges/Outliers removal');
+                grid(hAx_pixTrend,"on")
+                xlabel(hAx_pixTrend,'Pixel size','fontsize',12); ylabel(hAx_pixTrend,'Friction coefficient','fontsize',12);
+                titleText='FrictionCoefficient Trend VS pixel reduction';
+                title(hAx_pixTrend,titleText,'FontSize',14);                      
+                ylim(hAx_pixTrend,"padded"), xlim(hAx_pixTrend,"padded")
+                leg=legend(hAx_pixTrend,'show');
+                leg.FontSize=9; leg.Location="southeast"; 
+                % plot one or more line indicating at which FrictionCoeff the flagAnomaly occured
+                % ==> when section-LF has few elements (< accepted number min number of values, very common for large pix size)
+                % ==> when fc value is no-sense
+                flagAnomalies=[results_allPix.flagAnomalyData];
+                pixWithAnomalies=pixArray(flagAnomalies);                
+                if ~isempty(pixWithAnomalies)
+                    for m=1:length(pixWithAnomalies)
+                        numElemXsection=results_allPix([results_allPix.pixelReductionSize]==pixWithAnomalies(m)).numMedianElementsInEachSection;
+                        arrayText=sprintf('%d ',flip(numElemXsection));
+                        % flip because originally high setpoint from left                
+                        displayName=sprintf('Anomaly - #ElemXsection: [%s]',arrayText);
+                        xline(hAx_pixTrend,pixWithAnomalies(m),LineWidth=2,Color='red',DisplayName=displayName)
+                    end
+                end
+                % keep "global" the variable results of all pixels
+                data = guidata(hFig);
+                data.results_allPix=results_allPix;
+                data.fc_allPix=fc_allPix;
+                data.pixArray=pixArray;
+                guidata(hFig, data);
             end
-            
-        catch ME
-            % If error happens, restore UI before throwing error
+        % If error happens, restore UI before throwing error    
+        catch ME            
             set(allUI,{'Enable'},origEnable);
             set(src,'BackgroundColor',[0.1294 0.1294 0.1294]); % default gray
             rethrow(ME);
         end
-
-        textAnomaly="";
-        if results.flagAnomalyData, textAnomaly=" (ANOMALY IN CALC FRICTION CALC)"; end
-       
-        if strcmp(results.method,"1")
-            titleData1=sprintf(" Lateral Force - Method %s%s",results.method,textAnomaly);
-        else
-            titleData1={sprintf("Lateral Force - Method %s%s",results.method,textAnomaly);sprintf("Outliers removed within %s - Pixel reduction: %d",fOutlierRemoval_text,pixSelected)};
-        end
-        force_best=results.force_best;
-        % generate the fig and extract the only existing axes
-        fig_tmp=showData(idxMon,false,force_best,titleData1,"","",'saveFig',false,'labelBar','Force [nN]');
-        pause(0.1)
-        transferTempPlot(fig_tmp, hAx_plot);
-        delete(fig_tmp)
 
         % COMPUTATION IS TERMINATED
         % Restore controls
         set(allUI,{'Enable'},origEnable);
         % Restore button color
         set(src,'BackgroundColor',[0.1294 0.1294 0.1294]);
+        if method == 1
+            btnStop.Enable="on";
+            btnUpPlot.Enable="off";
+        else
+            btnUpPlot.Enable="on";
+        end
     end
 
-% END PART OF THE CODE. TERMINATE WHEN CLICKED ON TERMINATE. Block interface and save figures
+    % END PART OF THE CODE. TERMINATE WHEN CLICKED ON TERMINATE. Block interface and save figures
     uiwait(hFig);
     allUI = findall(hFig,'Type','uicontrol');  % all controls   
     % Save original states
@@ -354,7 +392,7 @@ function [pfit,xData,yData]=fittingForceSetpoint(x,y)
     end    
 end   
 
-function plotFitResults(resultsMethod,idxSection,ax,varargin)
+function plotFitResults(resultsMethod,idxSection,ax)
 % if multiple sections, then plot the fitting among section showing both data and fitting curve. Note: friction coeff as slope between the different sections
 % NOTE: not inside method1 function because it needs the axis where to show the fitting curve                    
     % clear old plot
@@ -365,23 +403,21 @@ function plotFitResults(resultsMethod,idxSection,ax,varargin)
     LF_sections_std=zeros(1,numSections);
     VF_sections_avg=zeros(1,numSections);
     VF_sections_std=zeros(1,numSections);
-    VF=resultsMethod.vertForce_avg_best;
-    LF=resultsMethod.force_avg_best;    
+    VF=resultsMethod.vertForce_median_vector;
+    LF=resultsMethod.force_median_vector;    
     hold(ax,"on")
-    if ~isempty(varargin)
-        titleAX=sprintf("Results method %s",resultsMethod.method);
-    elseif numSections==1
-        titleAX=sprintf("Results method 1 - fc = %.3f",resultsMethod.resFit(1));    % method 1 single section
+    if numSections==1
+        titleAX=sprintf("Results method %s - fc = %.3f",resultsMethod.method,resultsMethod.resFit.fc);    % method 1 single section
     else
-        if resultsMethod.resFit(2) < 0
+        if resultsMethod.resFit.offset < 0
             signM='-';
         else
             signM='+';
         end
-        titleAX=sprintf("Results method 1 - fitCurve = %.3f*x %s %0.3f",resultsMethod.resFit(1),signM,abs(resultsMethod.resFit(2)));    % method 1 single section
+        titleAX=sprintf("Results method %s - fitCurve = %.3f*x %s %0.3f",resultsMethod.method,resultsMethod.resFit.fc,signM,abs(resultsMethod.resFit.offset));        
     end
     legend(ax), xlabel(ax,'Vertical Forces [nN]','FontSize',12), ylabel(ax,'Lateral Forces [nN]','FontSize',12)
-    title(ax,titleAX,'FontSize',15), xlim(ax,"padded"),ylim(ax,"padded")
+    title(ax,titleAX,'FontSize',15)
     for i=1:numSections
         startIdx=idxSection(1,i);
         lastIdx=idxSection(2,i);
@@ -395,6 +431,7 @@ function plotFitResults(resultsMethod,idxSection,ax,varargin)
         VF_sections_avg(i)=mean(VF_section);
         VF_sections_std(i)=std(VF_section);
     end
+    xlim(ax,"padded"),ylim(ax,"padded")
     % flip because the high setpoint is on the left
     LF_sections_avg=flip(LF_sections_avg);
     LF_sections_std=flip(LF_sections_std);
@@ -446,12 +483,122 @@ function exportAndSaveAxes(hAx_plot,idxMon,dirName,fileName)
     saveFigures_FigAndTiff(figNew,dirName,fileName)
 end
 
+function line_filtered = remove_Edges_Outlier(line,line_mask,pix,segmentProcess,outlierRemovalMethod) 
+%%%%%%%% OUTLIER REMOVAL FOR THE GIVEN FAST SCAN LINE %%%%%%%%
+% Delete edges data by searching non-zero data area (segmentLineDataFilt) and put NaN in both edges of the segment
+% INPUT:    - line: single fast scan line or entire vector for the specific section
+%           - line_mask: since the line has been previously cleared, there may be areas that can be confused as edges.
+%                        Therefore, instead of using line, use the mask to identify the 0/1 changes as true BK/FR changes, therefore, true edges
+%           - pix: number of pixels to be removed at both edges of a segment.
+%           - segmentProcess: mode of outlier removal:
+%               0: No outlier removal.
+%               1: Apply outlier removal to each segment after pixel reduction.
+%               2: Apply outlier removal to one large connected segment after pixel reduction.
+% OUTPUT:   - line_filtered : line without edges and outliers.
+%                             Note: the output/filtered line has same size as the input line
+% for each element:
+%   1) if ~= 0 ==> DETECTION NEW SEGMENT 
+%           ==> update StartPos
+%           ==> find the end of the segment (first zero value)
+%           ==> build the segment and remove outliers
+%           ==> skip to end+1 element which is zero and detect a new segment
+%   2) if == 0 ==> nothing happens, skip to next iteration    
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%% METHOD 1 %%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % init
+    SegPosList_StartPos = [];
+    SegPosList_EndPos = [];
+    ConnectedSegment = [];
+    Cnt = 1;
+    line_filtered = line;
+    processSingleSegment=true; i=1;
+    while processSingleSegment
+    % DETECTION NEW SEGMENT AS BACKGROUND
+        if line_mask(i) == 0
+            StartPos = i;
+            % find the idx of the only first zero element from startpos idx. Then the result is the idx of the nonzero
+            % element just before the previously found idx of zero element
+            EndPos=StartPos+find(line_mask(StartPos:end)==1,1)-2;
+            % the previous operation will return NaN when the last element is non-zero, thus manage it
+            if isempty(EndPos)
+                EndPos=length(line);
+                processSingleSegment=false;                
+            end
+            % Extract the segment from the data (note: it is BACKGROUND data)
+            Segment = line(StartPos:EndPos);
+            % if the length of segment is less than 4, it is very likely to be a random artefact. 
+            % Also, not really realiable when filloutliers is used because few sample
+            % remove such values and put 0
+            if length(Segment)<4
+                line_filtered(StartPos:EndPos) = nan;
+            else
+                % save the indexes of start and end segment
+                SegPosList_StartPos(Cnt) = StartPos;                    %#ok<AGROW>
+                SegPosList_EndPos(Cnt) = EndPos;                        %#ok<AGROW>
+                Cnt = Cnt + 1;
+                % if first iteration, do nothing and use as reference
+                if pix > 0
+                    % if the half-segment is longer than pix window, then reset first and last part with size = pix
+                    % in order to remove edges in both sides (the tip encounters the edges of a single PDA crystal 
+                    % twice: trace and in retrace)
+                    if ceil(length(Segment)/2) >=pix
+                        Segment(1:pix) = nan;                
+                        Segment(end-pix+1:end) = nan;
+                    else
+                    % if the segment is shorter, then reset entire segment
+                        Segment(:) = nan;
+                    end
+                end                
+                % PROCESS THE SEGMENT IN ONE OF TWO POSSIBLE WAYS
+                % way 1: Detect and replace outliers in data with 0. Median findmethod is default
+                % Outliers are defined as elements more than three scaled MAD from the median.
+                % NOTE: since single segments already contains few elements, no good to use percentile threshold method
+                if segmentProcess == 1
+                    if outlierRemovalMethod == 1
+                        Segment = filloutliers(Segment,nan,'percentiles',[0 99]);
+                    else
+                        Segment = filloutliers(Segment,nan);
+                    end
+                    line_filtered(StartPos:EndPos) = Segment;
+                else
+                % method 2 or 3: attach the current segment to the previous found one to build a single large connected segment
+                    ConnectedSegment = [ConnectedSegment Segment];          %#ok<AGROW>
+                end   
+            end
+            % skip to find the next segment
+            i=EndPos+1;
+        else
+            % if the last element is zero, break the while loop 
+            if i==length(line_mask), break, end    
+            % if the element is zero, do nothing and move to the next element
+            i=i+1;
+        end
+    end
+    % Process one large connected segment. Note that if mode = 2 or 3, connected segment lacks of resetted edges of the previous part.
+    % Here, ConnectedSegment is just the concatenation of each nonFiltered segments previously found.
+    % in this way, the function filloutliers has more data to process so the result should be more consistent. Mehtod of finding outliers is
+    % with percentile threshold. Exclude 99 Percentile
+    if segmentProcess == 2 || segmentProcess == 3
+        if outlierRemovalMethod==1
+            ConnectedSegment2 = filloutliers(ConnectedSegment, nan,'percentiles',[0 99]);
+        else
+            ConnectedSegment2 = filloutliers(ConnectedSegment, nan);
+        end
+        % substitute the pieces of connectedSegment2 with the corresponding part of original fast scan line
+        Cnt2 = 1;
+        for i=1:length(SegPosList_StartPos)
+            % coincide with the number of elements of original segment
+            Len = SegPosList_EndPos(i) - SegPosList_StartPos(i) +1;
+            line_filtered(SegPosList_StartPos(i):SegPosList_EndPos(i)) = ConnectedSegment2(Cnt2:Cnt2+Len-1);
+            % start with the next segment
+            Cnt2 = Cnt2 + Len;  
+        end
+    end
+end
+
+%%%------- METHOD 1 -------%%%
 function resultsMethod1 = computeFriction_method1(vertForce,force,idxSection)
 % masking lateral and vertical data using AFM_height_IO to ignore PDA regions
+    flagAnomalyFriction=false;
     if size(idxSection,2)==1
         flagSingleSection=true;
     else
@@ -462,48 +609,45 @@ function resultsMethod1 = computeFriction_method1(vertForce,force,idxSection)
     % Check for NaN elements along the vector 
     [flag,numElemSections]=checkNaNelements(force_med,idxSection);
     if flag
+        flagAnomalyFriction=true;
         warndlg(sprintf('Aware! In some section there are few elements left\nfor fitting (%s). Adjust the mask or remove less data.',strjoin(string(numElemSections),',')));
     end
-    % Remove NaN elements
-    force_med_best      = force_med(~isnan(force_med));
-    vertForce_med_best  = vertForce_med(~isnan(vertForce_med));
-    % output, data for plotting
-    vertForce_best = vertForce; 
-    force_best     = force;
 
     % Fit or compute mean friction
     if ~flagSingleSection
-        resFit = fittingForceSetpoint(vertForce_med_best, force_med_best);
-        avg_fc = resFit(1);
+        res = fittingForceSetpoint(vertForce_med, force_med);
+        resFit.fc=res(1);
+        resFit.offset = res(2);
     else
-        % if single section, fitting is useless, therefore friction as average
-        avg_fc = mean(force_med_best) / mean(vertForce_med_best);
-        resFit(1) = avg_fc;
-        resFit(2) = nan;
+        % if single section, fitting is useless, therefore friction as average. Not remove nan from vectors to preserve idxSection
+        avg_fc = mean(force_med,'omitnan') / mean(vertForce_med,'omitnan');
+        resFit.fc = avg_fc;
+        resFit.offset = nan;
     end
 
-    % Detect anomaly in friction coefficient value 
+    %%%%%%%% SECOND CONSTRAINT TO STOP THE PROCESS %%%%%%%%%
+    % here apparently everything is ok and there is enough data to continue, but it could happen that the fitting yield anomalous slope.
+    % 1) slope higher than 0.95 has no sense
     if avg_fc > 0.95 || avg_fc < 0
         flagAnomalyFriction = true;
-    else
-        flagAnomalyFriction=false;
     end
     % === Outputs to support GUI plotting ===
     resultsMethod1 = struct( ...
                         'method',"1", ...
-                        'pixParameters',[],...
+                        'pixelReductionSize',0,...
+                        'typeSegment',[],...
+                        'typeOutlierMethod',[],...
                         'flagAnomalyData',flagAnomalyFriction,...
+                        'numMedianElementsInEachSection',numElemSections,...
                         'resFit', resFit, ...
-                        'force_avg_best', force_med_best, ...
-                        'vertForce_avg_best', vertForce_med_best, ...
-                        'force_best', force_best, ...
-                        'vertForce_best', vertForce_best );
+                        'force_median_vector', force_med, ...
+                        'vertForce_median_vector', vertForce_med, ...
+                        'force_data', force, ...
+                        'vertForce_data', vertForce);
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%% METHOD 2 %%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function resultsMethod2 = computeFriction_method2(vertForce,force,idxSection,pixData,fOutlierRemoval,fOutlierRemoval_text)
+%%%------- METHOD 2 -------%%%
+function results_final = computeFriction_method2(vertForce,force,mask,idxSection,pixData,segmentProcess,segmentType_text,outlierRemovalMethod,outlierRemovalMethod_text)
 % The second method removes outliers considered as spike signals in correspondence with the PDA crystal's edges using in-built matlab function.
 % Moreover, PIXEL REDUCTION is applied to make more robust the statistical calculation prior the outliers removal
 % once found a segment (single background region between two PDA regions), depending on the window/pixel
@@ -515,14 +659,104 @@ function resultsMethod2 = computeFriction_method2(vertForce,force,idxSection,pix
 %                                   setpoint region) ==> multiple segments of multiple fast scan lines all attached togheter
 
     % show a dialog box indicating the index of fast scan line along slow direction and which pixel size is processing
-    wb=waitbar(0/size(force_clear,2),sprintf('Processing the Outliers Removal Mode %d (pixel size %d / %d) \n\t Line %.0f Completeted  %2.1f %%',fOutlierRemoval,0,pixData(1),0,0),...
-             'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
+    wb=waitbar(0/size(force,2),sprintf('Processing the Outliers Removal Mode %d (pixel size %d / %d) \n\t Line %.0f Completeted  %2.1f %%',segmentProcess,0,pixData(1),0,0),...
+            'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
     setappdata(wb,'canceling',0);               
     
+    numSections=size(idxSection,2);
+    % start the counter to store the results of each pixel in the struct
+    Cnt=1;
+    % array containing the number of pixels for both borders of a segment that will be removed
+    arrayPixSizes=0:pixData(2):pixData(1);    
+    % init where store all the results, in order to extract the desired one later
+    resultsMethod2_allPIX=struct( ...
+                        'method',[], ...
+                        'pixelReductionSize',[],...
+                        'typeSegment',[],...
+                        'typeOutlierMethod',[],...
+                        'flagAnomalyData',[],...
+                        'numMedianElementsInEachSection',[],...
+                        'resFit', [], ...
+                        'force_median_vector', [], ...
+                        'vertForce_median_vector', [], ...
+                        'force_data', [], ...
+                        'vertForce_data', [] );
 
-
-
+    % start the pixel reduction
+    for pix = arrayPixSizes        
+        % update dialog box and check if cancel is clicked
+        if(exist('wb','var'))
+            %if cancel is clicked, stop and delete dialog
+            if getappdata(wb,'canceling')
+                error('Manually stopped the process')
+            end
+        end
+        waitbar(pix/max(arrayPixSizes),wb,sprintf('Processing the Outliers Removal within %s\nCurrent pixel reduction size %d / %d',segmentType_text,pix,max(arrayPixSizes)));
+        
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%%%% EDGES AND OUTLIERS REMOVAL %%%%%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        % init matrix where to store the data after pixel and outliers removal
+        force_final_pix = zeros(size(force));
+        % copy and then put zeros according to the lateral force
+        vertForce_final_pix = zeros(size(vertForce));
+        % start the clearing
+        % if method removal is on entire section-sameSetpoint, then extract the section and transform it into single vector
+        if segmentProcess == 3
+            for sec=1:numSections
+                startIdx=idxSection(1,sec);
+                endIdx=idxSection(2,sec);
+                % extratct the data from the section
+                force_section=force(:,startIdx:endIdx);
+                vertForce_section=vertForce(:,startIdx:endIdx);
+                mask_section=mask(:,startIdx:endIdx);
+                % trasform the section into vector
+                force_vector=reshape(force_section,1,[]);
+                vertForce_vector=reshape(vertForce_section,1,[]);
+                mask_vector=reshape(mask_section,1,[]);
+                % start the edge removal depending on the i-th pixel size and then remove outliers
+                force_vector_cleared = remove_Edges_Outlier(force_vector,mask_vector,pix,segmentProcess,outlierRemovalMethod); 
+                vertForce_vector_cleared=vertForce_vector;
+                vertForce_vector_cleared(isnan(force_vector_cleared))=nan;
+                % re-reshape to the original size
+                forceSectionTmp=reshape(force_vector_cleared,size(force_section));
+                force_final_pix(:,startIdx:endIdx)=forceSectionTmp;
+                vertForceSectionTmp=reshape(vertForce_vector_cleared,size(vertForce_section));
+                vertForce_final_pix(:,startIdx:endIdx)=vertForceSectionTmp;        
+            end
+        else
+        % if method removal is on single segments or connected segments, extact i-th single fast scan line, regardless the section-setpoint
+            for lineId=1:size(force,2)
+                LF_Line=force(:,lineId);
+                VF_Line=vertForce(:,lineId);
+                mask_Line=mask(:,lineId);
+                % start the edge removal depending on the i-th pixel size and then remove outliers
+                LF_Line_cleared = remove_Edges_Outlier(LF_Line,mask_Line,pix,segmentProcess,outlierRemovalMethod); 
+                VF_Line_cleared=VF_Line;
+                VF_Line_cleared(isnan(LF_Line_cleared))=nan;
+                force_final_pix(:,lineId)=LF_Line_cleared;
+                vertForce_final_pix(:,lineId)=VF_Line_cleared;                
+            end            
+        end
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%%%% CALC FRICTION COEFF (MEDIAN/FITTING) %%%%%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        % from here, the proces is identical to method 1, therefore, call method 1 function instead of copy/paste
+        resultsMethod2_pix = computeFriction_method1(vertForce_final_pix,force_final_pix,idxSection);
+        % change some parameters since they are originally empty.
+        resultsMethod2_pix.method="2";
+        resultsMethod2_pix.pixelReductionSize = pix;
+        resultsMethod2_pix.typeOutlierMethod = outlierRemovalMethod_text;
+        resultsMethod2_pix.typeSegment = segmentType_text;
+        % store the results of every pix size if no break occurred
+        resultsMethod2_allPIX(Cnt)=resultsMethod2_pix;            
+        % update counter
+        Cnt = Cnt+1;
+    end
+    results_final=resultsMethod2_allPIX;
+    % remove bar status
     if exist('wb','var')
         delete(wb)
     end 
 end
+
