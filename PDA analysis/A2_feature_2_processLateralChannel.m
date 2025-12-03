@@ -245,6 +245,13 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
     labelFig='Force [nN]';
     showData(idxMon,SeeMe,Corrected_LD_Trace*1e9,titleData,newFolder,nameFig,'labelBar',labelFig)
 
+    % remove outliers - big values only to show better the data which is difficult to notice even when normalized
+    Corrected_LD_Trace_cleared=filloutliers(Corrected_LD_Trace,nan,'percentile',[0 95]);
+    titleData={'Corrected Lateral Force'; "NOTE: Only for show - Removed 95 percentile of outliers"};
+    nameFig='resultA2_17_LateralDeflectionWithoutOutliers';
+    labelFig='Force [nN]';
+    showData(idxMon,true,Corrected_LD_Trace_cleared*1e9,titleData,newFolder,nameFig,'labelBar',labelFig)
+
     % save the corrected lateral force into cropped AFM image
     AFM_Elab=AFM_data;    
     AFM_Elab(strcmpi([AFM_data.Channel_name],'Lateral Deflection') & strcmpi([AFM_data.Trace_type],'Trace')).AFM_images_2_PostProcessed=Corrected_LD_Trace;

@@ -12,8 +12,8 @@ function results = A2_feature_2_2_FrictionGUI(vertForce,force,mask,idxSection,id
     % Default values
     pixData = [20; 1];
     segmentProcess = 1;
-    outlierRemovalMethod=2;
-    outlierRemovalMethod_text='MAD';
+    outlierRemovalMethod=1;
+    outlierRemovalMethod_text='none';
     segmentType_text = 'SingleSegmentsProcess';
     method = 1; % default method
         
@@ -60,7 +60,8 @@ function results = A2_feature_2_2_FrictionGUI(vertForce,force,mask,idxSection,id
     hc=annotation(hPanel_pixOutlierSettings,'textbox','String','Method Outlier Removal:','FontSize',13,...
         'Units','normalized','Position',[0.02 0.53 0.96 0.12],'HorizontalAlignment','left','VerticalAlignment','middle','EdgeColor','none');
     hd=uicontrol(hPanel_pixOutlierSettings,'Style','popupmenu', ...
-        'String',{'Percentile (outliers > 99°)', ...
+        'String',{'No outlier removal', ...
+                  'Percentile (outliers > 99°)', ...
                   'Median Absolute Deviation (outliers > 3*MAD)'},...               % Compares each data point to the median of the dataset using Median Absolute Deviation (MAD)
         'BackgroundColor','blue',...
         'FontSize',13,'Units','normalized','Position',[0.05 0.43 0.9 0.11], ...
@@ -80,6 +81,7 @@ function results = A2_feature_2_2_FrictionGUI(vertForce,force,mask,idxSection,id
     % ==== AXES FOR RESULT PLOT ====
     hAx_plot = axes('Parent',hFig,'Units','normalized', ...
                'Position',[0.4 0.10 0.55 0.8]);
+    
     title(hAx_plot,'Resulting Lateral Forces will appear here');
 
     % ==== AXES FOR PIXEL TREND ====
@@ -124,8 +126,9 @@ function results = A2_feature_2_2_FrictionGUI(vertForce,force,mask,idxSection,id
     function outlierMethod(src,~)
         outlierRemovalMethod = get(src,'Value');
         switch outlierRemovalMethod
-            case 1, outlierRemovalMethod_text='percentile';
-            case 2, outlierRemovalMethod_text='MAD';
+            case 1, outlierRemovalMethod_text='none';
+            case 2, outlierRemovalMethod_text='percentile';
+            case 3, outlierRemovalMethod_text='MAD';
         end
     end
 
@@ -178,9 +181,11 @@ function results = A2_feature_2_2_FrictionGUI(vertForce,force,mask,idxSection,id
         fig_tmp=showData(idxMon,false,force_best,titleData1,"","",'saveFig',false,'labelBar','Force [nN]');
         pause(0.1)
         transferTempPlot(fig_tmp, hAx_plot);
+        tb = axtoolbar(hAx_plot, {'zoomin','zoomout','pan','restoreview','datacursor'});
         delete(fig_tmp)   
         % Restore controls
-        set(allUI,{'Enable'},origEnable);       
+        set(allUI,{'Enable'},origEnable);
+        btnStop.Enable="on";
     end
 
     function computeMethod(src,~)
@@ -213,6 +218,7 @@ function results = A2_feature_2_2_FrictionGUI(vertForce,force,mask,idxSection,id
                 fig_tmp=showData(idxMon,false,force_best,titleData1,"","",'saveFig',false,'labelBar','Force [nN]');
                 pause(0.1)
                 transferTempPlot(fig_tmp, hAx_plot);
+                tb = axtoolbar(hAx_plot, {'zoomin','zoomout','pan','restoreview','datacursor'});
                 delete(fig_tmp)              
             else
                 pnl_fitResults.Visible="off";
@@ -273,12 +279,14 @@ function results = A2_feature_2_2_FrictionGUI(vertForce,force,mask,idxSection,id
             btnStop.Enable="on";
             btnUpPlot.Enable="off";
         else
+            btnStop.Enable="off";
             btnUpPlot.Enable="on";
         end
     end
 
     % END PART OF THE CODE. TERMINATE WHEN CLICKED ON TERMINATE. Block interface and save figures
     uiwait(hFig);
+    btnStop.String="Saving Figures";
     allUI = findall(hFig,'Type','uicontrol');  % all controls   
     % Save original states
     origEnable = get(allUI,'Enable');
@@ -483,12 +491,12 @@ function exportAndSaveAxes(hAx_plot,idxMon,dirName,fileName)
     saveFigures_FigAndTiff(figNew,dirName,fileName)
 end
 
-function line_filtered = remove_Edges_Outlier(line,line_mask,pix,segmentProcess,outlierRemovalMethod) 
+function data_filtered = remove_Edges_Outlier(data,data_mask,pix,segmentProcess,outlierRemovalMethod) 
 %%%%%%%% OUTLIER REMOVAL FOR THE GIVEN FAST SCAN LINE %%%%%%%%
 % Delete edges data by searching non-zero data area (segmentLineDataFilt) and put NaN in both edges of the segment
-% INPUT:    - line: single fast scan line or entire vector for the specific section
-%           - line_mask: since the line has been previously cleared, there may be areas that can be confused as edges.
-%                        Therefore, instead of using line, use the mask to identify the 0/1 changes as true BK/FR changes, therefore, true edges
+% INPUT:    - data: if segmentProcess=1/2, single fast scan line. If segmentProcess=3, section (matrix)
+%           - data_mask: since the data has been previously cleared, there may be areas that can be confused as edges.
+%                        Therefore, instead of using directly the data, use the mask to identify the 0/1 changes as true BK/FR changes, therefore, true edges
 %           - pix: number of pixels to be removed at both edges of a segment.
 %           - segmentProcess: mode of outlier removal:
 %               0: No outlier removal.
@@ -504,32 +512,59 @@ function line_filtered = remove_Edges_Outlier(line,line_mask,pix,segmentProcess,
 %           ==> skip to end+1 element which is zero and detect a new segment
 %   2) if == 0 ==> nothing happens, skip to next iteration    
 
+% check the type of the provided data
+    if ((segmentProcess==1 || segmentProcess==2) && ~isvector(data)) || (segmentProcess==3 && isvector(data))
+        error("The type of the data does not match with the type of segment")
+    end
+
+    
+    % trasform the section into vector
+    if ismatrix(data)
+        data_vector=reshape(data,[],1);
+        mask_vector=reshape(data_mask,[],1);
+        % track the border of each fast scan line so also the borders will be subjected to removal
+        idxBorders=1:size(data,1):length(data_vector);
+        idxCurrentFastLine=1;
+    else
+        data_vector=data;
+        mask_vector=data_mask;
+    end
+
     % init
     SegPosList_StartPos = [];
     SegPosList_EndPos = [];
     ConnectedSegment = [];
     Cnt = 1;
-    line_filtered = line;
+    data_filtered_vector = data_vector;
     processSingleSegment=true; i=1;
     while processSingleSegment
     % DETECTION NEW SEGMENT AS BACKGROUND
-        if line_mask(i) == 0
-            StartPos = i;
+        if mask_vector(i) == 0
+            StartPos = i;   
             % find the idx of the only first zero element from startpos idx. Then the result is the idx of the nonzero
             % element just before the previously found idx of zero element
-            EndPos=StartPos+find(line_mask(StartPos:end)==1,1)-2;
+            EndPos=StartPos+find(mask_vector(StartPos:end)==1,1)-2;
+            % in case of section, to avoid that the right border of i-th line is merged with the left border of i+1-th line and interpreted as segment,
+            % additional check. If so, treat them separately as two segment
+            if segmentProcess==3 && idxCurrentFastLine<=length(idxBorders)
+                if StartPos<idxBorders(idxCurrentFastLine) && EndPos>idxBorders(idxCurrentFastLine)
+                    EndPos=idxBorders(idxCurrentFastLine)-1;
+                elseif any(StartPos==idxBorders)
+                    idxCurrentFastLine=idxCurrentFastLine+1;
+                end
+            end
             % the previous operation will return NaN when the last element is non-zero, thus manage it
             if isempty(EndPos)
-                EndPos=length(line);
+                EndPos=length(mask_vector);
                 processSingleSegment=false;                
             end
             % Extract the segment from the data (note: it is BACKGROUND data)
-            Segment = line(StartPos:EndPos);
+            Segment = data_vector(StartPos:EndPos);
             % if the length of segment is less than 4, it is very likely to be a random artefact. 
             % Also, not really realiable when filloutliers is used because few sample
             % remove such values and put 0
             if length(Segment)<4
-                line_filtered(StartPos:EndPos) = nan;
+                data_filtered_vector(StartPos:EndPos) = nan;
             else
                 % save the indexes of start and end segment
                 SegPosList_StartPos(Cnt) = StartPos;                    %#ok<AGROW>
@@ -548,28 +583,34 @@ function line_filtered = remove_Edges_Outlier(line,line_mask,pix,segmentProcess,
                         Segment(:) = nan;
                     end
                 end                
-                % PROCESS THE SEGMENT IN ONE OF TWO POSSIBLE WAYS
-                % way 1: Detect and replace outliers in data with 0. Median findmethod is default
-                % Outliers are defined as elements more than three scaled MAD from the median.
-                % NOTE: since single segments already contains few elements, no good to use percentile threshold method
+                % PROCESS THE SEGMENT IN ONE OF THREE POSSIBLE WAYS (Detect and replace outliers in data with NaN) 
+                % way 1: do nothing. Dont remove outliers. They may be already removed by pixel reduction.
+                % way 2: Median findmethod is default: Outliers are defined as elements more than three scaled MAD from the median (robust
+                % when there are lot of data, but sometime aggressive and not suitable when BK contains "more" type of BK
+                % way 3; remove 99 percentile (NOTE: since single segments already contains few elements, no good to use percentile threshold method)
                 if segmentProcess == 1
-                    if outlierRemovalMethod == 1
+                    if outlierRemovalMethod == 2
                         Segment = filloutliers(Segment,nan,'percentiles',[0 99]);
-                    else
+                    elseif outlierRemovalMethod == 3
                         Segment = filloutliers(Segment,nan);
                     end
-                    line_filtered(StartPos:EndPos) = Segment;
+                    data_filtered_vector(StartPos:EndPos) = Segment;
                 else
                 % method 2 or 3: attach the current segment to the previous found one to build a single large connected segment
-                    ConnectedSegment = [ConnectedSegment Segment];          %#ok<AGROW>
+                    ConnectedSegment = [ConnectedSegment; Segment];          %#ok<AGROW>
                 end   
             end
             % skip to find the next segment
             i=EndPos+1;
         else
-            % if the last element is zero, break the while loop 
-            if i==length(line_mask), break, end    
-            % if the element is zero, do nothing and move to the next element
+            % if the last element=1, break the while loop 
+            if i>=length(mask_vector)
+                break
+            end    
+            % if the element=1 (FR), do nothing and move to the next element           
+            if segmentProcess==3 && (any(i==(idxBorders)))
+                idxCurrentFastLine=idxCurrentFastLine+1;
+            end
             i=i+1;
         end
     end
@@ -578,20 +619,26 @@ function line_filtered = remove_Edges_Outlier(line,line_mask,pix,segmentProcess,
     % in this way, the function filloutliers has more data to process so the result should be more consistent. Mehtod of finding outliers is
     % with percentile threshold. Exclude 99 Percentile
     if segmentProcess == 2 || segmentProcess == 3
-        if outlierRemovalMethod==1
-            ConnectedSegment2 = filloutliers(ConnectedSegment, nan,'percentiles',[0 99]);
-        else
-            ConnectedSegment2 = filloutliers(ConnectedSegment, nan);
+        if outlierRemovalMethod==2
+            ConnectedSegment = filloutliers(ConnectedSegment, nan,'percentiles',[0 99]);
+        elseif outlierRemovalMethod==3
+            ConnectedSegment = filloutliers(ConnectedSegment, nan);
         end
-        % substitute the pieces of connectedSegment2 with the corresponding part of original fast scan line
+        % substitute the pieces of connectedSegment with the corresponding part of original fast scan line
         Cnt2 = 1;
         for i=1:length(SegPosList_StartPos)
             % coincide with the number of elements of original segment
             Len = SegPosList_EndPos(i) - SegPosList_StartPos(i) +1;
-            line_filtered(SegPosList_StartPos(i):SegPosList_EndPos(i)) = ConnectedSegment2(Cnt2:Cnt2+Len-1);
+            data_filtered_vector(SegPosList_StartPos(i):SegPosList_EndPos(i)) = ConnectedSegment(Cnt2:Cnt2+Len-1);
             % start with the next segment
             Cnt2 = Cnt2 + Len;  
         end
+    end
+    % in case of section data, restore the size
+    if ismatrix(data)
+        data_filtered=reshape(data_filtered_vector,size(data));
+    else
+        data_filtered=data_filtered_vector;
     end
 end
 
@@ -710,19 +757,12 @@ function results_final = computeFriction_method2(vertForce,force,mask,idxSection
                 force_section=force(:,startIdx:endIdx);
                 vertForce_section=vertForce(:,startIdx:endIdx);
                 mask_section=mask(:,startIdx:endIdx);
-                % trasform the section into vector
-                force_vector=reshape(force_section,1,[]);
-                vertForce_vector=reshape(vertForce_section,1,[]);
-                mask_vector=reshape(mask_section,1,[]);
                 % start the edge removal depending on the i-th pixel size and then remove outliers
-                force_vector_cleared = remove_Edges_Outlier(force_vector,mask_vector,pix,segmentProcess,outlierRemovalMethod); 
-                vertForce_vector_cleared=vertForce_vector;
-                vertForce_vector_cleared(isnan(force_vector_cleared))=nan;
-                % re-reshape to the original size
-                forceSectionTmp=reshape(force_vector_cleared,size(force_section));
+                forceSectionTmp = remove_Edges_Outlier(force_section,mask_section,pix,segmentProcess,outlierRemovalMethod);                 
                 force_final_pix(:,startIdx:endIdx)=forceSectionTmp;
-                vertForceSectionTmp=reshape(vertForce_vector_cleared,size(vertForce_section));
-                vertForce_final_pix(:,startIdx:endIdx)=vertForceSectionTmp;        
+                vertForceSectionTmp=vertForce_section;
+                vertForceSectionTmp(isnan(forceSectionTmp))=nan;
+                vertForce_final_pix(:,startIdx:endIdx)=vertForceSectionTmp;               
             end
         else
         % if method removal is on single segments or connected segments, extact i-th single fast scan line, regardless the section-setpoint
