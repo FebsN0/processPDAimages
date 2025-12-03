@@ -206,7 +206,7 @@ function user_choice = getValidAnswer(question, title, options, default_choice)
     annotation('textbox','Units', 'normalized','Position', [nx, ny, nw, nh*1.4], 'String', lines, 'FontWeight','bold','interpreter','none','FontSize', FontsizeQuestion, ...
         'HorizontalAlignment', 'center','VerticalAlignment', 'middle', 'Color', 'red','EdgeColor', 'none');
     % Make bold the default button
-    set(button_handles(default_choice), 'FontWeight', 'bold');
+    set(button_handles(default_choice), 'FontWeight', 'bold','ForegroundColor','red');
 
     % Wait user choice selection before continuing
     uiwait(dialog_fig);
@@ -250,14 +250,10 @@ function user_choice = getValidAnswer(question, title, options, default_choice)
                 numericInput = '';
                 if numPressed >= 0 && numPressed <= numel(options)
                     buttonCallback(numPressed);
-                    clc
-                    fprintf('\nDefinitive selection: %s\n',string(options{numPressed})) 
                 end
             else
                 % In case the sequence number is empty, select default option
-                buttonCallback(default_choice);
-                clc
-                fprintf('\nDefinitive selection: %s\n',string(options{default_choice}))                
+                buttonCallback(default_choice);              
             end       
         elseif ismember(event.Key, {'1','2','3','4','5','6','7','8','9','0'})
             % check if the clicked button is a number button. If so, add to the sequence number
@@ -271,14 +267,10 @@ function user_choice = getValidAnswer(question, title, options, default_choice)
             % Remove the last number by clicking Backspace button
             numericInput = numericInput(1:end-1);
         elseif strcmpi(event.Key, 'y') && flagYesNo
-            % if click y ==> then yes. Note: it should be guaranted that the first option is always yes
-            clc
-            fprintf('\nDefinitive selection: Yes\n')
+            % if click y ==> then yes
             buttonCallback(1);
         elseif strcmpi(event.Key, 'n') && flagYesNo
-            % if click n ==> then no
-            clc
-            fprintf('\nDefinitive selection: No\n')            
+            % if click n ==> then no        
             buttonCallback(2);
         else
             % Reset the sequence number with any else button

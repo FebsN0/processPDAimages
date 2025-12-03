@@ -93,7 +93,7 @@ function fig=showData(idxMon,SeeMe,data1,titleData1,nameDir,nameFig,varargin)
         fullnameFig=fullfile(nameDir,"figImages",nameFig);
         saveas(fig,fullnameFig)
     end
-    if ~SeeMe
+    if ~SeeMe && saveFig
         close(fig)
         clear fig
     end

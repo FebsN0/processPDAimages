@@ -1,26 +1,31 @@
-% The feature removes portion of the AFM data which are manually considered unstable (for example, when the
+% The feature removes or restore portion of the AFM data which are manually considered unstable (for example, when the
 % tip is not scanning anymore or it is not properly scanning). Such regions can negatively affects both
 % regular scans used for fluorescence-force experiments and scans from which extrapolate the definitive
 % background friction coefficient.
-% The values in the removed regions are substituted with NaN. Therefore, for any type of fitting, lineByLine or Plane, they will be ignored.
-% Exception is in case of binary image: to prevent nan incompatibility in next steps, the values are changed into 0 or 1 depending on the
-% user choice.
+% After selecting the region of interest, a new small window will appear allowing the user to choose how to manage the selected ROI: 
+%   - consider it as Foreground or Background
+%   - restore or remove the values associated.
+%       NOTE: restore: 
+% In case of removal, the values are changed into NaN. Therefore, for any type of fitting, lineByLine or Plane, they will be ignored.
+% Exception is in case of binary image: to prevent nan incompatibility in next steps and plotting, the values are changed into 0 or 1 depending on the
+% user choice (0 if BK, 1 if FR).
 %  
 % INPUT:
 %   -dataToShow1 :  first data image (matrix or struct) to show
-%   -textTitle1 :   title for dataToShow1 figure
-%   -idxMon  :      idx for additional monitor
+%   -textTitle1 :   title for dataToShow1 figure (string)
+%   -idxMon  :      idx for additional monitor (numeric)
 %   -varargin :     additional optional inputs
 %                       - channelToShow :                   choose a specific channel (lateral,vertical,height) in case one of the given data is a struct data  
 %                       - additionalImagesToShow :          additional image to show. It can be a matrix (single additional image only) or
 %                                                                   cell array containing one or more additional images
 %                       - additionalImagesTitleToShow :     similar to textTitle1, but for additionalImagesTitleToShow%                       
-%                       - originalDataIndex                 which image to use to restore values. Recommended the one which has not been previously masked and not the binary image                           
-%                       - whichNaN                          which type of data convert into NaN? convert FR or BK values into NaN? By default, FR values will be converted into FR
-%                       
+%                       - originalDataIndex (default 1) :   which image to use to restore values. NOT VALID FOR BINARY IMAGE. 
+%                            NOTE: Recommended the one which has not been masked (i.e. without NaN values). Otherwise the restoring will just restore NaN values.                         
+%                       - normalize                         
 % OUTPUT:
-%   varargout :     cell array containing the original data with removed portions
-%                       (varargout{i}=allDataToShow{i} ==> allDataToShow = dataToShow1 + additionalImagesToShow)
+%   varargout :     varargout{1} contains the idx where mask has been applied. It contains 0,1,NaN. 
+%                   varargout{2} = transformed dataToShow1
+%                   varargout{3-n} = transformed additionalImagesToShow if they have been provided
 
 % several approaches to remove data has been explore and each showed a problem
 % sol 1 (USED): the removed values became NaN
@@ -31,7 +36,8 @@
 % new problem: when plotted, there is no right proportion so it seems that the removed region is
 % more close to BK while the true BK is higher rather than being close to zero
 % data(:,xstart:xend)=nan; 
-
+% ISSUE SOLVED BY IMPROVING SHOWDATA FUNCTION WHICH CAN NOW MANAGE NAN VALUES
+%
 % sol 2: the removed values became the minimum value in the matrix outside the removed regions
 % problem: the values in correspondence of crystal are considered background in the background/foreground
 % separation to create the mask, so in the optimization process (A4_El_AFM_masked), the values in PDA 
@@ -45,8 +51,7 @@
 % true problem: in case of normal scans, the alignment of IOimage with fluorescence images will
 % fail...            
 % data=[data(:,1:xstart-1) data(:,xend+1:end)];
-
-                          
+                         
 function varargout = featureRemovePortions(dataToShow1,textTitle1,idxMon,varargin)
     %init instance of inputParser
     p=inputParser();

@@ -53,9 +53,9 @@ function idMon=objInSecondMonitor(varargin)
         monitorXfig = screens(idMon, :);
         % Move to the target monitor manually
         left   = monitorXfig(1);
-        bottom = monitorXfig(2);
+        bottom = monitorXfig(2)+50; % because of bottom windows bar
         width  = monitorXfig(3);
-        height = monitorXfig(4);
+        height = monitorXfig(4)-80; % to see the top windows (where there is close, max, min)       
         set(fig, 'Position', [left bottom width height*0.95]);
         clear idMon % Prevent output from being returned
     end
