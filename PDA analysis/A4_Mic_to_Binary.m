@@ -13,19 +13,15 @@
 %       cropped Tritic After (if 'TRITIC_after' has been specified)
 %       FurtherDetails : details about binarisation
 %       
-function varargout=A8_Mic_to_Binary(imageBF_aligned,idxMon,newFolder,varargin)
+function varargout=A4_Mic_to_Binary(imageBF_aligned,idxMon,newFolder,varargin)
 
     p=inputParser();
     %Add default mandatory parameters.
-    addRequired(p, 'imageBF_aligned');
-    
+    addRequired(p, 'imageBF_aligned');    
     argName = 'TRITIC_before';      defaultVal = [];        addParameter(p,argName,defaultVal, @(x) ismatrix(x));
     argName = 'TRITIC_after';       defaultVal = [];        addParameter(p,argName,defaultVal, @(x) ismatrix(x));
-    argName = 'saveFig';            defaultVal = 'Yes';     addParameter(p, argName, defaultVal, @(x) ismember(x,{'No','Yes'}));
-
     parse(p,imageBF_aligned,varargin{:});
     clearvars argName defaultVal
-    if(strcmp(p.Results.saveFig,'Yes')), saveFig=1; else, saveFig=0; end
 
     reduced_imageBF=imageBF_aligned;
     if ~isempty(p.Results.TRITIC_before)
@@ -96,79 +92,71 @@ function varargout=A8_Mic_to_Binary(imageBF_aligned,idxMon,newFolder,varargin)
     end
     %}
     image2=reduced_imageBF; %%%%%%% in the original version Mic_to_Binary_PCDA.m, previous section was omitted %%%%%%%%%%%
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    closest_indices=[];
-    satisfied='Manual Selection';
-    first_In=true;
+    % prepare the fig where to show the starting BF and binarized BF
+    f_compFigs=figure;
+    objInSecondMonitor(f_compFigs,idxMon);
+    tiledlayout(f_compFigs,1,2,'TileSpacing','compact')
+    axMainBF=nexttile(1);
+    imshow(imadjust(image2),'Parent',axMainBF), title('Definitive Brightfield Image', 'FontSize',16)
+    axBinBF=nexttile(2);
+    tmpImg = imshow(zeros(size(image2)),'Parent',axBinBF);   % placeholder matrix    
+    title('Resulting Binarized Brightfield Image', 'FontSize',16)
+    % prepare the histogram figure where to select the binarization threshold
+    f_dist=figure;
+    ax_hist = axes('Parent', f_dist);
+    hold(ax_hist,"on")
+    title('Click on the distribution to extarct the threshold to binarize the BF image', 'FontSize',16)    
     no_sub_div=2000;
-    [Y,E] = histcounts(image2,no_sub_div); 
-    
-    f1=figure;
-    objInSecondMonitor(f1,idxMon);
-    subplot(121), imshow(imadjust(image2)), title('Cropped Brightfield Image', 'FontSize',16)
-    
-    while(strcmp(satisfied,'Manual Selection'))
-        % in the first iteration, 
-        if(first_In==true)
-            first_In=false;
-            diff_Y=diff(Y);         % calculates differences between adjacent elements (from right to left)
-            [~,b]=max(diff_Y);      % find idx of the max
-            for i=2:size(diff_Y,2)
-                if(i>b)
-                    if (diff_Y(1,i-1)<0) && (diff_Y(1,i)>=0)    
-                        flag=i;     % identify the index by which the PDA is distinguished from the background in the BF image
-                        break
-                    end
-                end
+    [Y,E] = histcounts(image2,no_sub_div);
+    plot(ax_hist,E(1:end-1),Y,'DisplayName','Experimental BF Data')
+    xlabel("Light Intensity","FontSize",14), ylabel("Count","FontSize",14)
+    % start the binarization as first run
+    diff_Y=diff(Y);         % calculates differences between adjacent elements (from right to left)
+    [~,b]=max(diff_Y);      % find idx of the max
+    for i=2:size(diff_Y,2)
+        if(i>b)
+            if (diff_Y(1,i-1)<0) && (diff_Y(1,i)>=0)    
+                flag=i;     % identify the index by which the PDA is distinguished from the background in the BF image
+                break
             end
-            % if the index is found, use as threshold
-            if(exist('flag','var'))
-                threshold=E(1,flag);
-                binary_image=image2;
-                binary_image(binary_image<threshold)=0;
-                binary_image(binary_image>=threshold)=1;
-                binary_image=~binary_image;
-            else        % otherwise use in-built MATLAB function
-                threshold = adaptthresh(image2);
-                binary_image=~imbinarize(image2,threshold);
-                % binary_image=~imbinarize(image2,'adaptive');       % identical operation. In this way it is
-                % possible to know the threshold
-            end
-        else
-            % take the original data
-            binary_image=image2;
-            % identify the threshold by histogram               
-            imhistfig=figure('visible','on');hold on,plot(Y)
-            if any(closest_indices)
-                scatter(closest_indices,Y(closest_indices),40,'r*')
-            end
-            pan on; zoom on;
-            % show dialog box before continue
-            uiwait(msgbox('Before click to continue the binarization, zoom or pan on the image for a better view',''));
-            zoom off; pan off;
-            figure(imhistfig)
-            closest_indices=selectRangeGInput(1,1,1:no_sub_div,Y);         
-            close(imhistfig)
-            % find the threshold
-            threshold=E(closest_indices);          
-            
-            binary_image(binary_image<threshold)=0;
-            binary_image(binary_image>=threshold)=1;
-            binary_image=~binary_image;
         end
-        if exist('h1', 'var') && ishandle(h1)
-            delete(h1);
-        end
-        h1=subplot(122);
-        imshow(binary_image); title('Binarized BrightField image', 'FontSize',16)
-        satisfied=questdlg('Keep selection or turn to Manual', 'Manual Selection', 'Keep Current','Manual Selection','Keep Current');
     end
-    if saveFig
-        saveas(f1,sprintf('%s/tiffImages/resultA8_1_OriginalBrightField_BaselineForeground',newFolder),'tif')
-        saveas(f1,sprintf('%s/figImages/resultA8_1_OriginalBrightField_BaselineForeground',newFolder))
+    % if the index is found, use as threshold
+    if(exist('flag','var'))
+        threshold=E(1,flag);
+        binary_image=image2;
+        binary_image(binary_image<threshold)=0;
+        binary_image(binary_image>=threshold)=1;
+        binary_image=~binary_image;
+    else        % otherwise use in-built MATLAB function
+        threshold = adaptthresh(image2);
+        binary_image=~imbinarize(image2,threshold);      
     end
-    close(f1)
+    
+    % start
+    while true
+        figure(f_compFigs)
+        pause(1)
+        tmpImg.CData=binary_image;       
+        currLine=xline(ax_hist,threshold,'r--','LineWidth',1.5,'DisplayName','Threshold line');
+        if getValidAnswer('Satisfied of the resulting binarization? If not, manual thresholding.','',{'Yes','No'})
+            break
+        end        
+        % take the original data from which binarize
+        binary_image=image2;
+        % identify the new threshold by histogram
+        axes(ax_hist) %#ok<LAXES>
+        pause(1)
+        closest_indices=selectRangeGInput(1,1,ax_hist);         
+        % find the threshold
+        threshold=E(closest_indices);          
+        delete(currLine)        
+        binary_image(binary_image<threshold)=0;
+        binary_image(binary_image>=threshold)=1;
+        binary_image=~binary_image;
+    end
+    close(f_dist)
+    saveFigures_FigAndTiff(f_compFigs,newFolder,'resultA4_1_OriginalBrightField_BaselineForeground')
     % create a Structuring Element to remove objects smaller than 2 pixels
     kernel=strel('square',2);
     binary_image=imerode(binary_image,kernel);
@@ -179,15 +167,7 @@ function varargout=A8_Mic_to_Binary(imageBF_aligned,idxMon,newFolder,varargin)
     text=sprintf('Definitive Binarized BrightField (Morphological Opening - kernel: square 2 pixels)');
     title(text,'FontSize',14)
     objInSecondMonitor(f2,idxMon);
-    if saveFig
-        saveas(f2,sprintf('%s/tiffImages/resultA8_2_DefinitiveBinarizedBrightField',newFolder),'tif')
-        saveas(f2,sprintf('%s/figImages/resultA8_2_DefinitiveBinarizedBrightField',newFolder))
-    else
-    % for the heated sample case in which no figImages exist, so store
-    % only the tiff to easy how good was the binarization
-        saveas(f2,sprintf('%s/binarizedBF',newFolder),'tif')      
-    end
-    close(f2)  
+    saveFigures_FigAndTiff(f2,newFolder,"resultA4_2_DefinitiveBinarizedBrightField")
 
     if flagCrop == 1
         FurtherDetails=struct(...
@@ -201,9 +181,7 @@ function varargout=A8_Mic_to_Binary(imageBF_aligned,idxMon,newFolder,varargin)
         FurtherDetails=struct(...
             'Threshold',    threshold,...
             'Cropped',      'No');
-    end
-    
+    end    
     varargout{1}=binary_image;
     varargout{4}=FurtherDetails;
-
 end
