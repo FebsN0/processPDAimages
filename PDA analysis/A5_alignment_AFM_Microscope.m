@@ -1,5 +1,5 @@
 % to align AFM height IO image to BF IO image, the main alignment
-function [AFM_IO_3_BFaligned,AFM_Elab,info_allignment,offset]=A5_alignment_AFM_Microscope(BF_IO_0_original,metaData_BF,AFM_IO_0_mask,metaData_AFM,AFM_Elab,newFolder,idxMon,varargin)
+function [AFM_IO_3_BFaligned,BF_IO_1_cropped,AFM_Elab,info_allignment,offset]=A5_alignment_AFM_Microscope(BF_IO_0_original,metaData_BF,AFM_IO_0_mask,metaData_AFM,AFM_Elab,newFolder,idxMon,varargin)
     % OUTPUT DETAILS
     %   - AFM_IO_padded :   AFM height 0/1 data ALIGNED with BF 0/1 data BUT the image is slighly bigger (in
     %                       case of margin or only crop) which values, outside AFM height is only 0. Briefly,
@@ -108,9 +108,9 @@ function [AFM_IO_3_BFaligned,AFM_Elab,info_allignment,offset]=A5_alignment_AFM_M
     % locate, without really adjust the data, to understand how make a better crop
     % rect is required to locate the AFM respect to BF
     [max_c_it_OI,~,rect,AFM_IO_2_BFpadded] = A5_feature_crossCorrelationAlignmentAFM(BF_IO_0_original,AFM_IO_1_BFscaled);
-    f1=figure("Visible","off");
-    imshowpair(BF_IO_0_original,AFM_IO_2_BFpadded,'falsecolor')
-    title('Brightfield and resized AFM images - Post First cross-correlation','FontSize',14)
+    f1=figure; axFig=axes('Parent', f1);
+    figPair=imshowpair(BF_IO_0_original,AFM_IO_2_BFpadded,'falsecolor','Parent',axFig);
+    title('Brightfield and AFM images - Post First cross-correlation','FontSize',14)
     objInSecondMonitor(f1,idxMon);
     saveFigures_FigAndTiff(f1,newFolder,"resultA5_1_BForiginal_AFMresize_firstCrossCorrelation",'closeImmediately',false)    
     AFM_Elab_original=AFM_Elab;
@@ -130,7 +130,7 @@ function [AFM_IO_3_BFaligned,AFM_Elab,info_allignment,offset]=A5_alignment_AFM_M
         if answerCrop == 1
         % crop the right area containing the AFM image, if not, restart
             uiwait(msgbox('Crop the area of interest containing the stimulated part',''));
-            [~,specs]=imcrop();
+            [~,specs]=imcrop(figPair);
             % extract the cropped area
             XBegin=round(specs(1));
             YBegin=round(specs(2));
@@ -144,7 +144,6 @@ function [AFM_IO_3_BFaligned,AFM_Elab,info_allignment,offset]=A5_alignment_AFM_M
             % create AFM image with same BF cropped size. Here alignment by cross-correlation is required at
             % the contrary of the other margin method because it is better
             [~,~,locationAFM2toBF1,AFM_IO_2_BFpadded] = A5_feature_crossCorrelationAlignmentAFM(BF_IO_1_cropped,AFM_IO_1_BFscaled);
-            textTitle='Cropped (manually) Brightfield and resized AFM images - First cross-correlation'; 
         elseif answerCrop == 2
         % extract the BF with border depending on the margin
             % save the coordinates of AFM resized in the 2D space of BF original
@@ -162,22 +161,19 @@ function [AFM_IO_3_BFaligned,AFM_Elab,info_allignment,offset]=A5_alignment_AFM_M
             BF_IO_1_cropped=BF_IO_0_original(YBegin:YEnd,XBegin:XEnd);
             % new crosscorrelation to locate the AFM to the new BF                        
             [~,~,locationAFM2toBF1,AFM_IO_2_BFpadded] = A5_feature_crossCorrelationAlignmentAFM(BF_IO_1_cropped,AFM_IO_1_BFscaled);
-            textTitle='Cropped (by margin) Brightfield and scaled AFM images - Pre Alignment';                                
         else
             % do nothing
-            AFM_IO_2_BFpadded=AFM_IO_1_BFscaled;
             BF_IO_1_cropped=BF_IO_0_original;
-            locationAFM2toBF1=rect;
+            locationAFM2toBF1=rect;            
         end
         % store the new dimensions of BF to adjust the TRITIC matrix 
-        offset=[YBegin,YEnd,XBegin,XEnd];
-        f1.Visible = 'off';
-        f2=figure;
-        imshowpair(BF_IO_1_cropped,AFM_IO_2_BFpadded,'falsecolor')
-        objInSecondMonitor(f2,idxMon);
-        title(textTitle,'FontSize',14)
-        saveFigures_FigAndTiff(f2,newFolder,"resultA5_2_BFcropped_AFMscaled_preAlignment",'closeImmediately',false)
+        if answerCrop == 3
+            offset=[];
+        else
+            offset=[YBegin,YEnd,XBegin,XEnd];              
+        end
         
+        f1.Visible = 'off';
         clear yend ybegin xend xbegin tmp_*
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%  THIRD STEP  %%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -200,12 +196,12 @@ function [AFM_IO_3_BFaligned,AFM_Elab,info_allignment,offset]=A5_alignment_AFM_M
         if answerMethod==1
             % the output AFM_Elab will contain the corrected aligned data. Rect is required to 
             [AFM_IO_3_BFaligned,AFM_Elab,details_it_reg,rect]=A5_feature_manualAlignmentGUI(AFM_IO_2_BFpadded,BF_IO_1_cropped,AFM_Elab,locationAFM2toBF1,max_c_it_OI,idxMon,newFolder);                         
-            textTitle='Final alignment of Brightfield IO and resized AFM IO - Manual Approach';
+            textTitle='Brightfield IO - AFM IO -Final Alignment (Manual Approach)';
         %%%%%%%%%%%%%%%%%%%%%%%%%%
         %%% automatic approach %%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%
         elseif answerMethod == 2
-            textTitle='Final alignment of Brightfield IO and resized AFM IO - Automatic Approach';
+            textTitle='Brightfield IO - AFM IO -Final Alignment (Automatic Approach)';
             [AFM_IO_3_BFaligned,AFM_Elab,details_it_reg,rect]=A5_feature_automaticLinearAlignment(AFM_IO_2_BFpadded,BF_IO_1_cropped,AFM_Elab,locationAFM2toBF1,max_c_it_OI,idxMon,newFolder);
         %%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%% Demon's approach %%%%
@@ -222,11 +218,11 @@ function [AFM_IO_3_BFaligned,AFM_Elab,info_allignment,offset]=A5_alignment_AFM_M
             % further check. It should not happen, but just in case...
             nonBinaryMask = AFM_IO_3_BFaligned(AFM_IO_3_BFaligned ~= 0 & AFM_IO_3_BFaligned ~= 1);
             if ~isempty(nonBinaryMask)
-                warndlg("Aware! For some unexpected reason, the interpolation of the borders 0-1 gave non binary values! Using the average, such values will be biclassified.")
+                uiwait(warndlg("Aware! For some unexpected reason, the interpolation of the borders 0-1 gave non binary values! Using the average, such values will be biclassified."))
                 threshold=mean(nonBinaryMask(:));
                 AFM_IO_3_BFaligned = AFM_IO_3_BFaligned > threshold;
             end
-            textTitle='Final alignment of Brightfield IO and resized AFM IO - Automatic Demon''s Algorithm Approach';
+            textTitle='Brightfield IO - AFM IO - Final Alignment (Automatic Demon''s Algorithm Approach)';
             % first, create the pad version where there is in the middle the AFM data, then transforms image according to the displacement field.
             for flag_AFM=1:size(AFM_Elab,2)
                 % first create zero matrix with the same dimension of the AFM IO mask
@@ -276,7 +272,6 @@ function [AFM_IO_3_BFaligned,AFM_Elab,info_allignment,offset]=A5_alignment_AFM_M
             break
         end
         AFM_Elab=AFM_Elab_original;
-        close(f2)
         close(f3)
     end   
 

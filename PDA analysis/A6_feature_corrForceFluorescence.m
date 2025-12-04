@@ -1,6 +1,6 @@
 % Function to collect data into bins
 
-function [outputme] = A10_feature_CDiB(X_Data,Y_Data,idxMon,newFolder,varargin)
+function [outputme] = A6_feature_corrForceFluorescence(X_Data,Y_Data,idxMon,newFolder,varargin)
 
     p=inputParser();
     argName = 'setpoints';      defaultVal = [];                                        addParameter(p,argName,defaultVal);
@@ -119,6 +119,5 @@ function [outputme] = A10_feature_CDiB(X_Data,Y_Data,idxMon,newFolder,varargin)
         title(p.Results.FigTitle,'FontSize',20);
     end    
     objInSecondMonitor(ftmp,idxMon);
-    saveas(ftmp,sprintf('%s/tiffImages/resultA10_end_%d_%s',newFolder,p.Results.NumFig,p.Results.FigFilename),'tif')
-    saveas(ftmp,sprintf('%s/figImages/resultA10_end_%d_%s',newFolder,p.Results.NumFig,p.Results.FigFilename))
+    saveFigures_FigAndTiff(ftmp,newFolder,sprintf('resultA_END_%d_%s',p.Results.NumFig,p.Results.FigFilename))
 end
