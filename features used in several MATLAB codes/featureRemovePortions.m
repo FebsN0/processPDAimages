@@ -21,7 +21,7 @@
 %                       - additionalImagesTitleToShow :     similar to textTitle1, but for additionalImagesTitleToShow%                       
 %                       - originalDataIndex (default 1) :   which image to use to restore values. NOT VALID FOR BINARY IMAGE. 
 %                            NOTE: Recommended the one which has not been masked (i.e. without NaN values). Otherwise the restoring will just restore NaN values.                         
-%                       - normalize                         
+%                       - normalize (default true)                        
 % OUTPUT:
 %   varargout :     varargout{1} contains the idx where mask has been applied. It contains 0,1,NaN. 
 %                   varargout{2} = transformed dataToShow1

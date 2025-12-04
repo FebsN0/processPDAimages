@@ -1,13 +1,9 @@
 function varargout = planeFitting_N_Order(data,limit)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%% plane fitting by exploring 1==>limit (1,2,3,..,limit) %%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%------- plane fitting by exploring 1==>limit (1,2,3,..,limit) -------%%%%
 % INPUT:    data = matrix (example a specific channel image)
 %           limit = scalar value, max fitOrder of plane fitting exploration (example: limit=3 ==> 1=>2=>3)
-%
-% OUTPUT:   varargout{1} =  dataCorrected               => original data MINUS correction_plane
-%           varargout{2} =  correction_plane            => best generated plane
-%           varargout{3} =  fit_decision_final_plane    => metrics of the best generated plane
+% OUTPUT:   varargout{1} =  correction_plane            => best generated plane
+%           varargout{2} =  fit_decision_final_plane    => metrics of the best generated plane
     warning('off', 'curvefit:prepareFittingData:removingNaNAndInf');
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)

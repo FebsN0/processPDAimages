@@ -20,6 +20,6 @@ function [countOutliers,cleanData]=dynamicOutliersRemoval(data)
     end
     totElements=nnz(~isnan(data(:)));
     percRemoval=countOutliers/totElements*100;
-    fprintf("\nResults outliers removal: %d outliers have been removed from the data (%.1f%% of total)\n",countOutliers,percRemoval)
+    fprintf("Results outliers removal: %d outliers have been removed from the data (%.1f%% of total)\n",countOutliers,percRemoval)
     cleanData=tmp;
 end

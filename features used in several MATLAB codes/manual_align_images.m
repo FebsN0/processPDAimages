@@ -154,32 +154,21 @@ function offset = manual_align_images(maskImg, rawImg)
     %    MODE HANDLER FUNCTIONS
     % -------------------------
     function enableMoveMode()
-        isMoveMode = true;
-    
+        isMoveMode = true;   
         % Disable zoom/pan
         zoom(hFig,'off');
         pan(hFig,'off');
-        set(hFig, 'WindowScrollWheelFcn', @(src,evt) []);
-    
-        % Do NOT reset axes limits! Keep current zoom/pan
-        % axis(hAx, 'manual');  % removed
-        % axis(hAx, [1 size(maskImg,2) 1 size(maskImg,1)]);  % removed
-    
-        disp('Move mode enabled (dragging ON, zoom OFF)');
+        set(hFig, 'WindowScrollWheelFcn', @(src,evt) []);    
     end
 
     function enableZoomMode()
         isMoveMode = false;
-
         % Enable zoom/pan
         zoom(hFig,'on');
         pan(hFig,'on');
         set(hFig, 'WindowScrollWheelFcn', []);
-
         % Let axes adjust automatically
         axis(hAx,'auto');
-
-        disp('Zoom mode enabled (dragging OFF, zoom ON)');
     end
 
     % -------------------------

@@ -9,7 +9,9 @@
 %               - saveFig       = true/false, choose if save the figure
 %               - normalized    = true/false, choose if normalize the data
 %               - binary        = true/false, the image is binary
-%               - lenghtAxis    = numerical, in case of conversion from pixel index to meter
+%               - lenghtAxis    = two value vector representing the true (meter) size of entire image, in case of conversion from pixel index to meter
+%                   lenghtAxis(1) ==> AXIS Y
+%                   lenghtAxis(2) ==> AXIS X
 %               - labelBar      = text to printed out as lateral bar
 %               - prevFig       = in case the figure should be plotted in an existing fig
 % for extra data
@@ -167,8 +169,8 @@ function showSingleData(ax,data, norm, titleData,labelBar,bin,AxisLength)
     if ~isempty(AxisLength)
         xlabel(sprintf('slow direction (%s)',unitsX),'FontSize',14);
         ylabel(sprintf('fast direction (%s)',unitsY),'FontSize',14);
-        xticks(0:5:max(x));
-        yticks(0:5:max(y));
+        xticks(round(linspace(0,max(x),11)));
+        yticks(round(linspace(0,max(y),11)));
     else
         xlabel('slow direction','FontSize',14), ylabel('fast direction','FontSize',14)    
     end
