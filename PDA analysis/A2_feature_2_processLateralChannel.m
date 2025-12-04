@@ -250,7 +250,7 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
     titleData={'Corrected Lateral Force'; "NOTE: Only for show - Removed 95 percentile of outliers"};
     nameFig='resultA2_17_LateralDeflectionWithoutOutliers';
     labelFig='Force [nN]';
-    showData(idxMon,true,Corrected_LD_Trace_cleared*1e9,titleData,newFolder,nameFig,'labelBar',labelFig)
+    showData(idxMon,SeeMe,Corrected_LD_Trace_cleared*1e9,titleData,newFolder,nameFig,'labelBar',labelFig)
 
     % save the corrected lateral force into cropped AFM image
     AFM_Elab=AFM_data;    
@@ -318,17 +318,12 @@ function figDistr=checkDistributionDataLD(SeeMe,idxMon,Data,varargin)
     % show the original LD of FR
     DataCleaned_FR=DataFR(:); DataCleaned_FR(~isnan(DataCleaned_FR));
     histogram(ax,DataCleaned_FR,'BinEdges',edges,"DisplayName",NameFR)
-    % check the abs min
-    absMinBK=min(DataCleaned_BK);
-    % check the min in corrispondence of 1 percentile
-    percentile=1;      
-    threshold = prctile(DataCleaned_BK, percentile);
-    % show vertical line of different min BK
-    xline(ax,absMinBK,':','LineWidth',1.5,     'Color',globalColor(idCall),'DisplayName',sprintf('Absolute Min BK:       %.2e',absMinBK))
-    xline(ax,threshold,'--','LineWidth',1.5,   'Color',globalColor(idCall),'DisplayName',sprintf('Min 1 percentile BK:   %.2e',threshold))        
-    % show vertical line of min FR
-    absMinFR=min(DataCleaned_FR);
-    xline(ax,absMinFR,'.-','LineWidth',1.5,    'Color',globalColor(idCall),'DisplayName',sprintf('Absolute Min FR:       %.2e',absMinFR))
+    % check where the 10 percentile locate in the distribution
+    percentile=10;      
+    threshold = prctile(DataCleaned_BK, percentile);    
+    xline(ax,threshold,'--','LineWidth',1.5,   'Color',globalColor(idCall),'DisplayName',sprintf('10° percentile BK: %.2e',threshold))
+    threshold = prctile(DataCleaned_FR, percentile); 
+    xline(ax,threshold,'.-','LineWidth',1.5,    'Color',globalColor(idCall),'DisplayName',sprintf('10° percentile FR: %.2e',threshold))
     pause(2)
 end
 

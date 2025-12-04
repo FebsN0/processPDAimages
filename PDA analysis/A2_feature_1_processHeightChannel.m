@@ -1,4 +1,4 @@
-function [AFM_Images_final,mask_FINAL,fitOrderHeight]=A2_feature_1_processHeightChannel(filtData,idxMon,SaveFigFolder,varargin)
+function [AFM_Images_final,mask_FINAL,fitOrderHeight,metadata]=A2_feature_1_processHeightChannel(filtData,idxMon,SaveFigFolder,varargin)
 % The function extracts Images from the experiments.
 % It removes baseline and extracts foreground from the AFM image.
 %
@@ -66,7 +66,7 @@ warning('off', 'stats:robustfit:IterationLimit');
     end        
     % show the data prior the height processing
     A1_feature_CleanOrPrepFiguresRawData(AFM_Images,'idxMon',idxMon,'folderSaveFig',SaveFigFolder,'metadata',metadata,'imageType',typeProcess,'SeeMe',SeeMe,'Normalization',norm);
-    clear metadata tmp* filtData
+    clear tmp* filtData
     % Extract the height channel
     height_1_original=AFM_Images(strcmp([AFM_Images.Channel_name],'Height (measured)')).AFM_images_1_original;
 
@@ -106,7 +106,7 @@ warning('off', 'stats:robustfit:IterationLimit');
             end
             height_2_outliersRemoved(:,i)=yData;
         end
-        fprintf("\nSTART HEIGHT PROCESSING ITERATION %d\nBefore 1st order plan and lineByline fitting, %d outliers have been removed!\n",iterationMain,countOutliers)
+        fprintf("START HEIGHT PROCESSING ITERATION %d - %s\nBefore 1st order plan and lineByline fitting, %d outliers have been removed!\n",iterationMain,HVmode,countOutliers)
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%% START HEIGHT PROCESS: GOAL OF THE FOLLOWING PART IS TO GENERATE THE MASK OF HEIGHT TO SEPARATE FOREGROUND AND BACKGROUND %%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -148,7 +148,7 @@ warning('off', 'stats:robustfit:IterationLimit');
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             % if HOVER MODE OFF, the data is often messed. Therefore, try to use the AFM mask of HV_ON and resize it instead of making it again,
             % saving significant amount of time. If not, just run the normal height process like in case of HV on     
-            if strcmp(HVmode,"HoverModeOFF")         
+            if strcmp(HVmode,"HoverModeOFF") && strcmp(typeProcess,'SingleSection')         
                 question="Is the HoverModeOFF data generated in the approximately same scan area as the HoverModeON data?";
                 options={"If yes, take the mask of HOVER MODE ON and re-align to avoid to perform binarization.";
                     "If not, then exe normal processing, therefore binarization from the Height Image (HV mode OFF)."};
@@ -158,7 +158,18 @@ warning('off', 'stats:robustfit:IterationLimit');
                         AFM_height_IO=tmp1;
                         AFM_Images=tmp2; % resized channels
                         % images are now resized, update starting image
-                        height_1_original=AFM_Images(strcmp([AFM_Images.Channel_name],'Height (measured)')).AFM_images_1_original;
+                        height_1_original=AFM_Images(strcmp([AFM_Images.Channel_name],'Height (measured)')).AFM_images_2_PostProcessed;
+                        % update metadata regarding y pixel size
+                        oldSizePixel_y=metadata.y_scan_pixels;
+                        oldSizeMeter_y=metadata.y_scan_length_m;
+                        oldSizePixel_x=metadata.x_scan_pixels;
+                        oldSizeMeter_x=metadata.x_scan_length_m;
+                        % Update metadata regarding x pixel size
+                        metadata.y_scan_pixels = size(AFM_height_IO,2);
+                        metadata.y_scan_length_m=oldSizeMeter_y*metadata.y_scan_pixels/oldSizePixel_y;
+                        metadata.x_scan_pixels = size(AFM_height_IO,1);
+                        metadata.x_scan_length_m=oldSizeMeter_x*metadata.x_scan_pixels/oldSizePixel_x;
+
                         clear tmp*
                         binarizationMethod="Extracted from HV ON mask";
                         flagExeMaskGen=false;
@@ -307,7 +318,7 @@ warning('off', 'stats:robustfit:IterationLimit');
                 % just for safety in case of interruption or system failure. If the mask is definitive, save it and dont restart again the entire binarization process
                 save(fullfile(SaveFigFolder,"TMP_DATA_MASK_definitive"),"AFM_height_IO_corr","BK_5_heightMasked_corr")
             end
-            clear titleText* nameFile flagRemoval ftmpIO answ question textTitleIO binarizationMethod allBaselines continueLineFit files_tmp tmp
+            clear titleText* nameFile flagRemoval ftmpIO answ question textTitleIO allBaselines continueLineFit files_tmp tmp
         end
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%% NOW THE MASK IS OBTAINED ==> LAST SERIES OF FITTING 1st ORDER USING MASKED BACKGROUND: ORIGINAL HEIGHT + FINAL MASKSKED DATA %%%%
@@ -380,8 +391,10 @@ warning('off', 'stats:robustfit:IterationLimit');
             for i=1:length(AFM_Images_final)
                 if strcmp(AFM_Images_final(i).Channel_name,"Height (measured)")
                     % The height channel will be changed with the new optimized final height previosuly obtained.
+                    % The height will keep the size. Therefore, if HV OFF and resizing, the height is ok. But for the other channels, they
+                    % have been already copied!
                     AFM_Images_final(i).AFM_images_2_PostProcessed=height_FINAL;
-                else
+                elseif ~strcmp(binarizationMethod,"Extracted from HV ON mask") 
                     % Copy the the original data as new column except height. 
                     AFM_Images_final(i).AFM_images_2_PostProcessed=AFM_Images_final(i).AFM_images_1_original; 
                 end

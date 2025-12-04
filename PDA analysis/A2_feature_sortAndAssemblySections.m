@@ -94,11 +94,11 @@ function varargout = A2_feature_sortAndAssemblySections(allData,otherParameters,
         for j=numFiles:-1:1
             % extract the struct AFM data
             tmp=allDataOrdered(j).AFMImage_Raw(i);
-            tmp_raw=flip(rot90(tmp.Raw_afm_image,-1),2);
-            tmp_start=flip(rot90(tmp.AFM_image,-1),2);
+            tmp_raw=flip(rot90(tmp.Raw_afm_image,-1));
+            tmp_start=flip(rot90(tmp.AFM_image,-1));
             if flag_processSingleSection
                 tmp=allDataOrdered(j).AFMImage_PostProcess(i);
-                tmp_end=flip(tmp.AFM_image,2);
+                tmp_end=tmp.AFM_images_2_PostProcessed;
             end
             yLen=size(tmp_end,2); colEnd = colStart + yLen-1;
             % concatenate

@@ -96,8 +96,6 @@ function [AFM_images_final,AFM_height_IO,metaData]=A2_processAFMdata(allData,oth
     % ASSEMBLY!
     [AFM_images,AFM_height_IO,metaData] = A2_feature_sortAndAssemblySections(allData,otherParameters,flag_processSingleSection);  
     
-    
-    
     % in case of no single section processing, now process the assembled image
     if ~flag_processSingleSection
         [AFM_images_postHeight,AFM_height_IO]=A2_feature_1_processHeightChannel(AFM_images,idxMon,SaveFigFolder,'SeeMe',SeeMe,'Normalization',norm, ...

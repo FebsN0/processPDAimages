@@ -77,12 +77,9 @@ function [avg_fc,FitOrderHVOFF_Height] = A2_feature_2_1_FrictionCalcFromSameScan
             %metadata
             nameFileResultPostHeightProcess=fullfile(mainPath,'HoverMode_OFF\resultsData_2_postHeight.mat');
         end
-        [AFM_images_postHeightFit_HVOFF,AFM_height_IO_HV_OFF,FitOrderHVOFF_Height]=A2_feature_1_processHeightChannel(dataPreProcess,idxMon,filePathResultsFriction, ...
-            'metadata',metadata,...
-            'fitOrder',FitOrderHVOFF_Height, ...
-            'imageType',imageType, ...
-            'SeeMe',false, ...
-            'HoverModeImage','HoverModeOFF');        
+        [AFM_images_postHeightFit_HVOFF,AFM_height_IO_HV_OFF,FitOrderHVOFF_Height,metadata]=A2_feature_1_processHeightChannel(dataPreProcess,idxMon,filePathResultsFriction, ...
+            'metadata',metadata,'fitOrder',FitOrderHVOFF_Height,'imageType',imageType, ...
+            'SeeMe',false,'HoverModeImage','HoverModeOFF');        
         save(nameFileResultPostHeightProcess,"AFM_images_postHeightFit_HVOFF","AFM_height_IO_HV_OFF","FitOrderHVOFF_Height","metadata","filePathResultsFriction")            
     end
     clear nameFileResultPostHeightProcess flagStartHeightProcess allData   
@@ -110,16 +107,16 @@ function [avg_fc,FitOrderHVOFF_Height] = A2_feature_2_1_FrictionCalcFromSameScan
         setpoints_nN=flip(round(metadata.SetP_N*1e9));
         % extract data (lateral deflection Trace and Retrace, vertical deflection) and then mask (BK-PDA)    
         mask=logical(AFM_height_IO_HV_OFF);
-        Lateral_Trace_masked   = (AFM_images_postHeightFit_HVOFF(strcmpi([AFM_images_postHeightFit_HVOFF.Channel_name],'Lateral Deflection') & strcmpi([AFM_images_postHeightFit_HVOFF.Trace_type],'Trace')).AFM_images_1_original);
+        Lateral_Trace_masked   = (AFM_images_postHeightFit_HVOFF(strcmpi([AFM_images_postHeightFit_HVOFF.Channel_name],'Lateral Deflection') & strcmpi([AFM_images_postHeightFit_HVOFF.Trace_type],'Trace')).AFM_images_2_PostProcessed);
         Lateral_Trace_masked(mask)=NaN;
-        Lateral_ReTrace_masked = (AFM_images_postHeightFit_HVOFF(strcmpi([AFM_images_postHeightFit_HVOFF.Channel_name],'Lateral Deflection') & strcmpi([AFM_images_postHeightFit_HVOFF.Trace_type],'ReTrace')).AFM_images_1_original);
+        Lateral_ReTrace_masked = (AFM_images_postHeightFit_HVOFF(strcmpi([AFM_images_postHeightFit_HVOFF.Channel_name],'Lateral Deflection') & strcmpi([AFM_images_postHeightFit_HVOFF.Trace_type],'ReTrace')).AFM_images_2_PostProcessed);
         Lateral_ReTrace_masked(mask)=NaN;
         Delta = (Lateral_Trace_masked + Lateral_ReTrace_masked) / 2;
         % Calc W (half-width loop)
         W = Lateral_Trace_masked - Delta;
-        vertical_Trace_masked   = (AFM_images_postHeightFit_HVOFF(strcmpi([AFM_images_postHeightFit_HVOFF.Channel_name],'Vertical Deflection') & strcmpi([AFM_images_postHeightFit_HVOFF.Trace_type],'Trace')).AFM_images_1_original);
+        vertical_Trace_masked   = (AFM_images_postHeightFit_HVOFF(strcmpi([AFM_images_postHeightFit_HVOFF.Channel_name],'Vertical Deflection') & strcmpi([AFM_images_postHeightFit_HVOFF.Trace_type],'Trace')).AFM_images_2_PostProcessed);
         vertical_Trace_masked(mask)=nan;
-        vertical_ReTrace_masked = (AFM_images_postHeightFit_HVOFF(strcmpi([AFM_images_postHeightFit_HVOFF.Channel_name],'Vertical Deflection') & strcmpi([AFM_images_postHeightFit_HVOFF.Trace_type],'ReTrace')).AFM_images_1_original);                                         
+        vertical_ReTrace_masked = (AFM_images_postHeightFit_HVOFF(strcmpi([AFM_images_postHeightFit_HVOFF.Channel_name],'Vertical Deflection') & strcmpi([AFM_images_postHeightFit_HVOFF.Trace_type],'ReTrace')).AFM_images_2_PostProcessed);                                         
         vertical_ReTrace_masked(mask)=nan;
         % convert W into force (in Newton units) using alpha calibration factor and show results. Convert N into nN
         alpha=metadata.Alpha;
@@ -231,7 +228,7 @@ function [vertForce_thirdClearing,force_forthClearing]=featureFrictionCalc1_clea
     % remove manually regions
     tmp=nnz(~isnan(force_thirdClearing));
     [~,force_forthClearing]=featureRemovePortions(force_thirdClearing,"Lateral Force\nAfter automatic clearing",idxMon, ...
-        'additionalImagesToShow',force,'additionalImagesTitleToShow','Lateral Force\nBefore clearing process','originalDataIndex',2);
+        'additionalImagesToShow',force,'additionalImagesTitleToShow','Lateral Force\nBefore clearing process','originalDataIndex',2,'normalize',false);
     vertForce_forthClearing=vertForce_thirdClearing;
     vertForce_forthClearing(isnan(force_forthClearing))=nan;
     numRemovedElements_4=tmp-nnz(~isnan(force_forthClearing));
