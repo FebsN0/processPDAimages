@@ -1,4 +1,4 @@
-function [moving_adj,fixed_adj,offset]=A7_BF_TRITIC_imageAlignment(moved,fixed,newFolder,idxMon,varargin)
+function [moving_adj,fixed_adj,offset]=A3_feature_BF_TRITIC_imageAlignment(moved,fixed,idxMon,varargin)
 % Function to align optical images to each other (TRITC after and BF to TRITC before)
 % if BF is given, it must be the first input
 
@@ -12,21 +12,18 @@ function [moving_adj,fixed_adj,offset]=A7_BF_TRITIC_imageAlignment(moved,fixed,n
     addRequired(p,'fixed')
     %Add default parameters.
     argName = 'Brightfield';    defaultVal = 'No';      addParameter(p, argName, defaultVal, @(x) ismember(x,{'No','Yes'}));
-    argName = 'saveFig';        defaultVal = 'Yes';     addParameter(p, argName, defaultVal, @(x) ismember(x,{'No','Yes'}));
-    
     % validate and parse the inputs
     parse(p,moved,fixed,varargin{:});
     clearvars argName defaultVal
 
-    if(strcmp(p.Results.saveFig,'Yes')), saveFig=1; else, saveFig=0; end
     % title and name figures based on what input and more are given
     switch p.Results.Brightfield
         case 'Yes'
             textFirstLastFig='BF preAFM and BF postAFM - PostAlignement';
-            sigma=0.4; % for Gaussian low-pass filter (smoothing). See later
+            sigma=0.4; % for Gaussian low-pass filter (smoothing). See later            
         case 'No'       
             textFirstLastFig='TRITIC preAFM and TRITIC postAFM- PostAlignement';
-            sigma=0.8;        
+            sigma=0.8;
     end
 
     % show the overlapped original images
@@ -37,17 +34,17 @@ function [moving_adj,fixed_adj,offset]=A7_BF_TRITIC_imageAlignment(moved,fixed,n
         fused_image=imfuse(moved,fixed,'falsecolor','Scaling','independent');
     end
     % dont close this figure. If BK is not fixed, then use this image to crop
-    f1=figure;
-    imshow(fused_image)
-    title(sprintf('%s - Not Aligned',textFirstLastFig),'FontSize',14)
+    f1 = figure;
+    axOriginal = axes('Parent', f1);    
+    imagesc(axOriginal, fused_image);
+    axis(axOriginal, 'image');       % keep aspect ratio    
+    title(axOriginal,sprintf('%s - Not Aligned',textFirstLastFig),'FontSize',14)
     objInSecondMonitor(f1,idxMon);
-
-    while true
-        figure(f1)
-        uiwait(msgbox('Crop the area to register the two images.',''));
+    while true        
+        uiwait(warndlg(sprintf('Crop the area to register the two images.\nNOTE: for better alignment, crop possibly outside the AFM scan area.\nObjects, especially small ones, can be drifted away from original position.'),''));        
         % close the previous figure and keep the new one to the crop part    
         % Size and position of the crop rectangle [xmin ymin width height]. Crop the last open figure.
-        [~,specs]=imcrop();
+        [~,specs]=imcrop(axOriginal);
         % find the indexes of the cropped area
         YBegin=round(specs(1,1));
         XBegin=round(specs(1,2));
@@ -60,8 +57,9 @@ function [moving_adj,fixed_adj,offset]=A7_BF_TRITIC_imageAlignment(moved,fixed,n
         reduced_fixed=fixed(XBegin:XEnd,YBegin:YEnd);
         reduced_moved=moved(XBegin:XEnd,YBegin:YEnd);
         % choose if run the automatic binarization or not
-        question='What type of traslation to perform?';
-        answer=getValidAnswer(question,'',{'Manual (buttons)','Manual (histogram)','Automatic'},3);
+        question='What type of traslation to perform?';        
+        options={'Manual (histogram)','Manual (buttons)'};
+        answer=getValidAnswer(question,'',options);
         
         % Apply a Gaussian low-pass filter (smoothing) to both images before any registration step. It reduces noise 
         % and high-frequency texture. It keeps only the large-scale structures (edges, shapes, intensity blobs).
@@ -77,52 +75,47 @@ function [moving_adj,fixed_adj,offset]=A7_BF_TRITIC_imageAlignment(moved,fixed,n
         reduced_moved_blurred=imgaussfilt(reduced_moved,sigma);
       
         %%%%%%%%%%%%%%%%%%%%%%%% SEMI- MANUAL SELECTION BY BINARIZATION OF MOVING AND FIXED AND THEN XCORR %%%%%%%%%%%%%%%%%%%%%%%%
-        if answer == 2
-            % find the point to transform separately the images fixed and moved into 0/1, similarly to step 3
-            % (A3) but twice
+        if answer == 1
+            % Since there are two images (fixed, moving), repeat the operation twice.
+            % The goal here is to binarize the images and easily align them. 
             text={'Cropped Fixed Image','Cropped Moved Image'};
             data={reduced_fixed,reduced_moved};
             for i=1:2
                 % init the not completion of manual selection
                 closest_indices=[];
                 satisfied=1;
-                eval(sprintf('f4_%d=figure;',i));
-                subplot(121), imshow(imadjust(data{i}))
-                objInSecondMonitor(eval(sprintf('f4_%d',i)),idxMon);
-                title(sprintf('Original %s',text{i}), 'FontSize',16)
-                while satisfied==1
-                    % reset every time
-                    originalData=data{i};
-                    no_sub_div=2000;
-                    [Y,E] = histcounts(data{i},no_sub_div);
-                    figure; hold on
-                    plot(Y)
-                    if any(closest_indices)
-                        scatter(closest_indices,Y(closest_indices),40,'r*')
-                    end
-                    title(text{i},'FontSize',14);
-                    pan on; zoom on;
-                    % show dialog box before continue
-                    uiwait(msgbox('Before click to continue the binarization, zoom or pan on the image for a better view',''));
-                    zoom off; pan off;
-                    closest_indices=selectRangeGInput(1,1,1:no_sub_div,Y);
-                    % close the histogram
-                    close gcf
-
-                    % if the value is lower than selected point, then 0, otherwise 1
-                    originalData(originalData<E(closest_indices))=0;
-                    originalData(originalData>=E(closest_indices))=1;
-                    if exist('subpl2','var')  && ishandle(subpl2)
-                        delete(subpl2)
-                    end
-                    subpl2=subplot(122);
-                    imshow(originalData)
-                    title(sprintf('Result Binarization of %s',text{i}), 'FontSize',16)
-                    question='Keep selection or turn again to manual selection?';
-                    satisfied=getValidAnswer(question,'',{'Continue the manual selection.','Keep current.'});       
+                ftmp=figure;
+                objInSecondMonitor(ftmp,idxMon);
+                tiledlayout(ftmp,2,2,'TileSpacing','compact');
+                % --- Subplot 1: Original AFM image (always visible) ---
+                axData_original=nexttile(1,[2 1]); cla(axData_original);
+                imshow(imadjust(data{i}),'Parent',axData_original)
+                title(axData_original,sprintf('Original %s',text{i}), 'FontSize',16)                
+                originalData=data{i};
+                no_sub_div=2000;
+                [Y,E] = histcounts(data{i},no_sub_div);
+                axHist=nexttile(2,[1 1]);
+                hold(axHist,"on"), plot(axHist,Y)
+                if any(closest_indices)
+                    scatter(axHist,closest_indices,Y(closest_indices),40,'r*')
                 end
-                close gcf
-                data{i}=originalData;
+                title(axHist,'Distribution values image','FontSize',12);
+                axData_Bin=nexttile([1 1]);                
+                tmpImg = imshow(zeros(size(originalData)),'Parent',axData_Bin);   % placeholder matrix
+                title(axData_Bin,sprintf('Result Binarization of %s',text{i}), 'FontSize',12)
+                while satisfied==1
+                    closest_indices=selectRangeGInput(1,1,axHist);
+                    % if the value is lower than selected point, then 0, otherwise 1
+                    tmpData=originalData;
+                    tmpData(tmpData<E(closest_indices))=0;
+                    tmpData(tmpData>=E(closest_indices))=1; 
+                    % Update ONLY the image, keep everything else
+                    tmpImg.CData = tmpData;
+                    question='Keep selection or turn again to manual selection?';
+                    satisfied=getValidAnswer(question,'',{'Continue the manual selection.','Keep current.'},2);       
+                end
+                close(ftmp)
+                data{i}=tmpData;
             end
             evo_reduced_fixed=data{1};
             evo_reduced_moved=data{2};
@@ -136,23 +129,11 @@ function [moving_adj,fixed_adj,offset]=A7_BF_TRITIC_imageAlignment(moved,fixed,n
             offset = round(corr_offset + rect_offset);
             xoffset = offset(1);
             yoffset = offset(2);
-
-        %%%%%%%%%%%%%%%%%%%%%%%% AUTOMATIC SELECTION %%%%%%%%%%%%%%%%%%%%%%%%
-        elseif answer == 3                   
-            % Normalize both images
-            fixed_norm = mat2gray(reduced_fixed);
-            moved_norm = mat2gray(reduced_moved);                     
-            % Compute phase correlation to estimate translation
-            output = dftregistration(fft2(fixed_norm), fft2(moved_norm), 10);            
-            % Extract shifts (x,y)
-            yoffset = round(output(3)); % note sign difference
-            xoffset = round(output(4));
-            offset=[xoffset, yoffset];
         %%%%%%%%%%%%%%%%%%%%%%%% MANUAL SELECTION BY BUTTONS %%%%%%%%%%%%%%%%%%%%%%%%
-        elseif answer==1          
+        else      
             reduced_fixed_blurred_exp = padarray(reduced_fixed_blurred, [100, 100], min(reduced_fixed_blurred(:)), 'both');
             reduced_moved_blurred_exp = padarray(reduced_moved_blurred, [100, 100], min(reduced_moved_blurred(:)), 'both');
-            [xoffset, yoffset]=A7_feature_manualAlignment(reduced_fixed_blurred_exp,reduced_moved_blurred_exp);
+            [xoffset, yoffset]=A3_feature_manualAlignment(reduced_fixed_blurred_exp,reduced_moved_blurred_exp);
             offset=[xoffset, yoffset];
         end
     
@@ -175,19 +156,14 @@ function [moving_adj,fixed_adj,offset]=A7_BF_TRITIC_imageAlignment(moved,fixed,n
             imshow(imfuse(moving_adj,fixed_adj))
         end
         title(sprintf('%s - Aligned',textFirstLastFig),'FontSize',15)
-        objInSecondMonitor(f2,idxMon);
-        uiwait(msgbox('Check on the image. Click ''OK'' to continue',''));
-        if getValidAnswer('Satisfied of the alignment?','',{'y','n'})
-            break
-        else
-            close(f2)
+        objInSecondMonitor(f2,idxMon);        
+        answer=getValidAnswer('Satisfied of the alignment? If not, restart from cropping.','',{'y','n'});
+        close(f2)
+        if answer
+            break            
         end
     end
     close(f1)
-    if saveFig
-        saveas(f2,sprintf('%s/tiffImages/resultA7_1_1_%s-Aligned',newFolder,textFirstLastFig),'tif')
-        saveas(f2,sprintf('%s/figImages/resultA7_1_1_%s-Aligned',newFolder,textFirstLastFig))
-    end
 end
 
 

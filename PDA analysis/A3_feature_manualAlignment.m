@@ -1,4 +1,4 @@
-function varargout = A7_feature_manualAlignment(fixed, moving)
+function varargout = A3_feature_manualAlignment(fixed, moving)
     % Crea la finestra principale
     hFig = figure('Name', 'Manual Image Translation', 'NumberTitle', 'off', ...
                   'Position', [100, 100, 900, 700], 'CloseRequestFcn', @on_close);
@@ -38,22 +38,15 @@ function varargout = A7_feature_manualAlignment(fixed, moving)
 
     % Zoom in e out
     uicontrol('Parent', hFig, 'Style', 'pushbutton', 'String', '+', ...
-              'Units', 'normalized', 'Position', [0.7, 0.1, 0.1, 0.05], ...
-              'Callback', @(~,~) zoom_image(1/zoom_factor));
-
+              'Units', 'normalized', 'Position', [0.7, 0.1, 0.1, 0.05], 'Callback', @(~,~) zoom_image(1/zoom_factor));
     uicontrol('Parent', hFig, 'Style', 'pushbutton', 'String', '-', ...
-              'Units', 'normalized', 'Position', [0.7, 0.05, 0.1, 0.05], ...
-              'Callback', @(~,~) zoom_image(zoom_factor));
-
+              'Units', 'normalized', 'Position', [0.7, 0.05, 0.1, 0.05], 'Callback', @(~,~) zoom_image(zoom_factor));
     % Pulsante RESET
     uicontrol('Parent', hFig, 'Style', 'pushbutton', 'String', 'Reset', ...
-              'Units', 'normalized', 'Position', [0.85, 0.05, 0.1, 0.05], ...
-              'Callback', @(~,~) reset_translation());
-
-    % Pulsante TERMINA
-    uicontrol('Parent', hFig, 'Style', 'pushbutton', 'String', 'Termina', ...
-              'Units', 'normalized', 'Position', [0.85, 0.1, 0.1, 0.05], ...
-              'Callback', @(~,~) close(hFig));
+              'Units', 'normalized', 'Position', [0.85, 0.05, 0.1, 0.05], 'Callback', @(~,~) reset_translation());
+    % Pulsante TERMINA    
+    uicontrol('Parent', hFig, 'Style', 'pushbutton', 'String', 'Terminate', ...
+              'Units', 'normalized', 'Position', [0.85, 0.1, 0.1, 0.05], 'Callback', @(src,evt) uiresume(hFig));
 
     % Movimento iterativo senza resettare la vista
     function apply_translation(direction)
@@ -115,15 +108,13 @@ function varargout = A7_feature_manualAlignment(fixed, moving)
         drawnow;
     end
 
-    % Output finale solo con offset_x e offset_y
     function on_close(~, ~)
-        assignin('base', 'offset_x', offset_x);
-        assignin('base', 'offset_y', offset_y);
         delete(hFig);
     end
 
-
-    uiwait(msgbox('Click ''OK'' to continue when the manual method is terminated',''));
+    % END PART OF THE CODE. TERMINATE WHEN CLICKED ON TERMINATE. Block interface and save figures
+    uiwait(hFig);           
+    close(hFig);
     varargout{1}=offset_x;
     varargout{2}=offset_y;
 end
