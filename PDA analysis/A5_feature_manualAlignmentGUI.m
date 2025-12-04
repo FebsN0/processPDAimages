@@ -37,6 +37,7 @@ function varargout=A9_feature_manualAlignmentGUI(AFM_IO_padded,BF_IO,AFM_data,re
     fixedImg1 = BF_IO;
     % extract only the AFM mask
     modifiedImg1=AFM_IO_padded(rect(3):rect(4),rect(1):rect(2));
+    AFM_IO_resized_original=modifiedImg1; 
     % generate the first AFM_IO_padded to show in the figure
     exeSingleCrossCorr(true)
     % init counter for all the operation. Required to save all operation done in order to modify AFM data
@@ -150,7 +151,7 @@ function varargout=A9_feature_manualAlignmentGUI(AFM_IO_padded,BF_IO,AFM_data,re
         score=1;                    set(hScoreCCText, 'String', ['Score (normalized): ' num2str(score)]);
         % original images
         fixedImg1 = BF_IO;
-        modifiedImg1 = AFM_IO;
+        modifiedImg1 = AFM_IO_resized_original;
         AFM_data=AFM_data_original;
         % restore the pre-crossCorrelation
         AFM_IO_padded=[];
