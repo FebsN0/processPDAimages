@@ -228,7 +228,7 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
                 histogram(H_FR,edgesPDA,'DisplayName','Distribution height','Normalization','percentage');
                 legend({'Background','Foreground'},'FontSize',15)
                 xlabel(sprintf('Feature height (nm)'),'FontSize',15), ylabel('Percentage %','FontSize',15), grid minor, grid on
-                title(sprintf('Distribution PostProcessed Height (Percentile %d°)',percentile),'FontSize',20)
+                title(sprintf('Distribution PostProcessed Height (Percentile %.0f°)',percentile),'FontSize',20)
                 objInSecondMonitor(f_heightDistribution,idxMon);     
                 saveFigures_FigAndTiff(f_heightDistribution,folderSaveFig,'resultA2_end_6_OptHeightDistribution_FR_BK')
                 % Since now there is the assembled mask

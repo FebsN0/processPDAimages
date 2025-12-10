@@ -13,8 +13,10 @@ function [outputme] = A6_feature_corrForceFluorescence(X_Data,Y_Data,idxMon,newF
     argName = 'FigFilename';    defaultVal = 'AA';                                      addParameter(p,argName,defaultVal);
     argName = 'Xlimit';         defaultVal = ([]);                                      addParameter(p,argName,defaultVal);
     argName = 'Ylimit';         defaultVal = ([]);                                      addParameter(p,argName,defaultVal);
-    argName = 'MType';          defaultVal = 'o';                                       addParameter(p,argName,defaultVal);
-    argName = 'MCoulor';        defaultVal = 'k';                                       addParameter(p,argName,defaultVal);
+    argName = 'LineCoulor';     defaultVal = 'r';                                       addParameter(p,argName,defaultVal);
+    argName = 'LineWidth';      defaultVal = 1.5;                                       addParameter(p,argName,defaultVal);
+    argName = 'MarkerType';     defaultVal = 'o';                                       addParameter(p,argName,defaultVal);
+    argName = 'MarkerColor';    defaultVal = 'k';                                       addParameter(p,argName,defaultVal);
     argName = 'NumFig';         defaultVal = '';                                        addParameter(p,argName,defaultVal);
 
     parse(p,varargin{:});
@@ -98,7 +100,7 @@ function [outputme] = A6_feature_corrForceFluorescence(X_Data,Y_Data,idxMon,newF
      
     ftmp=figure('Visible','off'); hold on
     try
-        errorbar(x_VDH_B,y_VDH_B,stde_VDH_B,'MarkerFaceColor',sprintf('%c',p.Results.MCoulor),'MarkerEdgeColor',sprintf('%c',p.Results.MCoulor),'Marker',sprintf('%c',p.Results.MType));
+        errorbar(x_VDH_B,y_VDH_B,stde_VDH_B,'Color',sprintf('%c',p.Results.LineCoulor),'MarkerFaceColor',sprintf('%c',p.Results.MarkerColor),'MarkerEdgeColor',sprintf('%c',p.Results.MarkerColor),'Marker',sprintf('%c',p.Results.MarkerType));
     catch
         errorbar(x_VDH_B,y_VDH_B,stde_VDH_B,'ok','MarkerFaceColor',[0 0 0]);
     end
@@ -110,7 +112,7 @@ function [outputme] = A6_feature_corrForceFluorescence(X_Data,Y_Data,idxMon,newF
     if(~isempty(p.Results.Ylimit))
         xlim(p.Results.Ylimit)
     else
-        xlim padded
+        ylim padded
     end    
     grid on, grid minor
     xlabel(p.Results.XAxL,'FontSize',15);
@@ -119,5 +121,5 @@ function [outputme] = A6_feature_corrForceFluorescence(X_Data,Y_Data,idxMon,newF
         title(p.Results.FigTitle,'FontSize',20);
     end    
     objInSecondMonitor(ftmp,idxMon);
-    saveFigures_FigAndTiff(ftmp,newFolder,sprintf('resultA_END_%d_%s',p.Results.NumFig,p.Results.FigFilename))
+    saveFigures_FigAndTiff(ftmp,newFolder,sprintf('resultEND_%d_%s',p.Results.NumFig,p.Results.FigFilename))
 end

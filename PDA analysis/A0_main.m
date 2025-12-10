@@ -129,7 +129,7 @@ if step2Start<4
     TRITIC_Before=TRITICdata.PRE;
     TRITIC_After=TRITICdata.POST;    
     % Produce the binary IO of Brightfield
-    [BF_Mic_Image_IO,TRITIC_Before,TRITIC_After,~]=A4_Mic_to_Binary(BF_Mic_Image_aligned,idxMon,SaveFigFolder,'TRITIC_before',TRITIC_Before,'TRITIC_after',TRITIC_After); 
+    [BF_Mic_Image_IO,TRITIC_Before,TRITIC_After]=A4_Mic_to_Binary(BF_Mic_Image_aligned,idxMon,SaveFigFolder,'TRITIC_before',TRITIC_Before,'TRITIC_after',TRITIC_After); 
     clear BF_Mic_Image_aligned 
     save(fullfile(SaveFigFolder,'resultsData_4_BF_TRITIC_binarization'))
 end

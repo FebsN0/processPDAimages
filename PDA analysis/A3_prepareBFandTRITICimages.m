@@ -72,6 +72,7 @@ function varargout=A3_prepareBFandTRITICimages(folderResultsImg,idxMon,nameExper
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%%% EXTRACT TRITIC IMAGES %%%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+        flagSubfolders=false;
         allFiles=dir(fullfile(filePathND2));
         dirsIDX=[allFiles.isdir];
         subDirs= allFiles(dirsIDX);
@@ -84,8 +85,10 @@ function varargout=A3_prepareBFandTRITICimages(folderResultsImg,idxMon,nameExper
                 options{i}=sprintf("Subfolder %s",subDirs(i).name);
             end
             choice=getValidAnswer(question,'',options);
+            subDirName=options{choice};
             filePathND2_sub=fullfile(filePathND2,subDirs(choice).name);
             fileList = dir(fullfile(filePathND2_sub, '*.nd2'));
+            flagSubfolders=true;
         end
         pattern = '(?i)(?<=TRITIC\w*)\d+(?=ms)';  
         matches= regexp({fileList.name}, pattern, 'match');   % returns cell array, each cell may be empty or a cell array of matches
@@ -105,7 +108,7 @@ function varargout=A3_prepareBFandTRITICimages(folderResultsImg,idxMon,nameExper
         % in case not found, manual selection
         if isempty(beforeFiles) || isempty(afterFiles)
             error('Issues in finding the files. Check the filenames');  
-        % in case there are multiple file with same timeExp ==> for example, because of different Gain
+        % in case there are multiple file with same timeExp ==> for example, because of different Gain all saved in the same directory
         elseif length(beforeFiles)==2 || length(afterFiles)==2
              selectedOptions = selectOptionsDialog("Multiple file with same timeExp. Which select?",false,beforeFiles,afterFiles);
              beforeFiles=beforeFiles{selectedOptions{1}};
@@ -114,12 +117,22 @@ function varargout=A3_prepareBFandTRITICimages(folderResultsImg,idxMon,nameExper
         % extract the TRITIC data. Note: the two figures that will be saved
         % are scaled differently, so the direct comparison on the images is
         % not correct.
-        beforeFiles=fullfile(filePathND2_sub,beforeFiles{:});
-        afterFiles=fullfile(filePathND2_sub,afterFiles{:});        
-        filenameND2='resultA3_2_1_TRITIC_Before_Stimulation'; titleImage=sprintf('TRITIC Before Stimulation - timeExp: %s',timeExp);
-        [TRITIC_ImagePRE,metaData_TRITIC]=selectND2file(folderResultsImg,filenameND2,titleImage,idxMon,beforeFiles);               
-        filenameND2='resultA3_2_2_TRITIC_After_Stimulation'; titleImage=sprintf('TRITIC After Stimulation - timeExp: %s',timeExp);
-        TRITIC_ImagePOST=selectND2file(folderResultsImg,filenameND2,titleImage,idxMon,afterFiles);
+        if flagSubfolders
+            beforeFiles=fullfile(filePathND2_sub,beforeFiles{:});
+            afterFiles=fullfile(filePathND2_sub,afterFiles{:});
+            titleImagePRE=sprintf('TRITIC Before Stimulation - timeExp: %s - %s',timeExp,subDirName);
+            titleImagePOST=sprintf('TRITIC After Stimulation - timeExp: %s - %s',timeExp,subDirName);
+        else
+            beforeFiles=fullfile(filePathND2,beforeFiles);
+            afterFiles=fullfile(filePathND2,afterFiles);   
+            titleImagePRE=sprintf('TRITIC Before Stimulation - timeExp: %s',timeExp);
+            titleImagePOST=sprintf('TRITIC After Stimulation - timeExp: %s',timeExp);
+        end
+        
+        filenameND2='resultA3_2_1_TRITIC_Before_Stimulation';
+        [TRITIC_ImagePRE,metaData_TRITIC]=selectND2file(folderResultsImg,filenameND2,titleImagePRE,idxMon,beforeFiles);               
+        filenameND2='resultA3_2_2_TRITIC_After_Stimulation'; 
+        TRITIC_ImagePOST=selectND2file(folderResultsImg,filenameND2,titleImagePOST,idxMon,afterFiles);
         close all       
         metadata.TRITIC=metaData_TRITIC;
         

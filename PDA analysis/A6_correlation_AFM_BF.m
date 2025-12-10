@@ -80,8 +80,8 @@ function dataResultsPlot=A6_correlation_AFM_BF(AFM_data,AFM_IO_Padded,metadataAF
         normFactor=A10_feature_normFluorescenceHeat(mainPathOpticalData,timeExp,gainTRITIC,nameExperiment,idxMon);          
     end    
     % plot original Delta
-    labelBar='Absolute fluorescence increase (A.U.)'; 
-    titleData1='Delta Fluorescence (After-Before, original)';
+    labelBar="Absolute fluorescence increase (A.U.)"; 
+    titleData1="Delta Fluorescence (After-Before, original)";
     nameFile='resultA6_1_DeltaFluorescenceOriginal';
     showData(idxMon,SeeMe,Delta,titleData1,newFolder,nameFile,'labelBar',labelBar,'lenghtAxis',size_meterXpix*size(Delta))
    
@@ -101,10 +101,13 @@ function dataResultsPlot=A6_correlation_AFM_BF(AFM_data,AFM_IO_Padded,metadataAF
     % crystal/PDA/polymer == 1   ||   background = 0
     mask_original=logical(AFM_IO_Padded);   
 
-    % There may be NaN values in height channel that have been manually removed.
-    %   - negative and zeros values
+    % There may be NaN values in height and lateral channel that have been manually removed at the end of the Height/Lateral data processing
+    % steps. To avoid vector incompatibilities during the correlation calculation, prepare the mask before starting the additional masking
     mask_validValues= ~isnan(AFM_data(idx_H).AFM_padded);  
     mask_original = mask_original & mask_validValues;
+    mask_validValues= ~isnan(AFM_data(idx_LD).AFM_padded);
+    mask_original = mask_original & mask_validValues;
+    
     % obtain the mask from Delta if it exists. 
     if ~flag_onlyAFM              
         % obtain the minimum value of background so Delta can be substracted by such a value
@@ -142,13 +145,16 @@ function dataResultsPlot=A6_correlation_AFM_BF(AFM_data,AFM_IO_Padded,metadataAF
             f1=figure('Visible','off');
         end 
         hold on
-        histogram(Delta_glass_ADJ,200,"DisplayName","Delta Background (adjusted)"),         
-        histogram(Delta_ADJ_firstMasking,200,"DisplayName","Delta Foreground (adjusted)")        
+        histogram(Delta_glass_ADJ,200,"DisplayName","Delta Background (adjusted)",'Normalization','pdf'),         
+        histogram(Delta_ADJ_firstMasking,200,"DisplayName","Delta Foreground (adjusted)",'Normalization','pdf')        
         legend('FontSize',15), grid on, grid minor
-        xlabel('Absolute Fluorescence','FontSize',15)
+        xlabel('Absolute Fluorescence','FontSize',15), ylabel("PDF",'FontSize',15)
         pHigh=max(prctile(Delta_glass_ADJ(:),99),prctile(Delta_ADJ_firstMasking(:),99));
         pLow=min(prctile(Delta_glass_ADJ(:),1e-4),prctile(Delta_ADJ_firstMasking(:),1e-4));
-        xlim([pLow pHigh]), ylim tight
+        x1=round(pLow,3,TieBreaker="minusinf");
+        x2=round(pHigh,3,TieBreaker="plusinf");
+        xlim([x1 x2]), ylim tight
+        xticks([linspace(x1,x2,10)])
         title(sprintf("Distribution Delta BK-FR (1e^-^4° - 99° percentile)"),"FontSize",20)
         objInSecondMonitor(f1,idxMon);
         nameFig='resultA6_2_DistributionDelta_FR_BK';
@@ -158,22 +164,22 @@ function dataResultsPlot=A6_correlation_AFM_BF(AFM_data,AFM_IO_Padded,metadataAF
             titleD2="Delta Fluorescence Background (shifted)";
             nameFile='resultA6_3_Fluorescence_PDA_BackGround';
             showData(idxMon,SeeMe,Delta_ADJ,titleD1,newFolder,nameFile,'labelBar',labelBar,'lenghtAxis',size_meterXpix*size(Delta_ADJ), ...
-                'extraData',Delta_glass_ADJ,'extraTitles',titleD2,'extraLengthAxis',{size_meterXpix*size(Delta_glass_ADJ)})
+                'extraData',Delta_glass_ADJ,'extraTitles',titleD2,'extraLengthAxis',{size_meterXpix*size(Delta_glass_ADJ)},'extraLabel',labelBar)
         end
     end
     % obtain the mask from each channel and ignore:
-    %   - eventual NaN values (there may be NaN values in height channel that have been manually removed)
     %   - negative and zeros values
+    % then merge the valid mask with the main mask
     idx=idx_H |idx_LD | idx_VD;
     mask = mask_first;
     for i=1:length(idx)
         if idx(i)
-            mask_validValues= AFM_data(i).AFM_padded>0 | ~isnan(AFM_data(i).AFM_padded);     
-            mask = mask & mask_validValues;                 % merge the mask with the previous mask or with original AFM_IO_Padded 
+            mask_validValues= AFM_data(i).AFM_padded>0;
+            mask = mask & mask_validValues;
         end
     end
     % obtain the definitive mask considering the removal of:
-    % 1)    Lateral Force > 1.2*maxSetpoint
+    % 1)    Lateral Force > 2*maxSetpoint
     % 2)    99°percentile height
     mask_second=mask; % keep the less "aggressive mask"
     % extract meaningful lateral force. Use setpoint+100% as upper limit:
@@ -210,7 +216,7 @@ function dataResultsPlot=A6_correlation_AFM_BF(AFM_data,AFM_IO_Padded,metadataAF
 
     showData(idxMon,SeeMe,mask_first,{'First Mask';'Delta Adjusted'},newFolder,'resultA6_4_FirstMask','binary',true,'lenghtAxis',size_meterXpix*size(mask_first))
     showData(idxMon,SeeMe,mask_second,{'Second Mask';'Positive values only from each channel'},newFolder,'resultA6_5_SecondMask','binary',true,'lenghtAxis',size_meterXpix*size(mask_second))
-    showData(idxMon,SeeMe,mask_third,{'Third Mask';'99° percentile and LD < 2*maxSetP'},newFolder,'resultA6_6_ThirdMask','binary',true,'lenghtAxis',size_meterXpix*size(mask_third))   
+    showData(idxMon,SeeMe,mask_third,{'Third Mask';'Height 99° percentile + LD < 2*maxSetP'},newFolder,'resultA6_6_ThirdMask','binary',true,'lenghtAxis',size_meterXpix*size(mask_third))   
     clear masking mask_validValues 
     
     %%%%%%%---------- Finally, applying the mask_definitive to all the data! ----------%%%%%%%

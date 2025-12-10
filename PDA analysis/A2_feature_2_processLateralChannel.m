@@ -34,7 +34,7 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
     else
         FitOrderHVON_Lat=p.Results.FitOrderHVON_Lat;
     end
-    if strcmp(FitOrderHVON_Lat,'Low'), limit=3; elseif strcmp(fitOrder,'Medium'), limit=6; else, limit=9; end       
+    if strcmp(FitOrderHVON_Lat,'Low'), limit=1; elseif strcmp(fitOrder,'Medium'), limit=2; else, limit=3; end       
     FitOrderHVOFF_Height=p.Results.FitOrderHVOFF_Height;
     clearvars argName defaultVal p varargin    
     if ~exist(fullfile(newFolder,'TMP_DATA_3_LATERAL_PART.mat'),'file')
@@ -78,7 +78,6 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
         [~,Lateral_BK_1]=dynamicOutliersRemoval(Lateral_BK_1);        
         % obtain the planeFit and save fitting's metrics
         [correction_plane,metricsBestPlaneFit]=planeFitting_N_Order(Lateral_BK_1,limit);
-        varargout{2}=metricsBestPlaneFit;
         % correct the raw original data by applyting the correction_plane
         Lateral_Image_2_planeFit = Lateral_Image_1_Raw - correction_plane;
         
@@ -90,7 +89,7 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
         %%%%---------------------%%%%%
         %%%%%------- plot -------%%%%%
         %%%%---------------------%%%%%      
-        titleData1='PlaneFit Background Lateral Deflection';
+        titleData1='Plane Fitted Background';
         titleData2={'Lateral Deflection'; 'After PlaneFit correction'};
         nameFig='resultA2_10_planeBKfit_LateralDeflectionCorr';    
         figTmp=showData(idxMon,true,correction_plane,titleData1,newFolder,nameFig,'normalized',norm,'labelBar',unitDataLabel, ...
@@ -137,22 +136,19 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
             answ=getValidAnswer('Satisfied of the fitting? If not, keep the original and skip to the next part.','',{'y','n'});
             close(figTmp)
             if answ
-                varargout{3}=metricsBestLineFit;  
                 % take the definitive last figures
                 figDistr=figDistrTmp;
                 figSingleLine=figSingleLineTmp;
-                titleData1='Line x Line Fitted Background'; titleData2={"Lateral Deflection - Trace";"Plane+LineByLine Fitted"};
+                titleData1='Line x Line Fitted Background'; titleData2={"Lateral Deflection";"Plane+LineByLine Fitted"};
                 nameFig='resultA2_11_LineBKfit_LateralDeflection';
                 showData(idxMon,false,baselineFit,titleData1,newFolder,nameFig,'normalized',norm,'labelBar',unitDataLabel, ...
                     'extraData',{Lateral_Image_3_lineFit},'extraTitle',{titleData2},'extraNorm',{norm},'extraLabel',{unitDataLabel});
-                noFitLine=false;
-            else
-                noFitLine=true;            
+                noFitLine=false;        
             end            
         end
         if noFitLine
-            varargout{3}="LineByLine Fitting not available (user skipped or refused this step)";
             Lateral_Image_3_lineFit=Lateral_Image_2_planeFit;
+            metricsBestLineFit=[];
         end
         % Finalise the distribution and signleLineAnalysis figures
         % adjust xlim, especially show the 99.5 percentile of the data in the distribution
@@ -171,9 +167,9 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
         saveFigures_FigAndTiff(figSingleLine,newFolder,nameResults)
         close all
         clear nameResults titleData* noFitLine
-        save(fullfile(newFolder,'TMP_DATA_3_LATERAL_PART'),"Lateral_Image_3_lineFit","idxLine",'vertical_Trace')
+        save(fullfile(newFolder,'TMP_DATA_3_LATERAL_PART'),"Lateral_Image_3_lineFit","idxLine",'vertical_Trace','metricsBestPlaneFit','metricsBestLineFit');
     else
-        load(fullfile(newFolder,'TMP_DATA_3_LATERAL_PART.mat'),'Lateral_Image_3_lineFit','idxLine','vertical_Trace')
+        load(fullfile(newFolder,'TMP_DATA_3_LATERAL_PART.mat'),'Lateral_Image_3_lineFit','idxLine','vertical_Trace','metricsBestPlaneFit','metricsBestLineFit')
     end
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%%%%%%--------- CONVERSION LATERAL DEFLECTIO [V] ==> LATERAL FORCE [N] ---------%%%%%%%%%
@@ -252,10 +248,21 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
     labelFig='Force [nN]';
     showData(idxMon,SeeMe,Corrected_LD_Trace_cleared*1e9,titleData,newFolder,nameFig,'labelBar',labelFig)
 
+    % show background of LATERAL FORCE to see eventually something interesting
+    Corrected_LD_Trace_BK=Corrected_LD_Trace;
+    Corrected_LD_Trace_BK(AFM_height_IO==1)=nan;
+    Corrected_LD_Trace_BK=filloutliers(Corrected_LD_Trace_BK,nan);
+    titleData={'Corrected Background Lateral Force'; "NOTE: Only for show - MAD filloutliers"};
+    nameFig='resultA2_18_BackgroundLateralDeflectionWithoutOutliers';
+    labelFig='Force [nN]';
+    showData(idxMon,SeeMe,Corrected_LD_Trace_BK*1e9,titleData,newFolder,nameFig,'labelBar',labelFig)
+
     % save the corrected lateral force into cropped AFM image
     AFM_Elab=AFM_data;    
     AFM_Elab(strcmpi([AFM_data.Channel_name],'Lateral Deflection') & strcmpi([AFM_data.Trace_type],'Trace')).AFM_images_2_PostProcessed=Corrected_LD_Trace;
     varargout{1}=AFM_Elab; 
+    varargout{2}=metricsBestPlaneFit;
+    varargout{3}=metricsBestLineFit;
     varargout{4}=FitOrderHVON_Lat;
     varargout{5}=FitOrderHVOFF_Height;
     varargout{6}=avg_fc;

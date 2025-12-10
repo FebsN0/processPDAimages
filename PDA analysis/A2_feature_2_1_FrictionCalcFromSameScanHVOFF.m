@@ -143,6 +143,7 @@ function [avg_fc,FitOrderHVOFF_Height] = A2_feature_2_1_FrictionCalcFromSameScan
         legend(ax,"fontsize",13),
         title(ax,"Distribution Lateral Data Trace-Retrace (0.5-99.5 percentile shown).",'FontSize',20)   
         nameFig="resultA3_friction_3_distribution_LateralData";
+        grid on, grid minor
         objInSecondMonitor(figDistr,idxMon)
         % apply indipently of the used method different cleaning outliers steps
         %   first clearing: filter out anomalies among vertical data by threshold betweem trace and retrace
@@ -171,7 +172,7 @@ end
     
 
 %%%%%%%% CLEARING STEPS %%%%%%%%      
-function [vertForce_thirdClearing,force_forthClearing]=featureFrictionCalc1_clearingAndPlotData(vertical_Trace,vertical_ReTrace,setpoints,force,idxSection,newFolder,idxMon)
+function [vertForce_forthClearing,force_forthClearing]=featureFrictionCalc1_clearingAndPlotData(vertical_Trace,vertical_ReTrace,setpoints,force,idxSection,newFolder,idxMon)
 % NOTE: doesnt matter the used method. Its just the mask applying and removal of common outliers
 % Remove outliers among Vertical Deflection data using a defined threshold of 4nN 
 % ==> trace and retrace in vertical deflection should be almost the same.
@@ -209,7 +210,7 @@ function [vertForce_thirdClearing,force_forthClearing]=featureFrictionCalc1_clea
     numRemovedElements_2=numRemovedElements_2/totElementsBeforeClearing*100;
     %%%%%% THIRD CLEARING %%%%%%%
     % remove from lateral data those values 20% higher than the setpoint
-    perc=6/5; % 20% more than the value
+    perc=7/5; % 40% more than the value
     force_thirdClearing=force_secondClearing;
     vertForce_thirdClearing=vertForce_secondClearing;
     tmp=nnz(~isnan(force_secondClearing));
@@ -239,14 +240,12 @@ function [vertForce_thirdClearing,force_forthClearing]=featureFrictionCalc1_clea
     if restClearing < 5*totElementsBeforeClearing/100
         warndlg(sprintf("ALARM: after clearing, background lateral/vertical data have less than 5%% (%d) of the total elements before cleaning (%d).\nSomething wrong in the data!",restClearing,totElementsBeforeClearing))
     end        
-    percResidues=restClearing/totElementsBeforeClearing*100;
     nameFig="resultA3_friction_2_LateralAndVerticalData_postCleared";
-    titleData1="Vertical Force - cleared";
-    titleData2={sprintf("Lateral Force - %.2f%% of original dataset",percResidues);...
-        sprintf("VD-4nN (%.2f%%), LD outliers (%.2f%%), LD>120%%*setpoint (%.2f%%), manualRemoval (%.2f%%)",numRemovedElements_1,numRemovedElements_2,numRemovedElements_3,numRemovedElements_4)};
-    titleData3="Lateral Force - raw";
+    titleData1="Lateral Force - raw";
+    titleData2={"Lateral Force - 1st+2nd clearing";sprintf("VD-4nN (%.2f%%), LD outliers (%.2f%%)",numRemovedElements_1,numRemovedElements_2)};
+    titleData3={"Lateral Force - 3rd+4th clearing";sprintf("LD>120%%*setpoint (%.2f%%), manualRemoval (%.2f%%)",numRemovedElements_3,numRemovedElements_4)};    
     labelText="Force [nN]";
-    showData(idxMon,true,vertForce_forthClearing,titleData1,newFolder,nameFig,"labelBar",labelText,...
-        "extraData",{force_forthClearing,force},...
+    showData(idxMon,true,force,titleData1,newFolder,nameFig,"labelBar",labelText,...
+        "extraData",{force_secondClearing,force_forthClearing},...
         "extraTitles",{titleData2,titleData3},"extraLabel",{labelText,labelText});
 end
