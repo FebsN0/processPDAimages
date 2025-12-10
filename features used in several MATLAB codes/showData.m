@@ -90,13 +90,14 @@ function fig=showData(idxMon,SeeMe,data1,titleData1,nameDir,nameFig,varargin)
             mkdir(sprintf('%s/tiffImages',nameDir))
             mkdir(sprintf('%s/figImages',nameDir))
         end
-        fullnameFig=fullfile(nameDir,"tiffImages",nameFig);
-        saveas(fig,fullnameFig,'tiff')
-        fullnameFig=fullfile(nameDir,"figImages",nameFig);
-        saveas(fig,fullnameFig)
+        if ~SeeMe
+            closeImmediate=true;
+        else
+            closeImmediate=false;
+        end
+        saveFigures_FigAndTiff(fig,nameDir,nameFig,'closeImmediately',closeImmediate);        
     end
-    if ~SeeMe && saveFig
-        close(fig)
+    if ~SeeMe & saveFig      
         clear fig
     end
 end
@@ -165,14 +166,25 @@ function showSingleData(ax,data, norm, titleData,labelBar,bin,AxisLength)
     else
         title(parts{1}, 'FontSize', 17,'Units', 'normalized', 'Position', [0.5, 1.02, 0]);
     end
+
+    if size(data,2)<size(data,1)/3
+        nXtickElements=5;
+    else
+        nXtickElements=11;
+    end
+
     % change the axis from pixel to micrometer unit
     if ~isempty(AxisLength)
         xlabel(sprintf('slow direction (%s)',unitsX),'FontSize',14);
-        ylabel(sprintf('fast direction (%s)',unitsY),'FontSize',14);
-        xticks(round(linspace(0,max(x),11)));
+        ylabel(sprintf('fast direction (%s)',unitsY),'FontSize',14);       
+        xticks(round(linspace(0,max(x),nXtickElements)));
+        xtickangle(0)
         yticks(round(linspace(0,max(y),11)));
     else
         xlabel('slow direction','FontSize',14), ylabel('fast direction','FontSize',14)    
+        xticks(round(linspace(min(x),max(x),nXtickElements)));
+        xtickangle(0)
+        yticks(round(linspace(min(x),max(y),11)));
     end
     axis on, axis equal
     xlim tight, ylim tight

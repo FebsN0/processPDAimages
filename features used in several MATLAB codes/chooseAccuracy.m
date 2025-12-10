@@ -1,5 +1,5 @@
 function accuracy=chooseAccuracy(question)
-    options={'Low (1-3)','Medium (1-6)','High (1-9)'};
+    options={'Max FitOrder: 1','Max FitOrder: 2','Max FitOrder: 3'};
     answer=getValidAnswer(question,'',options);
     switch answer
         case 1

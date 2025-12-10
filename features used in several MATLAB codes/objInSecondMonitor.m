@@ -4,11 +4,8 @@ function idMon=objInSecondMonitor(varargin)
 % - idMon = which ID monitor to put figures. Generated after first empty call function
 %%% OUTPUT first call function.
 % - idMon = Get the choosen ID of the monitor where to show figs from the first call
-
-    % identify all the monitors
+    % identify all the monitors and its position
     screens = get(0, 'MonitorPositions'); % get the position of the monitors and their size  
-    % The root origin (bottom-left of the primary monitor)
-    primaryOrigin = screens(end, 1:2);   % MATLAB puts the *primary* monitor last
 
     % first function call, empty input. Identify monitors and choose which
     % one use for showing figures
@@ -16,27 +13,39 @@ function idMon=objInSecondMonitor(varargin)
         if nargout ~= 1
             error("Output must be declared when this function is called without input!")
         end
+        
+        % since TASKBAR "eats" pixels, consider the effective space
         numScreens = size(screens, 1);
-        for i = 1:numScreens    
-        % Extract screen position and size
-            left   = screens(i, 1);       bottom = screens(i, 2);
-            width  = screens(i, 3);       height = screens(i, 4);
-        % Define proportional window size (20% of screen size) to identify them
+        usable=zeros(numScreens,4);
+        for i=1:numScreens
+            % Create an invisible temporary figure to detect usable area
+            tmp = figure('Visible','off','Units','pixels',...
+                         'Position',[screens(i,1)+10 screens(i,2)+10 300 200]);
+            drawnow;
+            % Maximize it
+            set(tmp,'WindowState','maximized');
+            drawnow;
+            usable(i,:) = get(tmp,'Position');  % usable area inside that monitor
+            delete(tmp);
+        
+            % Extract screen position and size
+            left   = usable(i,1);      bottom = usable(i,2);
+            width  = screens(i,3);   height = screens(i,4);
+            % Define proportional window size (20% of screen size) to identify them
             winWidth  = round(0.2 * width);
             winHeight = round(0.2 * height);    
-         % Center the window on the screen
-            winLeft   = left - primaryOrigin(1) + round((width - winWidth) / 2);
-            winBottom = bottom - primaryOrigin(2) + round((height - winHeight) / 2);
-        
-        % Create the small windows and put at the center showing which
-        % monitor they correspond
+             % Locate the window on the screen at 10% of the left-bottom corner
+            relativeXpositionXCenterScreen= left+width*0.5-winWidth/2 ;
+            relativeYpositionXCenterScreen= bottom+height*0.5-winHeight/2;
+            % Create the small windows and put at the center showing which
+            % monitor they correspond
             figure('Name', ['Monitor ' num2str(i)], 'NumberTitle', 'off',...
-                'Position', [winLeft, winBottom, winWidth, winHeight]);          
+                'Position', [relativeXpositionXCenterScreen, relativeYpositionXCenterScreen, winWidth, winHeight],'Visible','on');
             uicontrol('Style', 'text', 'String', ['This is Monitor ' num2str(i)], ...
                        'FontSize', 14, 'Units', 'normalized', ...
                        'Position', [0.2 0.4 0.6 0.2]);
         end
-        % choose where to show figures if there are more monitors
+            % choose where to show figures if there are more monitors
         if numScreens > 1
             question= sprintf('More monitor detected!\nIn which monitor do you want to show the maximized windows with the figures/plots?');
             options= arrayfun(@(x) {"Monitor " + string(x)}, 1:numScreens);

@@ -123,6 +123,7 @@ function varargout = lineByLineFitting_N_Order(data,limit,varargin)
                 fittedline=resultsCheckBorders{1};
                 fit_decision_final_tmp=resultsCheckBorders{2};
                 flagLineMissingDataBorder=resultsCheckBorders{3};
+                flagKeepOriginalData=resultsCheckBorders{4};
             end            
         else
             [fittedline,fit_decision_final_tmp]=bestFit(x,fit_decision);            
@@ -131,6 +132,9 @@ function varargout = lineByLineFitting_N_Order(data,limit,varargin)
         % Save fitting decisions
         fit_decision_final(i) = fit_decision_final_tmp;       
         % Generate baseline using the best polynomial fit
+        if flagCheckBorder && flagKeepOriginalData
+            allBaseline(:, i) = fastScanLine;
+        end
         allBaseline(:, i) = fittedline;
         % Progress update
         waitbar(i/num_lines, wb, sprintf('AIC-based background fitting - Line %d of %d completed',i, num_lines));
@@ -187,8 +191,9 @@ function  resultsCheckBorders=checkBorders(xData,yData,fit_decision,flagLineMiss
     resultsCheckBorders{1}=fittedline;
     resultsCheckBorders{2}=fit_decision_final_tmp;
     resultsCheckBorders{3}=flagLineMissingDataBorder; % dont update, it's already zero
-    % if first or last element of xData (=idx of where BK exp data starts) is 10% far from 1* and N* (entire array lenght) 
-    if xData(1) > length(x)*10/100 || (length(x)-xData(end)) > length(x)*10/100
+    resultsCheckBorders{4}=false; % flag to indicate that the raw data must be kept and no process
+    % if first or last element of xData (=idx of where BK exp data starts) is 20% far from 1* and N* (entire array lenght) 
+    if xData(1) > length(x)*20/100 || (length(x)-xData(end)) > length(x)*20/100
         % additional check: if the average of the last 10% elements of fitted line significantly differ 
         % by over 30% from the 10% of real data to fit        
         startX_endBorder=xData(end-round(length(yData)*5/100));     % last border
@@ -251,34 +256,44 @@ function  resultsCheckBorders=checkBorders(xData,yData,fit_decision,flagLineMiss
             limit=numel(fit_decision);
             % prepare what fit metrics should be considered if the current is not ok 
             idxFitToConsider=true(1,limit);             
-            flagContinue=true; 
-            while flagContinue
-                idxFitToConsider(bestFitOrder)=false;
-                options={...
-                    sprintf('Exclude the best current fitOrder (%d) and find the next best fit',bestFitOrder),...
+            flagContinue=true;
+            if limit>1
+                options={...                                        
                     'Transform the entire line into NaN vector which interpolation will be followed at the end.',...
-                    'Keep the current and continue to the next line.'};
+                    'Keep the current fitted line and continue to the next line.',...
+                    'Don''t perform any operation at the current line and keep the original raw line',...
+                    sprintf('Exclude the best current fitOrder (%d) and find the next best fit',bestFitOrder)};
+            else
+                options={...                    
+                    'Transform the entire line into NaN vector which interpolation will be followed at the end.',...
+                    'Keep the current and continue to the next line.',...
+                    'Don''t perform any operation at the current line and keep the original raw line'};
+            end
+            while flagContinue
+                idxFitToConsider(bestFitOrder)=false;                
                 % dont remove stop here to zoom the figure
-                operations=getValidAnswer(question,'',options,3);
-                switch operations
-                    case 3
-                        break
-                    case 1
-                        if nnz(idxFitToConsider)<1            
-                            idxstext = arrayfun(@(x) sprintf('fitOrder: %d', x), 1:limit, 'UniformOutput', false);
-                            idxFitToConsider=getValidAnswer('Operation not allowed: all the fitOrder already excluded. Choose the final fitOrder.','',idxstext);
-                            flagContinue=false;
-                        end                           
-                    case 2
-                        fittedline = NaN; % Mark for interpolation later
-                        % empty line
-                        fit_decision_final_tmp = struct( ...
-                            'bestFitOrder', 'None. Trasformed into NaN', ...
-                            'AIC_bestValue', [], ...
-                            'bestCoeff', [], ...
-                            'SSE', [], ...
-                            'R2', []);
-                        break
+                operations=getValidAnswer(question,'',options,2);
+                if operations==2                    
+                    break
+                elseif operations==4
+                    if nnz(idxFitToConsider)<1            
+                        idxstext = arrayfun(@(x) sprintf('fitOrder: %d', x), 1:limit, 'UniformOutput', false);
+                        idxFitToConsider=getValidAnswer('Operation not allowed: all the fitOrder already excluded. Choose the final fitOrder.','',idxstext);
+                        flagContinue=false;
+                    end                                   
+                else
+                    fittedline = NaN; % Mark for interpolation later
+                    % empty line
+                    fit_decision_final_tmp = struct( ...
+                        'bestFitOrder', 'None. Trasformed into NaN', ...
+                        'AIC_bestValue', [], ...
+                        'bestCoeff', [], ...
+                        'SSE', [], ...
+                        'R2', []);
+                    if operations==3
+                        resultsCheckBorders{4}=true;
+                    end
+                    break
                 end
                 % if here, then operation 1. exclude the current model and reiterate the best model                
                 [fittedline,fit_decision_final_tmp]=bestFit(x,fit_decision(idxFitToConsider));
