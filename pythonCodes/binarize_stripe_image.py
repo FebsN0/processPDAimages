@@ -123,8 +123,8 @@ def interactive_threshold_gui(image, method='sauvola'):
     ax_window = plt.axes([0.25, 0.15, 0.65, 0.03])
     ax_k      = plt.axes([0.25, 0.10, 0.65, 0.03])
 
-    s_window = Slider(ax_window, 'Window', 3, 300, valinit=window_default, valstep=2)
-    s_k      = Slider(ax_k, 'k', -3.0, 3.0, valinit=k_default, valstep=0.01)
+    s_window = Slider(ax_window, 'Window', 3, 200, valinit=window_default, valstep=2)
+    s_k      = Slider(ax_k, 'k', -2.0, 2.0, valinit=k_default, valstep=0.01)
     # Update function
     def update(val):
         win = int(s_window.val)
