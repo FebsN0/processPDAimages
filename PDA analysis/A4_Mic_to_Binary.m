@@ -8,7 +8,7 @@
 %       argument to specify: 'TRITIC_before' ==> upload Tritic Before
 %       argument to specify: 'TRITIC_after' ==> upload Tritic After,
 % OUTPUT:
-%       binary_image of BF image
+%       BF_IO of BF image
 %       cropped Tritic Before (if 'TRITIC_before' has been specified)
 %       cropped Tritic After (if 'TRITIC_after' has been specified)
 %       FurtherDetails : details about binarisation
@@ -30,16 +30,25 @@ function varargout=A4_Mic_to_Binary(imageBF_aligned,idxMon,newFolder,varargin)
     if ~isempty(p.Results.TRITIC_after)
         reduced_Tritic_after=p.Results.TRITIC_after;
     end
-    flagCrop=false;
+    textCrop="";
     % decide if crop the image. If not, leave as original size
     if getValidAnswer('The image is not cropped yet, would Like to Crop the Image? Dont in case of post heated scans', '', {'Yes','No'})
-        flagCrop=true;
+        textCrop = " and cropped";
+        if ~isempty(reduced_Tritic_after)
+            ftritic=figure;
+            imshow(imadjust(reduced_Tritic_after))
+            objInSecondMonitor(ftritic,idxMon);
+            title('TRITIC AFTER','FontSize',20)
+        end
         ftmp=figure;
         figure_image=imshow(imadjust(imageBF_aligned));
-        title('BrightField image post alignment - CROP THE IMAGE')
+        title('BrightField - CROP THE IMAGE','FontSize',20)
         objInSecondMonitor(ftmp,idxMon);
         [~,specs]=imcrop(figure_image);
-        close gcf
+        close(ftmp)
+        if ~isempty(reduced_Tritic_after)
+            close(ftritic)
+        end
         % take the coordinate of the cropped area
         YBegin=round(specs(1,1));
         XBegin=round(specs(1,2));
@@ -62,126 +71,14 @@ function varargout=A4_Mic_to_Binary(imageBF_aligned,idxMon,newFolder,varargin)
     if exist('reduced_Tritic_after','var')
         varargout{3}=reduced_Tritic_after;
     end
-    
-    % the following part has been observed to make worse the binarization.
-    % Not fully understood why it was implemented in the original versions...
-    %{
-    question=sprintf('Performs morphological opening operation? (Recommended for heated sample)');
-    if getValidAnswer(question,'',{'Yes','No'},2)
-        % find the highest value in the imageBF's matrix 
-        maxPixel=max(reduced_imageBF(:));
-        % create a matrix with same imageBF's size and add the maxPixel value
-        Im_baseShift= zeros(size(reduced_imageBF)) + maxPixel;
-        % substract the new matrix with the imageBF matrix to obtain the "mould" image of brightfield
-        Im_mold= Im_baseShift - reduced_imageBF;
-        % define the Structuring Element. In this case it is a 50x50 matrix (each element = 1), which will be
-        % used to erode and dilate the BF image
-        SE=strel('square',25);
-        % performs morphological opening operation on the grayscale/binary image ==> it is an erosion followed by a dilation,
-        % using the same SE for both operations. Required to remove small objects from an image while preserving the s
-        % hape and size of larger objects in the image. Imadjust transform the image into grayscale.
-        background=imopen(imadjust(Im_mold),SE);
-        % remove the morphological opening matrix from the "mould"
-        I2=imadjust(Im_mold)-background;
-        maxPixel=max(max(I2));
-        Im_baseShift= zeros(size(reduced_imageBF)) + maxPixel;
-        image2=imadjust(Im_baseShift - I2);
-        clearvars Im_Neg a background I2 Im_Pos
-    else
-        image2=reduced_imageBF; %%%%%%% in the original version Mic_to_Binary_PCDA.m, previous section was omitted %%%%%%%%%%%
-    end
-    %}
-    image2=reduced_imageBF; %%%%%%% in the original version Mic_to_Binary_PCDA.m, previous section was omitted %%%%%%%%%%%
-    % prepare the fig where to show the starting BF and binarized BF
-    f_compFigs=figure;
-    objInSecondMonitor(f_compFigs,idxMon);
-    tiledlayout(f_compFigs,1,2,'TileSpacing','compact')
-    axMainBF=nexttile(1);
-    imshow(imadjust(image2),'Parent',axMainBF), title('Definitive Brightfield Image', 'FontSize',16)
-    axBinBF=nexttile(2);
-    tmpImg = imshow(zeros(size(image2)),'Parent',axBinBF);   % placeholder matrix    
-    title('Resulting Binarized Brightfield Image', 'FontSize',16)
-    % prepare the histogram figure where to select the binarization threshold
-    f_dist=figure;
-    ax_hist = axes('Parent', f_dist);
-    hold(ax_hist,"on")
-    title('Click on the distribution to extarct the threshold to binarize the BF image', 'FontSize',16)    
-    no_sub_div=2000;
-    [Y,E] = histcounts(image2,no_sub_div);
-    plot(ax_hist,E(1:end-1),Y,'DisplayName','Experimental BF Data')
-    xlabel("Light Intensity","FontSize",14), ylabel("Count","FontSize",14)
-    % start the binarization as first run
-    diff_Y=diff(Y);         % calculates differences between adjacent elements (from right to left)
-    [~,b]=max(diff_Y);      % find idx of the max
-    for i=2:size(diff_Y,2)
-        if(i>b)
-            if (diff_Y(1,i-1)<0) && (diff_Y(1,i)>=0)    
-                flag=i;     % identify the index by which the PDA is distinguished from the background in the BF image
-                break
-            end
-        end
-    end
-    % if the index is found, use as threshold
-    if(exist('flag','var'))
-        threshold=E(1,flag);
-        binary_image=image2;
-        binary_image(binary_image<threshold)=0;
-        binary_image(binary_image>=threshold)=1;
-        binary_image=~binary_image;
-    else        % otherwise use in-built MATLAB function
-        threshold = adaptthresh(image2);
-        binary_image=~imbinarize(image2,threshold);      
-    end
-    
-    % start
-    while true
-        figure(f_compFigs)
-        pause(1)
-        tmpImg.CData=binary_image;       
-        currLine=xline(ax_hist,threshold,'r--','LineWidth',1.5,'DisplayName','Threshold line');
-        if getValidAnswer('Satisfied of the resulting binarization? If not, manual thresholding.','',{'Yes','No'})
-            break
-        end        
-        % take the original data from which binarize
-        binary_image=image2;
-        % identify the new threshold by histogram
-        axes(ax_hist) %#ok<LAXES>
-        pause(1)
-        closest_indices=selectRangeGInput(1,1,ax_hist);         
-        % find the threshold
-        threshold=E(closest_indices);          
-        delete(currLine)        
-        binary_image(binary_image<threshold)=0;
-        binary_image(binary_image>=threshold)=1;
-        binary_image=~binary_image;
-    end
-    close(f_dist)
-    saveFigures_FigAndTiff(f_compFigs,newFolder,'resultA4_1_OriginalBrightField_BaselineForeground')
-    % create a Structuring Element to remove objects smaller than 2 pixels
-    kernel=strel('square',2);
-    binary_image=imerode(binary_image,kernel);
-    binary_image=imdilate(binary_image,kernel);
-    
-    f2=figure('Visible','off');
-    imshow(binary_image)
-    text=sprintf('Definitive Binarized BrightField (Morphological Opening - kernel: square 2 pixels)');
-    title(text,'FontSize',14)
-    objInSecondMonitor(f2,idxMon);
-    saveFigures_FigAndTiff(f2,newFolder,"resultA4_2_DefinitiveBinarizedBrightField")
+    image2=reduced_imageBF;
 
-    if flagCrop == 1
-        FurtherDetails=struct(...
-            'Threshold',    threshold,...
-            'Cropped',      'Yes',...
-            'Crop_XBegin',  XBegin,...
-            'Crop_YBegin',  YBegin,...
-            'Crop_XEnd',    XEnd,...
-            'Crop_YEnd',    YEnd);
-    else
-        FurtherDetails=struct(...
-            'Threshold',    threshold,...
-            'Cropped',      'No');
-    end    
-    varargout{1}=binary_image;
-    varargout{4}=FurtherDetails;
+    [BF_IO, method]=binarizeImage(image2,idxMon);
+    % switch 0 to 1 (white BF = BK but originally toward 1)
+    BF_IO=~BF_IO;     
+    titleData1={sprintf("Original (adjusted%s) Brightfield Image",textCrop);"NOTE: white light (BK) toward 1, while dark regions (FR) toward 0"};
+    titleData2={"Definitive Binarized Image";sprintf("%s",method)};
+    showData(idxMon,false,imadjust(image2),titleData1,newFolder,'resultA4_1_OriginalBrightField_BackgroundForeground',...
+        'extraData',BF_IO,'extraBinary',true,'extraTitles',titleData2)
+    varargout{1}=BF_IO;
 end
