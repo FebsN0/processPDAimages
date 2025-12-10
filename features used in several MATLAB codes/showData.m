@@ -161,8 +161,8 @@ function showSingleData(ax,data, norm, titleData,labelBar,bin,AxisLength)
         parts=titleData;
     end
     if length(parts) > 1
-        title(parts{1}, 'FontSize', 15, 'Units', 'normalized', 'Position', [0.5, 1.04, 0]); % move upward
-        subtitle(parts{2},'FontSize',12,'Units', 'normalized', 'Position', [0.5, 1.01, 0])
+        title(parts{1}, 'FontSize', 14, 'Units', 'normalized', 'Position', [0.5, 1.045, 0]); % move upward
+        subtitle(parts{2},'FontSize',11,'Units', 'normalized', 'Position', [0.5, 1.01, 0])
     else
         title(parts{1}, 'FontSize', 17,'Units', 'normalized', 'Position', [0.5, 1.02, 0]);
     end

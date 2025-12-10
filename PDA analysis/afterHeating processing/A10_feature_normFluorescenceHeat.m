@@ -4,9 +4,11 @@
 % This value should be used later on to normalise the processed!
 % fluorescent images so that different measurements (and PDA) can be
 % compared.
-function normFactor = A10_feature_normFluorescenceHeat(nameDir,timeExp,nameExperiment,idxMon)
-    fprintf('\nAFM data is taken from the following experiment:\n\tEXPERIMENT: %s\n\n',nameExperiment)
-    heatSubDirectories=uigetdirMultiSelect(nameDir,sprintf('Select the directories which contains heated TRITIC fluorescence images'));
+function normFactor = A10_feature_normFluorescenceHeat(nameDir,timeExp,gainTRITIC,nameExperiment,idxMon)
+    textXbox=sprintf(['AFM data is taken from the following experiment:\n\tEXPERIMENT: %s\n\n' ...
+        'Select the directories which contains heated TRITIC fluorescence images.\nNOT THE DIR ITSELF!'],nameExperiment);
+    uiwait(msgbox(textXbox,'Warning','warn'));
+    heatSubDirectories=uigetdirMultiSelect(nameDir,sprintf(''));
     if ~iscell(heatSubDirectories)
         error("Data Folders not selected")
     end
@@ -54,29 +56,65 @@ function normFactor = A10_feature_normFluorescenceHeat(nameDir,timeExp,nameExper
             end
         end
         clear i j currentDir fileList pattern* filename fullFilePath foldername
+        % check integrity of TRITIC files
         if isempty(allMatchingTRITICFiles)
             error(['No .nd2 files found containing "', timeExp, 'ms" in their filename.']);
         elseif length(allMatchingTRITICFiles)~=length(allMatchingBFFiles)
-            error('Number of TRITIC files different from the number of BRIGHTFIELD files.');
-        else
-            % check if each file of allMatchingBFFiles is from the same directory of allMatchingTRITICFiles.
-            % Moreover, sort them in case the order is different. 
-            % extract directories path
-            bfDirs = cellfun(@fileparts, allMatchingBFFiles, 'UniformOutput', false);
-            triticDirs = cellfun(@fileparts, allMatchingTRITICFiles, 'UniformOutput', false);
-            % sort and save the idxs
-            [sortedBFDirs, bfSortIndices] = sort(bfDirs);
-            [sortedTriticDirs, triticSortIndices] = sort(triticDirs);
-            if ~isequal(sortedBFDirs, sortedTriticDirs)
-                error('Same files are not from same directories. Check better the filenames of the files');
-            else
-                disp(['List of .nd2 files found containing "', timeExp, 'ms" in their filename:']);
-                disp(allMatchingTRITICFiles);
-                % If everything ok, then sort also the filepath
-                sortedBFFiles = allMatchingBFFiles(bfSortIndices);
-                sortedTRITICFiles = allMatchingTRITICFiles(triticSortIndices);
+            % check the gain if there is more than one type
+            gainTokens = cellfun(@(x) regexp(x, '(_[A-Za-z]+Gain)\.nd2$', 'tokens'), allMatchingTRITICFiles, 'UniformOutput', false);
+            gainTokens = cellfun(@(x) erase(x{1}{1}, '_'), gainTokens, 'UniformOutput', false); % clean names            
+            % Get unique gain types
+            uniqueGains = unique(gainTokens);            
+            % check anomalies
+            if ~(length(allMatchingTRITICFiles)/length(uniqueGains) == length(allMatchingBFFiles))
+                error('Number of TRITIC files different from the number of BRIGHTFIELD files. Unexpected anomaly! Investigate!');
             end
+            % everything ok, each dir has same type of gain. Pick the N
+            % files from the first dir (N = types of Gain)
+            dirs = cellfun(@fileparts, allMatchingTRITICFiles, 'UniformOutput', false);
+            uniqueDirs = unique(dirs);            
+            firstDir=uniqueDirs{1};
+            idx = strcmp(dirs, firstDir);
+            filesList = allMatchingTRITICFiles(idx);
+            gainList= gainTokens(idx);
+            % Further check: Only if both lowGain and highGain exist in that folder. Extract the file addresses
+            metadataList=cell(1,length(filesList));
+            for i=1:length(filesList)                
+                % check the Gain from the specific files
+                [~,~,metaData]=A6_feature_Open_ND2(filesList{i});                
+                metadataList{i}=metaData.Gain;
+            end
+            if any(contains(metadataList,gainTRITIC))
+                idx=find(contains(metadataList,gainTRITIC));
+            else
+                metadataList{3}="Interrupt here";
+                question=sprintf("There are no Gain values of postHeated-TRITIC Images equal to the one of AFM-TRITIC Images (%s). Select one of the available or block here the exe?",gainTRITIC);
+                idx=getValidAnswer(question,"",metadataList);
+                if idx==3
+                    error("Manual Interruption")
+                end
+            end
+            selectedGain=gainList{idx};
+            allMatchingTRITICFiles = allMatchingTRITICFiles(contains(allMatchingTRITICFiles, selectedGain) );
         end
+        % check if each file of allMatchingBFFiles is from the same directory of allMatchingTRITICFiles.
+        % Moreover, sort them in case the order is different. 
+        % extract directories path
+        bfDirs = cellfun(@fileparts, allMatchingBFFiles, 'UniformOutput', false);
+        triticDirs = cellfun(@fileparts, allMatchingTRITICFiles, 'UniformOutput', false);
+        % sort and save the idxs
+        [sortedBFDirs, bfSortIndices] = sort(bfDirs);
+        [sortedTriticDirs, triticSortIndices] = sort(triticDirs);
+        if ~isequal(sortedBFDirs, sortedTriticDirs)
+            error('Same files are not from same directories. Check better the filenames of the files');
+        else
+            disp(['List of .nd2 files found containing "', timeExp, 'ms" in their filename:']);
+            disp(allMatchingTRITICFiles);
+            % If everything ok, then sort also the filepath
+            sortedBFFiles = allMatchingBFFiles(bfSortIndices);
+            sortedTRITICFiles = allMatchingTRITICFiles(triticSortIndices);
+        end
+        
         clear bfDirs triticDirs bfSortIndices triticSortIndices allMatchingTRITICFiles allMatchingBFFiles sortedBFDirs sortedTriticDirs
         all_Tritic_masked=cell(1,length(sortedTRITICFiles));
         for i=1:length(sortedTRITICFiles)
@@ -86,16 +124,15 @@ function normFactor = A10_feature_normFluorescenceHeat(nameDir,timeExp,nameExper
             else
                 % within the same directory, manage the TRITIC and BF images
                 titleFig=sprintf('TRITIC post heat - TimeExp: %s',timeExp);
-                Tritic_Image=openANDprepareND2(sortedTRITICFiles{i},titleFig,secondMonitorMain);
+                Tritic_Image=openANDprepareND2(sortedTRITICFiles{i},titleFig,idxMon);
                 titleFig='BF post heat';
-                [BF_Image,metadataBF]=openANDprepareND2(sortedBFFiles{i},titleFig,secondMonitorMain);
-                % align BF and TRITIC        
-                [BF_Image_aligned,offset]=A7_limited_registration(BF_Image,Tritic_Image,pathfile,secondMonitorMain,'Brightfield','Yes','Moving','Yes','saveFig','No');    
-                Tritic_Image=fixSize(Tritic_Image,offset);
-                close all
+                [BF_Image,metadataBF]=openANDprepareND2(sortedBFFiles{i},titleFig,idxMon);
+                % correct the tilted effect
+                pathFile=fullfile(pathfile,"BF_beforeAndcorrected");
+                BF_Image = A6_feature_correctBFtilted(BF_Image,idxMon,pathFile);
                 % generate the binarized BF. In case of cropping, also save the
                 % cropped TRITIC. Usually dont crop, entire fluorescence data is useful data
-                [binary_BF_image,Tritic_Image]=A8_Mic_to_Binary(BF_Image_aligned,secondMonitorMain,pathfile,'TRITIC_before',Tritic_Image,'saveFig','No');
+                [binary_BF_image,Tritic_Image]=A8_Mic_to_Binary(BF_Image,idxMon,pathfile,'TRITIC_before',Tritic_Image,'saveFig','No');
                 % mask the TRITIC using the new binarized BF to have PDA parts only
                 Tritic_masked=Tritic_Image;
                 Tritic_masked(binary_BF_image==0)=nan;      
@@ -104,8 +141,8 @@ function normFactor = A10_feature_normFluorescenceHeat(nameDir,timeExp,nameExper
                 Tritic_masked_glass(binary_BF_image==1)=nan;
                 Tritic_masked_glass_min=min(Tritic_masked_glass(:),[],'omitnan');
                 Tritic_masked= Tritic_masked-Tritic_masked_glass_min;
-                clear BF_Image Tritic_masked_glass_min offset Tritic_masked_glass titleFig BF_Image_aligned
-                save(fullfile(pathfile,sprintf('data_BF_TRITIC_postHeat_timeExp%sms',timeExp)),"metadataBF","binary_BF_image","Tritic_Image","Tritic_masked","secondMonitorMain","timeExp")
+                clear BF_Image Tritic_masked_glass_min offset Tritic_masked_glass titleFig BF_Image
+                save(fullfile(pathfile,sprintf('data_BF_TRITIC_postHeat_timeExp%sms',timeExp)),"metadataBF","binary_BF_image","Tritic_Image","Tritic_masked","idxMon","timeExp")
             end
             all_Tritic_masked{i}=Tritic_masked;
         end
@@ -161,12 +198,12 @@ function normFactor = A10_feature_normFluorescenceHeat(nameDir,timeExp,nameExper
     end    
 end
 
-function [image,metaData]=openANDprepareND2(filepath,titleFig,secondMonitorMain)
+function [image,metaData]=openANDprepareND2(filepath,titleFig,idxMon)
     [image,~,metaData]=A6_feature_Open_ND2(filepath);
     [pathfile,nameFile]=fileparts(filepath);
     f1=figure('Visible','off');
     imshow(imadjust(image)), title(titleFig,'FontSize',17)
-    if ~isempty(secondMonitorMain), objInSecondMonitor(f1,idxMon); end
+    objInSecondMonitor(f1,idxMon);
     fullfileName=fullfile(pathfile,nameFile);
     saveas(f1,fullfileName,'tif')
 end

@@ -117,7 +117,11 @@ function varargout = featureRemovePortions(dataToShow1,textTitle1,idxMon,varargi
             [flagStructTmp,tmp]=isstructImage2Show(tmp,channel);
             dataToShowK{1}=tmp;
             flagStructDataToShowK=flagStructTmp;
-            titleExtraK{1}=string(p.Results.additionalImagesTitleToShow);
+            if length(p.Results.additionalImagesTitleToShow)==2
+                titleExtraK{1}=p.Results.additionalImagesTitleToShow;
+            else
+                titleExtraK{1}=string(p.Results.additionalImagesTitleToShow);
+            end
             binaryFormatImage=isbinaryImage(tmp);
             if ~binaryFormatImage, normDataToShowK=1; else, normDataToShowK=0; end
         end
@@ -365,6 +369,6 @@ end
 function bin=isbinaryImage(image)
 % return 0 or 1 if the image is binary (contains 0/1/nan)
     finiteVals = image(~isnan(image));       % drop NaNs before checking finite values
-    hasZeroOne = all(ismember([0 1], finiteVals));
+    hasZeroOne = all(ismember(finiteVals,[0 1]));
     if hasZeroOne, bin=1; else, bin=0; end
 end

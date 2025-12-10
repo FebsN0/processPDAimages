@@ -1,7 +1,7 @@
 function [IO_Image,binarizationMethod]=binarizeImageMain(image,idxMon,varargin)    
     image=imadjust(image);
     % start the classic binarization to create the mask, i.e. the 0/1 height image (0 = Background, 1 = Foreground). 
-    [IO_Image,binarizationMethod]=binarizeByThreshold_GUI(image);                         
+    [IO_Image,binarizationMethod]=binarize_GUI(image);                         
     % PYTHON BINARIZATION TECHNIQUES. It requires other options, when I will have more time. Especially for DeepLearning technique
     question="Satisfied of the first binarization method? If not, run the Python Binarization tools!";
     if ~getValidAnswer(question,"",{"Yes","No"},2)
