@@ -73,12 +73,27 @@ function varargout=A4_Mic_to_Binary(imageBF_aligned,idxMon,newFolder,varargin)
     end
     image2=reduced_imageBF;
 
-    [BF_IO, method]=binarizeImage(image2,idxMon);
-    % switch 0 to 1 (white BF = BK but originally toward 1)
-    BF_IO=~BF_IO;     
+    [BF_IO, method]=binarizeImageMain(image2,idxMon);
+
+    
     titleData1={sprintf("Original (adjusted%s) Brightfield Image",textCrop);"NOTE: white light (BK) toward 1, while dark regions (FR) toward 0"};
     titleData2={"Definitive Binarized Image";sprintf("%s",method)};
-    showData(idxMon,false,imadjust(image2),titleData1,newFolder,'resultA4_1_OriginalBrightField_BackgroundForeground',...
-        'extraData',BF_IO,'extraBinary',true,'extraTitles',titleData2)
-    varargout{1}=BF_IO;
+
+    [~,~,BF_IO_corr] = featureRemovePortions(imadjust(image2),titleData1,idxMon, ...
+                'additionalImagesToShow',BF_IO,'additionalImagesTitleToShow',titleData2);    
+    % show final mask    
+    if ~isequal(BF_IO_corr,BF_IO)
+        tmpText=titleData2{2};
+        tmpText=sprintf("%s - manualCorrections",tmpText);
+        titleData2={titleData2{1};tmpText};
+    end                
+    % switch 0 to 1 in case of wrong category (white BF = BK but originally toward 1)    
+    ftmp=showData(idxMon,true,imadjust(image2),titleData1,'','','extraData',BF_IO_corr,'extraBinary',true,'extraTitles',{titleData2},'saveFig',false);
+    if ~getValidAnswer("Is the binarized image correct? If not, invert 0 → 1, 1 → 0",'',{'Y','N'})
+        BF_IO_corr=~BF_IO_corr;
+        close(ftmp)
+        ftmp=showData(idxMon,false,imadjust(image2),titleData1,'','','extraData',BF_IO_corr,'extraBinary',true,'extraTitles',{titleData2},'saveFig',false);
+    end
+    saveFigures_FigAndTiff(ftmp,newFolder,'resultA4_1_OriginalBrightField_BackgroundForeground')
+    varargout{1}=BF_IO_corr;
 end
