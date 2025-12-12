@@ -71,15 +71,15 @@ function varargout=A4_Mic_to_Binary(imageBF_aligned,idxMon,newFolder,varargin)
     if exist('reduced_Tritic_after','var')
         varargout{3}=reduced_Tritic_after;
     end
-    image2=reduced_imageBF;
-
-    [BF_IO, method]=binarizeImageMain(image2,idxMon);
-
+    image=imadjust(reduced_imageBF);
+    
+    waitfor(warndlg(sprintf("Brightfield Image typically contains lot of noise, remove through Morphological Operations small white pixels by inverting many time the binary image.\n" + ...
+        "NOTE: after binarization completation, there is manual removal tool to remove easily pixel in the background if they still persist.")))
+    [BF_IO, method]=binarizeImageMain(image,idxMon,'Brightfield');
     
     titleData1={sprintf("Original (adjusted%s) Brightfield Image",textCrop);"NOTE: white light (BK) toward 1, while dark regions (FR) toward 0"};
     titleData2={"Definitive Binarized Image";sprintf("%s",method)};
-
-    [~,~,BF_IO_corr] = featureRemovePortions(imadjust(image2),titleData1,idxMon, ...
+    [~,~,BF_IO_corr] = featureRemovePortions(imadjust(image),titleData1,idxMon, ...
                 'additionalImagesToShow',BF_IO,'additionalImagesTitleToShow',titleData2);    
     % show final mask    
     if ~isequal(BF_IO_corr,BF_IO)
@@ -88,11 +88,11 @@ function varargout=A4_Mic_to_Binary(imageBF_aligned,idxMon,newFolder,varargin)
         titleData2={titleData2{1};tmpText};
     end                
     % switch 0 to 1 in case of wrong category (white BF = BK but originally toward 1)    
-    ftmp=showData(idxMon,true,imadjust(image2),titleData1,'','','extraData',BF_IO_corr,'extraBinary',true,'extraTitles',{titleData2},'saveFig',false);
+    ftmp=showData(idxMon,true,imadjust(image),titleData1,'','','extraData',BF_IO_corr,'extraBinary',true,'extraTitles',{titleData2},'saveFig',false);
     if ~getValidAnswer("Is the binarized image correct? If not, invert 0 → 1, 1 → 0",'',{'Y','N'})
         BF_IO_corr=~BF_IO_corr;
         close(ftmp)
-        ftmp=showData(idxMon,false,imadjust(image2),titleData1,'','','extraData',BF_IO_corr,'extraBinary',true,'extraTitles',{titleData2},'saveFig',false);
+        ftmp=showData(idxMon,false,imadjust(image),titleData1,'','','extraData',BF_IO_corr,'extraBinary',true,'extraTitles',{titleData2},'saveFig',false);
     end
     saveFigures_FigAndTiff(ftmp,newFolder,'resultA4_1_OriginalBrightField_BackgroundForeground')
     varargout{1}=BF_IO_corr;

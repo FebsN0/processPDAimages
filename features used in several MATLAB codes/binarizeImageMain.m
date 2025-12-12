@@ -1,15 +1,15 @@
 function [IO_Image,binarizationMethod]=binarizeImageMain(image,idxMon,varargin)    
-    image=imadjust(image);
+    typeImage=varargin{1};
     % start the classic binarization to create the mask, i.e. the 0/1 height image (0 = Background, 1 = Foreground). 
-    [IO_Image,binarizationMethod]=binarize_GUI(image);                         
+    [IO_Image,binarizationMethod]=binarize_GUI(image,typeImage);                         
     % PYTHON BINARIZATION TECHNIQUES. It requires other options, when I will have more time. Especially for DeepLearning technique
     question="Satisfied of the first binarization method? If not, run the Python Binarization tools!";
     if ~getValidAnswer(question,"",{"Yes","No"},2)
         [IO_Image,binarizationMethod]=binarization_withPythonModules(image,idxMon);
     end    
     % show data and if it is not okay, start toolbox segmentation    
-    if ~isempty(varargin)     
-        iterationMain=varargin{1};
+    if ~isempty(varargin{2})     
+        iterationMain=varargin{2};
         question=sprintf('Satisfied of the binarization of the iteration %d? If not, run ImageSegmenter ToolBox for better manual binarization',iterationMain);    
         if iterationMain>1 && ~getValidAnswer(question,'',{'Yes','No'})                    
             % Run ImageSegmenter Toolbox if at end of the second iteration, the mask is still not good enough

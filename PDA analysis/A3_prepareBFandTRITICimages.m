@@ -250,13 +250,7 @@ function [Image,metaData]=selectND2file(folderResultsImg,filenameND2,titleImage,
         fullfilePath=varargin{1};    % location of the file
     end
     [Image,~,metaData]=A3_feature_Open_ND2(fullfilePath); 
-    f1=figure('Visible','off');
-    imshow(imadjust(Image)), title(titleImage,'FontSize',17)
-    objInSecondMonitor(f1,idxMon);
-    fullfileName=fullfile(folderResultsImg,'tiffImages',filenameND2);
-    saveas(f1,fullfileName,'tif')
-    fullfileName=fullfile(folderResultsImg,'figImages',filenameND2);
-    saveas(f1,fullfileName)
+    showData(idxMon,false,imadjust(Image),sprintf("%s - imadjusted",titleImage),folderResultsImg,filenameND2)    
 end
 
 function showAlignOriginalImages(image1,image2,folderResultsImg,titleText,fileText,idxMon,varargin)
@@ -273,12 +267,6 @@ function showAlignOriginalImages(image1,image2,folderResultsImg,titleText,fileTe
     imshow(imfuse(imadjust(image1),imadjust(image2)))
     title(titleText,'FontSize',15)
     objInSecondMonitor(f2,idxMon);
-    fullfileName=fullfile(folderResultsImg,'tiffImages',fileText);
-    saveas(f2,fullfileName,'tif')
-    fullfileName=fullfile(folderResultsImg,'figImages',fileText);
-    saveas(f2,fullfileName)
-    if p.Results.closeImmediately
-        close(f2)
-    end    
+    saveFigures_FigAndTiff(f2,folderResultsImg,fileText,p.Results.closeImmediately)
 end
        

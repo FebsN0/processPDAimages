@@ -30,11 +30,21 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
     
     % for the first time or first section, request the max fitOrder
     if isempty(p.Results.FitOrderHVON_Lat)
-        FitOrderHVON_Lat=chooseAccuracy("Choose the level of fit Order for lineXline baseline (i.e. Background) of AFM Lateral Deflection Data.");
+        question=sprintf("Choose the level of the maxFitOrder for AFM Lateral Channel Background Data (%s).",HVmode);
+        FitOrderHVON_Lat=chooseAccuracy(question);
     else
         FitOrderHVON_Lat=p.Results.FitOrderHVON_Lat;
     end
-    if strcmp(FitOrderHVON_Lat,'Low'), limit=1; elseif strcmp(fitOrder,'Medium'), limit=2; else, limit=3; end       
+    if strcmp(FitOrderHVON_Lat,'Low')
+        limitPlaneFit=3; 
+        limitLineFit=1;
+    elseif strcmp(FitOrderHVON_Lat,'Medium')
+        limitPlaneFit=6;
+        limitLineFit=2;
+    else
+        limitPlaneFit=9;
+        limitLineFit=3;
+    end   
     FitOrderHVOFF_Height=p.Results.FitOrderHVOFF_Height;
     clearvars argName defaultVal p varargin    
     if ~exist(fullfile(newFolder,'TMP_DATA_3_LATERAL_PART.mat'),'file')
@@ -77,7 +87,7 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
         % For better fitting, remove outliers line by line before planeFit using the masked AFM data containing only background
         [~,Lateral_BK_1]=dynamicOutliersRemoval(Lateral_BK_1);        
         % obtain the planeFit and save fitting's metrics
-        [correction_plane,metricsBestPlaneFit]=planeFitting_N_Order(Lateral_BK_1,limit);
+        [correction_plane,metricsBestPlaneFit]=planeFitting_N_Order(Lateral_BK_1,limitPlaneFit);
         % correct the raw original data by applyting the correction_plane
         Lateral_Image_2_planeFit = Lateral_Image_1_Raw - correction_plane;
         
@@ -114,7 +124,7 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
         else       
             % outliers removal in the background data
             [~,Lateral_BK_2]=dynamicOutliersRemoval(Lateral_BK_2);                 
-            [baselineFit,metricsBestLineFit]=lineByLineFitting_N_Order(Lateral_BK_2,limit,'CheckBordersLine',true,'idxMon',idxMon);              
+            [baselineFit,metricsBestLineFit]=lineByLineFitting_N_Order(Lateral_BK_2,limitLineFit,'CheckBordersLine',true,'idxMon',idxMon);              
             % Remove background
             Lateral_Image_3_lineFit = Lateral_Image_2_planeFit - baselineFit;
             % Plot the fitted backround:               
@@ -227,39 +237,50 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,alp
     Corrected_LD_Trace= Lateral_Trace_Force + Baseline_Friction_Force;
     figSingleLineForce=plotSingleLineCheck(idxMon,Corrected_LD_Trace*1e9,idxLine,'prevFig',figSingleLineForce,'nameLine','Corrected Force (F+OFFSET)');   
     
-    % save results force
+    % save results force lines
     nameFig='resultA2_14_singleFastScanLineLD_FORCE';
     saveFigures_FigAndTiff(figSingleLineForce,newFolder,nameFig)
 
-    % plot the definitive corrected lateral force
-    titleData='Fitted and corrected Lateral Force';
-    nameFig='resultA2_15_ResultsDefinitiveLateralDeflectionsNewton_normalized';
-    showData(idxMon,SeeMe,Corrected_LD_Trace,titleData,newFolder,nameFig,'normalized',true)
-
-    titleData='Fitted and corrected Lateral Force';
-    nameFig='resultA2_16_ResultsDefinitiveLateralDeflectionsNewton';
+    % plot the definitive corrected lateral force. Normalized and not
+    titleData={"Definitive Lateral Force";"Full, no outliers removal"};
+    nameFig='resultA2_15_ResultsDefinitiveLateralDeflectionsNewton';
     labelFig='Force [nN]';
     showData(idxMon,SeeMe,Corrected_LD_Trace*1e9,titleData,newFolder,nameFig,'labelBar',labelFig)
 
+    % remove outliers from lateral image ==> DEFINITIVE LATERAL DATA!!!!!!
+    percentile=99;
+    th=prctile(Corrected_LD_Trace(:),percentile);
+    Corrected_LD_Trace_clean99perc=Corrected_LD_Trace;
+    Corrected_LD_Trace_clean99perc(Corrected_LD_Trace_clean99perc>th)=nan;
+    titleData={"Definitive Lateral Force";"Removed 99° percentile"};
+    nameFig='resultA2_16_ResultsDefinitiveLateralDeflectionsNewton_99percClean';
+    labelFig='Force [nN]';
+    showData(idxMon,SeeMe,Corrected_LD_Trace_clean99perc*1e9,titleData,newFolder,nameFig,'labelBar',labelFig)
+
+    % ONLY FOR VISUAL
     % remove outliers - big values only to show better the data which is difficult to notice even when normalized
-    Corrected_LD_Trace_cleared=filloutliers(Corrected_LD_Trace,nan,'percentile',[0 95]);
-    titleData={'Corrected Lateral Force'; "NOTE: Only for show - Removed 95 percentile of outliers"};
-    nameFig='resultA2_17_LateralDeflectionWithoutOutliers';
+    Corrected_LD_Trace_cleared=filloutliers(Corrected_LD_Trace,nan,'percentile',[0 90]);
+    titleData={'Definitive Lateral Force'; "NOTE: Only for show, not used as definitive data. Removed 90° percentile."};
+    nameFig='resultA2_18_LateralDeflectionWithoutOutliers_90percSHOW';
     labelFig='Force [nN]';
     showData(idxMon,SeeMe,Corrected_LD_Trace_cleared*1e9,titleData,newFolder,nameFig,'labelBar',labelFig)
 
     % show background of LATERAL FORCE to see eventually something interesting
-    Corrected_LD_Trace_BK=Corrected_LD_Trace;
+    Corrected_LD_Trace_BK=Corrected_LD_Trace_clean99perc;
     Corrected_LD_Trace_BK(AFM_height_IO==1)=nan;
-    Corrected_LD_Trace_BK=filloutliers(Corrected_LD_Trace_BK,nan);
-    titleData={'Corrected Background Lateral Force'; "NOTE: Only for show - MAD filloutliers"};
-    nameFig='resultA2_18_BackgroundLateralDeflectionWithoutOutliers';
+    % remove 90 percentile BK data
+    percentile=90;
+    th=prctile(Corrected_LD_Trace_BK(:),percentile);
+    Corrected_LD_Trace_BK_90percSHOW=Corrected_LD_Trace_BK;
+    Corrected_LD_Trace_BK_90percSHOW(Corrected_LD_Trace_BK_90percSHOW>th)=nan;
+    titleData={"Definitive Background Lateral Force"; "NOTE: Only for show, not used as definitive data. Removed 90° percentile."};
+    nameFig='resultA2_19_BackgroundLateralDeflectionWithoutOutliers_SHOW';
     labelFig='Force [nN]';
-    showData(idxMon,SeeMe,Corrected_LD_Trace_BK*1e9,titleData,newFolder,nameFig,'labelBar',labelFig)
+    showData(idxMon,SeeMe,Corrected_LD_Trace_BK_90percSHOW*1e9,titleData,newFolder,nameFig,'labelBar',labelFig)
 
     % save the corrected lateral force into cropped AFM image
     AFM_Elab=AFM_data;    
-    AFM_Elab(strcmpi([AFM_data.Channel_name],'Lateral Deflection') & strcmpi([AFM_data.Trace_type],'Trace')).AFM_images_2_PostProcessed=Corrected_LD_Trace;
+    AFM_Elab(strcmpi([AFM_data.Channel_name],'Lateral Deflection') & strcmpi([AFM_data.Trace_type],'Trace')).AFM_images_2_PostProcessed=Corrected_LD_Trace_clean99perc;
     varargout{1}=AFM_Elab; 
     varargout{2}=metricsBestPlaneFit;
     varargout{3}=metricsBestLineFit;

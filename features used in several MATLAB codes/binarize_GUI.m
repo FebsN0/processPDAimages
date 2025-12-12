@@ -1,4 +1,4 @@
-function[IO_Image, detailOperations] = binarize_GUI(image)
+function[IO_Image, detailOperations] = binarize_GUI(image,typeImage)
 % Initialize outputs
     segImage = [];
     binarizationMethod_text = [];
@@ -6,10 +6,21 @@ function[IO_Image, detailOperations] = binarize_GUI(image)
     % max 15 operations, very unlikely to reach this iteration, but just in case
     segImage_MorphOpsHistory=cell(20);
     counterHistory=1;
+    if strcmp(typeImage,'Height')
+        textHistXLabel="Height [nm]";
+        textHistTitle="Height Distribution";
+        textOriginalImageTitle="Original Height Image - PostFit";
+        textOriginalImageSubtitle=[];
+    else % Brightfield
+        textHistXLabel="Intensity pixel (imadjusted)";
+        textHistTitle="Intensity Distribution (imadjusted)";
+        textOriginalImageTitle="Original Brightfield Image";
+        textOriginalImageSubtitle="Original (imadjusted - saturated 1% bottom and 99% top)";
+    end
     % Create main figure
     mainFig = uifigure('Name', 'Interactive Binarization Tool', ...
                      'NumberTitle', 'off', ...
-                     'WindowState','maximized','CloseRequestFcn', @onUserClose);
+                     'WindowState','maximized','CloseRequestFcn',@onUserClose);
     % Create main layout (5 columns)
     mainLayout = uigridlayout(mainFig, [2 6]);
     mainLayout.RowHeight = {'1x','1x'};                              % Top = 3/5 height
@@ -31,10 +42,21 @@ function[IO_Image, detailOperations] = binarize_GUI(image)
     axOriginal = uiaxes(imgGrid);
     axOriginal.Layout.Row = 1;
     axOriginal.Layout.Column = 1;
-    imshow(image, 'Parent', axOriginal);
+    if strcmp(typeImage,'Height')
+        h=imagesc(axOriginal,image);
+        h.AlphaData = ~isnan(image);   % NaN → transparent
+        set(axOriginal, 'Color', 'black');    % Background color visible    
+        c=colorbar(axOriginal); c.Label.FontSize=16;
+        c.Label.String="Height [nm]";
+    else
+        imshow(image, 'Parent', axOriginal);
+    end
     axis(axOriginal, 'image');
     axOriginal.Toolbar.Visible = 'on';
-    title(axOriginal, 'Original (imadjusted - saturated 1% bottom and 99% top)','FontSize',13);   
+    title(axOriginal,textOriginalImageTitle,'FontSize',13);   
+    if ~isempty(textOriginalImageSubtitle)
+        subtitle(textOriginalImageSubtitle,'FontSize',10)
+    end
     % Right axis
     axBin = uiaxes(imgGrid);
     axBin.Layout.Row = 1;
@@ -43,6 +65,15 @@ function[IO_Image, detailOperations] = binarize_GUI(image)
     axis(axBin, 'image');
     axBin.Toolbar.Visible = 'on';
     title(axBin, 'Binarized Preview','FontSize',14);
+    c=colorbar(axBin); c.Label.FontSize=16;   
+    % Apply a custom two-color colormap (black-white)
+    colormap(axBin,[0 0 0; 1 1 1]);
+    % colormap is binary and not gradient
+    clim(axBin,[0 1]);
+    %c.Ticks = [0 1];
+    set(c,'YTickLabel',[]);
+    cLabel = ylabel(c,'Background                                                     Foreground');
+    cLabel.FontSize=14;     
 
     % ================================================================
     % (B) RIGHT-TOP: HISTOGRAM (Column 5-6, Row 1 but upper half)
@@ -68,9 +99,9 @@ function[IO_Image, detailOperations] = binarize_GUI(image)
     hHistPlot.HitTest = 'off';
     % Store threshold line handle (initially empty)
     prevXLine = [];
-    xlabel(axHist, 'Intensity Pixel', 'FontSize', 12);
+    xlabel(axHist, textHistXLabel, 'FontSize', 12);
     ylabel(axHist, 'PDF count', 'FontSize', 12);
-    title(axHist, 'Intensity Distribution (imadjusted)', 'FontSize', 13);
+    title(axHist,textHistTitle, 'FontSize', 13);
     axHist.ButtonDownFcn = [];  % disabled by default
     % ================================================================
     % (C) RIGHT-BOTTOM: BUTTONS (Column 5-6, Row 2 but lower half)
@@ -78,41 +109,54 @@ function[IO_Image, detailOperations] = binarize_GUI(image)
     ctrlPanel = uipanel(mainLayout);
     ctrlPanel.Layout.Row = 2;
     ctrlPanel.Layout.Column = [5 6];
-    % inside the control panel, there are 6 rows and 1 column (nested grid)
-    ctrlGrid = uigridlayout(ctrlPanel, [6 1]);
-    ctrlGrid.RowHeight = {'0.90x','0.90x','0.90x','0.90x','0.90x','1.5x'};
+    % inside the control panel, there are 7 rows and 1 column (nested grid)
+    ctrlGrid = uigridlayout(ctrlPanel, [7 1]);
+    ctrlGrid.RowHeight = {'0.94x','0.94x','0.94x','0.94x','0.94x','0.94x','1.36x'};
 
     % ---- Buttons ----
     % BINARIZATION CONTROL
-    btnAuto = uibutton(ctrlGrid, 'Text','Run Binarization (select method below)','FontSize',14,'ButtonPushedFcn',@runBinarization);
+    btnAuto = uibutton(ctrlGrid, 'Text','Run Binarization','FontSize',14,'ButtonPushedFcn',@runBinarization, ...
+         'Tooltip',"Select method and eventually choose sensitivity below.");
     btnAuto.Layout.Row = 1;
     % nested grid
-    row2cols = uigridlayout(ctrlGrid, [1 2]);
-    row2cols.ColumnWidth = {'1x','1x'};
-    typeMethodPopup=uidropdown(row2cols,'Value','Adaptthresh (mean statistics)','FontSize',13,'Items', ...
+    row2cols_1 = uigridlayout(ctrlGrid, [1 2]);
+    row2cols_1.ColumnWidth = {'1x','1x'};
+    typeMethodPopup=uidropdown(row2cols_1,'Value','Adaptthresh (mean statistics)','FontSize',13, 'Tooltip',"Binarization method. In case of Adaptthresh, choose sensitivity.",'Items', ...
         {'Adaptthresh (mean statistics)','Adaptthresh (median statistics)','Adaptthresh (gaussian statistics)','Otsu''s method','Global manual (click on histogram)'});            
-    numField = uieditfield(row2cols,'numeric',"Limits",[0 1], "LowerLimitInclusive","off","UpperLimitInclusive","off", ...
-        "Placeholder","Sensitivity Adaptthresh (def: 0.5)","AllowEmpty",'on',"Value",[],'HorizontalAlignment','center','FontSize',13);
-    row2cols.ColumnSpacing=10; row2cols.Padding=0;
+    numField = uieditfield(row2cols_1,'numeric',"Limits",[0 1], "LowerLimitInclusive","off","UpperLimitInclusive","off",'Tooltip','Default value: 0.5', ...
+        "Placeholder","Sensitivity Adaptthresh","AllowEmpty",'on',"Value",[],'HorizontalAlignment','center','FontSize',13);
+    row2cols_1.ColumnSpacing=10; row2cols_1.Padding=0; row2cols_1.Layout.Row = 2;
 
-    % MORPHOLOGICAL CLEANING OPERATIONS TO REMOVE NOISE AND SMALL PIXELS
-    btnMorphological = uibutton(ctrlGrid, 'Text','Run Morphological Operations (remove white pixels (1) on binary image)','FontSize',13, ...
-        'ButtonPushedFcn',@applyMorphologyCleaning,'Enable','off');
+    % MORPHOLOGICAL CLEANING OPERATIONS TO REMOVE NOISE AND SMALL PIXELS (ACTUALLY ONLY MORPHOLOGICAL OPENING)
+    btnMorphological = uibutton(ctrlGrid, 'Text','Run Morphological Opening','FontSize',13,'ButtonPushedFcn',@applyMorphologyCleaning,'Enable','off',...
+    'tooltip',sprintf("Erosion → Dilation of white pixels (1) on binary image.\nNOTE 1: Morphological Closing if invert the binary image.\nNOTE 2: once clicked, first exe bwareaopen, then morphological opening and finally imfill."));
     btnMorphological.Layout.Row = 3;
     % nested grid
-    row3cols = uigridlayout(ctrlGrid, [1 3]);
-    row3cols.ColumnWidth = {'1x','1x','1x'};
-    row3cols.ColumnSpacing=10; row3cols.Padding=0; row3cols.Layout.Row = 4;
-    kernelPopup = uidropdown(row3cols,'Items',{'disk','square','diamond','rectangle','octagon'},'Value','square','FontSize',13);
-    kernelValue=uieditfield(row3cols,'numeric',"Limits",[0 100], "LowerLimitInclusive","on","UpperLimitInclusive","on", ...
-        "Placeholder","Kernel Radius (def: 3)","AllowEmpty",'on',"Value",[],'HorizontalAlignment','center','FontSize',13);
-    btnUndo=uibutton(row3cols,'Text','Undo last Morph.Op.','FontSize', 13,'ButtonPushedFcn',@undoMO,'Enable','off');
-    
-    btnInvertBinary = uibutton(ctrlGrid,'Text','Invert Binary Image: white (1) ↔ black (0)','FontSize', 14,'ButtonPushedFcn',@invertBinaryImage,'Enable','off');
-    btnInvertBinary.Layout.Row = 5;
+    row3cols_2 = uigridlayout(ctrlGrid, [1 3]);
+    row3cols_2.ColumnWidth = {'1x','1x','1x'};
+    row3cols_2.ColumnSpacing=10; row3cols_2.Padding=0; row3cols_2.Layout.Row = 4;
+    kernelPopup = uidropdown(row3cols_2,'Items',{'disk','square','diamond','octagon'},'Value','square','FontSize',13,'Tooltip',"Kernel type");
+    kernelValue=uieditfield(row3cols_2,'numeric',"Limits",[0 100], "LowerLimitInclusive","on","UpperLimitInclusive","on",'Tooltip',sprintf("Default value: 3\nIf 0, nothing change."),...
+        "Placeholder","Kernel Radius","AllowEmpty",'on',"Value",[],'HorizontalAlignment','center','FontSize',13);
+    btnUndo=uibutton(row3cols_2,'Text','Undo Morph.Op.','FontSize', 13,'ButtonPushedFcn',@undoMO,'Enable','off','Tooltip',"Return to the previous Morphological operation.");
+    % operation before M.O.
+    row2cols_3 = uigridlayout(ctrlGrid, [1 2]);
+    row2cols_3.ColumnWidth = {'1x','1x'};
+    row2cols_3.ColumnSpacing=10; row2cols_3.Padding=0; row2cols_3.Layout.Row = 5;    
+    removeWithNoDistorsionValue = uieditfield(row2cols_3,'numeric',"Limits",[0 100], "LowerLimitInclusive","on","UpperLimitInclusive","on", ...
+        "Placeholder","bwareaopen area","AllowEmpty",'on',"Value",[],'HorizontalAlignment','center','FontSize',13,...
+        'Tooltip',sprintf("Default area size: 0\nRemove small connected objects (white pixels) smaller than a certain area WITHOUT distorting real objects.\nIf 0, nothing happens"));
+    fillHolesCheck=uicheckbox(row2cols_3,"Value",false,"Text","Fill holes (regions of 0 - black)","FontSize",13, ...
+        "Tooltip","A hole is a set of background pixels that cannot be reached by filling in the background from the edge of the image.");
+    % final buttons
+    btnInvertBinary = uibutton(ctrlGrid,'Text','Invert Binary Image: white (1) ↔ black (0)','FontSize', 14,'ButtonPushedFcn',@invertBinaryImage,'Enable','off',...
+        'Tooltip',sprintf("IMPORTANT NOTE: Recommended to click before any MO if BK=white, so first Morph.Opening, then invert again to perform Morph.Closing.\n\n" + ...
+                          "If foreground (1) = real objects ==> Morph.Opening (removes small objects and thin protrusions from objects)\n" + ...
+                          "If foreground (1) = inverted background ==> Morph.Closing (removes small background islands and smooths the boundaries of BK regions."));
+    btnInvertBinary.Layout.Row = 6;
     % END BUTTON
     btnConfirm = uibutton(ctrlGrid, 'Text','Confirm the Binarized Preview and close','FontSize',20,'ButtonPushedFcn', @terminate,'Enable','off');
-    btnConfirm.Layout.Row = 6;
+    btnConfirm.Layout.Row = 7;
     %===== END PREPARATION GUI ======%
     % disable or activate buttons during execution of a binarization method
 
@@ -124,6 +168,8 @@ function[IO_Image, detailOperations] = binarize_GUI(image)
         btnMorphological.Enable = state;        
         kernelPopup.Enable = state;
         kernelValue.Enable = state;
+        removeWithNoDistorsionValue.Enable =state;
+        fillHolesCheck.Enable = state;
         btnInvertBinary.Enable = state;
         btnConfirm.Enable = state;
         % update the show of buttons
@@ -251,6 +297,27 @@ function[IO_Image, detailOperations] = binarize_GUI(image)
          
     %----------------------------------------------------------------- MORPHOLOGICAL CLEARING
     function applyMorphologyCleaning(~,~)
+    % workflow routinely used in object segmentation, cleaning binary masks, removing noise, filling holes, and measuring structures.
+    % 1) Remove very small objects (noise cleaning)
+    % 2) Fill holes inside objects
+    % 3) Morphological opening (erosion → dilation)
+    %       GOAL: 
+    %           Remove thin protrusions.
+    %           Smooth small details.
+    %           Disconnect narrow bridges.
+    % 4) Morphological closing (dilation → erosion)
+    %       GOAL:
+    %           Fill small gaps and "close" cracks between segments.
+    %           Smooth boundaries.
+    % 5) Remove objects touching the border: useful when you want only full objects inside the frame.
+    % 6) Label connected components
+    % CONSIDERATION:
+    % since invertImageBin has been introduced to give more control at the user,
+    % !!!!! Morphological Opening of BW == Morphological Closing of ~BW !!!!!
+    % therefore, step 4 is omitted
+    % DELUCIDATION ABOUT bwareaopen and imopen
+    % bwareaopen ==> delete all objects smaller than a certain area == robust cleaning WITHOUT distorting real objects.
+    % imopen     ==> remove thin structures or refine shape == to smooth boundaries and to disconnect objects connected by thin bridges.
         kernelType = kernelPopup.Value;
         rad = kernelValue.Value;
         if isempty(rad)
@@ -263,21 +330,42 @@ function[IO_Image, detailOperations] = binarize_GUI(image)
                 kernel = strel('square', rad);
             case 'diamond'
                 kernel = strel('diamond', rad);
-            case 'rectangle'
-                kernel = strel('rectangle', [rad rad]);
             case 'octagon'
                 rad=round(rad/3)*3;
                 kernel = strel('octagon', rad);
         end
         morphologicalOperations_text=sprintf("Kernel: %s - size: %d",kernelType,rad);
-        segImage_cleared = imerode(segImage, kernel);
-        segImage_cleared = imdilate(segImage_cleared, kernel);
-        segImage=segImage_cleared;
+        bw = segImage;
+        % step 1: remove tiny objects if value is not empty. Removes obvious noise.
+        if ~isempty(removeWithNoDistorsionValue.Value)
+            bw = bwareaopen(bw, removeWithNoDistorsionValue.Value);
+        end
+
+        % step 2: Perform actual morphology opening (previously as imerode then imdilate).
+        % NOTE: imopen(bw, kernel) always performs erosion followed by dilation.
+        %   Its effect depends on which pixels are treated as FOREGROUND (1):       
+        %     • If foreground = original objects:
+        %           - Removes small objects and thin protrusions from objects
+        %           - Smooths object boundaries
+        %           - Can break thin connections
+        %
+        %     • If foreground = inverted background (after binary inversion):
+        %           - Removes small background islands
+        %           - Smooths the boundaries of background regions
+        %           - Visually appears as "filling small bright gaps" in the ORIGINAL image
+        bw = imopen(bw, kernel);
+        % step 3: fill whatever true "holes" remain inside the cleaned objects.
+        if fillHolesCheck.Value
+            bw = imfill(bw, 'holes');
+        end
+
+        % end MO process
+        segImage=bw;
         % Update preview
         updateBinImage(segImage, binarizationMethod_text,morphologicalOperations_text)
 
         % update history of applied Morph.operations
-        segImage_MorphOpsHistory{counterHistory,1}=segImage_cleared;
+        segImage_MorphOpsHistory{counterHistory,1}=bw;
         segImage_MorphOpsHistory{counterHistory,2}=morphologicalOperations_text;
         counterHistory=counterHistory+1;
         % over storage not allowed, lose the oldest cell (first index)

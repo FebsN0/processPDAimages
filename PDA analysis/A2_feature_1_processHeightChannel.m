@@ -47,11 +47,21 @@ warning('off', 'stats:robustfit:IterationLimit');
     lengthAxis=[metadata.x_scan_length_m,metadata.y_scan_length_m];
     % for the first time or first section, request the max fitOrder
     if isempty(p.Results.fitOrder)
-        fitOrderHeight=chooseAccuracy(sprintf("Choose the level of fit Order for lineXline baseline (i.e. Background) of AFM Height Deflection Data (%s).",HVmode));
+        question=sprintf("Choose the level of the maxFitOrder for AFM Height Channel Background Data (%s).",HVmode);
+        fitOrderHeight=chooseAccuracy(question);
     else
         fitOrderHeight=p.Results.fitOrder;
     end
-    if strcmp(fitOrderHeight,'Low'), limit=3; elseif strcmp(fitOrderHeight,'Medium'), limit=6; else, limit=9; end    
+    if strcmp(fitOrderHeight,'Low')
+        limitPlaneFit=3; 
+        limitLineFit=1;
+    elseif strcmp(fitOrderHeight,'Medium')
+        limitPlaneFit=6;
+        limitLineFit=2;
+    else
+        limitPlaneFit=9;
+        limitLineFit=3;
+    end    
     clearvars argName defaultVal p varargin
     
     % Orient image of every channel by clockwise 90° and flip along long axis so the image coencide with the Microscopy image direction
@@ -221,7 +231,7 @@ warning('off', 'stats:robustfit:IterationLimit');
                     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                     %%%% SECOND FITTING: N ORDER PLANE FITTING ON BUTTERWORTH FILTERED BACKGROUND %%%%
                     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
-                    [planeCorrection,metrics] = planeFitting_N_Order(BK_2_butterworthFiltered_manualAdj,limit);
+                    [planeCorrection,metrics] = planeFitting_N_Order(BK_2_butterworthFiltered_manualAdj,limitPlaneFit);
                     BK_3_butterworthFiltered_PlaneFitted=BK_2_butterworthFiltered_manualAdj-planeCorrection;
                     height_5_afterButterworthBK_planeFit=height_4_corrLine-planeCorrection;
                     % show the results
@@ -240,7 +250,7 @@ warning('off', 'stats:robustfit:IterationLimit');
                     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
                     height_6_forBinarization=height_5_afterButterworthBK_planeFit;
                     if continueLineFit
-                        allBaselines= lineByLineFitting_N_Order(BK_3_butterworthFiltered_PlaneFitted,limit);            
+                        allBaselines= lineByLineFitting_N_Order(BK_3_butterworthFiltered_PlaneFitted,limitLineFit);            
                         BK_4_butterworthFiltered_LineFitted=BK_3_butterworthFiltered_PlaneFitted-allBaselines;
                         height_tmp_afterButterworthBK_lineFit = height_5_afterButterworthBK_planeFit-allBaselines;
                         % plot the resulting corrected data and check comparison with the height
@@ -267,7 +277,7 @@ warning('off', 'stats:robustfit:IterationLimit');
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% BINARIZATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 disp('Processing now the binarization of Height channel after LineByLine Fitting with Butterworth-filtered Height')
-                [AFM_height_IO,binarizationMethod]=binarizeImage(height_6_forBinarization,idxMon,iterationMain); 
+                [AFM_height_IO,binarizationMethod]=binarizeImageMain(height_6_forBinarization*1e9,idxMon,'Height',iterationMain); 
             end
             %%% here, both HVmode ON and OFF parts (if the user chose to use HV on MASK to generate the HV off mask) undergo the following parts
             textTitleIO=sprintf('Binary Height Image - iteration %d\n%s',iterationMain,binarizationMethod);                        
@@ -352,8 +362,9 @@ warning('off', 'stats:robustfit:IterationLimit');
                 'extraLabel',{labelHeight,labelHeight},'extraNorm',{norm,norm});
         % there may be still some anomalies. If so, permamently remove them from the height image
         textTitle={'Optimixed Height Image';'Check if there some parts to transform into NaN in the foreground. The resulting image will be definitive for the current iteration.'};
-        [~,height_8_LineFitOnFinalMaskBK_corr] = featureRemovePortions(height_8_LineFitOnFinalMaskBK,textTitle,idxMon,'normalize',false);       
+        [~,height_9_corr] = featureRemovePortions(height_8_LineFitOnFinalMaskBK,textTitle,idxMon,'normalize',false);       
 
+        
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%% HEIGHT CHANNEL PROCESSING TERMINATED. CHECK IF CONTINUE FOR BETTER MASK AND DATA %%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -362,17 +373,29 @@ warning('off', 'stats:robustfit:IterationLimit');
         question={"Satisfied of the definitive Height image and mask?";"If not, repeat again the process with the last height image to generate again a new mask.";"NOTE: ImageSegmenter Toolbox (Manual Binarization) is available from the second iteration\nso it can perform better with already optimized height image."};
         answ=getValidAnswer(question,'',{'y','n'},2);
         if answ
-            height_FINAL=height_8_LineFitOnFinalMaskBK_corr;
-            mask_FINAL=AFM_height_IO_corr;
+            % REMOVE 99 percentile from height channel (not in the AFM-IO because it will be used later and it is informative keep it as it is
+            % HOWEVER, just in case, ask. maybe it is not so bad
+            percentile=99;
+            th=prctile(height_9_corr(:),percentile);
+            height_10_clean99perc=height_9_corr;
+            height_10_clean99perc(height_10_clean99perc>th)=nan;
+            % finalize the process                        
             nameFile='resultA2_8_HeightFINAL';
             titleData1='Definitive Height Image';
-            titleData2='Definitive Height Image - Normalized';
-            showData(idxMon,false,height_FINAL*factor,titleData1,SaveFigFolder,nameFile,'labelBar',"Height (nm)",'lenghtAxis',lengthAxis,...
-                'extraData',{height_FINAL}, ...
-                'extraTitles',{titleData2},...
-                'extraNorm',true);
+            titleData2='Definitive Height Image - 99°percentile removed';
+            showData(idxMon,true,height_9_corr*factor,titleData1,'','','labelBar',"Height (nm)",'lenghtAxis',lengthAxis,'saveFig',false,...
+                'extraData',{height_10_clean99perc*factor},'extraTitles',{titleData2},'extraLabel',"Height (nm)",'extraLengthAxis',{lengthAxis});
+            if getValidAnswer("99° percentile removed. Keep the first or the second height image as definitive height image?",'',{'First','Second (99°percentile removed)'},1)
+                height_FINAL=height_9_corr;
+            else
+                height_FINAL=height_10_clean99perc;
+            end
+            % save final height
+            showData(idxMon,false,height_FINAL*factor,titleData1,SaveFigFolder,nameFile,'labelBar',"Height (nm)",'lenghtAxis',lengthAxis);
+            % save mask
             nameFile='resultA2_8_maskFINAL';
             titleData1='Definitive mask Height Image';
+            mask_FINAL=AFM_height_IO_corr;
             showData(idxMon,false,mask_FINAL,titleData1,SaveFigFolder,nameFile,'binary',true,'lenghtAxis',lengthAxis) 
             % substitutes to the original height image with the new opt fitted heigh
             AFM_Images_final=AFM_Images;            
@@ -487,7 +510,7 @@ function [data_butterworthFiltered] = butterworthFiltering(data,idxMon)
     % --- Subplot 1: Original AFM image (always visible) ---
     axData=nexttile(1,[1 1]); cla(axData);
     imagesc(axData,data*1e9)
-    title(axData,'Height Image post planeFit+outlierRemoval', 'FontSize',12);
+    title(axData,'Height Image post outlierRemoval+planeFit+lineFit', 'FontSize',12);
     c = colorbar; c.Label.String = 'Height [nm]'; c.Label.FontSize=11;
     ylabel('fast scan line direction','FontSize',10), xlabel('slow scan line direction','FontSize',10)
     colormap parula, axis equal, xlim tight, ylim tight   

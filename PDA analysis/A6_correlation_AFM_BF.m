@@ -111,7 +111,7 @@ function dataResultsPlot=A6_correlation_AFM_BF(AFM_data,AFM_IO_Padded,metadataAF
     % obtain the mask from Delta if it exists. 
     if ~flag_onlyAFM              
         % obtain the minimum value of background so Delta can be substracted by such a value
-        Delta_glass=Delta; Delta_glass(mask_original) = NaN;       
+        Delta_BK=Delta; Delta_BK(mask_original) = NaN;       
         % Original method use the minimum intensity of background to shift the Delta.
         % However, two pixels at same position of the two different TRITIC (after and before) 
         % often may significantly different values, although the BK should be identical.
@@ -119,12 +119,12 @@ function dataResultsPlot=A6_correlation_AFM_BF(AFM_data,AFM_IO_Padded,metadataAF
         % Min_Delta_glass=min(Delta_glass(:),[],"omitnan");  <===== NOT USED ANYMORE        
         percentile=0.1;      
         % exclude nan and transform into array
-        Delta_glass_clean = Delta_glass(~isnan(Delta_glass));
-        threshold = prctile(Delta_glass_clean, percentile);        
-        Min_Delta_glass=threshold;
+        Delta_BK_clean = Delta_BK(~isnan(Delta_BK));
+        threshold = prctile(Delta_BK_clean, percentile);        
+        Delta_BK_min=threshold;
         % Fix Delta and Delta_glass
-        Delta_glass_ADJ=Delta_glass-Min_Delta_glass;
-        Delta_ADJ=Delta-Min_Delta_glass;
+        Delta_BK_ADJ=Delta_BK-Delta_BK_min;
+        Delta_ADJ=Delta-Delta_BK_min;
 
         % create the first new mask (AFM IO + Delta Pos)
         mask_validValues= Delta_ADJ>0;                      % exclude zeros and negative values
@@ -134,7 +134,7 @@ function dataResultsPlot=A6_correlation_AFM_BF(AFM_data,AFM_IO_Padded,metadataAF
         Delta_ADJ_firstMasking(~mask_first)=nan; % FOREGROUND DELTA               
         % store Delta and its modifications
         DeltaData=struct();        
-        DeltaData.Delta_minBK=Min_Delta_glass;         
+        DeltaData.Delta_minBK=Delta_BK_min;         
         DeltaData.Delta_original=Delta;
         DeltaData.Delta_ADJ_minShifted=Delta_ADJ;
         DeltaData.Delta_ADJ_firstMasking_Delta=Delta_ADJ_firstMasking;  
@@ -145,12 +145,12 @@ function dataResultsPlot=A6_correlation_AFM_BF(AFM_data,AFM_IO_Padded,metadataAF
             f1=figure('Visible','off');
         end 
         hold on
-        histogram(Delta_glass_ADJ,200,"DisplayName","Delta Background (adjusted)",'Normalization','pdf'),         
+        histogram(Delta_BK_ADJ,200,"DisplayName","Delta Background (adjusted)",'Normalization','pdf'),         
         histogram(Delta_ADJ_firstMasking,200,"DisplayName","Delta Foreground (adjusted)",'Normalization','pdf')        
         legend('FontSize',15), grid on, grid minor
         xlabel('Absolute Fluorescence','FontSize',15), ylabel("PDF",'FontSize',15)
-        pHigh=max(prctile(Delta_glass_ADJ(:),99),prctile(Delta_ADJ_firstMasking(:),99));
-        pLow=min(prctile(Delta_glass_ADJ(:),1e-4),prctile(Delta_ADJ_firstMasking(:),1e-4));
+        pHigh=max(prctile(Delta_BK_ADJ(:),99),prctile(Delta_ADJ_firstMasking(:),99));
+        pLow=min(prctile(Delta_BK_ADJ(:),1e-4),prctile(Delta_ADJ_firstMasking(:),1e-4));
         x1=round(pLow,3,TieBreaker="minusinf");
         x2=round(pHigh,3,TieBreaker="plusinf");
         xlim([x1 x2]), ylim tight
@@ -164,7 +164,7 @@ function dataResultsPlot=A6_correlation_AFM_BF(AFM_data,AFM_IO_Padded,metadataAF
             titleD2="Delta Fluorescence Background (shifted)";
             nameFile='resultA6_3_Fluorescence_PDA_BackGround';
             showData(idxMon,SeeMe,Delta_ADJ,titleD1,newFolder,nameFile,'labelBar',labelBar,'lenghtAxis',size_meterXpix*size(Delta_ADJ), ...
-                'extraData',Delta_glass_ADJ,'extraTitles',titleD2,'extraLengthAxis',{size_meterXpix*size(Delta_glass_ADJ)},'extraLabel',labelBar)
+                'extraData',Delta_BK_ADJ,'extraTitles',titleD2,'extraLengthAxis',{size_meterXpix*size(Delta_BK_ADJ)},'extraLabel',labelBar)
         end
     end
     % obtain the mask from each channel and ignore:
@@ -178,26 +178,14 @@ function dataResultsPlot=A6_correlation_AFM_BF(AFM_data,AFM_IO_Padded,metadataAF
             mask = mask & mask_validValues;
         end
     end
-    % obtain the definitive mask considering the removal of:
-    % 1)    Lateral Force > 2*maxSetpoint
-    % 2)    99°percentile height
-    mask_second=mask; % keep the less "aggressive mask"
-    % extract meaningful lateral force. Use setpoint+100% as upper limit:
-    % remember, lateral force higher than vertical force is derived not from friction phenomena but rather 
+    mask_second=mask; 
+    % obtain the definitive third mask (more aggressive) considering the removal of Lateral Force > 2*maxSetpoint
+    % NOTE, lateral force higher than vertical force is derived not from friction phenomena but rather 
     % the collision between the tip and the surface and other instabilities.
     limitVD=max(setpoints)*2;
     mask_validValues= AFM_data(idx_LD).AFM_padded<=limitVD;          % exclude values higher than limit setpoint  
     mask_third=mask_second & mask_validValues;         % merge the mask with the previous mask  
-    % high vertical may generate wrong height values. Remove 99* percentile
-    percentile=99;
-    AFM_height_tmp = AFM_data(idx_H).AFM_padded; % copy height channel
-    AFM_height_tmp(~mask_third) = NaN;    
-    % exclude nan and transform into array
-    AFM_height_tmp_array = AFM_height_tmp(~isnan(AFM_height_tmp));
-    threshold = prctile(AFM_height_tmp_array, percentile);
-    mask_validValues= AFM_data(idx_H).AFM_padded<threshold;     % exclude 99 percentile from the height
-    mask_third=mask_third & mask_validValues;         % merge the mask with the previous mask
-
+   
     masking = struct();
     % store delta original (AFM IO)
     masking.mask_original = mask_original;
