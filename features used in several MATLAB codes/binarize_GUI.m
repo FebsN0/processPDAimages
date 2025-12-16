@@ -55,7 +55,7 @@ function[IO_Image, detailOperations] = binarize_GUI(image,typeImage)
     axOriginal.Toolbar.Visible = 'on';
     title(axOriginal,textOriginalImageTitle,'FontSize',13);   
     if ~isempty(textOriginalImageSubtitle)
-        subtitle(textOriginalImageSubtitle,'FontSize',10)
+        subtitle(axOriginal,textOriginalImageSubtitle,'FontSize',10)
     end
     % Right axis
     axBin = uiaxes(imgGrid);

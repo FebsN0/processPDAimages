@@ -8,7 +8,7 @@ function [IO_Image,binarizationMethod]=binarizeImageMain(image,idxMon,varargin)
         [IO_Image,binarizationMethod]=binarization_withPythonModules(image,idxMon);
     end    
     % show data and if it is not okay, start toolbox segmentation    
-    if ~isempty(varargin{2})     
+    if length(varargin)>1     
         iterationMain=varargin{2};
         question=sprintf('Satisfied of the binarization of the iteration %d? If not, run ImageSegmenter ToolBox for better manual binarization',iterationMain);    
         if iterationMain>1 && ~getValidAnswer(question,'',{'Yes','No'})                    
