@@ -209,7 +209,7 @@ function [vertForce_forthClearing,force_forthClearing]=featureFrictionCalc1_clea
     vertForce_secondClearing(isnan(force_secondClearing))=nan;
     numRemovedElements_2=numRemovedElements_2/totElementsBeforeClearing*100;
     %%%%%% THIRD CLEARING %%%%%%%
-    % remove from lateral data those values 20% higher than the setpoint
+    % remove from lateral data those values 40% higher than the setpoint
     perc=7/5; % 40% more than the value
     force_thirdClearing=force_secondClearing;
     vertForce_thirdClearing=vertForce_secondClearing;

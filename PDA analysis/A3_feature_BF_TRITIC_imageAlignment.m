@@ -19,10 +19,10 @@ function [moving_adj,fixed_adj,offset]=A3_feature_BF_TRITIC_imageAlignment(moved
     % title and name figures based on what input and more are given
     switch p.Results.Brightfield
         case 'Yes'
-            textFirstLastFig='BF preAFM and BF postAFM - PostAlignement';
+            textFirstLastFig='BF preAFM and BF postAFM';
             sigma=0.4; % for Gaussian low-pass filter (smoothing). See later            
         case 'No'       
-            textFirstLastFig='TRITIC preAFM and TRITIC postAFM- PostAlignement';
+            textFirstLastFig='TRITIC preAFM and TRITIC postAFM';
             sigma=0.8;
     end
 
@@ -38,7 +38,7 @@ function [moving_adj,fixed_adj,offset]=A3_feature_BF_TRITIC_imageAlignment(moved
     axOriginal = axes('Parent', f1);    
     imagesc(axOriginal, fused_image);
     axis(axOriginal, 'image');       % keep aspect ratio    
-    title(axOriginal,sprintf('%s - Not Aligned',textFirstLastFig),'FontSize',14)
+    title(axOriginal,sprintf('%s - Not Aligned',textFirstLastFig),'FontSize',15)
     objInSecondMonitor(f1,idxMon);
     while true        
         uiwait(warndlg(sprintf('Crop the area to register the two images.\nNOTE: for better alignment, crop possibly outside the AFM scan area.\nObjects, especially small ones, can be drifted away from original position.'),''));        
@@ -82,7 +82,6 @@ function [moving_adj,fixed_adj,offset]=A3_feature_BF_TRITIC_imageAlignment(moved
             data={reduced_fixed,reduced_moved};
             for i=1:2
                 % init the not completion of manual selection
-                closest_indices=[];
                 satisfied=1;
                 ftmp=figure;
                 objInSecondMonitor(ftmp,idxMon);
@@ -95,20 +94,25 @@ function [moving_adj,fixed_adj,offset]=A3_feature_BF_TRITIC_imageAlignment(moved
                 no_sub_div=2000;
                 [Y,E] = histcounts(data{i},no_sub_div);
                 axHist=nexttile(2,[1 1]);
-                hold(axHist,"on"), plot(axHist,Y)
-                if any(closest_indices)
-                    scatter(axHist,closest_indices,Y(closest_indices),40,'r*')
-                end
+                hold(axHist,"on"), plot(axHist,E(1:end-1),Y)
                 title(axHist,'Distribution values image','FontSize',12);
                 axData_Bin=nexttile([1 1]);                
                 tmpImg = imshow(zeros(size(originalData)),'Parent',axData_Bin);   % placeholder matrix
                 title(axData_Bin,sprintf('Result Binarization of %s',text{i}), 'FontSize',12)
-                while satisfied==1
+                while satisfied==1                                    
                     closest_indices=selectRangeGInput(1,1,axHist);
+                    if exist('currLine','var') && ~isempty(currLine) && isvalid(currLine)
+                        delete(currLine); delete(currScatt)                                            
+                    end
+                    th=E(closest_indices);
+                    currLine=xline(axHist,th, 'r--', 'LineWidth', 1.5,'DisplayName','Current Threshold');
+                    currScatt=scatter(axHist,th,Y(closest_indices),80,'g*');
+                    currScatt.Annotation.LegendInformation.IconDisplayStyle = 'off';
                     % if the value is lower than selected point, then 0, otherwise 1
                     tmpData=originalData;
-                    tmpData(tmpData<E(closest_indices))=0;
-                    tmpData(tmpData>=E(closest_indices))=1; 
+                    
+                    tmpData(tmpData<th)=0;
+                    tmpData(tmpData>=th)=1;
                     % Update ONLY the image, keep everything else
                     tmpImg.CData = tmpData;
                     question='Keep selection or turn again to manual selection?';
@@ -150,12 +154,14 @@ function [moving_adj,fixed_adj,offset]=A3_feature_BF_TRITIC_imageAlignment(moved
         moving_adj = moving_tr(y_start:y_end, x_start:x_end);
     
         f2=figure;
+        axPostAlign = axes('Parent', f2);
+        axis(axPostAlign, 'image');       % keep aspect ratio    
         if((~islogical(moved))&&(~islogical(fixed)))
-            imshow(imfuse(imadjust(moving_adj),imadjust(fixed_adj)))
+            imshow(imfuse(imadjust(moving_adj),imadjust(fixed_adj)),'Parent',axPostAlign)
         else
-            imshow(imfuse(moving_adj,fixed_adj))
+            imshow(imfuse(moving_adj,fixed_adj),'Parent',axPostAlign)
         end
-        title(sprintf('%s - Aligned',textFirstLastFig),'FontSize',15)
+        title(axPostAlign,sprintf('%s - Aligned',textFirstLastFig),'FontSize',15)
         objInSecondMonitor(f2,idxMon);        
         answer=getValidAnswer('Satisfied of the alignment? If not, restart from cropping.','',{'y','n'});
         close(f2)

@@ -83,7 +83,7 @@ function [AFM_images_final,AFM_height_IO,metaData]=A2_processAFMdata(allData,oth
             %%%%%%%% PROCESS LATERAL DEFLECTION CHANNEL (in case of HOVER MODE ON DATA) %%%%%%%%
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%           
             metaData_AFM=allData(i).metadata; 
-            [AFM_LatDeflecFitted_Force,metricsPlane,metricsLine,FitOrderHVON_Lat,FitOrderHVOFF_Height,avg_fc]=A2_feature_2_processLateralChannel(AFM_HeightFittedMasked,AFM_height_IO,metaData_AFM.Alpha,idxMon,SaveFigIthSectionFolder,mainPath, ...
+            [AFM_LatDeflecFitted_Force,metricsPlane,metricsLine,FitOrderHVON_Lat,FitOrderHVOFF_Height,avg_fc]=A2_feature_2_processLateralChannel(AFM_HeightFittedMasked,AFM_height_IO,metaData_AFM,idxMon,SaveFigIthSectionFolder,mainPath, ...
                 'FitOrderHVON_Lat',FitOrderHVON_Lat,'FitOrderHVOFF_Height',FitOrderHVOFF_Height,'SeeMe',false,'idxSectionHVon',i,'flagSingleSectionProcess',true);
             allData(i).metadata.frictionCoeff_Used=avg_fc;
             % prepare the info about the used fitting

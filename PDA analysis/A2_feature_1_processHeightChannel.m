@@ -91,7 +91,7 @@ warning('off', 'stats:robustfit:IterationLimit');
     while true
         % in case of MATLAB system failure, dont lose the work! Also AFM_Images because it may be different in case of HV mode OFF due to resizing
         if exist(fullfile(SaveFigFolder,"TMP_DATA_MASK_definitive.mat"),'file') && getValidAnswer('Mask AFM IO for the current section has been already generated. Take it definitively?','',{'y','n'})
-            load(fullfile(SaveFigFolder,"TMP_DATA_MASK_definitive.mat"),"AFM_height_IO_corr","BK_5_heightMasked_corr")
+            load(fullfile(SaveFigFolder,"TMP_DATA_MASK_definitive.mat"),"AFM_height_IO_corr","BK_5_heightMasked_corr","binarizationMethod")
             flagExeMaskGen=false;
             if strcmp(HVmode,"HoverModeOFF")
                 load(fullfile(SaveFigFolder,"TMP_DATA_MASK_definitive.mat"),"AFM_Images")
@@ -305,7 +305,7 @@ warning('off', 'stats:robustfit:IterationLimit');
                 'extraTitles',{titleData2,titleData3},...
                 'extraLabel',{labelHeight,labelHeight},'extraNorm',{norm,norm});       
             % save in case of system failure
-            save(fullfile(SaveFigFolder,sprintf("TMP_DATA_2_MASK_iteration%d",iterationMain)),"AFM_height_IO_corr","BK_5_heightMasked_corr")
+            save(fullfile(SaveFigFolder,sprintf("TMP_DATA_2_MASK_iteration%d",iterationMain)),"AFM_height_IO_corr","BK_5_heightMasked_corr","binarizationMethod")
             % decide to stop completely the mask generation if the current one is already good enough
             if getValidAnswer('Is the generated mask the definitive one? If not, it will be generated another one at the next step.','',{'y','n'})                
                 % delete the other tmp files since they will not be used anymore
@@ -314,7 +314,7 @@ warning('off', 'stats:robustfit:IterationLimit');
                 delete(files_tmp{:})
                 flagExeMaskGen=false;
                 % just for safety in case of interruption or system failure. If the mask is definitive, save it and dont restart again the entire binarization process
-                save(fullfile(SaveFigFolder,"TMP_DATA_MASK_definitive"),"AFM_height_IO_corr","BK_5_heightMasked_corr")
+                save(fullfile(SaveFigFolder,"TMP_DATA_MASK_definitive"),"AFM_height_IO_corr","BK_5_heightMasked_corr","binarizationMethod")
             end
             clear titleText* nameFile flagRemoval ftmpIO answ question textTitleIO allBaselines continueLineFit files_tmp tmp
         end
@@ -383,13 +383,14 @@ warning('off', 'stats:robustfit:IterationLimit');
             nameFile='resultA2_8_HeightFINAL';
             titleData1='Definitive Height Image';
             titleData2='Definitive Height Image - 99°percentile removed';
-            showData(idxMon,true,height_9_corr*factor,titleData1,'','','labelBar',"Height (nm)",'lenghtAxis',lengthAxis,'saveFig',false,...
+            ftmp=showData(idxMon,true,height_9_corr*factor,titleData1,'','','labelBar',"Height (nm)",'lenghtAxis',lengthAxis,'saveFig',false,...
                 'extraData',{height_10_clean99perc*factor},'extraTitles',{titleData2},'extraLabel',"Height (nm)",'extraLengthAxis',{lengthAxis});
             if getValidAnswer("99° percentile removed. Keep the first or the second height image as definitive height image?",'',{'First','Second (99°percentile removed)'},1)
                 height_FINAL=height_9_corr;
             else
                 height_FINAL=height_10_clean99perc;
             end
+            close(ftmp)
             % save final height
             showData(idxMon,false,height_FINAL*factor,titleData1,SaveFigFolder,nameFile,'labelBar',"Height (nm)",'lenghtAxis',lengthAxis);
             % save mask

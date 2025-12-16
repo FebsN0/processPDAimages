@@ -3,9 +3,9 @@ function varargout=A3_prepareBFandTRITICimages(folderResultsImg,idxMon,nameExper
     if exist(fullfile(folderResultsImg,"TMP_BF_TRITIC_rawFiles.mat"),"file")
         load(fullfile(folderResultsImg,"TMP_BF_TRITIC_rawFiles"),"flag_PRE_POST")
         if flag_PRE_POST
-            load(fullfile(folderResultsImg,"TMP_BF_TRITIC_rawFiles.mat"),"filePathND2","BF_ImagePOST","BF_ImagePRE","TRITIC_ImagePRE","TRITIC_ImagePOST","metadata")
+            load(fullfile(folderResultsImg,"TMP_BF_TRITIC_rawFiles.mat"),"filePathND2","BF_ImagePOST","BF_ImagePRE","TRITIC_ImagePRE","TRITIC_ImagePOST","metadata","timeExp")
         else
-            load(fullfile(folderResultsImg,"TMP_BF_TRITIC_rawFiles.mat"),"filePathND2","BF_ImagePRE","TRITIC_ImagePRE","TRITIC_ImagePOST","metadata")
+            load(fullfile(folderResultsImg,"TMP_BF_TRITIC_rawFiles.mat"),"filePathND2","BF_ImagePRE","TRITIC_ImagePRE","TRITIC_ImagePOST","metadata","timeExp")
         end
     else
         text=sprintf("Select the directory having all .nd2 files for EXP %s - SCAN %s",nameExperiment,nameScan);
@@ -137,16 +137,17 @@ function varargout=A3_prepareBFandTRITICimages(folderResultsImg,idxMon,nameExper
         metadata.TRITIC=metaData_TRITIC;
         
         % original images are not aligned
-        showAlignOriginalImages(BF_ImagePRE,TRITIC_ImagePRE,folderResultsImg,'BF preAFM and TRITIC preAFM - pre alignement with postAFM','resultA3_4_1_BFpre_TRITICpre_preAlign',idxMon)    
-        showAlignOriginalImages(TRITIC_ImagePRE,TRITIC_ImagePOST,folderResultsImg,'TRITIC preAFM and TRITIC postAFM - Not Aligned','resultA3_4_2_TRITIC_prePost_NotAligned',idxMon)
-        showAlignOriginalImages(BF_ImagePRE,TRITIC_ImagePOST,folderResultsImg,'BF preAFM and TRITIC postAFM - Not Aligned','resultA3_4_3_BFpre_TRITICpost_NotAligned',idxMon)
-        if exist('BF_ImagePOST','var')
-            showAlignOriginalImages(BF_ImagePRE,BF_ImagePOST,folderResultsImg,'BF preAFM and BF postAFM - Not Aligned','resultA3_4_4_BF_prePost_NotAligned',idxMon)
-        end
+        showAlignOriginalImages(BF_ImagePRE,TRITIC_ImagePRE,folderResultsImg,'BF preAFM and TRITIC preAFM','resultA3_4_BFpre_TRITICpre',idxMon)    
         if flag_PRE_POST
-            save(fullfile(folderResultsImg,"TMP_BF_TRITIC_rawFiles.mat"),"flag_PRE_POST","filePathND2","BF_ImagePOST","BF_ImagePRE","TRITIC_ImagePRE","TRITIC_ImagePOST","metadata")
+            showAlignOriginalImages(BF_ImagePOST,TRITIC_ImagePOST,folderResultsImg,'BF postAFM and TRITIC postAFM','resultA3_5_BFpost_TRITICpost',idxMon)
+            showAlignOriginalImages(BF_ImagePRE,BF_ImagePOST,folderResultsImg,'BF preAFM and BF postAFM - Not Aligned','resultA3_6_1_BF_prePost_NotAligned',idxMon)            
+        end
+        showAlignOriginalImages(TRITIC_ImagePRE,TRITIC_ImagePOST,folderResultsImg,'TRITIC preAFM and TRITIC postAFM - Not Aligned','resultA3_7_1_TRITIC_prePost_NotAligned',idxMon)
+        
+        if flag_PRE_POST
+            save(fullfile(folderResultsImg,"TMP_BF_TRITIC_rawFiles.mat"),"flag_PRE_POST","filePathND2","BF_ImagePOST","BF_ImagePRE","TRITIC_ImagePRE","TRITIC_ImagePOST","metadata","timeExp")
         else
-            save(fullfile(folderResultsImg,"TMP_BF_TRITIC_rawFiles.mat"),"flag_PRE_POST","filePathND2","BF_ImagePRE","TRITIC_ImagePRE","TRITIC_ImagePOST","metadata")
+            save(fullfile(folderResultsImg,"TMP_BF_TRITIC_rawFiles.mat"),"flag_PRE_POST","filePathND2","BF_ImagePRE","TRITIC_ImagePRE","TRITIC_ImagePOST","metadata","timeExp")
         end
     end
 
@@ -167,7 +168,6 @@ function varargout=A3_prepareBFandTRITICimages(folderResultsImg,idxMon,nameExper
         % fix TRITIC pre to BF pre
         TRITIC_ImagePRE_aligned=fixSize(TRITIC_ImagePRE,offset);
         TRITIC_ImagePOST_aligned=fixSize(TRITIC_ImagePOST,-offset);   % minus because post images was fixed during alignment with pre image
-        showAlignOriginalImages(TRITIC_ImagePRE_aligned,TRITIC_ImagePOST_aligned,folderResultsImg,'TRITIC preAFM and TRITIC postAFM - PostAlignement','resultA3_5_2_TRITICpre_TRITICpost_postAlign',idxMon,'visible',true,'closeImmediately',false)           
         if any(size(TRITIC_ImagePOST_aligned)~=size(BF_ImagePOST_aligned))
             uiwait(msgbox('Something wrong in the correction matrix of TRITICpost because its matrix size is not the same as BFpost. Repeat the alignment using TRITICpre and TRITICpost','Warning','warn'));
         elseif getValidAnswer(sprintf('Is the registration of TRITICpre and TRITICpost postAlign ok?'),'',{'Yes','No'})
@@ -179,24 +179,21 @@ function varargout=A3_prepareBFandTRITICimages(folderResultsImg,idxMon,nameExper
         % Align the fluorescent images After with the BEFORE stimulation
         [TRITIC_ImagePOST_aligned,TRITIC_ImagePRE_aligned,offset]=A3_feature_BF_TRITIC_imageAlignment(TRITIC_ImagePOST,TRITIC_ImagePRE,idxMon);        
         BF_ImagePRE_aligned=fixSize(BF_ImagePRE,offset);
-        if flag_PRE_POST
-            BF_ImagePOST_aligned=fixSize(BF_ImagePOST,-offset);
-            showAlignOriginalImages(BF_ImagePRE_aligned,BF_ImagePOST_aligned,folderResultsImg,'BF preAFM and BF postAFM - PostAlignement','resultA3_5_4_BFpre_BFpost_postAlign',idxMon)                                   
-        end
     end
+
     % END ALIGNMENT!
-    showAlignOriginalImages(BF_ImagePRE_aligned,TRITIC_ImagePRE_aligned,folderResultsImg,'BF preAFM and TRITIC preAFM - PostAlignement','resultA3_5_1_BFpre_TRITICpre_postAlign',idxMon)               
-    showAlignOriginalImages(BF_ImagePRE_aligned,TRITIC_ImagePOST_aligned,folderResultsImg,'BF preAFM and TRITIC postAFM - PostAlignement','resultA3_5_3_BFpre_TRITICpost_postAlign',idxMon)               
     if flag_PRE_POST
-        showAlignOriginalImages(BF_ImagePOST_aligned,TRITIC_ImagePOST_aligned,folderResultsImg,'BF postAFM and TRITIC postAFM - PostAlignement','resultA3_5_5_BFpost_TRITICpost_postAlign',idxMon)                                     
+        showAlignOriginalImages(BF_ImagePRE_aligned,BF_ImagePOST_aligned,folderResultsImg,'BF preAFM and BF postAFM - Aligned','resultA3_6_2_BF_prePost_Aligned',idxMon)            
     end
-    % SHOW FLUORESCENCE DISTRIBUTION AND COMPARE BEFORE AND AFTER
+    showAlignOriginalImages(TRITIC_ImagePRE_aligned,TRITIC_ImagePOST_aligned,folderResultsImg,'TRITIC preAFM and TRITIC postAFM - Aligned','resultA3_7_2_TRITIC_prePost_Aligned',idxMon)
+    
+    % SHOW FLUORESCENCE DISTRIBUTION OF TRITIC BEFORE AND AFTER
     fDist=figure("Visible","off");
     legend('FontSize',15), grid on, grid minor
     xlabel('TRITIC (absolute fluorescence)','FontSize',15)
     ylabel('PDF','FontSize',15)
     title("Distribution TRITIC values","FontSize",20)
-    subtitle(sprintf("(1e^-^4° - 98° percentile of the entire data)"),"FontSize",15)
+    subtitle(sprintf("(Data shown is within 1e^-^4° - 98° percentile of the entire data)"),"FontSize",15)
     objInSecondMonitor(fDist,idxMon);                
     hold on
     % prepare the data
@@ -205,9 +202,11 @@ function varargout=A3_prepareBFandTRITICimages(folderResultsImg,idxMon,nameExper
     % prepare histogram. round not work to excess but to nearest.
     xmin=floor(min(min(vectPRE),min(vectPOST)) * 1000) / 1000;
     xmax=ceil(max(max(vectPRE),max(vectPOST)) * 1000) / 1000;
-    edges=linspace(xmin,xmax,1000);
-    histogram(vectPRE,'BinEdges',edges,"DisplayName","TRITIC preAFM","Normalization","pdf")
-    histogram(vectPOST,'BinEdges',edges,"DisplayName","TRITIC postAFM","Normalization","pdf",'FaceAlpha',0.5)
+    edges=linspace(xmin,xmax,5000);
+    histogram(vectPRE,'BinEdges',edges,"DisplayName","TRITIC preAFM","Normalization","pdf",'FaceAlpha',0.5,"FaceColor",globalColor(1))
+    histogram(vectPOST,'BinEdges',edges,"DisplayName","TRITIC postAFM","Normalization","pdf",'FaceAlpha',0.5,"FaceColor",globalColor(2))
+    xline(prctile(vectPRE,90),'--','LineWidth',2,'DisplayName','90° percentile TRITIC preAFM','Color',globalColor(1));
+    xline(prctile(vectPOST,90),'--','LineWidth',2,'DisplayName','90° percentile TRITIC postAFM','Color',globalColor(2));
     % better show
     allData = [vectPRE; vectPOST];
     pLow = prctile(allData, 0.0001);
@@ -215,8 +214,33 @@ function varargout=A3_prepareBFandTRITICimages(folderResultsImg,idxMon,nameExper
     xlim([pLow, pHigh]); ylim tight
     clear allData pLow pHigh
     % save distribution and singleLine
-    nameResults='resultA3_6_DistributionTRITIC_PRE_POST';
+    nameResults='resultA3_8_DistributionTRITIC_PRE_POST';
     saveFigures_FigAndTiff(fDist,folderResultsImg,nameResults)
+
+    % SHOW DELTA DISTRIBUTION
+    fDistDelta=figure('Visible','off');   
+    xlabel('Delta Fluorescence','FontSize',15), ylabel("PDF",'FontSize',15)
+    Delta=TRITIC_ImagePOST_aligned-TRITIC_ImagePRE_aligned;
+    vectDelta=Delta(:);       
+    xmin=floor(min(vectDelta)*1000)/1000;
+    xmax=ceil(max(vectDelta)*1000)/1000;
+    edges=linspace(xmin,xmax,500);
+    histogram(vectDelta,edges,'Normalization','pdf')
+    grid on, grid minor
+    pHigh=prctile(vectDelta(:),99); pLow=min(prctile(vectDelta,1e-4));
+    x1=round(pLow,2,TieBreaker="minusinf");
+    x2=round(pHigh,2,TieBreaker="plusinf");
+    xlim([x1 x2]), ylim tight
+    title(sprintf("Distribution Delta"),"FontSize",20)
+    subtitle(sprintf("(Data shown is within 1e^-^4° - 98° percentile of the entire data)"),"FontSize",15)
+    objInSecondMonitor(fDistDelta,idxMon);
+    nameFig='resultA3_9_DistributionDelta';
+    saveFigures_FigAndTiff(fDistDelta,folderResultsImg,nameFig)
+    % SHOW DELTA FIGURE
+    titleTxt="Delta Fluorescence";
+    nameFile='resultA3_2_3_DeltaFluorescence';
+    size_meterXpix=metadata.TRITIC.ImageHeight_umeterXpixel*metadata.TRITIC.pixelSizeUnit;
+    showData(idxMon,false,imadjust(Delta),sprintf("%s - imadjusted",titleTxt),folderResultsImg,nameFile,'lenghtAxis',size_meterXpix*size(Delta))  
 
     % prepare the output data
     [mainPathOpticalData,~]=fileparts(fileparts(fileparts(filePathND2)));
@@ -267,6 +291,6 @@ function showAlignOriginalImages(image1,image2,folderResultsImg,titleText,fileTe
     imshow(imfuse(imadjust(image1),imadjust(image2)))
     title(titleText,'FontSize',15)
     objInSecondMonitor(f2,idxMon);
-    saveFigures_FigAndTiff(f2,folderResultsImg,fileText,p.Results.closeImmediately)
+    saveFigures_FigAndTiff(f2,folderResultsImg,fileText,'closeImmediately',p.Results.closeImmediately)
 end
        

@@ -237,9 +237,9 @@ function BF_final=compareAndChooseBF(AFM_height_IO,TRITICdata,BFdata,folderResul
     TRITICpost=TRITICdata.POST;
     BFpre=BFdata.PRE;  BFpost=BFdata.POST;
     % show binarized AFM
-    fAFM=figure;
-    imagesc(AFM_height_IO), title("binarized AFM Height",'FontSize',15)
-    axis on, axis equal, xlim tight, ylim tight
+    fAFM=figure; axAFM=axes(fAFM);
+    imagesc(axAFM,AFM_height_IO), title(axAFM,"binarized AFM Height",'FontSize',15)
+    axis(axAFM,"on"), axis(axAFM,"equal"), xlim(axAFM,"tight"), ylim(axAFM,"tight")
     % show BFpre overlapped with TRITICpost, then BFpost
     fcompare=figure;
     ax1=subplot(121);
@@ -273,9 +273,6 @@ function BF_final=compareAndChooseBF(AFM_height_IO,TRITICdata,BFdata,folderResul
     sgtitle(textTitle,"FontSize",20,'interpreter','no')
     objInSecondMonitor(fcompare,idxMon)
     nameFile="resultA3_7_DefinitiveSelectionFromComparison_BFpreBFpost_TRITICafterOverlapped";
-    fullfileName=fullfile(folderResultsImg,'tiffImages',nameFile);
-    saveas(fcompare,fullfileName,'tif')
-    fullfileName=fullfile(folderResultsImg,'figImages',nameFile);
-    saveas(fcompare,fullfileName)
-    close(fcompare), close(fAFM)
+    saveFigures_FigAndTiff(fcompare,folderResultsImg,nameFile)   
+    close all
 end
