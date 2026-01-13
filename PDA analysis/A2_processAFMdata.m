@@ -86,10 +86,6 @@ function [AFM_images_final,AFM_height_IO,metaData]=A2_processAFMdata(allData,oth
             metaData_AFM=allData(i).metadata; 
 
 
-
-
-
-            
             if ~p.Results.postHeat % save time in case of postHeat AFM data
                 [AFM_LatDeflecFitted_Force,metricsPlane,metricsLine,FitOrderHVON_Lat,FitOrderHVOFF_Height,avg_fc]=A2_feature_2_processLateralChannel(AFM_HeightFittedMasked,AFM_height_IO,metaData_AFM,idxMon,SaveFigIthSectionFolder,mainPath, ...
                     'FitOrderHVON_Lat',FitOrderHVON_Lat,'FitOrderHVOFF_Height',FitOrderHVOFF_Height,'SeeMe',false,'idxSectionHVon',i,'flagSingleSectionProcess',true);

@@ -1,4 +1,4 @@
-function [AFM_Images_final,mask_FINAL,fitOrderHeight,metadata]=A2_feature_1_processHeightChannel(filtData,idxMon,SaveFigFolder,varargin)
+function varargout=A2_feature_1_processHeightChannel(filtData,idxMon,SaveFigFolder,varargin)
 % The function extracts Images from the experiments.
 % It removes baseline and extracts foreground from the AFM image.
 %
@@ -17,23 +17,22 @@ function [AFM_Images_final,mask_FINAL,fitOrderHeight,metadata]=A2_feature_1_proc
 %
 % Author: Altieri F.
 % University of Tokyo
-warning('off', 'stats:robustfit:IterationLimit');
-
+    warning('off', 'stats:robustfit:IterationLimit');
     % in case of code error, the waitbar won't be removed. So the following command force its closure
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)
-    clear allWaitBars
-    
+    clear allWaitBars    
     % A tool for handling and validating function inputs.  define expected inputs, set default values, and validate the types and properties of inputs.
     p=inputParser();    % init instance of inputParser
     % Add required and default parameters and also check conditions
     addRequired(p, 'filtData', @(x) isstruct(x));
-    argName = 'SeeMe';          defaultVal = true;              addParameter(p,argName,defaultVal, @(x) islogical(x));
-    argName = 'imageType';      defaultVal = 'Entire';          addParameter(p,argName,defaultVal, @(x) ismember(x,{'Entire','SingleSection','Assembled'}));
-    argName = 'Normalization';  defaultVal = false;             addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
-    argName = 'fitOrder';       defaultVal = '';                addParameter(p, argName, defaultVal, @(x) (ismember(x, {'Low', 'Medium', 'High'}) || isempty(x)));
-    argName = 'metadata';       defaultVal = [];                addParameter(p,argName,defaultVal);
-    argName = 'HoverModeImage'; defaultVal = 'HoverModeON';     addParameter(p, argName, defaultVal, @(x) (ismember(x, {'HoverModeOFF', 'HoverModeON'})));
+    argName = 'SeeMe';              defaultVal = true;              addParameter(p,argName,defaultVal, @(x) islogical(x));
+    argName = 'imageType';          defaultVal = 'Entire';          addParameter(p,argName,defaultVal, @(x) ismember(x,{'Entire','SingleSection','Assembled'}));
+    argName = 'Normalization';      defaultVal = false;             addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
+    argName = 'fitOrder';           defaultVal = '';                addParameter(p, argName, defaultVal, @(x) (ismember(x, {'Low', 'Medium', 'High'}) || isempty(x)));
+    argName = 'metadata';           defaultVal = [];                addParameter(p,argName,defaultVal);
+    argName = 'HoverModeImage';     defaultVal = 'HoverModeON';     addParameter(p, argName, defaultVal, @(x) (ismember(x, {'HoverModeOFF', 'HoverModeON'})));
+    argName = 'offset_HVon_HVoff';  defaultVal = [];                addParameter(p,argName,defaultVal);
 
     % validate and parse the inputs
     parse(p,filtData,varargin{:});
@@ -62,8 +61,8 @@ warning('off', 'stats:robustfit:IterationLimit');
         limitPlaneFit=9;
         limitLineFit=3;
     end    
-    clearvars argName defaultVal p varargin
-    
+    clearvars argName defaultVal varargin
+    varargout{3}=fitOrderHeight;
     % Orient image of every channel by clockwise 90° and flip along long axis so the image coencide with the Microscopy image direction
     for i=1:size(filtData,2)
         tmp_img_0=flip(rot90(filtData(i).Raw_afm_image),2);
@@ -91,11 +90,10 @@ warning('off', 'stats:robustfit:IterationLimit');
     while true
         % in case of MATLAB system failure, dont lose the work! Also AFM_Images because it may be different in case of HV mode OFF due to resizing
         if exist(fullfile(SaveFigFolder,"TMP_DATA_MASK_definitive.mat"),'file') && getValidAnswer('Mask AFM IO for the current section has been already generated. Take it definitively?','',{'y','n'})
-            load(fullfile(SaveFigFolder,"TMP_DATA_MASK_definitive.mat"),"AFM_height_IO_corr","BK_5_heightMasked_corr","binarizationMethod")
+            load(fullfile(SaveFigFolder,"TMP_DATA_MASK_definitive.mat"),"AFM_height_IO_corr","BK_5_heightMasked_corr","binarizationMethod","AFM_Images")
             flagExeMaskGen=false;
             if strcmp(HVmode,"HoverModeOFF")
-                load(fullfile(SaveFigFolder,"TMP_DATA_MASK_definitive.mat"),"AFM_Images")
-                height_1_original=AFM_Images(strcmp([AFM_Images.Channel_name],'Height (measured)')).AFM_images_1_original;
+                load(fullfile(SaveFigFolder,"TMP_DATA_MASK_definitive.mat"),"height_1_original")
             end
         end         
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -162,8 +160,12 @@ warning('off', 'stats:robustfit:IterationLimit');
                 question="Is the HoverModeOFF data generated in the approximately same scan area as the HoverModeON data?";
                 options={"If yes, take the mask of HOVER MODE ON and re-align to avoid to perform binarization.";
                     "If not, then exe normal processing, therefore binarization from the Height Image (HV mode OFF)."};
-                if getValidAnswer(question,'',options)==1
-                    [tmp1,tmp2]=maskFromHVon(AFM_Images,height_4_corrLine,SaveFigFolder,typeProcess,idxMon);
+                offset_HVon_HVoff=p.Results.offset_HVon_HVoff;
+                if isempty(offset_HVon_HVoff)
+                    answerFromHVon=getValidAnswer(question,'',options);
+                end
+                if ~isempty(offset_HVon_HVoff) || answerFromHVon==1
+                    [tmp1,tmp2,offset_HVon_HVoff]=maskFromHVon(AFM_Images,height_4_corrLine,SaveFigFolder,typeProcess,idxMon,offset_HVon_HVoff);
                     if ~isempty(tmp1)
                         AFM_height_IO=tmp1;
                         AFM_Images=tmp2; % resized channels
@@ -179,13 +181,12 @@ warning('off', 'stats:robustfit:IterationLimit');
                         metadata.y_scan_length_m=oldSizeMeter_y*metadata.y_scan_pixels/oldSizePixel_y;
                         metadata.x_scan_pixels = size(AFM_height_IO,1);
                         metadata.x_scan_length_m=oldSizeMeter_x*metadata.x_scan_pixels/oldSizePixel_x;
-
                         clear tmp*
                         binarizationMethod="Extracted from HV ON mask";
                         flagExeMaskGen=false;
                     end
-                end                
-            end
+                end                  
+            end            
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             %%%%%%%%% BUTTERWORTH FILTERING : an automatic semi-binarization ==> transform into nan values over a certain threshold %%%%%%%%
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -278,7 +279,7 @@ warning('off', 'stats:robustfit:IterationLimit');
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 disp('Processing now the binarization of Height channel after LineByLine Fitting with Butterworth-filtered Height')
                 [AFM_height_IO,binarizationMethod]=binarizeImageMain(height_6_forBinarization*1e9,idxMon,'Height',iterationMain); 
-            end
+            end            
             %%% here, both HVmode ON and OFF parts (if the user chose to use HV on MASK to generate the HV off mask) undergo the following parts
             textTitleIO=sprintf('Binary Height Image - iteration %d\n%s',iterationMain,binarizationMethod);                        
             % before getting the definitive mask, let the user have the option to delete some areas for better mask and consequently fitting 
@@ -314,10 +315,12 @@ warning('off', 'stats:robustfit:IterationLimit');
                 delete(files_tmp{:})
                 flagExeMaskGen=false;
                 % just for safety in case of interruption or system failure. If the mask is definitive, save it and dont restart again the entire binarization process
-                save(fullfile(SaveFigFolder,"TMP_DATA_MASK_definitive"),"AFM_height_IO_corr","BK_5_heightMasked_corr","binarizationMethod")
+                save(fullfile(SaveFigFolder,"TMP_DATA_MASK_definitive"),"AFM_height_IO_corr","BK_5_heightMasked_corr","binarizationMethod","AFM_Images","height_1_original")
             end
             clear titleText* nameFile flagRemoval ftmpIO answ question textTitleIO allBaselines continueLineFit files_tmp tmp
         end
+        varargout{4}=metadata;
+        varargout{5}=offset_HVon_HVoff;
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%% NOW THE MASK IS OBTAINED ==> LAST SERIES OF FITTING 1st ORDER USING MASKED BACKGROUND: ORIGINAL HEIGHT + FINAL MASKSKED DATA %%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%            
@@ -371,33 +374,33 @@ warning('off', 'stats:robustfit:IterationLimit');
         % stop the iteration of the mask and height channel generation and keep
         % those have been generated in the last iteration    
         question={"Satisfied of the definitive Height image and mask?";"If not, repeat again the process with the last height image to generate again a new mask.";"NOTE: ImageSegmenter Toolbox (Manual Binarization) is available from the second iteration\nso it can perform better with already optimized height image."};
-        answ=getValidAnswer(question,'',{'y','n'},2);
+        answ=getValidAnswer(question,'',{'y','n'},1);
         if answ
-            % REMOVE 99 percentile from height channel (not in the AFM-IO because it will be used later and it is informative keep it as it is
-            % HOWEVER, just in case, ask. maybe it is not so bad
-            percentile=99;
-            th=prctile(height_9_corr(:),percentile);
-            height_10_clean99perc=height_9_corr;
-            height_10_clean99perc(height_10_clean99perc>th)=nan;
-            % finalize the process                        
-            nameFile='resultA2_8_HeightFINAL';
-            titleData1='Definitive Height Image';
-            titleData2='Definitive Height Image - 99°percentile removed';
-            ftmp=showData(idxMon,true,height_9_corr*factor,titleData1,'','','labelBar',"Height (nm)",'lenghtAxis',lengthAxis,'saveFig',false,...
-                'extraData',{height_10_clean99perc*factor},'extraTitles',{titleData2},'extraLabel',"Height (nm)",'extraLengthAxis',{lengthAxis});
-            if getValidAnswer("99° percentile removed. Keep the first or the second height image as definitive height image?",'',{'First','Second (99°percentile removed)'},1)
-                height_FINAL=height_9_corr;
+            titleData1 = 'Definitive Height Image';
+            titleTemplate = 'Definitive Height Image - clipped above %.2fth percentile';
+            % REMOVE th percentile from height channel through slider (not in the AFM-IO because it will be used later and it is informative keep it as it is
+            [th,dataClean] = percentileClipSlider(idxMon, height_9_corr*factor, ...
+                titleData1, titleTemplate, "Height (nm)", lengthAxis,'pInit', 99, 'pMin', 95, 'pMax', 100);            
+            % User cancelled
+            if isnan(th)
+                height_FINAL = height_9_corr;
+                nameFile='resultA2_8_HeightFINAL';
+                nameFileMask='resultA2_8_maskFINAL';
             else
-                height_FINAL=height_10_clean99perc;
-            end
-            close(ftmp)
+                % Convert back to unscaled if you want the raw stored:
+                height_10_prctile=dataClean/factor;
+                nameFile="resultA2_8_HeightBeforePrctileTH";
+                showData(idxMon,false,height_9_corr*factor,"Definitive Height before threshold",SaveFigFolder,nameFile,'labelBar',"Height (nm)",'lenghtAxis',lengthAxis);
+                nameFile='resultA2_9_HeightFINAL';  
+                nameFileMask='resultA2_9_maskFINAL';              
+                height_FINAL=height_10_prctile;
+            end        
             % save final height
             showData(idxMon,false,height_FINAL*factor,titleData1,SaveFigFolder,nameFile,'labelBar',"Height (nm)",'lenghtAxis',lengthAxis);
-            % save mask
-            nameFile='resultA2_8_maskFINAL';
+            % save mask            
             titleData1='Definitive mask Height Image';
             mask_FINAL=AFM_height_IO_corr;
-            showData(idxMon,false,mask_FINAL,titleData1,SaveFigFolder,nameFile,'binary',true,'lenghtAxis',lengthAxis) 
+            showData(idxMon,false,mask_FINAL,titleData1,SaveFigFolder,nameFileMask,'binary',true,'lenghtAxis',lengthAxis) 
             % substitutes to the original height image with the new opt fitted heigh
             AFM_Images_final=AFM_Images;            
             for i=1:length(AFM_Images_final)
@@ -411,6 +414,8 @@ warning('off', 'stats:robustfit:IterationLimit');
                     AFM_Images_final(i).AFM_images_2_PostProcessed=AFM_Images_final(i).AFM_images_1_original; 
                 end
             end
+            varargout{1}=AFM_Images_final;
+            varargout{2}=mask_FINAL;
             break
         else
             iterationMain=iterationMain+1;
@@ -424,8 +429,8 @@ end
 %%%%%%%%%%%%%%%%%
 %%% FUNCTIONS %%%
 %%%%%%%%%%%%%%%%%
-function varargout=maskFromHVon(data_HV_OFF,height_HV_OFF,folderHVoff,typeProcess,idxMon)
-    varargout=cell(1,2);
+function varargout=maskFromHVon(data_HV_OFF,height_HV_OFF,folderHVoff,typeProcess,idxMon,offset_HVon_HVoff)
+    varargout=cell(1,3);
     parts = split(folderHVoff, filesep);   % split into folders
     idx = find(parts == "HoverMode_OFF");
     mainPath = strjoin(parts(1:idx-1), filesep);
@@ -454,9 +459,11 @@ function varargout=maskFromHVon(data_HV_OFF,height_HV_OFF,folderHVoff,typeProces
     % now there are both HV_ON and HV_OFF masks. Correlate them to exclude not correlated regions so the friction is derived to a
     % confined region which is guaranted to be same in both scan modes
     mask_HV_ON = double(AFM_height_IO_HV_ON);
-    % since the data are different, move manually.
-    offset = round(manual_align_images(mask_HV_ON, height_HV_OFF));
-    dxInt=offset(1); dyInt=offset(2);
+    % since the data are different, move manually. If offset_HVon_HVoff has been already calculated from first section, take it
+    if isempty(offset_HVon_HVoff)
+        offset_HVon_HVoff = round(manual_align_images(mask_HV_ON, height_HV_OFF));
+    end
+    dxInt=offset_HVon_HVoff(1); dyInt=offset_HVon_HVoff(2);
     % sizes
     [mH, mW] = size(mask_HV_ON); [dH, dW] = size(height_HV_OFF);    
     % compute overlapping ranges in mask and data coordinates
@@ -471,7 +478,6 @@ function varargout=maskFromHVon(data_HV_OFF,height_HV_OFF,folderHVoff,typeProces
     % optionally, apply mask to data
     maskedData = dataOverlap;
     maskedData(logical(mask_HV_OFF))=NaN;   % nan outside mask
-
     f_maskComparison=figure;
     subplot(1,3,1)
     imagesc(mask_HV_ON),axis equal, xlim tight,title('Original mask HV mode ON','Fontsize',14);
@@ -480,17 +486,17 @@ function varargout=maskFromHVon(data_HV_OFF,height_HV_OFF,folderHVoff,typeProces
     subplot(1,3,3);
     imagesc(maskedData),axis equal, xlim tight,title({'Background';'Masked height image after 1st order fit Plane'},'Fontsize',14);    
     objInSecondMonitor(f_maskComparison,idxMon)     
-    if getValidAnswer('Satisfied of the pseudo-mask of HoverMode OFF?','',{'Y','N'})
-        varargout{1}=mask_HV_OFF;
-        %%% === Trim AFM images (HVOFF) to the common region === %%%        
-        for i = 1:length(data_HV_OFF)
-            img = data_HV_OFF(i).AFM_images_1_original;
-            img=img(yDataStart:yDataEnd, xDataStart:xDataEnd);
-            data_HV_OFF(i).AFM_images_2_PostProcessed = img;
-        end 
-        varargout{2}=data_HV_OFF;
-        saveFigures_FigAndTiff(f_maskComparison,folderHVoff,"resultA2_2_maskHVoff_fromHVon")   
+     
+    varargout{1}=mask_HV_OFF;
+    %%% === Trim AFM images (HVOFF) to the common region === %%%        
+    for i = 1:length(data_HV_OFF)
+        img = data_HV_OFF(i).AFM_images_1_original;
+        img=img(yDataStart:yDataEnd, xDataStart:xDataEnd);
+        data_HV_OFF(i).AFM_images_2_PostProcessed = img;
     end 
+    varargout{2}=data_HV_OFF;
+    saveFigures_FigAndTiff(f_maskComparison,folderHVoff,"resultA2_2_maskHVoff_fromHVon")  
+    varargout{3}=offset_HVon_HVoff;
 end
 
 function [data_butterworthFiltered] = butterworthFiltering(data,idxMon)
@@ -588,3 +594,4 @@ function [data_butterworthFiltered] = butterworthFiltering(data,idxMon)
         end
     end
 end
+

@@ -1,7 +1,13 @@
-function varargout = A2_feature_sortAndAssemblySections(allData,otherParameters,flag_processSingleSection)
+function varargout = A2_feature_sortAndAssemblySections(allData,otherParameters,flag_processSingleSection,varargin)
 % First part is sorting in function of the y-position of the sections
 % Second part is assembling the sections
-     numFiles=length(allData);
+    
+    p=inputParser(); 
+    argName = 'frictionMain';          defaultVal = true;              addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
+    parse(p,varargin{:});
+    frictionMain=p.Results.frictionMain;
+  
+    numFiles=length(allData);
     % check the origin offset information and properly sort data and
     % metadata. In theory, the sections are already ordered, but further
     % check always better! Note: each line of struct is
@@ -48,75 +54,95 @@ function varargout = A2_feature_sortAndAssemblySections(allData,otherParameters,
     end
     clear y_scan_lengthAllScans y_OriginAllScans idx 
 
-    % Init vars where store the assembled sections by copying common data fields.
-    % Copy just the first row (The data will be overwritten later during assembly):
-    %   Channel_name
-    %   Trace_type
-    %   AFM data
-    wantedFields = {'Channel_name','Trace_type'};
-    tmp=allDataOrdered(1).AFMImage_Raw;
-    dataAssembled = rmfield(tmp, setdiff(fieldnames(tmp), wantedFields));
+    if frictionMain
+        varargout{1}=assemblyDataFromFrictionMain(allDataOrdered,metaDataAssembled);       
+    else
+        % Init vars where store the assembled sections by copying common data fields.
+        % Copy just the first row (The data will be overwritten later during assembly):
+        %   Channel_name
+        %   Trace_type
+        %   AFM data
+        wantedFields = {'Channel_name','Trace_type'};
+        tmp=allDataOrdered(1).AFMImage_Raw;
+        dataAssembled = rmfield(tmp, setdiff(fieldnames(tmp), wantedFields));
+        [dataAssembled.AFM_images_0_raw]=deal(zeros(0,1));   
+        [dataAssembled.AFM_images_1_original]=deal(zeros(0,1));
+        if flag_processSingleSection
+            [dataAssembled.AFM_images_2_PostProcessed]=deal(zeros(0,1));        
+        end
+            
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%%%%%%%%%%%%%%%%%%% ASSEMBLY BY CONCATENATION %%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        % Then, for each iteration, in case of AFM image (5 channels), take all those channel
+        % init the var where store the concatenated sections of pre and post processed sections        
+        assembledMask=assemblyMask(metaData,dataMask);
+        
+        % start the assembly of the AFM images. For convenience, it is better take the i-th channel and then assembly all the sections of that
+        % specific channel    
+        for i=1:size(dataAssembled,2)
+            % for each channel, init the var containing the concatenated data
+            concatenatedData_Raw_afm_image=zeros(xpix, ypix_total);
+            concatenatedData_AFM_image_START=zeros(xpix, ypix_total);
+            if flag_processSingleSection
+                concatenatedData_AFM_image_END=zeros(xpix, ypix_total);        
+            end
+            colStart = 1;
+            % start the assembly of the i-th channel
+            for j=numFiles:-1:1
+                % extract the struct AFM data
+                tmp=allDataOrdered(j).AFMImage_Raw(i);
+                tmp_raw=flip(rot90(tmp.Raw_afm_image,-1));
+                tmp_start=flip(rot90(tmp.AFM_image,-1));
+                if flag_processSingleSection
+                    tmp=allDataOrdered(j).AFMImage_PostProcess(i);
+                    tmp_end=tmp.AFM_images_2_PostProcessed;
+                end
+                yLen=size(tmp_end,2); colEnd = colStart + yLen-1;
+                % concatenate
+                concatenatedData_Raw_afm_image(:,colStart:colEnd)=tmp_raw;
+                concatenatedData_AFM_image_START(:,colStart:colEnd)=tmp_start;
+                if flag_processSingleSection
+                    concatenatedData_AFM_image_END(:,colStart:colEnd)=tmp_end;
+                end
+                colStart = colEnd+1;
+            end
+            % now the data has been concatenated. Store in the final var
+            dataAssembled(i).AFM_images_0_raw=concatenatedData_Raw_afm_image;
+            dataAssembled(i).AFM_images_1_original=concatenatedData_AFM_image_START;
+            if flag_processSingleSection
+                dataAssembled(i).AFM_images_2_PostProcessed=concatenatedData_AFM_image_END;
+            end
+        end
+    end
+    varargout{1}=dataAssembled;
+    varargout{2}=concatenatedMask;
+    varargout{3}=metaDataAssembled;
+end
+
+function assembledMask=assemblyMask(metaData,allData)
+% assembly the mask. Since the size can be big, preallocate    
+        xpix = metaData.x_scan_pixels;
+        ypix_total = sum(metaData.y_scan_pixels);
+        assembledMask=zeros(xpix, ypix_total);
+        colStart = 1;
+        for j=numFiles:-1:1
+            tmp1=allData(j).AFMmask_heightIO;
+            yLen=size(tmp1,2);        
+            colEnd = colStart + yLen-1;
+            assembledMask(:,colStart:colEnd)=tmp1;
+            colStart = colEnd+1;
+        end
+end
+
+function allDataAssembled=assemblyDataFromFrictionMain(allData,metaData)
+    assembledMask=assemblyMask(metaData,allData);
+    allDataAssembled.mask=assembledMask;
+    % Init vars where store the assembled sections
+    assembledForceRaw=zeros
     [dataAssembled.AFM_images_0_raw]=deal(zeros(0,1));   
     [dataAssembled.AFM_images_1_original]=deal(zeros(0,1));
     if flag_processSingleSection
         [dataAssembled.AFM_images_2_PostProcessed]=deal(zeros(0,1));        
     end
-        
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%% ASSEMBLY BY CONCATENATION %%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % Then, for each iteration, in case of AFM image (5 channels), take all those channel
-    % init the var where store the concatenated sections of pre and post processed sections        
-    
-    % assembly the mask. Since the size can be big, preallocate    
-    xpix = metaDataAssembled.x_scan_pixels;
-    ypix_total = sum(metaDataAssembled.y_scan_pixels);
-    concatenatedMask=zeros(xpix, ypix_total);
-    colStart = 1;
-    for j=numFiles:-1:1
-        tmp1=allDataOrdered(j).AFMmask_heightIO;
-        yLen=size(tmp1,2);        
-        colEnd = colStart + yLen-1;
-        concatenatedMask(:,colStart:colEnd)=tmp1;
-        colStart = colEnd+1;
-    end
-    % start the assembly of the AFM images. For convenience, it is better take the i-th channel and then assembly all the sections of that
-    % specific channel    
-    for i=1:size(dataAssembled,2)
-        % for each channel, init the var containing the concatenated data
-        concatenatedData_Raw_afm_image=zeros(xpix, ypix_total);
-        concatenatedData_AFM_image_START=zeros(xpix, ypix_total);
-        if flag_processSingleSection
-            concatenatedData_AFM_image_END=zeros(xpix, ypix_total);        
-        end
-        colStart = 1;
-        % start the assembly of the i-th channel
-        for j=numFiles:-1:1
-            % extract the struct AFM data
-            tmp=allDataOrdered(j).AFMImage_Raw(i);
-            tmp_raw=flip(rot90(tmp.Raw_afm_image,-1));
-            tmp_start=flip(rot90(tmp.AFM_image,-1));
-            if flag_processSingleSection
-                tmp=allDataOrdered(j).AFMImage_PostProcess(i);
-                tmp_end=tmp.AFM_images_2_PostProcessed;
-            end
-            yLen=size(tmp_end,2); colEnd = colStart + yLen-1;
-            % concatenate
-            concatenatedData_Raw_afm_image(:,colStart:colEnd)=tmp_raw;
-            concatenatedData_AFM_image_START(:,colStart:colEnd)=tmp_start;
-            if flag_processSingleSection
-                concatenatedData_AFM_image_END(:,colStart:colEnd)=tmp_end;
-            end
-            colStart = colEnd+1;
-        end
-        % now the data has been concatenated. Store in the final var
-        dataAssembled(i).AFM_images_0_raw=concatenatedData_Raw_afm_image;
-        dataAssembled(i).AFM_images_1_original=concatenatedData_AFM_image_START;
-        if flag_processSingleSection
-            dataAssembled(i).AFM_images_2_PostProcessed=concatenatedData_AFM_image_END;
-        end
-    end     
-    varargout{1}=dataAssembled;
-    varargout{2}=concatenatedMask;
-    varargout{3}=metaDataAssembled;
 end
