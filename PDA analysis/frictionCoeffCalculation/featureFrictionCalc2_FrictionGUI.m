@@ -1,12 +1,26 @@
-% easy interface to see how different methods to extract friction affect the overall data
+% This function opens an easy interface to see how different methods to extract friction affect the overall data. 
+% The user has to choose one of the two possible methods depending on the choice and input data
+%   method 1) INPUT: BK+FR   ==>  masking lateral and vertical data using AFM_height_IO to ignore PDA regions
+%
+% The second method removes outliers considered as spike signals in correspondence with the PDA crystal's edges using in-built matlab function.
+% Moreover, PIXEL REDUCTION is applied to make more robust the statistical calculation prior the outliers removal
+% once found a segment (single background region between two PDA regions), depending on the window/pixel
+% size, the edges will be "brutally" removed by zeroing (0:PDA-1:BK)
+%   method 2a) INPUT: BK+FR  ==>  method 1 + REMOVAL OF OUTLIERS on single segments found in each single fast scan line
+%   method 2b) INPUT: BK+FR  ==>  method 1 + REMOVAL OF OUTLIERS on connected segments (multiple single segment attached togheter before
+%                                   outliers removal for better statistics) for each single fast scan line
+%   method 2c) INPUT: BK+FR  ==>  method 1 + REMOVAL OF OUTLIERS on connected segments of each entire section (in correspondence of same
+%                                   setpoint region) ==> multiple segments of multiple fast scan lines all attached togheter
+%
+%   method 3 (development) INPUT: background ONLY ==>  simplest method
+%
 % INPUT:    - vertForce : vertical forces (mean trace-retrace)
 %           - force     : lateral forces
 %           - idxSection: indexes of the sections (matrix). (1,i) = startIdx, (2,i) = endIdx
 %           - filePathResultsFriction : folder where to save plots and results
-%
 % OUTPUT:   - results
 
-function results = A2_feature_2_2_FrictionGUI(vertForce,force,mask,idxSection,idxMon,filePathResultsFriction)
+function results = featureFrictionCalc2_FrictionGUI(vertForce,force,mask,idxSection,idxMon,filePathResultsFriction)
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)    
     % Default values
