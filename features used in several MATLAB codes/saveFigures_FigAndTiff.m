@@ -4,7 +4,7 @@ function saveFigures_FigAndTiff(fig,nameDir,nameFig,varargin)
     addParameter(p,'closeImmediately',true,@islogical);
     parse(p,varargin{:});
     fullnameTif=fullfile(nameDir,"tiffImages",nameFig+".tif");
-    fullnameFig=fullfile(nameDir,"figImages",nameFig);
+    fullnameFig=fullfile(nameDir,"figImages",nameFig+".fig");
     % --- Save only the content of the axes ---
     if isMatlabDarkMode()
         forceLightTheme(fig);
