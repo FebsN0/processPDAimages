@@ -8,7 +8,6 @@ function varargout = A1_openANDprepareAFMdata(varargin)
     p=inputParser();
     argName = 'filePath';                   defaultVal = '';        addParameter(p,argName,defaultVal, @(x) ischar(x));
     argName = 'frictionData';               defaultVal = 'No';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
-    argName = 'flagSingleSectionProcess';   defaultVal = 'No';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     % validate and parse the inputs
     parse(p,varargin{:});
     if isempty(p.Results.filePath)

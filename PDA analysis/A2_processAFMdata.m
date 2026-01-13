@@ -3,6 +3,7 @@ function [AFM_images_final,AFM_height_IO,metaData]=A2_processAFMdata(allData,oth
     p=inputParser(); 
     argName = 'SeeMe';          defaultVal = true;              addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
     argName = 'Normalization';  defaultVal = false;             addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
+    argName = 'postHeat';       defaultVal = false;             addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
     parse(p,varargin{:});
     SeeMe=p.Results.SeeMe;
     norm=p.Results.Normalization;
@@ -83,20 +84,28 @@ function [AFM_images_final,AFM_height_IO,metaData]=A2_processAFMdata(allData,oth
             %%%%%%%% PROCESS LATERAL DEFLECTION CHANNEL (in case of HOVER MODE ON DATA) %%%%%%%%
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%           
             metaData_AFM=allData(i).metadata; 
-            [AFM_LatDeflecFitted_Force,metricsPlane,metricsLine,FitOrderHVON_Lat,FitOrderHVOFF_Height,avg_fc]=A2_feature_2_processLateralChannel(AFM_HeightFittedMasked,AFM_height_IO,metaData_AFM,idxMon,SaveFigIthSectionFolder,mainPath, ...
-                'FitOrderHVON_Lat',FitOrderHVON_Lat,'FitOrderHVOFF_Height',FitOrderHVOFF_Height,'SeeMe',false,'idxSectionHVon',i,'flagSingleSectionProcess',true);
-            allData(i).metadata.frictionCoeff_Used=avg_fc;
-            % prepare the info about the used fitting
-            if ~isempty(metricsLine)
-                infoLine=" - LineByLineFit";
-            else
-                infoLine="";
+
+
+
+
+
+            
+            if ~p.Results.postHeat % save time in case of postHeat AFM data
+                [AFM_LatDeflecFitted_Force,metricsPlane,metricsLine,FitOrderHVON_Lat,FitOrderHVOFF_Height,avg_fc]=A2_feature_2_processLateralChannel(AFM_HeightFittedMasked,AFM_height_IO,metaData_AFM,idxMon,SaveFigIthSectionFolder,mainPath, ...
+                    'FitOrderHVON_Lat',FitOrderHVON_Lat,'FitOrderHVOFF_Height',FitOrderHVOFF_Height,'SeeMe',false,'idxSectionHVon',i,'flagSingleSectionProcess',true);
+                allData(i).metadata.frictionCoeff_Used=avg_fc;
+                % prepare the info about the used fitting
+                if ~isempty(metricsLine)
+                    infoLine=" - LineByLineFit";
+                else
+                    infoLine="";
+                end
+                infoPlane=metricsPlane.fitOrder;
+                allData(i).metadata.fittingInfo=sprintf("PlaneFit: %s%s",infoPlane,infoLine);
+                allData(i).AFMImage_PostProcess=AFM_LatDeflecFitted_Force;
+                allData(i).AFMmask_heightIO=AFM_height_IO;     
+                save(fullfile(SaveFigIthSectionFolder,sprintf("%s_lateralChannelProcessed.mat",nameSection)),"allData","FitOrderHVON_Height","FitOrderHVOFF_Height","FitOrderHVON_Lat") 
             end
-            infoPlane=metricsPlane.fitOrder;
-            allData(i).metadata.fittingInfo=sprintf("PlaneFit: %s%s",infoPlane,infoLine);
-            allData(i).AFMImage_PostProcess=AFM_LatDeflecFitted_Force;
-            allData(i).AFMmask_heightIO=AFM_height_IO;     
-            save(fullfile(SaveFigIthSectionFolder,sprintf("%s_lateralChannelProcessed.mat",nameSection)),"allData","FitOrderHVON_Height","FitOrderHVOFF_Height","FitOrderHVON_Lat") 
             close all            
         end
     end

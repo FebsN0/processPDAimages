@@ -20,6 +20,7 @@ function varargout=A4_Mic_to_Binary(imageBF_aligned,idxMon,newFolder,varargin)
     addRequired(p, 'imageBF_aligned');    
     argName = 'TRITIC_before';      defaultVal = [];        addParameter(p,argName,defaultVal, @(x) ismatrix(x));
     argName = 'TRITIC_after';       defaultVal = [];        addParameter(p,argName,defaultVal, @(x) ismatrix(x));
+    argName = 'postHeat';           defaultVal = false;     addParameter(p,argName,defaultVal, @(x) islogical(x));
     parse(p,imageBF_aligned,varargin{:});
     clearvars argName defaultVal
 
@@ -32,7 +33,7 @@ function varargout=A4_Mic_to_Binary(imageBF_aligned,idxMon,newFolder,varargin)
     end
     textCrop="";
     % decide if crop the image. If not, leave as original size
-    if getValidAnswer('The image is not cropped yet, would Like to Crop the Image? Dont in case of post heated scans', '', {'Yes','No'})
+    if ~p.Results.postHeat && getValidAnswer('The image is not cropped yet, would Like to crop the Image?', '', {'Yes','No'})
         textCrop = " and cropped";
         if ~isempty(reduced_Tritic_after)
             ftritic=figure;
