@@ -92,7 +92,7 @@ if ~getValidAnswer(question,'',{'Yes','No'})
     end
 end
 clear question
-
+%%
 % check if data already exist. If so, upload.
 step2Start=checkExistingData(mainPath,nameExperiment,nameScan);
 
@@ -121,21 +121,21 @@ end
 if step2Start<4
     % in case there are two BF images (PRE and POST), choose which one to use for binarization and all the next steps. Use AFM mask for better help
     if numel(fieldnames(BFdata))==2
-        BF_Mic_Image_aligned=compareAndChooseBF(AFM_height_IO,TRITICdata,BFdata,SaveFigFolder,idxMon);        
+        BF_Image_aligned=compareAndChooseBF(AFM_height_IO,TRITICdata,BFdata,SaveFigFolder,idxMon);        
     else
         field=fieldnames(BFdata);
-        BF_Mic_Image_aligned=BFdata.(field{1});
+        BF_Image_aligned=BFdata.(field{1});
     end
     TRITIC_Before=TRITICdata.PRE;
     TRITIC_After=TRITICdata.POST;    
     % Produce the binary IO of Brightfield
-    [BF_Mic_Image_IO,TRITIC_Before,TRITIC_After]=A4_Mic_to_Binary(BF_Mic_Image_aligned,idxMon,SaveFigFolder,'TRITIC_before',TRITIC_Before,'TRITIC_after',TRITIC_After); 
-    clear BF_Mic_Image_aligned 
+    [BF_Image_IO,TRITIC_Before,TRITIC_After]=A4_Mic_to_Binary(BF_Image_aligned,idxMon,SaveFigFolder,'TRITIC_before',TRITIC_Before,'TRITIC_after',TRITIC_After); 
+    clear BF_Image_aligned 
     save(fullfile(SaveFigFolder,'resultsData_4_BF_TRITIC_binarization'))
 end
 %% Align AFM to BF and extract the coordinates for alignment to be transferred to the other data
 if step2Start<5
-    [AFM_height_IO_final,BF_Mic_Image_IO,AFM_data_final,results_AFM_BF_aligment,offset]=A5_alignment_AFM_Microscope(BF_Mic_Image_IO,metaData_NIKON.BF,AFM_height_IO,metaData_AFM,dataAFM_latDeflecFitted,SaveFigFolder,idxMon,'Margin',150);
+    [AFM_height_IO_final,BF_Image_IO,AFM_data_final,results_AFM_BF_aligment,offset]=A5_alignment_AFM_Microscope(BF_Image_IO,metaData_NIKON.BF,AFM_height_IO,metaData_AFM,dataAFM_latDeflecFitted,SaveFigFolder,idxMon,'Margin',150);
     % adjust size BF and TRITIC
     %BF_Mic_Image_IO=fixSize(BF_Mic_Image_IO,offset);
     TRITIC_Before=fixSize(TRITIC_Before,offset);  
