@@ -25,36 +25,51 @@ function varargout = percentileClipSlider(idxMon,data,titleOrig,titleTemplateCle
     addParameter(p, 'pInit', 99, @(x) isnumeric(x) && isscalar(x));
     addParameter(p, 'pMin',  95, @(x) isnumeric(x) && isscalar(x));
     addParameter(p, 'pMax', 100, @(x) isnumeric(x) && isscalar(x));
+    addParameter(p, 'pLowInit',  1, @(x) isnumeric(x) && isscalar(x));
+    addParameter(p, 'pLowMin',   0, @(x) isnumeric(x) && isscalar(x));
+    addParameter(p, 'pLowMax',   5, @(x) isnumeric(x) && isscalar(x));
     parse(p,varargin{:});
-    pInit = p.Results.pInit; pMin = p.Results.pMin; pMax = p.Results.pMax;
-    
+    pHighInit = p.Results.pInit;    pHighMin = p.Results.pMin;      pHighMax = p.Results.pMax;
+    pLowInit = p.Results.pLowInit;  pLowMin = p.Results.pLowMin;    pLowMax = p.Results.pLowMax;
     % --- UI Figure
     fig = uifigure('Name','Percentile clip (interactive)');
     objInSecondMonitor(fig, idxMon);
     
-    % Layout grid
+    % Layout grid (plots + control row)
     gl = uigridlayout(fig,[2 2]);
     gl.RowHeight = {'1x', 100};
     gl.ColumnWidth = {'1x','1x'};    
     ax1 = uiaxes(gl); ax1.Layout.Row = 1; ax1.Layout.Column = 1;
     ax2 = uiaxes(gl); ax2.Layout.Row = 1; ax2.Layout.Column = 2;
     
-    % ---- controls row (2 rows × 3 columns) ---- (1st row empty|empty|AcceptBtn - 2nd row number|slider|TakeOriginalBtn
+    % -------------------------------------------------------------------------
+    % Controls: 2 rows × 3 cols
+    % Row 1: low-label  | low-slider  | Accept
+    % Row 2: high-label | high-slider | Take original
+    % -------------------------------------------------------------------------
     ctrl = uigridlayout(gl,[2 3]);
     ctrl.Layout.Row = 2;
     ctrl.Layout.Column = [1 2];
     ctrl.RowHeight   = {'1x', '1x'};      % top = Accept, bottom = slider row
     ctrl.ColumnWidth = {140,'1x',220};  % label | slider | buttons
     ctrl.RowSpacing  = 6;
-    % --- Row 2: label + slider ---
-    lbl = uilabel(ctrl,'Text',sprintf('p = %.2f',pInit));
-    lbl.Layout.Row = 2;
-    lbl.Layout.Column = 1;
-    sld = uislider(ctrl,'Limits',[pMin pMax],'Value',pInit);
-    sld.Layout.Row = 2;
-    sld.Layout.Column = 2;
-    sld.MajorTicks = [];
-    sld.MinorTicks = [];
+    % --- Row 1: label + slider Low Percentile ---
+    lblLow = uilabel(ctrl,'Text',sprintf('Low clip p = %.2f', pLowInit));
+    lblLow.Layout.Row = 1; lblLow.Layout.Column = 1;    
+    sldLow = uislider(ctrl,'Limits',[pLowMin pLowMax],'Value',pLowInit);
+    sldLow.Layout.Row = 1; sldLow.Layout.Column = 2;
+    sldLow.MajorTicks = [];
+    sldLow.MinorTicks = [];
+
+    % --- Row 2: label + slider High Percentile ---
+    % High percentile (Row 2)
+    lblHigh = uilabel(ctrl,'Text',sprintf('High clip p = %.2f', pHighInit));
+    lblHigh.Layout.Row = 2; lblHigh.Layout.Column = 1;
+    sldHigh = uislider(ctrl,'Limits',[pHighMin pHighMax],'Value',pHighInit);
+    sldHigh.Layout.Row = 2; sldHigh.Layout.Column = 2;
+    sldHigh.MajorTicks = [];
+    sldHigh.MinorTicks = [];
+
     % --- Row 1: Accept button (above slider) ---
     btnOK = uibutton(ctrl,'Text','Accept');
     btnOK.Layout.Row = 1;
@@ -67,14 +82,18 @@ function varargout = percentileClipSlider(idxMon,data,titleOrig,titleTemplateCle
 
     % --- initial render
     localShowUI(ax1, data, titleOrig, labelBar, AxisLength);
-    [pNow, dataNow] = localClip(data, pInit);
-    h2 = localShowUI(ax2, dataNow, sprintf(titleTemplateClean,pNow), labelBar, AxisLength);
+    [pLowNow, pHighNow, dataNow] = localClip2Sided(data, pLowInit, pHighInit);
+    h2 = localShowUI(ax2, dataNow, sprintf(titleTemplateClean,pLowNow, pHighNow), labelBar, AxisLength);
+    
     % --- shared state
-    pChosen = NaN; dataClean = [];
+    pChosen = [NaN NaN]; dataClean = [];
     % --- continuous update while dragging
-    sld.ValueChangingFcn = @(src,evt) onSlide(evt.Value);
-    % --- also update on final release (optional redundancy)
-    sld.ValueChangedFcn  = @(src,evt) onSlide(src.Value);
+    sldLow.ValueChangingFcn  = @(src,evt) onAnySlide(evt.Value, sldHigh.Value);
+    sldHigh.ValueChangingFcn = @(src,evt) onAnySlide(sldLow.Value, evt.Value);
+    % also update on release (redundant but fine)
+    sldLow.ValueChangedFcn   = @(src,evt) onAnySlide(src.Value, sldHigh.Value);
+    sldHigh.ValueChangedFcn  = @(src,evt) onAnySlide(sldLow.Value, src.Value);
+    
     % --- buttons
     btnOK.ButtonPushedFcn = @(~,~) doAccept();
     btnCA.ButtonPushedFcn = @(~,~) doCancel();
@@ -84,21 +103,21 @@ function varargout = percentileClipSlider(idxMon,data,titleOrig,titleTemplateCle
     close(fig)
 
 % ---------------- nested callbacks ----------------
-    function onSlide(pVal)
-        [pUse, dataCl] = localClip(data, pVal);
-        lbl.Text = sprintf('p = %.2f', pUse);
-
-        % Update image data + alpha (NaN transparent)
-        h2.CData = dataCl;
-        h2.AlphaData = ~isnan(dataCl);
-
-        ax2.Title.String = sprintf(titleTemplateClean, pUse);
+    function onAnySlide(pLowVal, pHighVal)
+        [pL, pH, dataClean] = localClip2Sided(data, pLowVal, pHighVal);
+        lblLow.Text  = sprintf('Low clip p = %.2f',  pL);
+        lblHigh.Text = sprintf('High clip p = %.2f', pH);
+        h2.CData = dataClean;
+        h2.AlphaData = ~isnan(dataClean);
+        % Expect titleTemplateClean to accept TWO values, e.g.:
+        % 'Clipped (low %.2f%%, high %.2f%%)'
+        ax2.Title.String = sprintf(titleTemplateClean, pL, pH);
         drawnow limitrate
     end
 
     function doAccept()
-        pChosen = sld.Value;
-        [pChosen, dataClean] = localClip(data, pChosen);
+        pChosen = [sldLow.Value sldHigh.Value];
+        [~, ~, dataClean] = localClip2Sided(data, pChosen(1), pChosen(2));
         varargout{1}=pChosen;        
         varargout{2}=dataClean;
         uiresume(fig);
@@ -112,7 +131,7 @@ function varargout = percentileClipSlider(idxMon,data,titleOrig,titleTemplateCle
 end
 
 % ---------- helpers ----------
-function [h, climRef] = localShowUI(ax, data, ttl, labelBar, AxisLength)
+function h = localShowUI(ax, data, ttl, labelBar, AxisLength)
     [x,y] = localAxisVectors(data, AxisLength);
     h = imagesc(ax,x,y,data);
     h.AlphaData = ~isnan(data);
@@ -121,25 +140,24 @@ function [h, climRef] = localShowUI(ax, data, ttl, labelBar, AxisLength)
     cb = colorbar(ax);
     cb.Label.String = string(labelBar);
     ax.Title.String = ttl;
-    axis(ax,'equal'); xlim(ax,'tight'); ylim(ax,'tight');
-
-    v = data(:); v = v(~isnan(v));
-    if isempty(v), climRef = [0 1];
-    else
-        climRef = [prctile(v,1) prctile(v,99)];
-        if climRef(1) == climRef(2)
-            climRef = [min(v) max(v)];
-            if climRef(1)==climRef(2), climRef = climRef + [-1 1]; end
-        end
-    end
+    axis(ax,'equal'); xlim(ax,'tight'); ylim(ax,'tight');   
 end
 
-function [pUse, dataClipped] = localClip(data, pUse)
+function [pLowUse, pHighUse, dataClipped] = localClip2Sided(data, pLowUse, pHighUse)
+    % Enforce ordering (avoid invalid states)
+    if pLowUse > pHighUse
+        tmp = pLowUse; pLowUse = pHighUse; pHighUse = tmp;
+    end
     v = data(:); v = v(~isnan(v));
-    if isempty(v), dataClipped = data; return; end
-    th = prctile(v, pUse);
+    if isempty(v)
+        dataClipped = data;
+        return;
+    end
+    thLow  = prctile(v, pLowUse);
+    thHigh = prctile(v, pHighUse);
     dataClipped = data;
-    dataClipped(dataClipped > th) = NaN;
+    dataClipped(dataClipped < thLow)  = NaN;
+    dataClipped(dataClipped > thHigh) = NaN;
 end
 
 function [x,y] = localAxisVectors(data, AxisLength)
