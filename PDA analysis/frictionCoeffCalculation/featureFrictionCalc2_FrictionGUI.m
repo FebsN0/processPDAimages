@@ -225,8 +225,11 @@ function results = featureFrictionCalc2_FrictionGUI(vertForce,force,mask,idxSect
                 results = computeFriction_method1(vertForce,force, idxSection);               
                 plotFitResults(results,idxSection,hAx_fitResults);       
                 textAnomaly="";
-                if results.flagAnomalyData, textAnomaly=" (ANOMALY IN CALC FRICTION CALC)"; end
-                titleData1=sprintf(" Lateral Force - Method %s%s",results.method,textAnomaly);
+                if results.flagAnomalyData
+                    titleData1= {sprintf("Lateral Force - Method %s",results.method);"ANOMALY IN CALC FRICTION CALC)"};
+                else
+                    titleData1=sprintf("Lateral Force - Method %s",results.method);
+                end                                 
                 force_best=results.force_data;
                 % generate the fig and extract the only existing axes
                 fig_tmp=showData(idxMon,false,force_best,titleData1,"","",'saveFig',false,'labelBar','Force [nN]');
