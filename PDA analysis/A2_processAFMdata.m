@@ -1,4 +1,4 @@
-function [AFM_images_final,AFM_height_IO,metaData]=A2_processAFMdata(allData,otherParameters,mainPath,SaveFigFolder,idxMon,varargin)
+function varargout=A2_processAFMdata(allData,otherParameters,mainPath,SaveFigFolder,idxMon,varargin)
 
     p=inputParser(); 
     argName = 'SeeMe';          defaultVal = true;              addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
@@ -28,10 +28,14 @@ function [AFM_images_final,AFM_height_IO,metaData]=A2_processAFMdata(allData,oth
                 FitOrderHVON_Lat='';
                 FitOrderHVOFF_Height='';        
             end
-        
+            % take the info from the first section.
             if i~=1 && isempty(FitOrderHVOFF_Height)
-                firstFileLat=dir(fullfile(startPathSingleSectionFolder,"section_1","*_lateralChannelProcessed.mat"));
-                load(fullfile(firstFileLat.folder,firstFileLat.name),"FitOrderHVON_Height","FitOrderHVON_Lat","FitOrderHVOFF_Height");
+                firstFileHeight=dir(fullfile(startPathSingleSectionFolder,"section_1","*_heightChannelProcessed.mat"));
+                load(fullfile(firstFileHeight.folder,firstFileHeight.name),"FitOrderHVON_Height");
+                if answSkipLat~=1
+                    firstFileLat=dir(fullfile(startPathSingleSectionFolder,"section_1","*_lateralChannelProcessed.mat"));
+                    load(fullfile(firstFileLat.folder,firstFileLat.name),"FitOrderHVON_Lat","FitOrderHVOFF_Height");
+                end
             end
             TypeSectionProcess="SingleSection";
             % check if results were already made.
@@ -84,7 +88,15 @@ function [AFM_images_final,AFM_height_IO,metaData]=A2_processAFMdata(allData,oth
             %%%%%%%% PROCESS LATERAL DEFLECTION CHANNEL (in case of HOVER MODE ON DATA) %%%%%%%%
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%           
             metaData_AFM=allData(i).metadata; 
-
+            if ~exist("answSkipLat","var")
+                question=sprintf("Skip the %d-section LateralProcessing?",i);
+                options={"Yes. NOTE: Skipped same parts for all other sections ==> Evaluate friction script separately."; ...
+                         "No. Continue with the Lateral PostProcessing assuming to know ho to manage the friction part."};
+                answSkipLat=getValidAnswer(question,'',options);
+            end
+            if answSkipLat==1
+                continue
+            end
 
             if ~p.Results.postHeat % save time in case of postHeat AFM data
                 [AFM_LatDeflecFitted_Force,metricsPlane,metricsLine,FitOrderHVON_Lat,FitOrderHVOFF_Height,avg_fc]=A2_feature_2_processLateralChannel(AFM_HeightFittedMasked,AFM_height_IO,metaData_AFM,idxMon,SaveFigIthSectionFolder,mainPath, ...
@@ -104,6 +116,12 @@ function [AFM_images_final,AFM_height_IO,metaData]=A2_processAFMdata(allData,oth
             end
             close all            
         end
+    end
+    if answSkipLat == 1
+        uiwait(warndlg("The HeightChannel processing of every section has terminated. Continue with Friction Calculation script for the same scan"))
+        A0_main_friction(mainPath,idxMon)
+        uiwait(warndlg("Friction main code completed. One ore more friction coefficients are ready to be used. Restart A0_main.m code and reply 'No' in the skipping lateral postprocessing"))
+        error("Current running Code ends here! Restart A0_main.m")
     end
 
     % ASSEMBLY!
@@ -127,6 +145,9 @@ function [AFM_images_final,AFM_height_IO,metaData]=A2_processAFMdata(allData,oth
     A1_feature_CleanOrPrepFiguresRawData(AFM_images_final,'AFM_IO',AFM_height_IO,'metadata',metaData, ...
         'idxMon',idxMon,'folderSaveFig',SaveFigFolder,'SeeMe',false, ...
         'imageType','Assembled','Normalization',norm,'postProcessed',true)
+    varargout{1}=AFM_images_final;
+    varargout{2}=AFM_height_IO;
+    varargout{3}=metaData;
 end      
     
 %%%%%%%%%%%%%%%%%%%%%%%%%

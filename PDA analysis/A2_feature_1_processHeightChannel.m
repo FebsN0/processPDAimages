@@ -71,7 +71,7 @@ function varargout=A2_feature_1_processHeightChannel(filtData,idxMon,SaveFigFold
                 'Channel_name', filtData(i).Channel_name,...
                 'Trace_type', filtData(i).Trace_type, ...
                 'AFM_images_0_raw', tmp_img_0, ...
-                'AFM_images_1_original', tmp_img_1); %#ok<AGROW>
+                'AFM_images_1_original', tmp_img_1);
     end        
     % show the data prior the height processing
     A1_feature_CleanOrPrepFiguresRawData(AFM_Images,'idxMon',idxMon,'folderSaveFig',SaveFigFolder,'metadata',metadata,'imageType',typeProcess,'SeeMe',SeeMe,'Normalization',norm);
@@ -94,6 +94,9 @@ function varargout=A2_feature_1_processHeightChannel(filtData,idxMon,SaveFigFold
             flagExeMaskGen=false;
             if strcmp(HVmode,"HoverModeOFF")
                 load(fullfile(SaveFigFolder,"TMP_DATA_MASK_definitive.mat"),"height_1_original")
+                if strcmp(typeProcess,'SingleSection')
+                    load(fullfile(SaveFigFolder,"TMP_DATA_MASK_definitive.mat"),'metadata','offset_HVon_HVoff');
+                end
             end
         end         
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -183,7 +186,7 @@ function varargout=A2_feature_1_processHeightChannel(filtData,idxMon,SaveFigFold
                         metadata.x_scan_length_m=oldSizeMeter_x*metadata.x_scan_pixels/oldSizePixel_x;
                         clear tmp*
                         binarizationMethod="Extracted from HV ON mask";
-                        flagExeMaskGen=false;
+                        flagExeMaskGen=false;                        
                     end
                 end                  
             end            
@@ -315,12 +318,15 @@ function varargout=A2_feature_1_processHeightChannel(filtData,idxMon,SaveFigFold
                 delete(files_tmp{:})
                 flagExeMaskGen=false;
                 % just for safety in case of interruption or system failure. If the mask is definitive, save it and dont restart again the entire binarization process
-                save(fullfile(SaveFigFolder,"TMP_DATA_MASK_definitive"),"AFM_height_IO_corr","BK_5_heightMasked_corr","binarizationMethod","AFM_Images","height_1_original")
+                if strcmp(HVmode,"HoverModeOFF") && strcmp(typeProcess,'SingleSection')                    
+                    save(fullfile(SaveFigFolder,"TMP_DATA_MASK_definitive"),"AFM_height_IO_corr","BK_5_heightMasked_corr","binarizationMethod","AFM_Images","height_1_original","metadata","offset_HVon_HVoff")
+                else
+                    save(fullfile(SaveFigFolder,"TMP_DATA_MASK_definitive"),"AFM_height_IO_corr","BK_5_heightMasked_corr","binarizationMethod","AFM_Images","height_1_original")
+                end
             end
             clear titleText* nameFile flagRemoval ftmpIO answ question textTitleIO allBaselines continueLineFit files_tmp tmp
         end
-        varargout{4}=metadata;
-        varargout{5}=offset_HVon_HVoff;
+        
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%% NOW THE MASK IS OBTAINED ==> LAST SERIES OF FITTING 1st ORDER USING MASKED BACKGROUND: ORIGINAL HEIGHT + FINAL MASKSKED DATA %%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%            
@@ -365,8 +371,8 @@ function varargout=A2_feature_1_processHeightChannel(filtData,idxMon,SaveFigFold
                 'extraLabel',{labelHeight,labelHeight},'extraNorm',{norm,norm});
         % there may be still some anomalies. If so, permamently remove them from the height image
         textTitle={'Optimixed Height Image';'Check if there some parts to transform into NaN in the foreground. The resulting image will be definitive for the current iteration.'};
-        [~,height_9_corr] = featureRemovePortions(height_8_LineFitOnFinalMaskBK,textTitle,idxMon,'normalize',false);       
-
+        [~,height_9_corr] = featureRemovePortions(height_8_LineFitOnFinalMaskBK*1e9,textTitle,idxMon,'normalize',false);       
+        height_9_corr=height_9_corr/factor;
         
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%% HEIGHT CHANNEL PROCESSING TERMINATED. CHECK IF CONTINUE FOR BETTER MASK AND DATA %%%%
@@ -386,6 +392,7 @@ function varargout=A2_feature_1_processHeightChannel(filtData,idxMon,SaveFigFold
                 height_FINAL = height_9_corr;
                 nameFile='resultA2_8_HeightFINAL';
                 nameFileMask='resultA2_8_maskFINAL';
+                titleData1={titleData1;'No prctile thresholding'}; %#ok<*AGROW>
             else
                 % Convert back to unscaled if you want the raw stored:
                 height_10_prctile=dataClean/factor;
@@ -394,11 +401,13 @@ function varargout=A2_feature_1_processHeightChannel(filtData,idxMon,SaveFigFold
                 nameFile='resultA2_9_HeightFINAL';  
                 nameFileMask='resultA2_9_maskFINAL';              
                 height_FINAL=height_10_prctile;
+                subtext=sprintf('Removed <%.2f° and >%.2f° from the data',th(1),th(2));
+                titleData1={titleData1;sprintf('%s',subtext)};
             end        
             % save final height
             showData(idxMon,false,height_FINAL*factor,titleData1,SaveFigFolder,nameFile,'labelBar',"Height (nm)",'lenghtAxis',lengthAxis);
             % save mask            
-            titleData1='Definitive mask Height Image';
+            titleData1='Definitive Mask Height Image';
             mask_FINAL=AFM_height_IO_corr;
             showData(idxMon,false,mask_FINAL,titleData1,SaveFigFolder,nameFileMask,'binary',true,'lenghtAxis',lengthAxis) 
             % substitutes to the original height image with the new opt fitted heigh
@@ -416,6 +425,10 @@ function varargout=A2_feature_1_processHeightChannel(filtData,idxMon,SaveFigFold
             end
             varargout{1}=AFM_Images_final;
             varargout{2}=mask_FINAL;
+            if strcmp(HVmode,"HoverModeOFF") && strcmp(typeProcess,'SingleSection')
+                varargout{4}=metadata;
+                varargout{5}=offset_HVon_HVoff;
+            end
             break
         else
             iterationMain=iterationMain+1;
