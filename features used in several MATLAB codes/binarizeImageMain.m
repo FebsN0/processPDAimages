@@ -4,7 +4,7 @@ function [IO_Image,binarizationMethod]=binarizeImageMain(image,idxMon,varargin)
     [IO_Image,binarizationMethod]=binarize_GUI(image,typeImage);                         
     % PYTHON BINARIZATION TECHNIQUES. It requires other options, when I will have more time. Especially for DeepLearning technique
     question="Satisfied of the first binarization method? If not, run the Python Binarization tools!";
-    if ~getValidAnswer(question,"",{"Yes","No"},2)
+    if ~getValidAnswer(question,"",{"Yes","No"},1)
         [IO_Image,binarizationMethod]=binarization_withPythonModules(image,idxMon);
     end    
     % show data and if it is not okay, start toolbox segmentation    

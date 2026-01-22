@@ -5,7 +5,7 @@ function offset = manual_align_images(maskImg, rawImg)
 % offset = [dx, dy] translation applied to rawImg
 
     % ---- Normalize RAW image ----
-    rawImgNorm = mat2gray(rawImg);
+    rawImgNorm = imadjust(mat2gray(rawImg));
 
     % ---- RGB overlays ----
     maskRGB = cat(3, maskImg, zeros(size(maskImg)), 0*maskImg);       % red mask

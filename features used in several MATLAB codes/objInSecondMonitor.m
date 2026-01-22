@@ -19,7 +19,7 @@ function idMon=objInSecondMonitor(varargin)
         usable=zeros(numScreens,4);
         for i=1:numScreens
             % Create an invisible temporary figure to detect usable area
-            tmp = figure('Visible','off','Units','pixels',...
+            tmp = uifigure('Visible','off','Units','pixels',...
                          'Position',[screens(i,1)+10 screens(i,2)+10 300 200]);
             drawnow;
             % Maximize it
@@ -32,18 +32,22 @@ function idMon=objInSecondMonitor(varargin)
             left   = usable(i,1);      bottom = usable(i,2);
             width  = screens(i,3);   height = screens(i,4);
             % Define proportional window size (20% of screen size) to identify them
-            winWidth  = round(0.2 * width);
+            winWidth  = round(0.4 * width);
             winHeight = round(0.2 * height);    
              % Locate the window on the screen at 10% of the left-bottom corner
             relativeXpositionXCenterScreen= left+width*0.5-winWidth/2 ;
             relativeYpositionXCenterScreen= bottom+height*0.5-winHeight/2;
             % Create the small windows and put at the center showing which
             % monitor they correspond
-            figure('Name', ['Monitor ' num2str(i)], 'NumberTitle', 'off',...
+            f=uifigure('Name', ['Monitor ' num2str(i)], 'NumberTitle', 'off',...
                 'Position', [relativeXpositionXCenterScreen, relativeYpositionXCenterScreen, winWidth, winHeight],'Visible','on');
-            uicontrol('Style', 'text', 'String', ['This is Monitor ' num2str(i)], ...
-                       'FontSize', 14, 'Units', 'normalized', ...
-                       'Position', [0.2 0.4 0.6 0.2]);
+            gl = uigridlayout(f, [1 1]);
+            uilabel(gl,'Text',  ['This is Monitor ' num2str(i)], ...
+                'FontSize', 25, ...
+                'FontWeight', 'bold', ...
+                'HorizontalAlignment', 'center', ...
+                'VerticalAlignment', 'center', ...
+                'WordWrap', 'off'); % no text wrapping    
         end
             % choose where to show figures if there are more monitors
         if numScreens > 1
@@ -53,7 +57,7 @@ function idMon=objInSecondMonitor(varargin)
         else
             idMon=1;
         end
-        close all
+        close all force
     else
         idMon = varargin{2};
         fig=varargin{1};

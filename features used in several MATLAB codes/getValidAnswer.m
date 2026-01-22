@@ -1,328 +1,446 @@
-function user_choice = getValidAnswer(question, title, options, default_choice)
-% adaptive window which ask the user which option want to be selected
-% INPUT:        question : text of the question
-%               title : name of the window. You can leave blank as ''
-%               options : list of the possible options to be select (NOTE: if options contains 2 strings like "yes" OR "y" OR "1" and "no" OR "n" OR "0" ==> outcomes will be just 0 or 1 (logical))
-%               default_choice : by default the option is first. Just click Enter keyboard button instead of point with the mouse.
-% OUTPUT:       user_choice : give the idx of the choosen option (if option 2 ==> user_choice = 2)
-%
-% NOTE: the script is perfectly working but there are some aesthetic issues.
+function user_choice = getValidAnswer(question, titleStr, options, default_choice)
+% getValidAnswer
+% Adaptive option dialog using UIFIGURE + UIGRIDLAYOUT.
+% - Question supports '\n' and real newlines -> multi-line display
+% - Options now ALSO support '\n' and real newlines
+% - Reduced bottom whitespace by tighter padding/spacing and better size estimate
 
-    
-    % persistent allow to store a number sequence (for example if there are more than 9 options, it is
-    % necessary to store two/three/etc digits when the function is called
-    persistent numericInput
+    % ------------------------ Input checks ------------------------
+    if nargin < 2 || isempty(titleStr), titleStr = ''; end
+    if nargin < 3 || isempty(options), error('Options must be non-empty.'); end
+    if nargin < 4 || isempty(default_choice), default_choice = 1; end
 
-    % Manage the default option. If not specified, then first option is default
-    if nargin < 4 || isempty(default_choice)
-        default_choice = 1; 
+    options = cellstr(string(options));
+    nOpt = numel(options);
+
+    if ~isnumeric(default_choice) || default_choice < 1 || default_choice > nOpt
+        error('Invalid default choice index.');
     end
-    if ~isnumeric(default_choice) || default_choice < 1 || default_choice > numel(options) 
-        error('Invalid default choice!.');
-    end
-    % Normalize options to strings for comparison
-    try
-        optionStrs = cellfun(@(x) lower(string(x)), options, 'UniformOutput', false);
-    catch
-        error('Options must be either strings or scalar numeric values.');
-    end
-    % the size depends on the fontsize too.
-    FontsizeQuestion= 14;
-    FontsizeOptions = 12;
 
-    % Default dialog box size
-    button_height = 40; spacing = 15; spacingBorders=20;
-    
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%% PREPARE THE SIZE OF THE QUESTION DIALOG %%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % Check the longest string in the question and how many rows
-    [lines, num_lines_question, max_question_length] = splitLines(question);
-    % Compute results
-    widthQuestion  = max_question_length*FontsizeQuestion*0.9;    
-    heightQuestion = (num_lines_question*FontsizeQuestion)*1.2;
+    % ------------------------ Normalize options ------------------------
+    optionStrs = lower(string(options(:)));
 
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%% PREPARE THE SIZE OF THE OPTION DIALOG %%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % First, need to check how many options rows and measure the length of each string line.
-    % In case of options different from Yes/No, there may be options containing \n, therefore, check the length better
+    % Yes/No detection
+    yesStrings = ["yes","y","1","true"];
+    noStrings  = ["no","n","0","false"];
+    flagYesNo = false;
 
-    % Check if it's a yes/no dialog
-    yesStrings = ["yes", "y", "1","true"];
-    noStrings = ["no", "n", "0","false"];    
-    % if options is just Yes and No, then simple dialog box
-    flagYesNo=zeros(1,2);
-    if length(options) == 2        
-        for i=1:2
-            singleOption=optionStrs{i};
-            if any(ismember(singleOption,yesStrings))
-                flagYesNo(i)=1;
-                continue
-            else            
-                flagYesNo(i)=any(ismember(singleOption,noStrings));
-                continue
-            end
+    if nOpt == 2
+        isYes1 = any(optionStrs(1) == yesStrings);
+        isNo2  = any(optionStrs(2) == noStrings);
+        isYes2 = any(optionStrs(2) == yesStrings);
+        isNo1  = any(optionStrs(1) == noStrings);
+        if (isYes1 && isNo2) || (isYes2 && isNo1)
+            flagYesNo = true;
         end
     end
-    if all(flagYesNo)
-        flagYesNo=1;
-        max_option_length = 3; % Yes = 3 chars, longer than No = 2 chars
-        num_lines_options = 1; % for more compact visual, just put the two options in a line instead of multiple rows
-    else
-        flagYesNo=0;
-    end
-    if ~flagYesNo
-        num_lines_options = length(options);
-        num_lines_options_split = 0;
-        lengthRow=[];
-        for i=1:length(options)
-            splittedCell = strsplit(options{i},'\n');
-            num_lines_options_split = num_lines_options_split + length(splittedCell);
-            % for now, each button has the size for two rows for a single option
-            if num_lines_options_split == 2
-                num_lines_options_split = 1;
-            end
-            for j=1:length(splittedCell)
-                lengthRow(i,j)= cellfun(@length, splittedCell(j)); %#ok<AGROW>
-            end
+
+    
+
+    % ------------------------ UI sizing heuristics ------------------------
+    FontQuestion = 18;
+    FontOptions = 15;
+    % Compute option metrics that account for '\n' and real newlines
+    m = measureDialogContentPixels_legacy(question, options, FontQuestion, FontOptions ,flagYesNo);      
+
+    % ------------------------ Screen clamp (current monitor) ------------------------
+    mon = get(0,'MonitorPositions');
+    p = get(0,'PointerLocation');
+    monIdx = 1;
+    for k = 1:size(mon,1)
+        if p(1) >= mon(k,1) && p(1) <= mon(k,1)+mon(k,3) && ...
+           p(2) >= mon(k,2) && p(2) <= mon(k,2)+mon(k,4)
+            monIdx = k; break;
         end
-        max_option_length = max(max(lengthRow));
     end
-    
-    % calc the definitive option dialog size
-    
-    if flagYesNo
-        widthOption  =   2*button_height + spacing;
-        heightOption =   button_height;
-    else
-        % width of the longest Option string + button size + space between string and button
-        widthOption  =   (FontsizeOptions*max_option_length)+ button_height + spacing;
-        % height of entire option section
-        heightOption =   (num_lines_options)*max(button_height,FontsizeOptions) + spacing*(num_lines_options-1); 
-    end
-    % check what is the longest width between question and option sections,
-    % considering space for RIGHT/LEFT borders
-    maxWidth = max(widthQuestion, widthOption);
+    scr = mon(monIdx,:);
+    scrW = scr(3); scrH = scr(4);
 
-    % TOT HEIGHT: UP/BOTTOM SPACING BORDERS + questionDialogSize + spacing
-    % between question and option dialogs + optionDialogSize
-    tot_height = heightQuestion + heightOption + 2*spacingBorders + spacing;
-    % TOT WIDTH: LEFT/RIGHT SPACING BORDERS + biggest size between option and question dialogs
-    tot_width = maxWidth+2*spacingBorders;
-
-    % Locate the dialog box in the center
-    screenSize = get(0, 'ScreenSize');
-    center_screen_width = screenSize(3)/2;
-    center_screen_height = screenSize(4)/2;
-    dialog_x = (center_screen_width - tot_width/2);
-    dialog_y = (center_screen_height - tot_height/2);
-        
-    % Open dialog box and associate the buttons and close button
-    dialog_fig = figure('Name', title, 'NumberTitle', 'off', 'MenuBar', 'none', ...
-        'ToolBar', 'none', 'Resize', 'off', 'Position', [dialog_x, dialog_y, tot_width, tot_height], ...
-        'KeyPressFcn', @keyPressCallback,...
-        'CloseRequestFcn',@closeRequestCallback);
-  
-    figPos = dialog_fig.Position;
-    % store the user choice
+    figW = m.targetW_px;
+    figH = m.targetH_px;
+    figX = scr(1) + (scrW - figW)/2;
+    figY = scr(2) + (scrH - figH)/2;
+    
+    % ------------------------ State ------------------------
     user_choice = 0;
-    % create object for each button
-    button_handles = gobjects(1, numel(options));
+    numericInput = "";
+    done = false;
+
+    % ------------------------ UIFIGURE + layout ------------------------
+    f = uifigure( ...
+        'Name', titleStr, ...
+        'Position', [figX figY figW figH], ...
+        'Resize', 'on', ...
+        'CloseRequestFcn', @onClose);
+
+    f.KeyPressFcn = @onKey;
+
+    % Main grid: question + options
+    gl = uigridlayout(f, [2 1]);
+    gl.RowHeight = {'fit','fit'};        % avoid forced expansion bottom gap in default size
+    gl.ColumnWidth = {'1x'};
+    gl.Padding = [12 10 12 2];           % smaller bottom padding
+    gl.RowSpacing = 10;
+    gl.BackgroundColor='black';
+    % Question label
+    questionLines = splitToLines_legacy(question);
+    qText = strjoin(questionLines, newline);
+    qLabel = uilabel(gl, ...
+        'Text', qText, ...
+        'FontSize', FontQuestion, ...
+        'FontWeight', 'bold', ...
+        'HorizontalAlignment', 'center', ...
+        'VerticalAlignment', 'center', ...
+        'WordWrap', 'off'); % no text wrapping
+    qLabel.Layout.Row = 1;
+
+    % Options area (directly on main grid)
     if flagYesNo
-        % fixed in y, moving in x
-        button_start_y = 15;
-        opts = {'Yes','No'};
-        for i=1:2
-         % Name button = first char of the given option ( 1) bla bla ==> 1, Yes ==> Y
-            button_handles(i)= uicontrol('Style', 'pushbutton',...
-                'Position', [tot_width/3*i-10, button_start_y, 50, 30], ...
-                'String', opts{i}, 'FontSize', FontsizeOptions,...
-                'Callback', @(src, event) buttonCallback(i));
-        end
-   else
-        % pattern to find in the options (especially those having like (<number>)
-        % ^expression indicate to check at the beginning of the input text
-        pattern = {'^\(\d+\)\s', ...        % (<number>)
-            '^\d+\)\s', ...                 % <number>)
-            '^\s\(\d+\)\s', ...             % <whiteSpace>(<number>)
-            '^\s\d+\)\s'};                  % <whiteSpace><number>)
-        % create buttons and texts from the bottom        
-        fromLeft_button=spacingBorders;
-        fromLeft_textOption=fromLeft_button+button_height+spacing;        
+        optGrid = uigridlayout(gl, [1 2]);
+        optGrid.Layout.Row = 2;
+        optGrid.ColumnWidth = {'1x','1x'};
+        optGrid.RowHeight = {'fit'};
+        optGrid.ColumnSpacing = 10;
+        optGrid.Padding = [0 0 0 0];
 
-        for i = num_lines_options:-1:1
-            % find the pattern           
-            [startIdx,endIdx]=regexp(options{num_lines_options-i+1}, pattern);
-            % in case the options does not contain any pattern, just show 1 or 2 etc.
-            if all(cellfun(@isempty, startIdx))
-                icon= num2str(num_lines_options-i+1);
-                text= options{num_lines_options-i+1};
-            else
-            % in case there is a pattern, take the pattern to show as icon and display the text option
-            % identify the index where pattern start and finish. Then start the number inside the pattern
-                startIdx= startIdx{find(~cellfun(@isempty, startIdx), 1)};
-                endIdx= endIdx{find(~cellfun(@isempty, endIdx), 1)};
-                patternNumber = '\d';
-                [startIdxNum,endIdxNum] = regexp(options{num_lines_options-i+1}(startIdx:endIdx), patternNumber);
-                icon=str2double(options{num_lines_options-i+1}(startIdxNum:endIdxNum));
-                text= options{num_lines_options-i+1}(endIdx+1:end);
+        % Determine yes/no meaning for default mapping
+        idxYes = find(optionStrs == "yes" | optionStrs == "y" | optionStrs == "1" | optionStrs == "true", 1);
+        idxNo  = find(optionStrs == "no"  | optionStrs == "n" | optionStrs == "0" | optionStrs == "false", 1);
+        if isempty(idxYes), idxYes = 1; end
+        if isempty(idxNo),  idxNo  = 2; end
+
+        bYes = uibutton(optGrid, 'push', ...
+            'Text', 'Yes', 'FontSize', FontOptions, ...
+            'ButtonPushedFcn', @(~,~)chooseYesNo(true));
+        bNo  = uibutton(optGrid, 'push', ...
+            'Text', 'No',  'FontSize', FontOptions, ...
+            'ButtonPushedFcn', @(~,~)chooseYesNo(false));
+
+        if default_choice == idxYes
+            highlightButton(bYes);
+        elseif default_choice == idxNo
+            highlightButton(bNo);
+        end
+
+    else
+        optGrid = uigridlayout(gl, [nOpt 2]);
+        optGrid.Layout.Row = 2;
+        optGrid.ColumnWidth = {52, '1x'};
+        optGrid.RowHeight = repmat({'fit'}, 1, nOpt); % key: rows expand for multiline options
+        optGrid.RowSpacing = 10;                       
+        optGrid.ColumnSpacing = 10;
+        optGrid.Padding = [0 0 0 0];
+        btns = gobjects(nOpt,1);
+
+        for i = 1:nOpt
+            [icon, textOnly] = parseOptionIconAndText(options{i}, i);
+            % Convert any literal '\n' sequences to real newlines for display
+            textOnly = normalizeNewlines(textOnly);
+
+            btns(i) = uibutton(optGrid, 'push', ...
+                'Text', string(icon), ...
+                'FontSize', FontOptions, ...
+                'ButtonPushedFcn', @(~,~)chooseIndex(i));
+            btns(i).Layout.Row = i;
+            btns(i).Layout.Column = 1;
+
+            lab = uilabel(optGrid, ...
+                'Text', textOnly, ...
+                'FontSize', FontOptions, ...
+                'HorizontalAlignment', 'left', ...
+                'VerticalAlignment', 'center', ...
+                'WordWrap', 'off'); % no wrapping
+            lab.Layout.Row = i;
+            lab.Layout.Column = 2;
+            lab.BackgroundColor = "red";
+            if i == default_choice
+                highlightButton(btns(i));
             end
-            % Calc button vertical position 
-            fromBottom = spacingBorders + (button_height+spacing)*(i-1);
-            
-            % Name button = first char of the given option ( 1) bla bla ==> 1              % cubic button
-            button_handles(i)=uicontrol('Style', 'pushbutton',...
-                'Position', [fromLeft_button, fromBottom, button_height, button_height], ...
-                'String', icon, 'FontSize', FontsizeOptions,...
-                'Callback', @(src, event) buttonCallback(num_lines_options-i+1));
-            % add 1.1 margin in the width
-            textWidth=length(text)*FontsizeOptions*1.1;
-            textHeight=button_height;
-            % insert label of each button with the entire text option
-            nx = fromLeft_textOption / figPos(3);
-            ny = fromBottom / figPos(4);
-            nw = textWidth / figPos(3);
-            nh = textHeight / figPos(4);
-            % NOTE: annotation position is always normalized
-            annotation('textbox','Units','normalized','Position', [nx, ny, nw, nh], 'String', text,'FontSize', FontsizeOptions, ...
-                'HorizontalAlignment', 'left','VerticalAlignment', 'middle','EdgeColor', 'none','FitBoxToText', 'on');
         end
-        % flipped because the for cycle before is inverted
-        button_handles=flip(button_handles);
     end
-    
-    % PREPARE THE QUESTION DIALOG
-    fromLeft = spacingBorders;
-    fromBottom = tot_height -(spacingBorders+heightQuestion);
-    textWidth = widthQuestion;
-    textHeight = heightQuestion;
-    % Convert absolute pixel coordinates -> normalized coordinates   
-    nx = fromLeft / figPos(3);
-    ny = fromBottom / figPos(4);
-    nw = textWidth / figPos(3);
-    nh = textHeight / figPos(4);
-    % NOTE: annotation position is always normalized
-    annotation('textbox','Units', 'normalized','Position', [nx, ny, nw, nh*1.4], 'String', lines, 'FontWeight','bold','interpreter','none','FontSize', FontsizeQuestion, ...
-        'HorizontalAlignment', 'center','VerticalAlignment', 'middle', 'Color', 'red','EdgeColor', 'none');
-    % Make bold the default button
-    set(button_handles(default_choice), 'FontWeight', 'bold','ForegroundColor','red');
 
-    % Wait user choice selection before continuing
-    uiwait(dialog_fig);
-    % Check if the user closed the window without making a choice
+  
+    drawnow;
+    uiwait(f);
+
     if isnan(user_choice)
-        error('Closed window. Stopped the process.')
+        error('Closed window. Stopped the process.');
     end
 
-    % create the Button Callback function
-    function buttonCallback(choice)
-        if flagYesNo
-            if choice == 2
-                user_choice = false;
-            else
-                user_choice = true;
-            end
-        else
-            user_choice = choice;
-        end
-        uiresume(dialog_fig);
-        delete(dialog_fig);
-    end    
+    % ------------------------ Callbacks ------------------------
+    function chooseIndex(idx)
+        user_choice = idx;
+        done = true;
+        finish();
+    end
 
-    % create the keyboard buttons Callback function. It allows to select the possible option by clicking the
-    % specific related button on the keyboard
-    % i.e. if the desired option is 2, then click 2 on keyboard   
-    function keyPressCallback(~, event)
-        % init. The first time will be empty
-        if isempty(numericInput)
-            numericInput = '';
+    function chooseYesNo(tf)
+        user_choice = logical(tf);
+        done = true;
+        finish();
+    end
+
+    function finish()
+        if isvalid(f)
+            uiresume(f);
+            delete(f);
         end
-        % if escape\Esc is clicked, close and stop
-        if strcmp(event.Key, 'escape')
-            closeRequestCallback
-        % click by return/enter to end the selection.
-        elseif strcmp(event.Key, 'return') || strcmp(event.Key, 'enter')
-            if ~isempty(numericInput)
-                % if there is a sequence, convert it to a number
-                numPressed = str2double(numericInput);
-                % reset to restart next time
-                numericInput = '';
-                if numPressed >= 0 && numPressed <= numel(options)
-                    buttonCallback(numPressed);
+    end
+
+    function onClose(~,~)
+        if ~done
+            user_choice = NaN;
+        end
+        finish();
+    end
+
+    function onKey(~, event)
+        k = lower(string(event.Key));
+
+        if k == "escape"
+            onClose();
+            return;
+        end
+
+        if k == "return" || k == "enter"
+            if strlength(numericInput) > 0
+                val = str2double(numericInput);
+                numericInput = "";
+                if ~isnan(val) && val >= 1 && val <= nOpt
+                    if flagYesNo
+                        if val == 1, chooseYesNo(true); end
+                        if val == 2, chooseYesNo(false); end
+                    else
+                        chooseIndex(val);
+                    end
+                else
+                    numericInput = "";
                 end
             else
-                % In case the sequence number is empty, select default option
-                buttonCallback(default_choice);              
-            end       
-        elseif ismember(event.Key, {'1','2','3','4','5','6','7','8','9','0'})
-            % check if the clicked button is a number button. If so, add to the sequence number
-            numericInput = strcat(numericInput, event.Key);
-            % if the sequence number is a number higher than the number of possible options
-            if str2double(numericInput) > numel(options)
-                % Reset to the last pressed number
-                numericInput = event.Key; 
+                if flagYesNo
+                    if any(optionStrs(default_choice) == yesStrings)
+                        chooseYesNo(true);
+                    elseif any(optionStrs(default_choice) == noStrings)
+                        chooseYesNo(false);
+                    else
+                        chooseYesNo(default_choice == 1);
+                    end
+                else
+                    chooseIndex(default_choice);
+                end
             end
-        elseif strcmp(event.Key, 'backspace') && ~isempty(numericInput)
-            % Remove the last number by clicking Backspace button
-            numericInput = numericInput(1:end-1);
-        elseif strcmpi(event.Key, 'y') && flagYesNo
-            % if click y ==> then yes
-            buttonCallback(1);
-        elseif strcmpi(event.Key, 'n') && flagYesNo
-            % if click n ==> then no        
-            buttonCallback(2);
+            return;
+        end
+
+        if k == "backspace"
+            if strlength(numericInput) > 0
+                numericInput = extractBefore(numericInput, strlength(numericInput));
+            end
+            return;
+        end
+
+        if strlength(k) == 1 && k >= "0" && k <= "9"
+            numericInput = numericInput + k;
+            val = str2double(numericInput);
+            if ~isnan(val) && val > nOpt
+                numericInput = k;
+            end
+            return;
+        end
+
+        if flagYesNo && (k == "y" || k == "n")
+            if k == "y", chooseYesNo(true); else, chooseYesNo(false); end
+            return;
+        end
+
+        numericInput = "";
+    end
+
+    function highlightButton(b)
+        b.FontWeight = 'bold';
+        try
+            b.FontColor = [0.85 0 0];
+        catch
+        end
+    end
+end
+
+
+function metrics = measureDialogContentPixels_legacy(question, options, FontQ, FontOpt, flagYesNo, ui)
+% measureDialogContentPixels_legacy
+% Estimates dialog content dimensions using classic uicontrol text Extent.
+%
+% INPUTS:
+%   question, options: strings/cells (supports '\n' and real newlines)
+%   FontQ, FontOpt   : font sizes for question/options
+%   ui               : struct with layout constants (pixels), e.g.:
+%       ui.buttonColW   = 52;
+%       ui.buttonH      = 44;
+%       ui.colSpacing   = 10;
+%       ui.rowSpacing   = 6;
+%       ui.glPad        = [12 10 12 2];   % [L T R B]
+%       ui.mainRowGap   = 8;             % gap between question and options (gl.RowSpacing)
+%       ui.safetyW      = 40;
+%       ui.safetyH      = 18;
+%       ui.lineGapQ     = 2;             % extra gap between question lines
+%       ui.lineGapOpt   = 2;             % extra gap between option lines within a row
+% OUTPUT (metrics struct):
+%   metrics.targetW_px          : recommended figure width (including UI chrome)
+%   metrics.targetH_px          : recommended figure height (including padding/gaps)
+
+    % Defaults for ui constants if missing
+    if nargin < 6 || isempty(ui), ui = struct(); end
+    ui = fillDefaults(ui);
+    % Split lines
+    questionLines = splitToLines_legacy(question);
+    optionsLines = cell(numel(options),1);
+    for i = 1:numel(options)
+        optionsLines{i} = splitToLines_legacy(options{i});
+    end
+    % Hidden classic figure & text control for measurement
+    fh = figure('Visible','off','Units','pixels','Position',[100 100 400 300]); %#ok<NASGU>
+    c = onCleanup(@() close(gcf));
+    ht = uicontrol('Style','text','Units','pixels','Position',[1 1 10 10], ...
+                   'HorizontalAlignment','left');
+        % ---------- Measure question block ----------
+    set(ht,'FontSize',FontQ);
+    qMaxW = 0;
+    qLineHeights = zeros(numel(questionLines),1);
+    for k = 1:numel(questionLines)
+        set(ht,'String',char(questionLines(k)));
+        e = get(ht,'Extent');           % [x y w h]
+        qMaxW = max(qMaxW, e(3));
+        qLineHeights(k) = e(4);
+    end
+    if isempty(qLineHeights)
+        qH = 0;
+    elseif isscalar(questionLines)
+        qH = sum(qLineHeights)+10;
+    else
+        qH = sum(qLineHeights)*(0.95^numel(questionLines));
+    end
+
+    % ---------- Measure options block ----------
+    set(ht,'FontSize',FontOpt);
+    
+
+    if flagYesNo
+        optH=30;
+        maxLineW = qMaxW;
+    else
+        optMaxW = 0;
+        rowHeights = zeros(numel(options),1);
+        for i = 1:numel(options)
+            lines = optionsLines{i};
+            lineHeights = zeros(numel(lines),1);
+    
+            for k = 1:numel(lines)
+                set(ht,'String',char(lines(k)));
+                e = get(ht,'Extent');
+                optMaxW = max(optMaxW, e(3));
+                lineHeights(k) = e(4);
+            end
+    
+            textH = 0;
+            if ~isempty(lineHeights)
+                textH = sum(lineHeights) + ui.lineGapOpt * (numel(lineHeights)-1);
+            end
+    
+            % Option row height is at least the button height
+            rowHeights(i) = max(ui.buttonH, textH);
+        end
+        if isempty(rowHeights)
+            optH = 0;
         else
-            % Reset the sequence number with any else button
-            numericInput = '';
+            optH = sum(rowHeights)*(0.95^numel(rowHeights));
         end
+        % ---------- Combine to recommended figure size ----------
+        maxLineW = max(qMaxW, optMaxW);
     end
 
-    function closeRequestCallback(~, ~)
-        % Handle the window being closed without a selection
-        uiresume(dialog_fig);
-        delete(dialog_fig);
-        user_choice = NaN;        
+    % Width: longest text line + button column + spacing + padding + safety
+    %targetW = maxLineW + ui.buttonColW + ui.colSpacing + ui.glPad(1) + ui.glPad(3) + ui.safetyW;
+    targetW = maxLineW*0.95;
+    % Height: padding top/bottom + question + gap + options + safety
+    targetH = qH + optH;
+
+    metrics = struct();
+    metrics.targetW_px      = targetW;
+    metrics.targetH_px      = targetH;
+end
+
+function ui = fillDefaults(ui)
+    def.buttonColW = 52;
+    def.buttonH    = 44;
+    def.colSpacing = 10;
+    def.rowSpacing = 6;
+    def.glPad      = [12 10 12 2]; % [L T R B]
+    def.mainRowGap = 8;
+    def.safetyW    = 40;
+    def.safetyH    = 18;
+    def.lineGapQ   = 2;
+    def.lineGapOpt = 2;
+
+    fns = fieldnames(def);
+    for k = 1:numel(fns)
+        if ~isfield(ui, fns{k}) || isempty(ui.(fns{k}))
+            ui.(fns{k}) = def.(fns{k});
+        end
     end
 end
 
-
-
-% Robust splitting of 'question' into individual lines (handles cells, string arrays, char arrays,
-% literal '\n' sequences and actual newline characters).
-function [lines, num_lines_question, max_question_length] = splitLines(question)
-
-    lines = string.empty(0,1);  % will collect all lines as a column string array
-
-    if iscell(question)
-        for i = 1:numel(question)
-            elem = question{i};
-            sarr = string(elem);   % convert char / string / string-array -> string array
+function parts = splitToLines_legacy(s)    
+    if iscell(s)
+        lines = string.empty(0,1);
+        for i = 1:numel(s)
+            sarr = string(s{i});
             for k = 1:numel(sarr)
-                % split on literal backslash-n OR real newline(s) (handle CRLF too)
                 parts = regexp(char(sarr(k)), '\\n|\r\n|\n', 'split');
-                % convert parts to string array and append
-                lines = [lines; string(parts(:))];
+                lines = [lines; string(parts(:))]; %#ok<AGROW>
             end
         end
-
+        parts=lines;
     else
-        % question is not a cell (could be char, string, numeric)
-        sarr = string(question);    % convert to string array
-        for k = 1:numel(sarr)
-            parts = regexp(char(sarr(k)), '\\n|\r\n|\n', 'split');
-            lines = [lines; string(parts(:))];
+        parts = regexp(char(string(s)), '\\n|\r\n|\n', 'split');
+        parts = string(parts(:));
+    end
+    if isempty(parts), parts = ""; end
+end
+
+% ---------- Helper: convert literal '\n' to real newline for UI display ----------
+function out = normalizeNewlines(in)
+    out = string(in);
+    out = regexprep(out, '\\n', newline);
+end
+
+% ---------- Helper: parse "(n) text" / "n) text" patterns ----------
+function [icon, textOnly] = parseOptionIconAndText(optStr, fallbackIdx)
+    s = char(string(optStr));
+
+    patterns = { ...
+        '^\(\d+\)\s*', ...
+        '^\d+\)\s*', ...
+        '^\s*\(\d+\)\s*', ...
+        '^\s*\d+\)\s*'};
+
+    icon = fallbackIdx;
+    textOnly = string(optStr);
+
+    for p = 1:numel(patterns)
+        [startIdx, endIdx] = regexp(s, patterns{p}, 'once');
+        if ~isempty(startIdx)
+            prefix = s(startIdx:endIdx);
+            d = regexp(prefix, '\d+', 'match', 'once');
+            if ~isempty(d)
+                icon = str2double(d);
+                if ~isnan(icon)
+                    textOnly = string(strtrim(s(endIdx+1:end)));
+                end
+            end
+            return;
         end
     end
-
-    % remove possible empty lines (optional)
-    lines = lines(strlength(strtrim(lines)) > 0);
-
-    % final metrics
-    num_lines_question = numel(lines);
-    if num_lines_question == 0
-        max_question_length = 0;
-    else
-        max_question_length = max(strlength(lines));
-    end
 end
+
+
+
