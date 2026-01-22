@@ -53,10 +53,8 @@ function A0_main_friction(varargin)
             % same crowded directory of HVon results.
             filePathResultsFriction=fullfile(HVoffPath,"Results Processing AFM for friction coefficient");
             mkdir(filePathResultsFriction)
-            imageType='Assembled';
         end
     end           
-
     if flagSingleSectionProcess
         for ithSection=1:numSections
             if exist(fullfile(SaveFigSingleSectionsFolder,sprintf("section_%d",ithSection),"resultsDataFrictionCoefficient.mat"),'file')     
