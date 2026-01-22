@@ -1,4 +1,3 @@
-% before starting, check the pyenv compatibility with the current MATLAN version on the following website:
 % https://www.mathworks.com/support/requirements/python-compatibility.html?s_tid=srchtitle_site_search_1_python+compatibility
 % 
 % In case multiple pythons version or not compatible current version occur,
@@ -77,6 +76,11 @@ clear vers pv* pe
 idxMon=objInSecondMonitor;
 pause(1)
 
+% suppress some warnings
+id = 'curvefit:fit:IterationLimitReached';
+orig = warning('off', id);            % disable that warning id
+
+
 mainPath=uigetdir(pwd,sprintf('Locate the main scan directory which contains both HVon and HVoff directories'));
 tmp=strsplit(mainPath,'\');
 nameScan=tmp{end}; nameExperiment=tmp{end-2}; clear tmp
@@ -102,7 +106,7 @@ if step2Start<1
     [allData,otherParameters,SaveFigFolder]=A1_openANDprepareAFMdata('filePath',fullfile(mainPath,'HoverMode_ON'));
     save(fullfile(SaveFigFolder,'resultsData_1_extractAFMdata'),"allData","otherParameters","SaveFigFolder")
 end
-
+%%
 if step2Start<2  
     [dataAFM_latDeflecFitted, AFM_height_IO, metaData_AFM]= A2_processAFMdata(allData,otherParameters,mainPath,SaveFigFolder,idxMon);     
     clear BW maskedImage accuracy 
@@ -154,6 +158,9 @@ clear flag* TRITIC_Before TRITIC_After AFM_A10_data_final AFM_A10_IO_final AFM_A
 close all
 save(fullfile(SaveFigFolder,'resultsData_END_Force_Fluorescence_Correlation'))
 disp('A10 - Correlation completed')
+% restore warning
+cleanupObj = onCleanup(@() warning(orig));  % will restore original state
+
 %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%% FUNCTIONS %%%%%%%%%%
@@ -276,3 +283,4 @@ function BF_final=compareAndChooseBF(AFM_height_IO,TRITICdata,BFdata,folderResul
     saveFigures_FigAndTiff(fcompare,folderResultsImg,nameFile)   
     close all
 end
+
