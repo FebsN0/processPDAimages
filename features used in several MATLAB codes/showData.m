@@ -168,9 +168,9 @@ function showSingleData(ax,data, norm, titleData,labelBar,bin,AxisLength)
     end
 
     if size(data,2)<size(data,1)/3
-        nXtickElements=5;
+        nXtickElements=4;
     else
-        nXtickElements=11;
+        nXtickElements=7;
     end
 
     % change the axis from pixel to micrometer unit
@@ -179,12 +179,12 @@ function showSingleData(ax,data, norm, titleData,labelBar,bin,AxisLength)
         ylabel(sprintf('fast direction (%s)',unitsY),'FontSize',14);       
         xticks(round(linspace(0,max(x),nXtickElements)));
         xtickangle(0)
-        yticks(round(linspace(0,max(y),11)));
+        yticks(round(linspace(0,max(y),7)));
     else
         xlabel('slow direction','FontSize',14), ylabel('fast direction','FontSize',14)    
         xticks(round(linspace(min(x),max(x),nXtickElements)));
         xtickangle(0)
-        yticks(round(linspace(min(x),max(y),11)));
+        yticks(round(linspace(min(x),max(y),7)));
     end
     axis on, axis equal
     xlim tight, ylim tight
