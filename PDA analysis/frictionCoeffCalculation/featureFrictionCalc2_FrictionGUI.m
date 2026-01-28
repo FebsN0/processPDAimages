@@ -35,7 +35,7 @@ function results = featureFrictionCalc2_FrictionGUI(vertForce,force,mask,idxSect
     hFig = figure('Name','Friction Extraction','NumberTitle','off', ...
                   'MenuBar','none','ToolBar','none');
     screens = get(0, 'MonitorPositions');
-    monitorXfig = screens(idxMon, :);
+    monitorXfig = screens(idxMon,:);
     % Move to the target monitor manually.
     % NOTE: the positions left and bottom equal to 1 means it is coincident literally with (1,1) which is over the bottom bar
     left   = monitorXfig(1);
@@ -395,7 +395,7 @@ function [flag,numElemSections]=checkNaNelements(vectorAvg,idxSection)
     end
 end
 
-function [pfit,xData,yData]=fittingForceSetpoint(x,y)
+function [resFit,xData,yData]=fittingForceSetpoint(x,y)
 % FITTING VERTICAL VS LATERAL DATA (NanoNewton) 
 % NOTE --------- THE FUNCTION WORKS ONLY IF MULTIPLE SECTION ARE PROVIDED ----------
 % Input:    x and y are the data to fit or the fitted curve in case of plot only.
@@ -404,17 +404,34 @@ function [pfit,xData,yData]=fittingForceSetpoint(x,y)
     % suppress the warning for the fitting
     id='curvefit:fit:iterationLimitReached';
     warning('off',id)
-    % Linear fitting
-    if fitting
-        % prepare the data
-        [xData, yData] = prepareCurveData(x,y);
-        % Set up fittype and options.
-        ft = fittype( 'poly1' ); opts = fitoptions( 'Method', 'LinearLeastSquares'); opts.Robust = 'LAR';
-        % Fit model to data.
-        fitresult = fit( xData, yData, ft, opts);       
-        pfit(1)=fitresult.p1; % slope
-        pfit(2)=fitresult.p2; % offset
-    end    
+    % prepare the data
+    [xData, yData] = prepareCurveData(x,y);
+    % Set up fittype and options.
+    ft = fittype( 'poly1' ); opts = fitoptions( 'Method', 'LinearLeastSquares'); opts.Robust = 'LAR';
+    % Fit model to data.
+    fitresult = fit( xData, yData, ft, opts);   
+    % Residuals
+    yhat = fitresult(xData);
+    r = yData - yhat;
+    % (1) Robust residual scale: sigma_MAD
+    sigmaMAD_r = 1.4826 * mad(r, 1);   % "std-like" robust scale
+    % relScatter option A: relative to robust y-variation
+    sigmaY = 1.4826 * mad(yData - median(yData,'omitnan'), 1);
+    relScatter = sigmaMAD_r / max(sigmaY, eps);
+    % Using Option A (relative to robust y-variation):
+    % relScatter ≪ 1 (e.g., 0.1–0.3): the linear trend explains most of the systematic variation; residual scatter is modest.
+    % relScatter ~ 1: residual scatter is comparable to the total robust variation in y; the linear trend is weak compared to noise/outliers.
+    % relScatter > 1: the line is a poor description; scatter dominates.        
+    % (2) Inlier fraction within ±k*sigmaMAD
+    k = 2;                           % adjust as needed (2 or 3 are common)
+    inlierFrac = mean(abs(r) <= k*sigmaMAD_r);
+    % save results
+    resFit.fc = fitresult.p1; % slope
+    resFit.offset = fitresult.p2; % offset
+    resFit.fc_stats = [relScatter,k,inlierFrac]; 
+    % How to interpret
+    % sigmaMAD: "typical vertical deviation" (robust to outliers)
+    %inlierFrac: "% of points within ±k·sigmaMAD of the line"   ==>     If inlierFrac is high (for your chosen k), your line is consistent with the bulk of data.
 end   
 
 function plotFitResults(resultsMethod,idxSection,ax)
@@ -431,44 +448,45 @@ function plotFitResults(resultsMethod,idxSection,ax)
     VF=resultsMethod.vertForce_median_vector;
     LF=resultsMethod.force_median_vector;    
     hold(ax,"on")
-    if numSections==1
-        titleAX=sprintf("Results method %s - fc = %.3f",resultsMethod.method,resultsMethod.resFit.fc);    % method 1 single section
-    else
-        if resultsMethod.resFit.offset < 0
-            signM='-';
-        else
-            signM='+';
-        end
-        titleAX=sprintf("Results method %s - fitCurve = %.3f*x %s %0.3f",resultsMethod.method,resultsMethod.resFit.fc,signM,abs(resultsMethod.resFit.offset));        
-    end
+    stats=resultsMethod.resFit.fc_stats;
+    titleAX = sprintf("Method %s: fc= %.3f | RS= %.3f | Inliers(k= %g)= %.1f%%", ...
+        resultsMethod.method, ...
+        resultsMethod.resFit.fc, ...
+        stats(1),stats(2),stats(3)*100); % relScatter, k, inliers in percentage
     legend(ax), xlabel(ax,'Vertical Forces [nN]','FontSize',12), ylabel(ax,'Lateral Forces [nN]','FontSize',12)
-    title(ax,titleAX,'FontSize',15)
+    title(ax,titleAX,'FontSize',14)
     for i=1:numSections
         startIdx=idxSection(1,i);
         lastIdx=idxSection(2,i);
         % extract the lateral and vertical deflection of the single section and plot
         LF_section=LF(startIdx:lastIdx);
         VF_section=VF(startIdx:lastIdx);       
-        plot(ax,VF,LF,'*','Color',globalColor(i),'MarkerSize',20,'DisplayName',sprintf('ExpData Section %d',i))
+        plot(ax,VF_section,LF_section,'*','Color',globalColor(i),'MarkerSize',20,'DisplayName',sprintf('Datapoints section#%d',i))
         % calc the avg an std of the entire block (vector portion that represent the original matrix)
-        LF_sections_avg(i)=mean(LF_section); 
-        LF_sections_std(i)=std(LF_section);
-        VF_sections_avg(i)=mean(VF_section);
-        VF_sections_std(i)=std(VF_section);
+        LF_sections_avg(i)=mean(LF_section,"omitnan"); 
+        LF_sections_std(i)=std(LF_section,"omitnan");
+        VF_sections_avg(i)=mean(VF_section,"omitnan");
+        VF_sections_std(i)=std(VF_section,"omitnan");
     end
-    xlim(ax,"padded"),ylim(ax,"padded")
+    if numSections==1
+        % in case of single section, show better the x axis
+        xlim(ax,[VF_sections_avg-VF_sections_avg*1/100, VF_sections_avg+VF_sections_avg*1/100])
+    else
+        xlim(ax,"padded")
+    end
+    ylim(ax,"padded")
     % flip because the high setpoint is on the left
     LF_sections_avg=flip(LF_sections_avg);
     LF_sections_std=flip(LF_sections_std);
     VF_sections_avg=flip(VF_sections_avg);
     VF_sections_std=flip(VF_sections_std);
-    errorbar(ax,VF_sections_avg,LF_sections_avg,LF_sections_std,LF_sections_std,VF_sections_std,VF_sections_std, ...
+    errorbar(ax,VF_sections_avg,LF_sections_avg,LF_sections_std,"-s",...
         'Linewidth',1.3,'capsize',15,'Color',globalColor(2),...
         'markerFaceColor',globalColor(2),'markerEdgeColor',globalColor(2),'MarkerSize',10,...
-        'DisplayName','Statistical results (mean-std)');
+        'DisplayName','Mean-Std LatForce');
     if numSections>1
-        slope=resultsMethod.resFit(1);
-        offset=resultsMethod.resFit(2);
+        slope=resultsMethod.resFit.fc;
+        offset=resultsMethod.resFit.offset;
         % in case of multiple section, show the trend among the setpoint. Useless if only one section
         xfit=linspace(min(VF),max(VF),100);
         yfit=xfit*slope+offset;
@@ -478,21 +496,58 @@ function plotFitResults(resultsMethod,idxSection,ax)
 end
 
 function exportAndSaveAxes(hAx_plot,idxMon,dirName,fileName)
-    % Create new figure
+    % Create new figure and axis
     figNew = figure("Visible","off");
-    % Create new axes
     axNew = axes('Parent', figNew);
     % Copy plot children
-    copyobj(allchild(hAx_plot), axNew);
+    hOldChildren = allchild(hAx_plot);
+    hNewChildren = copyobj(hOldChildren, axNew);
+
     % Copy axes properties
     axNew.XLim = hAx_plot.XLim;
     axNew.YLim = hAx_plot.YLim;
     axNew.YDir = hAx_plot.YDir;
     axNew.XDir = hAx_plot.XDir;
     axNew.DataAspectRatio = hAx_plot.DataAspectRatio;
+
     title(axNew, hAx_plot.Title.String,'FontSize',20);
     xlabel(axNew, hAx_plot.XLabel.String,'FontSize',15);
     ylabel(axNew, hAx_plot.YLabel.String,'FontSize',15);
+    % ---- LEGEND (axes-specific + correct order) ----
+    figOld = ancestor(hAx_plot,'figure');
+    lgds = findobj(figOld,'Type','Legend');
+    lgdOld = [];
+    
+    % pick the legend that belongs to this axes
+    for k = 1:numel(lgds)
+        try
+            if isequal(lgds(k).Axes, hAx_plot)
+                lgdOld = lgds(k);
+                break
+            end
+        catch
+            % some older versions may not expose .Axes consistently
+        end
+    end
+    if ~isempty(lgdOld)
+        labelsOld = lgdOld.String;   
+        % Important: PlotChildren is commonly reverse of displayed legend order
+        plotsOld  = flipud(lgdOld.PlotChildren);  
+        % Map old plot handles -> new copied handles
+        [tf, idx] = ismember(plotsOld, hOldChildren);
+        plotsNew  = hNewChildren(idx(tf));
+        labelsNew = labelsOld(tf);    
+        if ~isempty(plotsNew)
+            lgdNew = legend(axNew, plotsNew, labelsNew, ...
+                'Location', lgdOld.Location,'FontSize',20);   
+            % preserve some appearance settings
+            lgdNew.FontSize    = lgdOld.FontSize;
+            lgdNew.Orientation = lgdOld.Orientation;
+            lgdNew.Box         = lgdOld.Box;
+        end
+    end
+
+
     % Copy colorbar if present
     cb = hAx_plot.Colorbar;
     if ~isempty(cb)
@@ -561,6 +616,11 @@ function data_filtered = remove_Edges_Outlier(data,data_mask,pix,segmentProcess,
             % find the idx of the only first zero element from startpos idx. Then the result is the idx of the nonzero
             % element just before the previously found idx of zero element
             EndPos=StartPos+find(mask_vector(StartPos:end)==1,1)-2;
+            % the previous operation will return NaN when the last element is non-zero, thus manage it
+            if isempty(EndPos)
+                EndPos=length(mask_vector);
+                processSingleSegment=false;                
+            end
             % in case of section, to avoid that the right border of i-th line is merged with the left border of i+1-th line and interpreted as segment,
             % additional check. If so, treat them separately as two segment
             if segmentProcess==3 && idxCurrentFastLine<=length(idxBorders)
@@ -569,12 +629,7 @@ function data_filtered = remove_Edges_Outlier(data,data_mask,pix,segmentProcess,
                 elseif any(StartPos==idxBorders)
                     idxCurrentFastLine=idxCurrentFastLine+1;
                 end
-            end
-            % the previous operation will return NaN when the last element is non-zero, thus manage it
-            if isempty(EndPos)
-                EndPos=length(mask_vector);
-                processSingleSegment=false;                
-            end
+            end            
             % Extract the segment from the data (note: it is BACKGROUND data)
             Segment = data_vector(StartPos:EndPos);
             % if the length of segment is less than 4, it is very likely to be a random artefact. 
@@ -679,20 +734,44 @@ function resultsMethod1 = computeFriction_method1(vertForce,force,idxSection)
 
     % Fit or compute mean friction
     if ~flagSingleSection
-        res = fittingForceSetpoint(vertForce_med, force_med);
-        resFit.fc=res(1);
-        resFit.offset = res(2);
+        resFit = fittingForceSetpoint(vertForce_med, force_med);
+        fc=resFit.fc;
     else
-        % if single section, fitting is useless, therefore friction as average. Not remove nan from vectors to preserve idxSection
-        avg_fc = mean(force_med,'omitnan') / mean(vertForce_med,'omitnan');
-        resFit.fc = avg_fc;
+        % if single section, fitting is useless, therefore friction as follows. Not remove nan from vectors to preserve idxSection
+        F = force_med;
+        V = vertForce_med;
+        m = isfinite(F) & isfinite(V);
+        F = F(m); V = V(m);
+        fc = sum(F) / sum(V);
+        % statistics describe how well this proportionality represents the bulk of the data.
+        % Why sigmaMAD_r + inlierFrac work well together'
+        %   sigmaMAD_r tells you how wide the cloud is
+        %   inlierFrac tells you how much of the cloud follows the trend
+        % calc Uncertainty (robust, point-wise): compute residuals to the model F=fc*V, then a robust residual scale:
+        r = F - fc*V;
+        % sigmaMAD_r is the "typical absolute deviation" of data points from the model line F=fc*V
+        % Same units as F, Robust to outliers,Directly comparable to instrument noise or experimental uncertainty
+        % Think of it as: "If I pick a typical datapoint, its force deviates from the model by about ±sigmaMAD_r."
+        sigmaMAD_r = 1.4826 * mad(r,1);
+        % Interpretation: “Typical deviation is ~X% of the force magnitude.” This is often easier to communicate than absolute units. relative error scale (dimensionless)
+        relScatter = sigmaMAD_r / median(abs(F),'omitnan');
+        % inlierFrac is the fraction of datapoints that behave "normally" with respect to the fitted proportionality. This is a consistency
+        % metric.
+        % If ≥ 0.85 ==> Very consistent dataset
+        % If < 0.50 ==> Proportional model questionable
+        % With k = 2, What fraction of datapoints lie within ±2 typical deviations from the expected force?
+        k = 2;
+        inlierFrac = mean(abs(r) <= k*sigmaMAD_r);      
+        % save stats
+        resFit.fc = fc;
         resFit.offset = nan;
+        resFit.fc_stats = [relScatter,k,inlierFrac];
     end
 
     %%%%%%%% SECOND CONSTRAINT TO STOP THE PROCESS %%%%%%%%%
     % here apparently everything is ok and there is enough data to continue, but it could happen that the fitting yield anomalous slope.
     % 1) slope higher than 0.95 has no sense
-    if avg_fc > 0.95 || avg_fc < 0
+    if fc > 0.95 || fc < 0
         flagAnomalyFriction = true;
     end
     % === Outputs to support GUI plotting ===
@@ -761,9 +840,9 @@ function results_final = computeFriction_method2(vertForce,force,mask,idxSection
         %%%%%%%% EDGES AND OUTLIERS REMOVAL %%%%%%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         % init matrix where to store the data after pixel and outliers removal
-        force_final_pix = zeros(size(force));
+        force_final_pix = nan(size(force));
         % copy and then put zeros according to the lateral force
-        vertForce_final_pix = zeros(size(vertForce));
+        vertForce_final_pix = nan(size(vertForce));
         % start the clearing
         % if method removal is on entire section-sameSetpoint, then extract the section and transform it into single vector
         if segmentProcess == 3
