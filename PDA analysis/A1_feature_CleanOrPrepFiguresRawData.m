@@ -88,30 +88,30 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
         % start to show the data
         data=data_Height*1e9;
         titleData=sprintf('Height (measured) channel (%s - %s)',textTypeData,imageType);
-        nameFig=sprintf('resultA%s_%s_1_HeightChannel_%s',stepProcess,textTypeData,imageType);
+        nameFig=sprintf('resultA%s_1_%s_HeightChannel_%s',stepProcess,textTypeData,imageType);
         labelBar=sprintf('Height (nm)');
         showData(idxMon,SeeMe,data,titleData,folderSaveFig,nameFig,'normalized',norm,'labelBar',labelBar);
         % Lateral Deflection Trace
         data=data_LD_trace;
         titleData=sprintf('Lateral Deflection Trace channel (%s - %s)',textTypeData,imageType);
-        nameFig=sprintf('resultA%s_%s_2_LDChannel_trace_%s',stepProcess,textTypeData,imageType);
+        nameFig=sprintf('resultA%s_2_%s_LDChannel_trace_%s',stepProcess,textTypeData,imageType);
         labelBar='Voltage [V]';
         showData(idxMon,SeeMe,data,titleData,folderSaveFig,nameFig,'normalized',norm,'labelBar',labelBar);
         % Lateral Deflection ReTrace
         data=data_LD_retrace;
         titleData=sprintf('Lateral Deflection Retrace channel (%s - %s)',textTypeData,imageType);
-        nameFig=sprintf('resultA%s_%s_3_LDChannel_retrace_%s',stepProcess,textTypeData,imageType);
+        nameFig=sprintf('resultA%s_3_%s_LDChannel_retrace_%s',stepProcess,textTypeData,imageType);
         showData(idxMon,SeeMe,data,titleData,folderSaveFig,nameFig,'normalized',norm,'labelBar',labelBar);
         % Vertical Deflection trace
         data=data_VD_trace*1e9;
         titleData=sprintf('Vertical Deflection trace channel (%s - %s)',textTypeData,imageType);
-        nameFig=sprintf('resultA%s_%s_4_VDChannel_trace_%s',stepProcess,textTypeData,imageType);
+        nameFig=sprintf('resultA%s_4_%s_VDChannel_trace_%s',stepProcess,textTypeData,imageType);
         labelBar='Force [nN]';
         showData(idxMon,SeeMe,data,titleData,folderSaveFig,nameFig,'normalized',norm,'labelBar',labelBar);
         % Vertical Deflection Retrace
         data=data_VD_retrace*1e9;
         titleData=sprintf('Vertical Deflection retrace channel (%s - %s)',textTypeData,imageType);
-        nameFig=sprintf('resultA%s_%s_5_VDChannel_retrace_%s',stepProcess,textTypeData,imageType);
+        nameFig=sprintf('resultA%s_5_%s_VDChannel_retrace_%s',stepProcess,textTypeData,imageType);
         showData(idxMon,SeeMe,data,titleData,folderSaveFig,nameFig,'normalized',norm,'labelBar',labelBar);          
         
         %%%%% perform the following step ONLY after assembly %%%%%
@@ -142,20 +142,12 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
                     setN{i}=xline(axes1,setpoints(i)*1e9,'LineWidth',4,'DisplayName',sprintf('setpoint section %d',i),'Color',colors{i});
                 end
                 vertForceAVG=zeros(1,numSetpoints);
-                for i=1:numSetpoints
-                    % in case of more files of single section scans, we know prior the size of single
-                    % sections other than how much was the setpoint
-                    if  ~isempty(metadata)
-                        sizeSingleSection=metadata.y_scan_pixels(i); % already expressed in nanoNewton
-                    else
-                    % in case of single file, then divide the image in sections according to the number of used setpoint.
-                    % IMPORTANT: this method is not accurate because when you change the setpoint manually, it is very
-                    % likely that the "new" section has not same size as well as the previous one
-                        sizeSingleSection=round(size(data,2)/numSetpoints);
-                    end
+                for i=1:numSetpoints  
+                    startSection=metadata.y_scan_pixels(1,i);
+                    endSection=metadata.y_scan_pixels(2,i);
                     % extract the vertical force data. Although this step could be made before the assembly, I
                     % found optimal put here so it can be made even in case of single entire scan
-                    verticalForceSingleSection= data(:,(i-1)*sizeSingleSection+1:i*sizeSingleSection);
+                    verticalForceSingleSection= data(:,startSection:endSection);
                     % exclude 99.9 percentile and 0.1
                     th=prctile(verticalForceSingleSection(:),99.9);
                     verticalForceSingleSection(verticalForceSingleSection>th)=NaN;

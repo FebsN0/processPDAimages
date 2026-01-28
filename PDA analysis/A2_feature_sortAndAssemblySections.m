@@ -3,7 +3,7 @@ function varargout = A2_feature_sortAndAssemblySections(allData,otherParameters,
 % Second part is assembling the sections
     
     p=inputParser(); 
-    argName = 'frictionMain';          defaultVal = true;              addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
+    argName = 'frictionMain';          defaultVal = false;              addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
     parse(p,varargin{:});
     frictionMain=p.Results.frictionMain;
   
@@ -42,10 +42,17 @@ function varargout = A2_feature_sortAndAssemblySections(allData,otherParameters,
     metaDataAssembled.y_scan_length_m= sum(y_scan_lengthAllScans);
     % in case of y pixel, keep the pixel value of each section. This information is valuable especially for
     % friction experiment method 1 which it needs to separate the section depending on setpoint
-    metaDataAssembled.y_scan_pixels = arrayfun(@(s) s.metadata.y_scan_pixels, allDataOrdered);
+    metaDataAssembled.y_scan_pixels = arrayfun(@(s) s.metadata.y_scan_pixels, allDataOrdered,'UniformOutput',false);
     % in case of setpoints and baseline, create an array if more sections. For newton values, round a little a bit the values
     metaDataAssembled.SetP_V= arrayfun(@(s) s.metadata.SetP_V, allDataOrdered);
-    metaDataAssembled.SetP_N=round(arrayfun(@(s) s.metadata.SetP_N, allDataOrdered),9);
+    vals=arrayfun(@(s) s.metadata.SetP_N, allDataOrdered,'UniformOutput',false);
+    % Flatten cell content into a numeric vector
+    if isscalar(vals)           % case: {Nx1 double}
+        vals = vals{1};
+    else        
+        vals = cell2mat(vals);  % case: {1x1 double, 1x1 double, ...}
+    end
+    metaDataAssembled.SetP_N=round(vals,9);
     metaDataAssembled.Baseline_V=arrayfun(@(s) s.metadata.Baseline_V, allDataOrdered);
     metaDataAssembled.Baseline_N=round(arrayfun(@(s) s.metadata.Baseline_N, allDataOrdered),12);
     % in case of processing single sections before assembly, additional field in the data (friction used for each section)

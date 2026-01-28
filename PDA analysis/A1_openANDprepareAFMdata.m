@@ -6,7 +6,7 @@ function varargout = A1_openANDprepareAFMdata(varargin)
     delete(allWaitBars)    
     %init instance of inputParser
     p=inputParser();
-    argName = 'filePath';                   defaultVal = '';        addParameter(p,argName,defaultVal, @(x) ischar(x));
+    argName = 'filePath';                   defaultVal = '';        addParameter(p,argName,defaultVal, @(x) (ischar(x) || isstring(x)));
     argName = 'frictionData';               defaultVal = 'No';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
     % validate and parse the inputs
     parse(p,varargin{:});
@@ -165,27 +165,63 @@ function varargout = A1_openANDprepareAFMdata(varargin)
         % extract the setpoint information from metadata. In case of single scan in which setpoint
         % has changed manually (which is technically wrong), then put manually
         if numFiles> 1
-            setpointN(i)=metaData.SetP_N;
+            setpoint    N(i)=metaData.SetP_N;
+            % store the position and size of each found sections. They will be likely not regular           
+            metaData.y_scan_pixels=[1;metaData.y_scan_pixels];
         else            
-            % extract the applied setpoint of each section as average of fast lines. Also, extract the idx of
-            % each section
-            data_VD_trace=  data(strcmp([data.Channel_name],'Vertical Deflection') & strcmp([data.Trace_type],'ReTrace')).AFM_image;
-            [setpointN,idxSet]=unique(round(mean(data_VD_trace,2),9),'stable'); %expressed in nanoNewton. Dont sort
+            % extract the applied setpoint of each section as average of fast lines. Also, extract the idx of each section
+            % NOTE: sometimes, in correspondence of setpoint change, trace and retrace may be not aligned.
+            % track those lines as idx
+            % extract Vertical Images
+            data_VD_retrace=  data(strcmp([data.Channel_name],'Vertical Deflection') & strcmp([data.Trace_type],'ReTrace')).AFM_image;
+            data_VD_trace=  data(strcmp([data.Channel_name],'Vertical Deflection') & strcmp([data.Trace_type],'Trace')).AFM_image;
+            % average of each single fast line
+            vertTrace_avg = mean(data_VD_trace,2,'omitnan');
+            vertReTrace_avg = mean(data_VD_retrace,2,'omitnan');             
+            % find the idx (slow direction) for which the difference 
+            % of average vertical force between trace and retrace is acceptable
+            Th = 4e-9;  
+            IdxAnomalyFlag = abs(vertTrace_avg - vertReTrace_avg) > Th; % entire fast scan line
+            IdxAnomaly = find(IdxAnomalyFlag);                          % position of anomalous fast lines
+            if any(IdxAnomalyFlag)
+                warning("Some fast scan lines between Vertical-Trace and Vertical-ReTrace are not coincident, very likely in corrispondence of setpoint change. Those lines are ignored for entire process")
+            end
+            keep = ~IdxAnomalyFlag;                 % logical mask, size = N x 1
+            origIdxKeep = find(keep);               % original row indices that remain            
+            % Compute setpoint groups on the filtered data
+            VDmed= (data_VD_trace(~IdxAnomalyFlag,:)+data_VD_retrace(~IdxAnomalyFlag,:))/2;
+            [setpointN,idxSet_kept]=unique(round(mean(VDmed,2),9),'stable'); %expressed in nanoNewton. Dont sort
             % store the setpoint
             metaData.SetP_N=setpointN;
-            % store the position and size of each found sections. They will be likely not regular
-            yScanPixel=zeros(1,length(idxSet));
-            for j=1:length(idxSet)-1
-                yScanPixel(j)=idxSet(j+1)-idxSet(j);
-            end
-            yScanPixel(end)=size(data_VD_trace,2)-idxSet(end);
-            metaData.y_scan_pixels=yScanPixel;
+            % Map group-representative indices back to ORIGINAL rows
+            idxSet = origIdxKeep(idxSet_kept);
+            % build section idx which contain start and end, excluding anomalous fast lines
+            idx_section_Start_End=zeros(2,length(idxSet));
+            for m=1:length(idxSet)
+                idx_section_Start_End(1,m)=idxSet(m);
+                if m~=length(idxSet)
+                    idxEndTmp=idxSet(m+1)-1;
+                else
+                    idxEndTmp=length(IdxAnomalyFlag);
+                end
+                if ismember(idxEndTmp,IdxAnomaly)
+                    idxEndTmp=idxEndTmp-1;
+                end
+                idx_section_Start_End(2,m)=idxEndTmp;
+            end            
+            % since the data will be flipped, also the idx of sections must be flipped because the here the first section for example is the
+            % last setpoint (idx_section_Start_End(:,1) = last setpoint) so it must be numerically flipped 
+            % (idx_section_Start_End(:,1) = first setpoint)
+            N=length(IdxAnomalyFlag);
+            idxSet_flip = [N-idx_section_Start_End(2,:)+1;N-idx_section_Start_End(1,:)+1];
+            [~,ord] = sort(idxSet_flip(1,:), 'ascend');
+            idx_section_Start_End = idxSet_flip(:,ord);
+            % store the position and size of each found sections. They will be likely not regular           
+            metaData.y_scan_pixels=idx_section_Start_End;
             clear v_num question v valueDefault
-        end
-               
+        end               
         % remove not useful channels before processing. Not show the figures. It will be done later
-        filtData=A1_feature_CleanOrPrepFiguresRawData(data,'cleanOnly',true);
-        
+        filtData=A1_feature_CleanOrPrepFiguresRawData(data,'cleanOnly',true);        
         % store the data in a big struct var       
         if numFiles>1
             allData(i).filenameSection=fileNameSections{i};
@@ -194,7 +230,6 @@ function varargout = A1_openANDprepareAFMdata(varargin)
             allData(i).filenameSection=fileNameSections;
         end   
         allData(i).metadata=metaData;
-        allData(i).setpointN=setpointN(i);
         allData(i).AFMImage_Raw=filtData;
         varargout{1}=allData;
         %%%%%% Extract important parameters from metadata to check the integrity of the data %%%%%%
