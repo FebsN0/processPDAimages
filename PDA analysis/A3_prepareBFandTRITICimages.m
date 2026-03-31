@@ -1,20 +1,15 @@
-function varargout=A3_prepareBFandTRITICimages(folderResultsImg,idxMon,groupExperiment,nameExperiment,nameScan,varargin)
+function varargout=A3_prepareBFandTRITICimages(folderResultsImg,idxMon,nameExperiment,nameScan)
 % flag_PRE_POST is for alignment between BF pre and BF post, rather than BF pre and TRITIC post
-    p=inputParser();
-    argName = 'pathOpticalImages';         defaultVal = [];        addOptional(p,argName,defaultVal);
-    argName = 'postHeatProcessing';        defaultVal = false;     addOptional(p,argName,defaultVal, @(x) islogical(x));
-    parse(p,varargin{:});
-    if isempty(p.Results.pathOpticalImages)
-        text=sprintf("Select the directory having all .nd2 files for EXP %s - %s - SCAN %s",groupExperiment,nameExperiment,nameScan);
-        filePathND2=uigetdir(pwd,text);
+    if exist(fullfile(folderResultsImg,"TMP_BF_TRITIC_rawFiles.mat"),"file")
+        load(fullfile(folderResultsImg,"TMP_BF_TRITIC_rawFiles"),"flag_PRE_POST")
+        if flag_PRE_POST
+            load(fullfile(folderResultsImg,"TMP_BF_TRITIC_rawFiles.mat"),"filePathND2","BF_ImagePOST","BF_ImagePRE","TRITIC_ImagePRE","TRITIC_ImagePOST","metadata","timeExp")
+        else
+            load(fullfile(folderResultsImg,"TMP_BF_TRITIC_rawFiles.mat"),"filePathND2","BF_ImagePRE","TRITIC_ImagePRE","TRITIC_ImagePOST","metadata","timeExp")
+        end
     else
-        filePathND2=p.Results.pathOpticalImages;
-    end
-    postHeat=p.Results.postHeatProcessing;
-    clear argName text defaultVal p varargin
-    if exist(fullfile(filePathND2,"BFdata.mat"),"file")
-        load(fullfile(filePathND2,"BFdata.mat"),"metadata","BF_ImagePRE","BF_ImagePOST","flag_PRE_POST","fileList")            
-    else        
+        text=sprintf("Select the directory having all .nd2 files for EXP %s - SCAN %s",nameExperiment,nameScan);
+        filePathND2=uigetdir(pwd,text);
         % .nd2 files inside dir
         fileList = dir(fullfile(filePathND2, '*.nd2'));
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -30,16 +25,12 @@ function varargout=A3_prepareBFandTRITICimages(folderResultsImg,idxMon,groupExpe
             i=1;
             while true
                 if i==1
-                    filenameND2='resultA3_1_1_BrightField_preAFM';
-                    [BF_ImagePRE,metaData_BF]=selectND2file( ...
-                        'folderResultsImg',folderResultsImg,'filenameND2',filenameND2,'idxMon',idxMon, ...
-                        'titleImage','BrightField - original - preAFM','typeImage','BrightField','mode','Before');
+                    mode='Before'; filenameND2='resultA3_1_1_BrightField_preAFM'; titleImage='BrightField - original - preAFM';
+                    [BF_ImagePRE,metaData_BF]=selectND2file(folderResultsImg,filenameND2,titleImage,idxMon,'BrightField',mode);
                     flag_PRE_POST = 0;
                 else
-                    filenameND2='resultA3_1_2_BrightField_postAFM';
-                    BF_ImagePOST=selectND2file( ...
-                        'folderResultsImg',folderResultsImg,'filenameND2',filenameND2,'idxMon',idxMon, ...
-                        'titleImage','BrightField - original - postAFM','typeImage','BrightField','mode','After');
+                    mode='After'; filenameND2='resultA3_1_2_BrightField_postAFM'; titleImage='BrightField - original - postAFM';
+                    BF_ImagePOST=selectND2file(folderResultsImg,filenameND2,titleImage,idxMon,'BrightField',mode);
                     flag_PRE_POST = 1;
                 end            
                 if getValidAnswer("End the selection of BF files?",'',{'y','n'}) || i>2
@@ -56,19 +47,15 @@ function varargout=A3_prepareBFandTRITICimages(folderResultsImg,idxMon,groupExpe
                 beforeFiles=fileBF(idxBFmode);
             end        
             fullfilePath=fullfile(filePathND2,beforeFiles{:});
-            filenameND2='resultA3_1_1_BrightField_preAFM'; 
-            [BF_ImagePRE,metaData_BF]=selectND2file('fullfilePath',fullfilePath,...
-                'folderResultsImg',folderResultsImg,'filenameND2',filenameND2,'idxMon',idxMon, ...
-                'titleImage','BrightField - original - preAFM');
+            filenameND2='resultA3_1_1_BrightField_preAFM'; titleImage='BrightField - original - preAFM';
+            [BF_ImagePRE,metaData_BF]=selectND2file(folderResultsImg,filenameND2,titleImage,idxMon,fullfilePath); 
             % if exist, extract postAFM BF acquisition
             if any(contains(fileBF, {'post','after'}))            
                 idxBFmode=contains(fileBF, {'post','after'});
                 afterFiles=fileBF(idxBFmode);
                 fullfilePath=fullfile(filePathND2,afterFiles{:});
-                filenameND2='resultA3_1_2_BrightField_postAFM';
-                BF_ImagePOST=selectND2file('fullfilePath',fullfilePath,...
-                    'folderResultsImg',folderResultsImg,'filenameND2',filenameND2,'idxMon',idxMon, ...
-                    'titleImage','BrightField - original - postAFM','mode','After');
+                filenameND2='resultA3_1_2_BrightField_postAFM'; titleImage='BrightField - original - postAFM';
+                BF_ImagePOST=selectND2file(folderResultsImg,filenameND2,titleImage,idxMon,fullfilePath);
                 flag_PRE_POST = 1;  % flag post
             else            
                 flag_PRE_POST = 0;
@@ -80,18 +67,11 @@ function varargout=A3_prepareBFandTRITICimages(folderResultsImg,idxMon,groupExpe
         BF_ImagePRE = A3_feature_correctBFtilted(BF_ImagePRE,idxMon,folderResultsImg,'resultA3_3_1_comparisonOriginalCorrected_beforeAFM');
         if exist("BF_ImagePOST","var")
             BF_ImagePOST = A3_feature_correctBFtilted(BF_ImagePOST,idxMon,folderResultsImg,'resultA3_3_2_comparisonOriginalCorrected_afterAFM');
-        else
-            BF_ImagePOST=[];
         end
-        save(fullfile(filePathND2,"BFdata"),"metadata","BF_ImagePRE","BF_ImagePOST","flag_PRE_POST","fileList")
-    end
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%% EXTRACT TRITIC IMAGES %%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
-    clear patternBF beforeFiles fileBF filenameND2 fullfilePath afterFiles idxBFmode idxBF matches metaData_BF titleImage
-    if exist(fullfile(filePathND2,"TRITICdata.mat"),"file")
-        load(fullfile(filePathND2,"TRITICdata.mat"),"metadata","TRITIC_ImagePRE","TRITIC_ImagePOST")            
-    else 
+
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%% EXTRACT TRITIC IMAGES %%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
         flagSubfolders=false;
         allFiles=dir(fullfile(filePathND2));
         dirsIDX=[allFiles.isdir];
@@ -116,87 +96,46 @@ function varargout=A3_prepareBFandTRITICimages(folderResultsImg,idxMon,groupExpe
         timeValues = sort(unique(str2double(matches(:))));
         timeList = cellstr(string(timeValues));    
         if ~isempty(timeList)
-            if ~postHeat
-                timeExp=timeList{getValidAnswer('What exposure time do you want to take?','',timeList)};
-            else
-                % prepare cell array where to store image and metadata of all expTime
-                allMetadata_TRITIC=cell(size(timeList));
-                allImage_TRITIC=cell(size(timeList));
-            end
+            timeExp=timeList{getValidAnswer('What exposure time do you want to take?','',timeList)};
         else
             error('This error occurs when the file .nd2 does not containt time exposure in the filename. part has not prepared. Modify in a second moment. Contact the coder if you have issues.')
         end
-        time_th=1;
-        while true
-            if postHeat
-                timeExp=timeList{time_th};
-            end
-            % select the files with the choosen time exposure
-            matchingFiles = {fileList(contains({fileList.name}, [timeExp, 'ms'])).name};
-            % auto selection
-            beforeFiles = matchingFiles(contains(matchingFiles, {'pre','before'}, 'IgnoreCase', true));
-            afterFiles = matchingFiles(contains(matchingFiles, {'post', 'after'}, 'IgnoreCase', true));        
-            % in case of normal processing, TRITIC after and before AFM scan is mandatory. So, further check. If not found, return error
-            if ~postHeat && (isempty(beforeFiles) || isempty(afterFiles))
-                error('Issues in finding the files. Check the filenames naming. Must be in the format TRITIC<pre/before/after/post>_<number>ms..');  
-            % in case there are multiple file with same timeExp ==> for example, because of different Gain all saved in the same directory
-            elseif length(beforeFiles)~=1 || length(afterFiles)~=1
-                 selectedOptions = selectOptionsDialog("Multiple file with same timeExp. Which select?",false,beforeFiles,afterFiles);
-                 beforeFiles=beforeFiles{selectedOptions{1}};
-                 if ~postHeat
-                    afterFiles=afterFiles{selectedOptions{2}};
-                 end
-            end
-            % extract the TRITIC data. Note: the two figures that will be saved
-            % are scaled differently, so the direct comparison on the images is
-            % not correct.
-            if flagSubfolders
-                beforeFiles=fullfile(filePathND2_sub,beforeFiles{:});            
-                if ~postHeat
-                    titleImagePRE=sprintf('TRITIC Before Stimulation - timeExp: %s - %s',timeExp,subDirName);
-                    titleImagePOST=sprintf('TRITIC After Stimulation - timeExp: %s - %s',timeExp,subDirName);
-                    afterFiles=fullfile(filePathND2_sub,afterFiles{:});
-                end           
-            else
-                beforeFiles=fullfile(filePathND2,beforeFiles);            
-                if ~postHeat
-                    afterFiles=fullfile(filePathND2,afterFiles);  
-                    titleImagePRE=sprintf('TRITIC Before Stimulation - timeExp: %s',timeExp);
-                    titleImagePOST=sprintf('TRITIC After Stimulation - timeExp: %s',timeExp);
-                end                       
-            end            
-            filenameND2='resultA3_2_1_TRITIC_Before_Stimulation';
-            % since there may lot of TRITIC images at different exp time, save memory and data processing time
-            if postHeat
-                [TRITIC_ImagePRE,metaData_TRITIC]=selectND2file('fullfilePath',beforeFiles,'saveFig',false);     
-                TRITIC_ImagePOST=[];
-            else
-                [TRITIC_ImagePRE,metaData_TRITIC]=selectND2file('fullfilePath',beforeFiles,...
-                        'folderResultsImg',folderResultsImg,'filenameND2',filenameND2,'idxMon',idxMon, ...
-                        'titleImage',titleImagePRE,'typeImage','TRITIC');
-                filenameND2='resultA3_2_2_TRITIC_After_Stimulation'; 
-                TRITIC_ImagePOST=selectND2file('fullfilePath',afterFiles,...
-                        'folderResultsImg',folderResultsImg,'filenameND2',filenameND2,'idxMon',idxMon, ...
-                        'titleImage',titleImagePOST,'typeImage','TRITIC','mode','After');
-            end        
-            % in case of postHeat, repeat the TRITIC image extraction at the next timeExp. Otherwise, store in cell array all the results of
-            % each TRITIC image and metadata
-            if ~postHeat
-                metadata.TRITIC=metaData_TRITIC;
-                break
-            else
-                allMetadata_TRITIC{time_th}=metaData_TRITIC;
-                allImage_TRITIC{time_th}=TRITIC_ImagePRE;
-                time_th=time_th+1;
-                if time_th>length(allImage_TRITIC)
-                    metadata.TRITIC=allMetadata_TRITIC;
-                    break
-                end
-            end
+        % select the files with the choosen time exposure
+        matchingFiles = {fileList(contains({fileList.name}, [timeExp, 'ms'])).name};
+        % auto selection
+        beforeFiles = matchingFiles(contains(matchingFiles, {'pre','before'}, 'IgnoreCase', true));
+        afterFiles = matchingFiles(contains(matchingFiles, {'post', 'after'}, 'IgnoreCase', true));        
+        % in case not found, manual selection
+        if isempty(beforeFiles) || isempty(afterFiles)
+            error('Issues in finding the files. Check the filenames');  
+        % in case there are multiple file with same timeExp ==> for example, because of different Gain all saved in the same directory
+        elseif length(beforeFiles)==2 || length(afterFiles)==2
+             selectedOptions = selectOptionsDialog("Multiple file with same timeExp. Which select?",false,beforeFiles,afterFiles);
+             beforeFiles=beforeFiles{selectedOptions{1}};
+             afterFiles=afterFiles{selectedOptions{2}};
         end
-        save(fullfile(filePathND2,"TRITICdata"),"metadata","TRITIC_ImagePRE","TRITIC_ImagePOST")
-    end
-    if ~postHeat
+        % extract the TRITIC data. Note: the two figures that will be saved
+        % are scaled differently, so the direct comparison on the images is
+        % not correct.
+        if flagSubfolders
+            beforeFiles=fullfile(filePathND2_sub,beforeFiles{:});
+            afterFiles=fullfile(filePathND2_sub,afterFiles{:});
+            titleImagePRE=sprintf('TRITIC Before Stimulation - timeExp: %s - %s',timeExp,subDirName);
+            titleImagePOST=sprintf('TRITIC After Stimulation - timeExp: %s - %s',timeExp,subDirName);
+        else
+            beforeFiles=fullfile(filePathND2,beforeFiles);
+            afterFiles=fullfile(filePathND2,afterFiles);   
+            titleImagePRE=sprintf('TRITIC Before Stimulation - timeExp: %s',timeExp);
+            titleImagePOST=sprintf('TRITIC After Stimulation - timeExp: %s',timeExp);
+        end
+        
+        filenameND2='resultA3_2_1_TRITIC_Before_Stimulation';
+        [TRITIC_ImagePRE,metaData_TRITIC]=selectND2file(folderResultsImg,filenameND2,titleImagePRE,idxMon,beforeFiles);               
+        filenameND2='resultA3_2_2_TRITIC_After_Stimulation'; 
+        TRITIC_ImagePOST=selectND2file(folderResultsImg,filenameND2,titleImagePOST,idxMon,afterFiles);
+        close all       
+        metadata.TRITIC=metaData_TRITIC;
+        
         % original images are not aligned
         showAlignOriginalImages(BF_ImagePRE,TRITIC_ImagePRE,folderResultsImg,'BF preAFM and TRITIC preAFM','resultA3_4_BFpre_TRITICpre',idxMon)    
         if flag_PRE_POST
@@ -211,13 +150,7 @@ function varargout=A3_prepareBFandTRITICimages(folderResultsImg,idxMon,groupExpe
             save(fullfile(folderResultsImg,"TMP_BF_TRITIC_rawFiles.mat"),"flag_PRE_POST","filePathND2","BF_ImagePRE","TRITIC_ImagePRE","TRITIC_ImagePOST","metadata","timeExp")
         end
     end
-    
 
-
-
-
-
-    
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%% ALIGN BF-TRITIC IMAGES PRE AND POST AFM %%%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -325,28 +258,23 @@ function varargout=A3_prepareBFandTRITICimages(folderResultsImg,idxMon,groupExpe
 end
 
 
-function [Image,metaData]=selectND2file(varargin)
-% the function extract the given .nd2 image file and generate the picture with a given title
-    p=inputParser();
-    argName = 'titleImage';         defaultVal = [];            addOptional(p,argName,defaultVal);    
-    argName = 'typeImage';          defaultVal = 'BrightField'; addOptional(p,argName,defaultVal,@(x) ismember(x,{'BrightField','TRITIC'}));  % Brightfield or TRITIC
-    argName = 'mode';               defaultVal = [];      addOptional(p,argName,defaultVal,@(x) ismember(x,{[],' Before',' After'}));  % Before or After
-    argName = 'fullfilePath';       defaultVal = [];            addOptional(p,argName,defaultVal);
-    argName = 'saveFig';            defaultVal = true;          addOptional(p,argName,defaultVal, @(x) islogical(x));
-    argName = 'idxMon';             defaultVal = [];            addOptional(p,argName,defaultVal);  
-    argName = 'folderResultsImg';   defaultVal = [];            addOptional(p,argName,defaultVal);  
-    argName = 'filenameND2';        defaultVal = [];            addOptional(p,argName,defaultVal);  
-    parse(p,varargin{:});   
-    fullfilePath=p.Results.fullfilePath;
-    if isempty(fullfilePath)
-        text= sprintf('Select the %s Image%s AFM acquisition',p.Results.typeImage,p.Results.mode);
+function [Image,metaData]=selectND2file(folderResultsImg,filenameND2,titleImage,idxMon,varargin)
+    % the function extract the given .nd2 image file and generate the picture with a given title
+    % varargin:
+    %   - if two elements ==> typeImage and Mode ====> MANUAL SELECTION
+    %   - if 1 element    ==> already selected .nd2 file
+    
+    if length(varargin)==2
+        typeImage = varargin{1}; % Brightfield or TRITIC
+        mode = varargin{2};      % Before or After
+        text= sprintf('Select the %s Image %s AFM acquisition',typeImage,mode);
         [fileName, filePathData] = uigetfile({'*.nd2'},text);
         fullfilePath=fullfile(filePathData,fileName);
+    else
+        fullfilePath=varargin{1};    % location of the file
     end
-    [Image,~,metaData]=A3_feature_Open_ND2(fullfilePath);
-    if p.Results.saveFig
-        showData(p.Results.idxMon,false,imadjust(Image),sprintf("%s - imadjusted",p.Results.titleImage),p.Results.folderResultsImg,p.Results.filenameND2)  
-    end
+    [Image,~,metaData]=A3_feature_Open_ND2(fullfilePath); 
+    showData(idxMon,false,imadjust(Image),sprintf("%s - imadjusted",titleImage),folderResultsImg,filenameND2)    
 end
 
 function showAlignOriginalImages(image1,image2,folderResultsImg,titleText,fileText,idxMon,varargin)

@@ -1,6 +1,6 @@
 function A0_main_friction(varargin)
-    if isempty(varargin)
-        close all
+    close all
+    if isempty(varargin)       
         idxMon=objInSecondMonitor;
         pause(1)
         mainPath=uigetdir(pwd,sprintf('Locate the main scan directory which contains HVoff directory'));     
@@ -28,7 +28,7 @@ function A0_main_friction(varargin)
 
     tmp=strsplit(mainPath,'\');
     nameScan=tmp{end}; nameExperiment=tmp{end-2}; clear tmp
-    fprintf(sprintf("\n MAIN CODE OF FRICTION COEFFICIENT CALCULATION Experiment %s - scan %s\n\n",nameExperiment,nameScan))
+    fprintf(sprintf("\n MAIN CODE OF FRICTION COEFFICIENT CALCULATION Experiment %s - scan %s\n",nameExperiment,nameScan))
     HVoffPath=fullfile(mainPath,'HoverMode_OFF');
     % check if data HoverModeOFF post Height fitting has already been made
     if exist(fullfile(HVoffPath,'resultsData_1_extractAFMdata.mat'),"file")
@@ -86,7 +86,7 @@ function A0_main_friction(varargin)
             if exist(nameFileResultPostHeightProcess,"file")
                 question=sprintf("PostHeightChannelProcess file .mat (HoverModeOFF-FrictionPart) for the section %d already exists. Take it?",ithSection);
                 if getValidAnswer(question,"",{'y','n'})
-                    load(nameFileResultPostHeightProcess,"AFM_images_postHeightFit_HVOFF","AFM_height_IO_HV_OFF","FitOrderHVOFF_Height","metadata","offset_HVon_HVoff")
+                    load(nameFileResultPostHeightProcess,"AFM_images_postHeightFit_HVOFF","AFM_height_IO_HV_OFF","FitOrderHVOFF_Height","metadata")
                     flagStartHeightProcess=false;
                 end
                 clear fileName question
@@ -104,7 +104,7 @@ function A0_main_friction(varargin)
             end
             clear nameFileResultPostHeightProcess      
             %%%%% PREPARE THE DATA BEFORE FRICTION CALC %%%%%
-            [vertForce_clear,force_clear,force_masked,idxSection]=prepareFrictionData(AFM_images_postHeightFit_HVOFF,AFM_height_IO_HV_OFF,metadata,filePathResultsFriction);            
+            [vertForce_clear,force_clear,force_masked,idxSection]=prepareFrictionData(AFM_images_postHeightFit_HVOFF,AFM_height_IO_HV_OFF,metadata,filePathResultsFriction,idxMon);            
             %%%%%%%%% FRICTION CALCULATION %%%%%%%%%
             resFriction = featureFrictionCalc2_FrictionGUI(vertForce_clear,force_clear,AFM_height_IO_HV_OFF,idxSection,idxMon,filePathResultsFriction);
             close all
@@ -134,11 +134,9 @@ function A0_main_friction(varargin)
             %%%%%%%%% FRICTION CALCULATION %%%%%%%%%
             resFriction = featureFrictionCalc2_FrictionGUI(vertForce_clear,force_clear,AFM_height_IO,idxSection,idxMon,filePathResultsFriction);
             close all
-            save(fullfile(filePathResultsFriction,"resultsDataFrictionCoefficient"),"resFriction","force_masked","force_clear")
+            save(fullfile(HVoffPath,"resultsDataFrictionCoefficient"),"resFriction","force_masked","force_clear")
             correctHeight(AFM_images,AFM_height_IO,resFriction,idxMon,filePathResultsFriction)            
-            save(fullfile(HVoffPath,"resultsDataFrictionCoefficient.mat"))
-        end
-        
+        end        
     end
     clear AFM_height_IO_HV_OFF AFM_images_postHeightFit_HVOFF dataType filePathResultsFriction flagStartHeightProcess force* FitOrderHVOFF_Height height* ithSection metadata nameFig nameOperation SaveFigIthSectionFolder resFriction nameSection imageType     
 end

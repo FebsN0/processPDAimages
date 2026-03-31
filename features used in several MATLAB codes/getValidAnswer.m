@@ -302,7 +302,7 @@ function metrics = measureDialogContentPixels_legacy(question, options, FontQ, F
     c = onCleanup(@() close(gcf));
     ht = uicontrol('Style','text','Units','pixels','Position',[1 1 10 10], ...
                    'HorizontalAlignment','left');
-        % ---------- Measure question block ----------
+    % ---------- Measure question block ----------
     set(ht,'FontSize',FontQ);
     qMaxW = 0;
     qLineHeights = zeros(numel(questionLines),1);
@@ -357,10 +357,14 @@ function metrics = measureDialogContentPixels_legacy(question, options, FontQ, F
         % ---------- Combine to recommended figure size ----------
         maxLineW = max(qMaxW, optMaxW);
     end
-
+    
     % Width: longest text line + button column + spacing + padding + safety
     %targetW = maxLineW + ui.buttonColW + ui.colSpacing + ui.glPad(1) + ui.glPad(3) + ui.safetyW;
     targetW = maxLineW*0.95;
+    % when targetW is <260, the window doesnt show
+    if targetW<260
+        targetW=260;
+    end
     % Height: padding top/bottom + question + gap + options + safety
     targetH = qH + optH;
 

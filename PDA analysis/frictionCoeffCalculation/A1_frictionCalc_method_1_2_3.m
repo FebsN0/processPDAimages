@@ -1,38 +1,5 @@
-% This function opens the AFM data previously created to calculate the background friction
-% coefficient.
-% 
-% This function uses one of three methods depending on the choice and input data
-%   method 1)  INPUT: background ONLY ==>  simplest method
-%   method 2)  INPUT: background+PDA  ==>  masking lateral and vertical data using AFM_height_IO to ignore PDA regions
-%
-% The third method removes outliers considered as spike signals in correspondence with the PDA crystal's edges using
-% in-built matlab function.
-% Moreover, PIXEL REDUCTION is applied to make more robust the statistical calculation prior the outliers removal
-% once found a segment (single background region between two PDA regions), depending on the window/pixel
-% size, the edges will be "brutally" removed by zeroing (0:PDA-1:BK)
-%   method 3a) INPUT: background+PDA  ==>  method 2 + REMOVAL OF OUTLIERS on single segments for each single fast
-%                                          scan line
-%   method 3b) INPUT: background+PDA  ==>  method 2 + REMOVAL OF OUTLIERS on connected segments for each single
-%                                          fast scan line
-% WORKING PROGRESS
-%   method 3c) INPUT: background+PDA  ==>  method 2 + REMOVAL OF OUTLIERS on connected segments of each entire
-%                                          section (in correspondence of same setpoint region)
-%   
-% INPUT:    1) AFM_AllScanImages (trace and retrace | height, lateral and vertical data, Hover Mode off) of ANY SELECTED SCAN
-%           2) metadata of ANY SELECTED SCAN
-%           3) AFM_height_IO (mask PDA-background 0/1 values) of ANY SELECTED SCAN
-%           4) secondMonitorMain
-%           5) newFolder: path where store the results
-%           5) choice: method 1 | method 2 | method 3 (three available options)
-%
-% OUTPUT:   resFrictionAllExp struct which contains
-%           1) nameScan
-%           2) friction/slope value
-%           3) offset value
-%           4) force image cleared (depending on the method)
-%           5) vertical force image cleared (depending on the method)
-%           6) averaged values of fast scan lines of force used for the fitting
-%           7) averaged values of fast scan lines of vertical force used for the fitting
+ 
+
 
 function [resFrictionAllExp,varargout]=A1_frictionCalc_method_1_2_3(AFM_AllScanImages,metadata_AllScan,AFM_AllScan_height_IO,idxMon,newFolder,method,nameScan_AllScan,idxRemovedPortion_onlyBK,varargin)
     % in case of code error, the waitbar won't be removed. So the following command force its closure

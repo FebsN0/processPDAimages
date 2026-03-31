@@ -165,7 +165,7 @@ function varargout = A1_openANDprepareAFMdata(varargin)
         % extract the setpoint information from metadata. In case of single scan in which setpoint
         % has changed manually (which is technically wrong), then put manually
         if numFiles> 1
-            setpointN(i)=metaData.SetP_N;
+            setpoint    N(i)=metaData.SetP_N;
             % store the position and size of each found sections. They will be likely not regular           
             metaData.y_scan_pixels=[1;metaData.y_scan_pixels];
         else            

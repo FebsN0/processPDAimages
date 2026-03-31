@@ -3,6 +3,12 @@ function saveFigures_FigAndTiff(fig,nameDir,nameFig,varargin)
     % Add required parameters
     addParameter(p,'closeImmediately',true,@islogical);
     parse(p,varargin{:});
+    if ~exist(fullfile(nameDir,"tiffImages"),"dir")
+        mkdir(fullfile(nameDir,"tiffImages"))
+    end
+    if ~exist(fullfile(nameDir,"figImages"),"dir")
+        mkdir(fullfile(nameDir,"figImages"))
+    end
     fullnameTif=fullfile(nameDir,"tiffImages",nameFig+".tif");
     fullnameFig=fullfile(nameDir,"figImages",nameFig+".fig");
     % --- Save only the content of the axes ---
@@ -10,7 +16,6 @@ function saveFigures_FigAndTiff(fig,nameDir,nameFig,varargin)
         forceLightTheme(fig);
     end
     exportgraphics(fig,fullnameTif,'Resolution',300,'ContentType','image','Padding', 100);
-
     saveas(fig,fullnameFig)
     if p.Results.closeImmediately
         close(fig)
