@@ -63,15 +63,21 @@ function varargout=A2_feature_1_processHeightChannel(filtData,idxMon,SaveFigFold
     end    
     clearvars argName defaultVal varargin
     varargout{3}=fitOrderHeight;
-    % Orient image of every channel by clockwise 90° and flip along long axis so the image coencide with the Microscopy image direction
+    % In case the data is single section, orient image of every channel by clockwise 90° and flip along long axis so the image
+    % coencide with the Microscopy image direction. Otherwise, if assembled, keep it as it is, since it is already adjusted.
     for i=1:size(filtData,2)
-        tmp_img_0=flip(rot90(filtData(i).Raw_afm_image),2);
-        tmp_img_1=flip(rot90(filtData(i).AFM_image),2);
+        if ~strcmp(typeProcess,'Assembled')
+            tmp_img_0=flip(rot90(filtData(i).Raw_afm_image),2);
+            tmp_img_1=flip(rot90(filtData(i).AFM_image),2);            
+        else
+            tmp_img_0=filtData(i).Raw_afm_image;
+            tmp_img_1=filtData(i).AFM_image;
+        end
         AFM_Images(i)=struct(...
-                'Channel_name', filtData(i).Channel_name,...
-                'Trace_type', filtData(i).Trace_type, ...
-                'AFM_images_0_raw', tmp_img_0, ...
-                'AFM_images_1_original', tmp_img_1);
+                    'Channel_name', filtData(i).Channel_name,...
+                    'Trace_type', filtData(i).Trace_type, ...
+                    'AFM_images_0_raw', tmp_img_0, ...
+                    'AFM_images_1_original', tmp_img_1);
     end        
     % show the data prior the height processing
     A1_feature_CleanOrPrepFiguresRawData(AFM_Images,'idxMon',idxMon,'folderSaveFig',SaveFigFolder,'metadata',metadata,'imageType',typeProcess,'SeeMe',SeeMe,'Normalization',norm);
@@ -352,7 +358,7 @@ function varargout=A2_feature_1_processHeightChannel(filtData,idxMon,SaveFigFold
         % background from foreground, therefore a better plane-baseline fitting can be made, thus a more accurate AFM height image 
         % can be obtained directly from original AFM height image
         heightRaw_masked=height_1_original;
-        heightRaw_masked(AFM_height_IO==1)=NaN;
+        heightRaw_masked(AFM_height_IO_corr==1)=NaN;
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%% FORTH FITTING: FIRST ORDER PLANE FITTING ON MASKED DATA %%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -617,8 +623,10 @@ function [data_butterworthFiltered] = butterworthFiltering(data,idxMon)
         data_butterworthFiltered(data_butterworthFiltered > background_th*1e-9) = NaN; 
         % Update ONLY the image, keep everything else
         currImg.CData = data_butterworthFiltered*1e9;
-        choice=questdlg('Keep the current threshold or manually change by clicking on the histogram?', 'Manual Selection', 'Keep Current','Manual Selection','Keep Current');        
-        if strcmp(choice,'Manual Selection')
+        question='Keep the current result or manually change the global threshold by clicking on the histogram?';
+        options={'Keep Current','Manual Selection'};
+        choice=getValidAnswer(question,'',options);        
+        if choice==2
             closest_indices=selectRangeGInput(1,1,axHist);
             background_th=E_height(closest_indices);
             th_Y=Y_filtered(closest_indices);
