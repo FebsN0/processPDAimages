@@ -1,4 +1,8 @@
 function varargout=A2_processAFMdata(allData,otherParameters,mainPath,SaveFigFolder,idxMon,varargin)
+    % suppress some annoying warnings
+    warning('off','MATLAB:polyfit:RepeatedPointsOrRescale');
+    warning('off','curvefit:fit:IterationLimitReached');            
+    warning('off','stats:statrobustfit:IterationLimit');
 
     p=inputParser(); 
     argName = 'SeeMe';          defaultVal = true;              addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
@@ -14,9 +18,13 @@ function varargout=A2_processAFMdata(allData,otherParameters,mainPath,SaveFigFol
     % QUESTION process single sections then assembly or assembly then
     % process? ASK only if the function is running with HOVER MODE ON. In
     % case of HOVER MODE OFF (friction), skip it because it will 
-    
+    if getValidAnswer("What type of Hover Mode has been made the data to process?","",{"Hover Mode ON","Hover Mode OFF"})==1
+        HVmode="HoverMode_ON";
+    else
+        HVmode="HoverMode_OFF";
+    end
     if numFiles>1
-        typeProcessChoice=askTypeProcess(mainPath,SaveFigFolder);
+        typeProcessChoice=askTypeProcess(mainPath,SaveFigFolder,HVmode);
         flag_processSingleSection=typeProcessChoice.flag;
         if flag_processSingleSection
             % main directory where there are the results of the sections
@@ -91,10 +99,11 @@ function varargout=A2_processAFMdata(allData,otherParameters,mainPath,SaveFigFol
                 %%%%%%%% PROCESS LATERAL DEFLECTION CHANNEL (in case of HOVER MODE ON DATA) %%%%%%%%
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%           
                 metaData_AFM=allData(i).metadata; 
-                if ~exist("answSkipLat","var")
-                    question=sprintf("Skip the %d-section LateralProcessing?",i);
-                    options={"Yes. NOTE: Skipped same parts for all other sections ==> Evaluate friction script separately."; ...
-                             "No. Continue with the Lateral PostProcessing assuming to know ho to manage the friction part."};
+                if ~exist("answSkipLat","var") && exist(fullfile(mainPath,"HoverMode_OFF"),"dir")
+                    question=sprintf("Found HVoff for the same current section. Skip the Lateral Image Processing of %d-th section?",i);
+                    options={"Yes. Continue the Height Image Processing of all other sections first,\n" + ...
+                        "so the friction coefficient can be extracted separately by using same masks for HVoff."; ...
+                             "No. Continue with the Lateral Image Processing."};
                     answSkipLat=getValidAnswer(question,'',options);
                 end
                 if answSkipLat==1
@@ -119,22 +128,26 @@ function varargout=A2_processAFMdata(allData,otherParameters,mainPath,SaveFigFol
                 end
                 close all            
             end
-        end
-        if answSkipLat == 1
-            uiwait(warndlg("The HeightChannel processing of every section has terminated. Continue with Friction Calculation script for the same scan"))
-            A0_main_friction(mainPath,idxMon)
-            uiwait(warndlg("Friction main code completed. One ore more friction coefficients are ready to be used. Restart A0_main.m code and reply 'No' in the skipping lateral postprocessing"))
-            error("Current running Code ends here! Restart A0_main.m")
+        
+            if answSkipLat == 1
+                uiwait(warndlg("The HeightChannel processing of every section has terminated. Continue with Friction Calculation script for the same scan"))
+                A0_main_friction(mainPath,idxMon,2)
+                uiwait(warndlg("Friction main code completed. One ore more friction coefficients are ready to be used. Restart A0_main.m code and reply 'No' in the skipping lateral postprocessing"))
+                error("Current running Code ends here! Restart A0_main.m")
+            end            
         end
         % ASSEMBLY!
-        [AFM_images,AFM_height_IO,metaData] = A2_feature_sortAndAssemblySections(allData,otherParameters,flag_processSingleSection);  
-    
+        [AFM_images_assembled,metaData] = A2_feature_sortAndAssemblySections(allData,otherParameters,flag_processSingleSection,modeScan);             
         % in case of no single section processing, now process the assembled image
         if ~flag_processSingleSection
-            [AFM_images_postHeight,AFM_height_IO]=A2_feature_1_processHeightChannel(AFM_images,idxMon,SaveFigFolder,'SeeMe',SeeMe,'Normalization',norm, ...
+            [AFM_images_postHeight,AFM_height_IO]=A2_feature_1_processHeightChannel(AFM_images_assembled,idxMon,SaveFigFolder,'SeeMe',SeeMe,'Normalization',norm, ...
                 'imageType','Assembled','metadata',metaData);
-            AFM_images_final=A2_feature_2_processLateralChannel(AFM_images_postHeight,AFM_height_IO,metaData_AFM.Alpha,idxMon,SaveFigFolder,mainPath, ...
-                'FitOrder',accuracy,'SeeMe',SeeMe,'Normalization',norm);        
+            if strcmp(modeScan,'normalScan')
+                AFM_images_final=A2_feature_2_processLateralChannel(AFM_images_postHeight,AFM_height_IO,metaData_AFM.Alpha,idxMon,SaveFigFolder,mainPath, ...
+                    'FitOrder',accuracy,'SeeMe',SeeMe,'Normalization',norm);  
+            else
+                AFM_images_final=AFM_images_postHeight;
+            end
         else
             % show and save figures post assembly BEFORE processing in case of singleSection processing.
             % In case of processing after assembling, it will be done already inside A2_feature_1_processHeightChannel
@@ -147,6 +160,7 @@ function varargout=A2_processAFMdata(allData,otherParameters,mainPath,SaveFigFol
         A1_feature_CleanOrPrepFiguresRawData(AFM_images_final,'AFM_IO',AFM_height_IO,'metadata',metaData, ...
             'idxMon',idxMon,'folderSaveFig',SaveFigFolder,'SeeMe',false, ...
             'imageType','Assembled','Normalization',norm,'postProcessed',true)
+        save(fullfile(SaveFigFolder,"data_postProcessedpostAssembled"),"AFM_images_final","AFM_height_IO","metaData") 
     else
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%%%%%%% HEIGHT PROCESSING %%%%%%%%%
@@ -171,10 +185,14 @@ function varargout=A2_processAFMdata(allData,otherParameters,mainPath,SaveFigFol
         % continue lateral processing
  
     end
-    
+    % return outputs
     varargout{1}=AFM_images_final;
     varargout{2}=AFM_height_IO;
     varargout{3}=metaData;
+    % reactivate the annoying warnings
+    warning('on','MATLAB:polyfit:RepeatedPointsOrRescale');
+    warning('on','curvefit:fit:IterationLimitReached');            
+    warning('on','stats:statrobustfit:IterationLimit');
 end      
     
 %%%%%%%%%%%%%%%%%%%%%%%%%
@@ -183,7 +201,8 @@ end
 
 function typeProcessChoice=askTypeProcess(varargin)    
     mainPath=varargin{1};
-    startPathResults=fullfile(mainPath,"HoverMode_ON","Results singleSectionProcessing");
+    HVmode=varargin{3};
+    startPathResults=fullfile(mainPath,HVmode,"Results singleSectionProcessing");
     flag_processSingleSection=true;    
     % if exist, dont ask and start automatically section processing
     if ~exist(startPathResults,"dir")
