@@ -58,7 +58,7 @@
 % %%% REQUIRED PACKAGES %%%
 % %%%%%%%%%%%%%%%%%%%%%%%%%
 % - Image Processing Toolbox, polyfitn, Xcorr2_fft, settingsdlg:      from "Get More Apps" box as toolbox 
-% - Bio-Formats :   from https://www.openmicroscopy.org/bio-formats/downloads/  (MATLAB icon)
+% - Bio-Formats (bfmatlab) :   from https://www.openmicroscopy.org/bio-formats/downloads/  (MATLAB icon)
 %                       NOTE: move the package into <DISK>:\Users\<name-user>\Documents\MATLAB\Third-part Toolbox.
 %                       If the folder doesn’t exist, create it. Save any plugin and extension in this directory.
 %                       IMPORTANT: add such directory in the MATLAB path by using pathtool
@@ -75,11 +75,6 @@ end
 clear vers pv* pe
 idxMon=objInSecondMonitor;
 pause(1)
-
-% suppress some warnings
-id = 'curvefit:fit:IterationLimitReached';
-orig = warning('off', id);            % disable that warning id
-
 
 mainPath=uigetdir(pwd,sprintf('Locate the main scan directory which contains both HVon and HVoff directories'));
 tmp=strsplit(mainPath,'\');
@@ -106,7 +101,6 @@ if step2Start<1
     [allData,otherParameters,SaveFigFolder]=A1_openANDprepareAFMdata('filePath',fullfile(mainPath,'HoverMode_ON'));
     save(fullfile(SaveFigFolder,'resultsData_1_extractAFMdata'),"allData","otherParameters","SaveFigFolder")
 end
-%%
 if step2Start<2  
     [dataAFM_latDeflecFitted, AFM_height_IO, metaData_AFM]= A2_processAFMdata(allData,otherParameters,mainPath,SaveFigFolder,idxMon);     
     clear BW maskedImage accuracy 
