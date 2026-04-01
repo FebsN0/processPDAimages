@@ -85,12 +85,16 @@ function varargout=A3_prepareBFandTRITICimages(folderResultsImg,idxMon,groupExpe
         end
         save(fullfile(filePathND2,"BFdata"),"metadata","BF_ImagePRE","BF_ImagePOST","flag_PRE_POST","fileList")
     end
+    clear patternBF beforeFiles fileBF filenameND2 fullfilePath afterFiles idxBFmode idxBF matches metaData_BF titleImage
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%% EXTRACT TRITIC IMAGES %%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
-    clear patternBF beforeFiles fileBF filenameND2 fullfilePath afterFiles idxBFmode idxBF matches metaData_BF titleImage
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
     if exist(fullfile(filePathND2,"TRITICdata.mat"),"file")
-        load(fullfile(filePathND2,"TRITICdata.mat"),"metadata","TRITIC_ImagePRE","TRITIC_ImagePOST")            
+        if postHeat
+            load(fullfile(filePathND2,"TRITICdata.mat"),"metadata","allImage_TRITIC")   
+        else
+            load(fullfile(filePathND2,"TRITICdata.mat"),"metadata","TRITIC_ImagePRE","TRITIC_ImagePOST")            
+        end
     else 
         flagSubfolders=false;
         allFiles=dir(fullfile(filePathND2));
@@ -127,25 +131,26 @@ function varargout=A3_prepareBFandTRITICimages(folderResultsImg,idxMon,groupExpe
             error('This error occurs when the file .nd2 does not containt time exposure in the filename. part has not prepared. Modify in a second moment. Contact the coder if you have issues.')
         end
         time_th=1;
+        % in case of postHeat=true, then extract TRITIC of each nd2 file in function of available exposure time
         while true
             if postHeat
                 timeExp=timeList{time_th};
             end
             % select the files with the choosen time exposure
             matchingFiles = {fileList(contains({fileList.name}, [timeExp, 'ms'])).name};
-            % auto selection
+            % auto selection. put into cell array
             beforeFiles = matchingFiles(contains(matchingFiles, {'pre','before'}, 'IgnoreCase', true));
             afterFiles = matchingFiles(contains(matchingFiles, {'post', 'after'}, 'IgnoreCase', true));        
             % in case of normal processing, TRITIC after and before AFM scan is mandatory. So, further check. If not found, return error
             if ~postHeat && (isempty(beforeFiles) || isempty(afterFiles))
                 error('Issues in finding the files. Check the filenames naming. Must be in the format TRITIC<pre/before/after/post>_<number>ms..');  
-            % in case there are multiple file with same timeExp ==> for example, because of different Gain all saved in the same directory
-            elseif length(beforeFiles)~=1 || length(afterFiles)~=1
+            % in case there are multiple file with same timeExp ==> for example, because of different Gain all saved in the same directory. Otherwise
+            % pick all of them for further analysis
+            elseif ~postHeat && (length(beforeFiles)~=1 || length(afterFiles)~=1)
                  selectedOptions = selectOptionsDialog("Multiple file with same timeExp. Which select?",false,beforeFiles,afterFiles);
+                 % cell array into string
                  beforeFiles=beforeFiles{selectedOptions{1}};
-                 if ~postHeat
-                    afterFiles=afterFiles{selectedOptions{2}};
-                 end
+                 afterFiles=afterFiles{selectedOptions{2}};
             end
             % extract the TRITIC data. Note: the two figures that will be saved
             % are scaled differently, so the direct comparison on the images is
@@ -168,9 +173,20 @@ function varargout=A3_prepareBFandTRITICimages(folderResultsImg,idxMon,groupExpe
             filenameND2='resultA3_2_1_TRITIC_Before_Stimulation';
             % since there may lot of TRITIC images at different exp time, save memory and data processing time
             if postHeat
-                [TRITIC_ImagePRE,metaData_TRITIC]=selectND2file('fullfilePath',beforeFiles,'saveFig',false);     
-                TRITIC_ImagePOST=[];
+                for i=1:length(beforeFiles)
+                    % each column represent different condition at the same exposure time, usually different gain
+                    [TRITIC_ImagePRE,metaData_TRITIC]=selectND2file('fullfilePath',beforeFiles{i},'saveFig',false);     
+                    allMetadata_TRITIC{time_th,i}=metaData_TRITIC;
+                    allImage_TRITIC{time_th,i}=TRITIC_ImagePRE;
+                end             
+                time_th=time_th+1;
+                if time_th>length(allImage_TRITIC)
+                    metadata.TRITIC=allMetadata_TRITIC;
+                    save(fullfile(filePathND2,"TRITICdata"),"metadata","allImage_TRITIC",'-v7.3')
+                    break
+                end
             else
+                % in case of normal scan, a specific exposure time and gain have been selected, therefore there will be just one TRITICpost and one TRITICpre
                 [TRITIC_ImagePRE,metaData_TRITIC]=selectND2file('fullfilePath',beforeFiles,...
                         'folderResultsImg',folderResultsImg,'filenameND2',filenameND2,'idxMon',idxMon, ...
                         'titleImage',titleImagePRE,'typeImage','TRITIC');
@@ -178,26 +194,14 @@ function varargout=A3_prepareBFandTRITICimages(folderResultsImg,idxMon,groupExpe
                 TRITIC_ImagePOST=selectND2file('fullfilePath',afterFiles,...
                         'folderResultsImg',folderResultsImg,'filenameND2',filenameND2,'idxMon',idxMon, ...
                         'titleImage',titleImagePOST,'typeImage','TRITIC','mode','After');
-            end        
-            % in case of postHeat, repeat the TRITIC image extraction at the next timeExp. Otherwise, store in cell array all the results of
-            % each TRITIC image and metadata
-            if ~postHeat
                 metadata.TRITIC=metaData_TRITIC;
+                save(fullfile(filePathND2,"TRITICdata"),"metadata","TRITIC_ImagePRE","TRITIC_ImagePOST")
                 break
-            else
-                allMetadata_TRITIC{time_th}=metaData_TRITIC;
-                allImage_TRITIC{time_th}=TRITIC_ImagePRE;
-                time_th=time_th+1;
-                if time_th>length(allImage_TRITIC)
-                    metadata.TRITIC=allMetadata_TRITIC;
-                    break
-                end
-            end
+            end        
         end
-        save(fullfile(filePathND2,"TRITICdata"),"metadata","TRITIC_ImagePRE","TRITIC_ImagePOST")
     end
     if ~postHeat
-        % original images are not aligned
+        % original images are not aligned. This part is only for AFM normal scans
         showAlignOriginalImages(BF_ImagePRE,TRITIC_ImagePRE,folderResultsImg,'BF preAFM and TRITIC preAFM','resultA3_4_BFpre_TRITICpre',idxMon)    
         if flag_PRE_POST
             showAlignOriginalImages(BF_ImagePOST,TRITIC_ImagePOST,folderResultsImg,'BF postAFM and TRITIC postAFM','resultA3_5_BFpost_TRITICpost',idxMon)
@@ -211,117 +215,116 @@ function varargout=A3_prepareBFandTRITICimages(folderResultsImg,idxMon,groupExpe
             save(fullfile(folderResultsImg,"TMP_BF_TRITIC_rawFiles.mat"),"flag_PRE_POST","filePathND2","BF_ImagePRE","TRITIC_ImagePRE","TRITIC_ImagePOST","metadata","timeExp")
         end
     end
-    
-
-
-
-
-
-    
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%% ALIGN BF-TRITIC IMAGES PRE AND POST AFM %%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % if there are BFpre and BFpost, alignment on these two only. Otherwise
-    % keep the original method (i.e. two separate alignments) 
-    %       TRITIC_After WITH TRITIC_Before
-    %       BF with TRITIC_Before
-    
-    flagRepeatAlignWithTRITIC=true;
-    if flag_PRE_POST
-        % align BF_post to BF_pre. Then shift TRITIC_post with the obtained
-        % offset. Required BF_ImagePRE_adjusted because of cutting borders
-        % of BF_ImagePOST_aligned for alignment
-        [BF_ImagePOST_aligned,BF_ImagePRE_aligned,offset]=A3_feature_BF_TRITIC_imageAlignment(BF_ImagePOST,BF_ImagePRE,idxMon,'Brightfield','Yes');
-        % fix TRITIC pre to BF pre
-        TRITIC_ImagePRE_aligned=fixSize(TRITIC_ImagePRE,offset);
-        TRITIC_ImagePOST_aligned=fixSize(TRITIC_ImagePOST,-offset);   % minus because post images was fixed during alignment with pre image
-        if any(size(TRITIC_ImagePOST_aligned)~=size(BF_ImagePOST_aligned))
-            uiwait(msgbox('Something wrong in the correction matrix of TRITICpost because its matrix size is not the same as BFpost. Repeat the alignment using TRITICpre and TRITICpost','Warning','warn'));
-        elseif getValidAnswer(sprintf('Is the registration of TRITICpre and TRITICpost postAlign ok?'),'',{'Yes','No'})
-            close gcf
-            flagRepeatAlignWithTRITIC=false;        
+    clear fileList
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%% ALIGN BF-TRITIC IMAGES PRE AND POST AFM (for normal AFM scans) %%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    if ~postHeat
+        % if there are BFpre and BFpost, alignment on these two only. Otherwise
+        % keep the original method (i.e. two separate alignments) 
+        %       TRITIC_After WITH TRITIC_Before
+        %       BF with TRITIC_Before
+        if flag_PRE_POST
+            flagRepeatAlignWithTRITIC=true;
+            % align BF_post to BF_pre. Then shift TRITIC_post with the obtained
+            % offset. Required BF_ImagePRE_adjusted because of cutting borders
+            % of BF_ImagePOST_aligned for alignment
+            [BF_ImagePOST_aligned,BF_ImagePRE_aligned,offset]=A3_feature_BF_TRITIC_imageAlignment(BF_ImagePOST,BF_ImagePRE,idxMon,'Brightfield','Yes');
+            % fix TRITIC pre to BF pre
+            TRITIC_ImagePRE_aligned=fixSize(TRITIC_ImagePRE,offset);
+            TRITIC_ImagePOST_aligned=fixSize(TRITIC_ImagePOST,-offset);   % minus because post images was fixed during alignment with pre image
+            if any(size(TRITIC_ImagePOST_aligned)~=size(BF_ImagePOST_aligned))
+                uiwait(msgbox('Something wrong in the correction matrix of TRITICpost because its matrix size is not the same as BFpost. Repeat the alignment using TRITICpre and TRITICpost','Warning','warn'));
+            elseif getValidAnswer(sprintf('Is the registration of TRITICpre and TRITICpost postAlign ok?'),'',{'Yes','No'})
+                close gcf
+                flagRepeatAlignWithTRITIC=false;        
+            end
         end
-    end
-    if ~flag_PRE_POST && flagRepeatAlignWithTRITIC
-        % Align the fluorescent images After with the BEFORE stimulation
-        [TRITIC_ImagePOST_aligned,TRITIC_ImagePRE_aligned,offset]=A3_feature_BF_TRITIC_imageAlignment(TRITIC_ImagePOST,TRITIC_ImagePRE,idxMon);        
-        BF_ImagePRE_aligned=fixSize(BF_ImagePRE,offset);
-    end
+        if ~flag_PRE_POST && flagRepeatAlignWithTRITIC
+            % Align the fluorescent images After with the BEFORE stimulation
+            [TRITIC_ImagePOST_aligned,TRITIC_ImagePRE_aligned,offset]=A3_feature_BF_TRITIC_imageAlignment(TRITIC_ImagePOST,TRITIC_ImagePRE,idxMon);        
+            BF_ImagePRE_aligned=fixSize(BF_ImagePRE,offset);
+        end
+        % END ALIGNMENT!
+        if flag_PRE_POST
+            showAlignOriginalImages(BF_ImagePRE_aligned,BF_ImagePOST_aligned,folderResultsImg,'BF preAFM and BF postAFM - Aligned','resultA3_6_2_BF_prePost_Aligned',idxMon)            
+        end
+        showAlignOriginalImages(TRITIC_ImagePRE_aligned,TRITIC_ImagePOST_aligned,folderResultsImg,'TRITIC preAFM and TRITIC postAFM - Aligned','resultA3_7_2_TRITIC_prePost_Aligned',idxMon)
 
-    % END ALIGNMENT!
-    if flag_PRE_POST
-        showAlignOriginalImages(BF_ImagePRE_aligned,BF_ImagePOST_aligned,folderResultsImg,'BF preAFM and BF postAFM - Aligned','resultA3_6_2_BF_prePost_Aligned',idxMon)            
-    end
-    showAlignOriginalImages(TRITIC_ImagePRE_aligned,TRITIC_ImagePOST_aligned,folderResultsImg,'TRITIC preAFM and TRITIC postAFM - Aligned','resultA3_7_2_TRITIC_prePost_Aligned',idxMon)
+        % SHOW FLUORESCENCE DISTRIBUTION OF TRITIC BEFORE AND AFTER. ONLY FOR NORMAL AFM SCANS
+        fDist=figure("Visible","off");
+        legend('FontSize',15), grid on, grid minor
+        xlabel('TRITIC (absolute fluorescence)','FontSize',15)
+        ylabel('PDF','FontSize',15)
+        title("Distribution TRITIC values","FontSize",20)
+        subtitle(sprintf("(Data shown is within 1e^-^4° - 98° percentile of the entire data)"),"FontSize",15)
+        objInSecondMonitor(fDist,idxMon);                
+        hold on
+        % prepare the data
+        vectPRE=TRITIC_ImagePRE_aligned(:); 
+        vectPOST=TRITIC_ImagePOST_aligned(:);
+        % prepare histogram. round not work to excess but to nearest.
+        xmin=floor(min(min(vectPRE),min(vectPOST)) * 1000) / 1000;
+        xmax=ceil(max(max(vectPRE),max(vectPOST)) * 1000) / 1000;
+        edges=linspace(xmin,xmax,5000);
+        histogram(vectPRE,'BinEdges',edges,"DisplayName","TRITIC preAFM","Normalization","pdf",'FaceAlpha',0.5,"FaceColor",globalColor(1))
+        histogram(vectPOST,'BinEdges',edges,"DisplayName","TRITIC postAFM","Normalization","pdf",'FaceAlpha',0.5,"FaceColor",globalColor(2))
+        xline(prctile(vectPRE,90),'--','LineWidth',2,'DisplayName','90° percentile TRITIC preAFM','Color',globalColor(1));
+        xline(prctile(vectPOST,90),'--','LineWidth',2,'DisplayName','90° percentile TRITIC postAFM','Color',globalColor(2));
+        % better show
+        allData = [vectPRE; vectPOST];
+        pLow = prctile(allData, 0.0001);
+        pHigh = prctile(allData, 98);
+        xlim([pLow, pHigh]); ylim tight
+        clear allData pLow pHigh
+        % save distribution and singleLine
+        nameResults='resultA3_8_DistributionTRITIC_PRE_POST';
+        saveFigures_FigAndTiff(fDist,folderResultsImg,nameResults)
     
-    % SHOW FLUORESCENCE DISTRIBUTION OF TRITIC BEFORE AND AFTER
-    fDist=figure("Visible","off");
-    legend('FontSize',15), grid on, grid minor
-    xlabel('TRITIC (absolute fluorescence)','FontSize',15)
-    ylabel('PDF','FontSize',15)
-    title("Distribution TRITIC values","FontSize",20)
-    subtitle(sprintf("(Data shown is within 1e^-^4° - 98° percentile of the entire data)"),"FontSize",15)
-    objInSecondMonitor(fDist,idxMon);                
-    hold on
-    % prepare the data
-    vectPRE=TRITIC_ImagePRE_aligned(:); 
-    vectPOST=TRITIC_ImagePOST_aligned(:);
-    % prepare histogram. round not work to excess but to nearest.
-    xmin=floor(min(min(vectPRE),min(vectPOST)) * 1000) / 1000;
-    xmax=ceil(max(max(vectPRE),max(vectPOST)) * 1000) / 1000;
-    edges=linspace(xmin,xmax,5000);
-    histogram(vectPRE,'BinEdges',edges,"DisplayName","TRITIC preAFM","Normalization","pdf",'FaceAlpha',0.5,"FaceColor",globalColor(1))
-    histogram(vectPOST,'BinEdges',edges,"DisplayName","TRITIC postAFM","Normalization","pdf",'FaceAlpha',0.5,"FaceColor",globalColor(2))
-    xline(prctile(vectPRE,90),'--','LineWidth',2,'DisplayName','90° percentile TRITIC preAFM','Color',globalColor(1));
-    xline(prctile(vectPOST,90),'--','LineWidth',2,'DisplayName','90° percentile TRITIC postAFM','Color',globalColor(2));
-    % better show
-    allData = [vectPRE; vectPOST];
-    pLow = prctile(allData, 0.0001);
-    pHigh = prctile(allData, 98);
-    xlim([pLow, pHigh]); ylim tight
-    clear allData pLow pHigh
-    % save distribution and singleLine
-    nameResults='resultA3_8_DistributionTRITIC_PRE_POST';
-    saveFigures_FigAndTiff(fDist,folderResultsImg,nameResults)
-
-    % SHOW DELTA DISTRIBUTION
-    fDistDelta=figure('Visible','off');   
-    xlabel('Delta Fluorescence','FontSize',15), ylabel("PDF",'FontSize',15)
-    Delta=TRITIC_ImagePOST_aligned-TRITIC_ImagePRE_aligned;
-    vectDelta=Delta(:);       
-    xmin=floor(min(vectDelta)*1000)/1000;
-    xmax=ceil(max(vectDelta)*1000)/1000;
-    edges=linspace(xmin,xmax,500);
-    histogram(vectDelta,edges,'Normalization','pdf')
-    grid on, grid minor
-    pHigh=prctile(vectDelta(:),99); pLow=min(prctile(vectDelta,1e-4));
-    x1=round(pLow,2,TieBreaker="minusinf");
-    x2=round(pHigh,2,TieBreaker="plusinf");
-    xlim([x1 x2]), ylim tight
-    title(sprintf("Distribution Delta"),"FontSize",20)
-    subtitle(sprintf("(Data shown is within 1e^-^4° - 98° percentile of the entire data)"),"FontSize",15)
-    objInSecondMonitor(fDistDelta,idxMon);
-    nameFig='resultA3_9_DistributionDelta';
-    saveFigures_FigAndTiff(fDistDelta,folderResultsImg,nameFig)
-    % SHOW DELTA FIGURE
-    titleTxt="Delta Fluorescence";
-    nameFile='resultA3_2_3_DeltaFluorescence';
-    size_meterXpix=metadata.TRITIC.ImageHeight_umeterXpixel*metadata.TRITIC.pixelSizeUnit;
-    showData(idxMon,false,imadjust(Delta),sprintf("%s - imadjusted",titleTxt),folderResultsImg,nameFile,'lenghtAxis',size_meterXpix*size(Delta))  
-
+        % SHOW DELTA DISTRIBUTION
+        fDistDelta=figure('Visible','off');   
+        xlabel('Delta Fluorescence','FontSize',15), ylabel("PDF",'FontSize',15)
+        Delta=TRITIC_ImagePOST_aligned-TRITIC_ImagePRE_aligned;
+        vectDelta=Delta(:);       
+        xmin=floor(min(vectDelta)*1000)/1000;
+        xmax=ceil(max(vectDelta)*1000)/1000;
+        edges=linspace(xmin,xmax,500);
+        histogram(vectDelta,edges,'Normalization','pdf')
+        grid on, grid minor
+        pHigh=prctile(vectDelta(:),99); pLow=min(prctile(vectDelta,1e-4));
+        x1=round(pLow,2,TieBreaker="minusinf");
+        x2=round(pHigh,2,TieBreaker="plusinf");
+        xlim([x1 x2]), ylim tight
+        title(sprintf("Distribution Delta"),"FontSize",20)
+        subtitle(sprintf("(Data shown is within 1e^-^4° - 98° percentile of the entire data)"),"FontSize",15)
+        objInSecondMonitor(fDistDelta,idxMon);
+        nameFig='resultA3_9_DistributionDelta';
+        saveFigures_FigAndTiff(fDistDelta,folderResultsImg,nameFig)
+        % SHOW DELTA FIGURE
+        titleTxt="Delta Fluorescence";
+        nameFile='resultA3_2_3_DeltaFluorescence';
+        size_meterXpix=metadata.TRITIC.ImageHeight_umeterXpixel*metadata.TRITIC.pixelSizeUnit;
+        showData(idxMon,false,imadjust(Delta),sprintf("%s - imadjusted",titleTxt),folderResultsImg,nameFile,'lenghtAxis',size_meterXpix*size(Delta))  
+    end
     % prepare the output data
     [mainPathOpticalData,~]=fileparts(fileparts(fileparts(filePathND2)));
-    varargout{1}=metadata;      varargout{2}=mainPathOpticalData;       varargout{3}=timeExp;
-    % put BF and TRITIC data in struct
-    data_TRITIC.PRE=TRITIC_ImagePRE_aligned;        data_TRITIC.POST=TRITIC_ImagePOST_aligned;    
-    data_BF.PRE=BF_ImagePRE_aligned;    
-    if flag_PRE_POST
-        data_BF.POST=BF_ImagePOST_aligned;
+    varargout{1}=metadata;      varargout{2}=mainPathOpticalData;      
+    if ~postHeat
+        varargout{3}=timeExp;
+        % put BF and TRITIC data in struct
+        data_TRITIC.PRE=TRITIC_ImagePRE_aligned;        data_TRITIC.POST=TRITIC_ImagePOST_aligned;    
+        data_BF.PRE=BF_ImagePRE_aligned;    
+        if flag_PRE_POST
+            data_BF.POST=BF_ImagePOST_aligned;
+        end
+        varargout{4}=data_TRITIC;
+        varargout{5}=data_BF;
+        % delete TMP file after completed alignment
+        delete(fullfile(folderResultsImg,"TMP_BF_TRITIC_rawFiles.mat"),"file")
+    else
+        varargout{3}=allImage_TRITIC;
+        varargout{4}=BF_ImagePRE;
     end
-    varargout{4}=data_TRITIC;
-    varargout{5}=data_BF;
-    % delete TMP file after completed alignment
-    delete(fullfile(folderResultsImg,"TMP_BF_TRITIC_rawFiles.mat"),"file")
 end
 
 
