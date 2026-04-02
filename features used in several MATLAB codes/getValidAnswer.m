@@ -158,8 +158,6 @@ function user_choice = getValidAnswer(question, titleStr, options, default_choic
             end
         end
     end
-
-  
     drawnow;
     uiwait(f);
 

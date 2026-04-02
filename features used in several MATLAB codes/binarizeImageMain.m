@@ -72,7 +72,7 @@ function mod=extractBinarizationPYmodule()
     % return to original position
     cd(originalPos)  
 end
-function [IO_Image,binarizationMethod]=binarization_withPythonModules(idxMon,image)    
+function [IO_Image,binarizationMethod]=binarization_withPythonModules(image,idxMon)    
     modulePython=extractBinarizationPYmodule();
     % show height image for help
     titletext='Image - original';
@@ -89,6 +89,7 @@ function [IO_Image,binarizationMethod]=binarization_withPythonModules(idxMon,ima
         figPy{i}=figure; imagesc(BW), axis equal, xlim tight, title(sprintf("METHOD BINARIZATION: %s",method),"Fontsize",16)
         BW_allMethods{i}=BW;
     end
+    pause(3)
     choice=getValidAnswer('Which Binarization method do you choose?',"",options);
     IO_Image=BW_allMethods{choice};
     binarizationMethod=sprintf("Python Binarization Method %s",options{choice});

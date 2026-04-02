@@ -18,7 +18,7 @@ function [outputme] = A6_feature_corrForceFluorescence(X_Data,Y_Data,idxMon,newF
     argName = 'MarkerType';     defaultVal = 'o';                                       addParameter(p,argName,defaultVal);
     argName = 'MarkerColor';    defaultVal = 'k';                                       addParameter(p,argName,defaultVal);
     argName = 'NumFig';         defaultVal = '';                                        addParameter(p,argName,defaultVal);
-
+    argName = 'flagHeat';       defaultVal = false;                                     addParameter(p,argName,defaultVal, @(x) islogical(x));
     parse(p,varargin{:});
     % clean NaN
     x_clean=X_Data(~isnan(X_Data));
@@ -37,8 +37,7 @@ function [outputme] = A6_feature_corrForceFluorescence(X_Data,Y_Data,idxMon,newF
         if setpointN(1)>setpointN(end)
             setpointN=flip(setpointN);
             DataOI=flip(DataOI);
-        end
- 
+        end 
         x_bin_start=zeros(length(setpointN)+1,1);
         % first and last bin will include the first and last values instead of removing them
         x_bin_start(1)= min(DataOI(:,1));
@@ -88,38 +87,41 @@ function [outputme] = A6_feature_corrForceFluorescence(X_Data,Y_Data,idxMon,newF
         clearvars flag_Array a b c BinMean BinSTD BinCenetr_V BinMean_Norm
     end
     
-    x_VDH_B=NaN(1,size(outputme,2));
-    y_VDH_B=NaN(1,size(outputme,2));
-    stde_VDH_B=NaN(1,size(outputme,2));
-    
-    for i=1:size(outputme,2)
-        x_VDH_B(i)=outputme(i).BinCenter*p.Results.xpar;
-        y_VDH_B(i)=outputme(i).MeanBin*p.Results.ypar;
-        stde_VDH_B(i)=outputme(i).STDBin*p.Results.ypar;
+    % save time and memory in case of heatedSample
+    if ~p.Results.flagHeat
+        x_VDH_B=NaN(1,size(outputme,2));
+        y_VDH_B=NaN(1,size(outputme,2));
+        stde_VDH_B=NaN(1,size(outputme,2));
+        
+        for i=1:size(outputme,2)
+            x_VDH_B(i)=outputme(i).BinCenter*p.Results.xpar;
+            y_VDH_B(i)=outputme(i).MeanBin*p.Results.ypar;
+            stde_VDH_B(i)=outputme(i).STDBin*p.Results.ypar;
+        end
+         
+        ftmp=figure('Visible','off'); hold on
+        try
+            errorbar(x_VDH_B,y_VDH_B,stde_VDH_B,'Color',sprintf('%c',p.Results.LineCoulor),'MarkerFaceColor',sprintf('%c',p.Results.MarkerColor),'MarkerEdgeColor',sprintf('%c',p.Results.MarkerColor),'Marker',sprintf('%c',p.Results.MarkerType));
+        catch
+            errorbar(x_VDH_B,y_VDH_B,stde_VDH_B,'ok','MarkerFaceColor',[0 0 0]);
+        end
+        if(~isempty(p.Results.Xlimit))
+            xlim(p.Results.Xlimit)
+        else
+            xlim padded
+        end
+        if(~isempty(p.Results.Ylimit))
+            xlim(p.Results.Ylimit)
+        else
+            ylim padded
+        end    
+        grid on, grid minor
+        xlabel(p.Results.XAxL,'FontSize',15);
+        ylabel(p.Results.YAyL,'FontSize',15);
+        if (~isempty(p.Results.FigTitle))
+            title(p.Results.FigTitle,'FontSize',20);
+        end    
+        objInSecondMonitor(ftmp,idxMon);
+        saveFigures_FigAndTiff(ftmp,newFolder,sprintf('resultEND_%d_%s',p.Results.NumFig,p.Results.FigFilename))
     end
-     
-    ftmp=figure('Visible','off'); hold on
-    try
-        errorbar(x_VDH_B,y_VDH_B,stde_VDH_B,'Color',sprintf('%c',p.Results.LineCoulor),'MarkerFaceColor',sprintf('%c',p.Results.MarkerColor),'MarkerEdgeColor',sprintf('%c',p.Results.MarkerColor),'Marker',sprintf('%c',p.Results.MarkerType));
-    catch
-        errorbar(x_VDH_B,y_VDH_B,stde_VDH_B,'ok','MarkerFaceColor',[0 0 0]);
-    end
-    if(~isempty(p.Results.Xlimit))
-        xlim(p.Results.Xlimit)
-    else
-        xlim padded
-    end
-    if(~isempty(p.Results.Ylimit))
-        xlim(p.Results.Ylimit)
-    else
-        ylim padded
-    end    
-    grid on, grid minor
-    xlabel(p.Results.XAxL,'FontSize',15);
-    ylabel(p.Results.YAyL,'FontSize',15);
-    if (~isempty(p.Results.FigTitle))
-        title(p.Results.FigTitle,'FontSize',20);
-    end    
-    objInSecondMonitor(ftmp,idxMon);
-    saveFigures_FigAndTiff(ftmp,newFolder,sprintf('resultEND_%d_%s',p.Results.NumFig,p.Results.FigFilename))
 end

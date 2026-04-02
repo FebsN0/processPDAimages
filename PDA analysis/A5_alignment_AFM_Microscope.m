@@ -40,7 +40,7 @@ function [AFM_IO_3_BFaligned,BF_IO_1_cropped,AFM_Elab,info_allignment,offset]=A5
     metaData_AFM.y_scan_length=metaData_AFM.y_scan_length_m*1e6;
     % Optical microscopy and AFM image resolution can be entered here
     if length(metaData_AFM.y_scan_pixels)~=1
-        y_scan_pixelsCorrected=sum(metaData_AFM.y_scan_pixels);
+        y_scan_pixelsCorrected=metaData_AFM.y_scan_pixels(end,end);
     else
         y_scan_pixelsCorrected=metaData_AFM.y_scan_pixels;
     end

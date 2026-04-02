@@ -17,38 +17,51 @@ function idMon=objInSecondMonitor(varargin)
         % since TASKBAR "eats" pixels, consider the effective space
         numScreens = size(screens, 1);
         usable=zeros(numScreens,4);
-        for i=1:numScreens
-            % Create an invisible temporary figure to detect usable area
-            tmp = uifigure('Visible','off','Units','pixels',...
-                         'Position',[screens(i,1)+10 screens(i,2)+10 300 200]);
-            drawnow;
-            % Maximize it
-            set(tmp,'WindowState','maximized');
-            drawnow;
-            usable(i,:) = get(tmp,'Position');  % usable area inside that monitor
+        for i = 1:numScreens
+            % Compute the CENTER of each monitor from MonitorPositions
+            % MonitorPositions: [left, bottom, width, height]  ← in pixel units
+            % For rotated monitors, 'left' can be negative
+            monLeft   = screens(i,1);
+            monBottom = screens(i,2);
+            monW      = screens(i,3);
+            monH      = screens(i,4);
+            
+            % Place the temp figure near the CENTER of the monitor (safer than corner)
+            centerX = monLeft + floor(monW / 2) - 150;   % 300/2 offset
+            centerY = monBottom + floor(monH / 2) - 100;  % 200/2 offset
+            
+            tmp = uifigure('Visible','on', 'Units','pixels', ...
+                           'Position', [centerX, centerY, 300, 200]);
+            set(tmp, 'WindowState', 'maximized');
+            pause(2);   % give Windows time to finish maximizing            
+            usable(i,:) = get(tmp, 'Position');
             delete(tmp);
-        
-            % Extract screen position and size
-            left   = usable(i,1);      bottom = usable(i,2);
-            width  = screens(i,3);   height = screens(i,4);
-            % Define proportional window size (20% of screen size) to identify them
+            drawnow; pause(0.1);
+            
+            % Use USABLE area (post-maximize) for placement
+            left   = usable(i,1);
+            bottom = usable(i,2);
+            width  = usable(i,3);   % <-- usable width, not raw screen width
+            height = usable(i,4);   % <-- usable height
+            
             winWidth  = round(0.4 * width);
-            winHeight = round(0.2 * height);    
-             % Locate the window on the screen at 10% of the left-bottom corner
-            relativeXpositionXCenterScreen= left+width*0.5-winWidth/2 ;
-            relativeYpositionXCenterScreen= bottom+height*0.5-winHeight/2;
-            % Create the small windows and put at the center showing which
-            % monitor they correspond
-            f=uifigure('Name', ['Monitor ' num2str(i)], 'NumberTitle', 'off',...
-                'Position', [relativeXpositionXCenterScreen, relativeYpositionXCenterScreen, winWidth, winHeight],'Visible','on');
+            winHeight = round(0.2 * height);
+            
+            posX = left + (width  - winWidth)  / 2;
+            posY = bottom + (height - winHeight) / 2;
+            
+            f = uifigure('Name', ['Monitor ' num2str(i)], ...
+                         'Position', [posX, posY, winWidth, winHeight], ...
+                         'Visible', 'on');
             gl = uigridlayout(f, [1 1]);
-            uilabel(gl,'Text',  ['This is Monitor ' num2str(i)], ...
-                'FontSize', 25, ...
-                'FontWeight', 'bold', ...
+            uilabel(gl, 'Text', ['This is Monitor ' num2str(i)], ...
+                'FontSize', 25, 'FontWeight', 'bold', ...
                 'HorizontalAlignment', 'center', ...
                 'VerticalAlignment', 'center', ...
-                'WordWrap', 'off'); % no text wrapping    
+                'WordWrap', 'off');
         end
+
+
             % choose where to show figures if there are more monitors
         if numScreens > 1
             question= sprintf('More monitor detected!\nIn which monitor do you want to show the maximized windows with the figures/plots?');

@@ -48,10 +48,16 @@ function selectedOptions = selectOptionsDialog(question,multipleSelection,vararg
         else
             listY = 50;   % same as original code
         end       
-        % Create listbox
+        % Create listbox. But first convert into string if these input are numerical
+        if isnumeric(varargin{i}) 
+            strCell = num2cell(varargin{i});
+            strCell = cellfun(@(x) num2str(x), strCell, 'UniformOutput', false);
+        else
+            strCell=varargin{i};
+        end
         lb(i) = uilistbox(fig, ...
-            'Items', varargin{i}, ...              % displayed text
-            'ItemsData', 1:numel(varargin{i}), ... % underlying numeric value
+            'Items', strCell, ...              % displayed text
+            'ItemsData', 1:numel(strCell), ... % underlying numeric value
             'FontSize',15, ...
             'Position', [startInnerWindow listY 260 330]);
         % multiselect ON only when allowed
