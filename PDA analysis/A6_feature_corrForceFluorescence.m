@@ -88,16 +88,11 @@ function [outputme] = A6_feature_corrForceFluorescence(X_Data,Y_Data,idxMon,newF
     end
     
     % save time and memory in case of heatedSample
-    if ~p.Results.flagHeat
-        x_VDH_B=NaN(1,size(outputme,2));
-        y_VDH_B=NaN(1,size(outputme,2));
-        stde_VDH_B=NaN(1,size(outputme,2));
-        
-        for i=1:size(outputme,2)
-            x_VDH_B(i)=outputme(i).BinCenter*p.Results.xpar;
-            y_VDH_B(i)=outputme(i).MeanBin*p.Results.ypar;
-            stde_VDH_B(i)=outputme(i).STDBin*p.Results.ypar;
-        end
+    if ~p.Results.flagHeat    
+        % extract data
+        x_VDH_B=[outputme.BinCenter]*p.Results.xpar;
+        y_VDH_B=[outputme.MeanBin]*p.Results.ypar;
+        stde_VDH_B=[outputme.STDBin]*p.Results.ypar;
          
         ftmp=figure('Visible','off'); hold on
         try

@@ -4,11 +4,11 @@ function varargout=A3_prepareBFandTRITICimages(folderResultsImg,idxMon,groupExpe
     argName = 'pathOpticalImages';         defaultVal = [];        addOptional(p,argName,defaultVal);
     argName = 'postHeatProcessing';        defaultVal = false;     addOptional(p,argName,defaultVal, @(x) islogical(x));
     parse(p,varargin{:});
-    if isempty(p.Results.pathOpticalImages)
-        text=sprintf("Select the directory having all .nd2 files for EXP %s - %s - SCAN %s",groupExperiment,nameExperiment,nameScan);
+    text=sprintf("Select the directory having all .nd2 files for EXP %s - %s - SCAN %s",groupExperiment,nameExperiment,nameScan);
+    if isempty(p.Results.pathOpticalImages)        
         filePathND2=uigetdir(pwd,text);
     else
-        filePathND2=p.Results.pathOpticalImages;
+        filePathND2=uigetdir(p.Results.pathOpticalImages,text);
     end
     postHeat=p.Results.postHeatProcessing;
     clear argName text defaultVal p varargin
@@ -333,7 +333,7 @@ function [Image,metaData]=selectND2file(varargin)
     p=inputParser();
     argName = 'titleImage';         defaultVal = [];            addOptional(p,argName,defaultVal);    
     argName = 'typeImage';          defaultVal = 'BrightField'; addOptional(p,argName,defaultVal,@(x) ismember(x,{'BrightField','TRITIC'}));  % Brightfield or TRITIC
-    argName = 'mode';               defaultVal = [];      addOptional(p,argName,defaultVal,@(x) ismember(x,{[],' Before',' After'}));  % Before or After
+    argName = 'mode';               defaultVal = [];            addOptional(p,argName,defaultVal,@(x) ismember(x,{[],' Before',' After'}));  % Before or After
     argName = 'fullfilePath';       defaultVal = [];            addOptional(p,argName,defaultVal);
     argName = 'saveFig';            defaultVal = true;          addOptional(p,argName,defaultVal, @(x) islogical(x));
     argName = 'idxMon';             defaultVal = [];            addOptional(p,argName,defaultVal);  

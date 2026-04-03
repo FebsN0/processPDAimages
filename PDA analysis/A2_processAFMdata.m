@@ -160,7 +160,10 @@ function varargout=A2_processAFMdata(allData,otherParameters,mainPath,SaveFigFol
         A1_feature_CleanOrPrepFiguresRawData(AFM_images_final,'AFM_IO',AFM_height_IO,'metadata',metaData, ...
             'idxMon',idxMon,'folderSaveFig',SaveFigFolder,'SeeMe',false, ...
             'imageType','Assembled','Normalization',norm,'postProcessed',true)
-        save(fullfile(SaveFigFolder,"data_postProcessedpostAssembled"),"AFM_images_final","AFM_height_IO","metaData") 
+        % avoid saving because already saving outside this function in A0_main_fluorescence.m
+        if ~strcmp(modeScan,'postHeatScan')
+            save(fullfile(SaveFigFolder,"data_postProcessedpostAssembled"),"AFM_images_final","AFM_height_IO","metaData")
+        end
     else
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%%%%%%% HEIGHT PROCESSING %%%%%%%%%

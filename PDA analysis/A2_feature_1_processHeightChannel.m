@@ -463,6 +463,7 @@ function varargout=A2_feature_1_processHeightChannel(filtData,idxMon,SaveFigFold
             AFM_height_IO=AFM_height_IO_corr;
         end 
     end
+    close all
 end
 
 

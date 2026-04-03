@@ -192,9 +192,9 @@ function dataResultsPlot=A6_correlation_AFM_BF(AFM_data,AFM_IO_Padded,metadataAF
     % show the plots of the masks in case of normal AFM scans
     if ~flag_heat
         showData(idxMon,SeeMe,mask_AFM,{'Original Mask';'Generated from AFM-Height Binarization + modification due to registration'},folderResultsImg,'resultA6_1_1_OriginalMask','binary',true,'lenghtAxis',size_meterXpix*size(mask_first))
-        showData(idxMon,SeeMe,mask_first,{'First Mask';'Delta Adjusted'},folderResultsImg,'resultA6_1_2_FirstMask','binary',true,'lenghtAxis',size_meterXpix*size(mask_first))
-        showData(idxMon,SeeMe,mask_second,{'Second Mask';'Positive values only from each channel'},folderResultsImg,'resultA6_1_3_SecondMask','binary',true,'lenghtAxis',size_meterXpix*size(mask_second))
-        showData(idxMon,SeeMe,mask_third,{'Third Mask';'Height 99° percentile + LD < 2*maxSetP'},folderResultsImg,'resultA6_1_4_ThirdMask','binary',true,'lenghtAxis',size_meterXpix*size(mask_third))   
+        showData(idxMon,SeeMe,mask_first,{'First Mask';'From Delta Positive value only'},folderResultsImg,'resultA6_1_2_FirstMask','binary',true,'lenghtAxis',size_meterXpix*size(mask_first))
+        showData(idxMon,SeeMe,mask_second,{'Second Mask';'From any AFM channel with Positive values'},folderResultsImg,'resultA6_1_3_SecondMask','binary',true,'lenghtAxis',size_meterXpix*size(mask_second))
+        showData(idxMon,SeeMe,mask_third,{'Third Mask';'From AFM Height 99° percentile + AFM Lateral < 2*maxSetP'},folderResultsImg,'resultA6_1_4_ThirdMask','binary',true,'lenghtAxis',size_meterXpix*size(mask_third))   
     end
     clear masking mask_validValues     
     %%%%%%%---------- Finally, applying the mask_definitive to all the data! ----------%%%%%%%
@@ -262,19 +262,20 @@ function dataResultsPlot=A6_correlation_AFM_BF(AFM_data,AFM_IO_Padded,metadataAF
     % Define data for masks
     if flag_heat
         maskFields = {
-            'firstMasking_Delta',                'Delta_firstMasking',              'Delta_firstMasking_norm',                  '1st mask',     '1M';            
+            'firstMasking_Delta',                'Delta_firstMasking',              '1st mask',     '1M';            
         };
     else
         maskFields = {
-            'firstMasking_Delta',                'Delta_firstMasking',              'Delta_firstMasking_norm',                  '1st mask',     '1M';
-            'secondMasking_eachAFM',             'Delta_secondMasking_eachAFM',     'Delta_secondMasking_eachAFM_norm',         '2nd mask',     '2M';
-            'thirdMasking_maxVD_99perc',         'Delta_thirdMasking_99percMaxSet', 'Delta_thirdMasking_99percMaxSet_norm',     '3rd mask',     '3M';
+            'firstMasking_Delta',                'Delta_firstMasking',              '1st mask',     '1M';
+            'secondMasking_eachAFM',             'Delta_secondMasking_eachAFM',     '2nd mask',     '2M';
+            'thirdMasking_maxVD_99perc',         'Delta_thirdMasking_99percMaxSet', '3rd mask',     '3M';
         };
     end
     if ~flag_heat
         % 7 - HEIGHT VS LATERAL FORCE
         tmp=struct();
         for i=1:size(maskFields,1)
+            % use the AFM masked data
             x = AFM_data(idx_H).(maskFields{i,1})(:);
             y = AFM_data(idx_LD).(maskFields{i,1})(:);
             titleP = sprintf('Height VS Lateral Deflection (%s)', maskFields{i,4});
@@ -291,9 +292,9 @@ function dataResultsPlot=A6_correlation_AFM_BF(AFM_data,AFM_IO_Padded,metadataAF
         for i = 1:size(maskFields,1)
             x = AFM_data(idx_H).(maskFields{i,1})(:);
             y1 = DeltaData.(maskFields{i,2})(:); 
-            titleP = sprintf('Height Vs Fluorescence (%s - time exp %s ms)', maskFields{i,4}, timeExp);
-            figName = sprintf('Height_Fluo_%s', maskFields{i,5});
-            tmp.(['Height_FLUO_' maskFields{i,5}]) = A6_feature_corrForceFluorescence(x,y1,idxMon,folderResultsImg,'NumberOfBins',numBins, ...
+            titleP = sprintf('Height Vs Fluorescence (%s - time exp %g ms)', maskFields{i,3}, timeExp);
+            figName = sprintf('Height_Fluo_%s', maskFields{i,4});
+            tmp.(['Height_FLUO_' maskFields{i,4}]) = A6_feature_corrForceFluorescence(x,y1,idxMon,folderResultsImg,'NumberOfBins',numBins, ...
                 'xpar',1e9,'XAxL','Feature height (nm)','ypar',1,'YAyL',labelBar,'FigTitle',titleP,'FigFilename',figName,'NumFig',2,'flagHeat',true);            
         end
         dataResultsPlot.Height_FLUO=tmp;
