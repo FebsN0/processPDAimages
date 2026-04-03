@@ -3,6 +3,11 @@ function [files] = uigetdirMultiSelect(currPath,titleText)
     % SOURCES:
     % 1) https://stackoverflow.com/questions/6349410/using-uigetfile-instead-of-uigetdir-to-get-directories-in-matlab
     % 2) https://www.mathworks.com/matlabcentral/fileexchange/32555-uigetfile_n_dir-select-multiple-files-and-directories
+    % INPUT:
+    %   currPath ：path from where start the selection
+    %   titleText : description of the window
+    % OUTPUT:
+    %   files : paths of each selected directory
 
     if nargin < 1 || (isempty(currPath) & isempty(titleText))
         titleText = 'Select Directories'; % Titolo predefinito
