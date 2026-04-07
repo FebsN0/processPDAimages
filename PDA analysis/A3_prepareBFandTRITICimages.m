@@ -76,10 +76,15 @@ function varargout=A3_prepareBFandTRITICimages(folderResultsImg,idxMon,groupExpe
         end
         metadata=struct();
         metadata.BF=metaData_BF;
-        % correct the tilted effect of BF
-        BF_ImagePRE = A3_feature_correctBFtilted(BF_ImagePRE,idxMon,folderResultsImg,'resultA3_3_1_comparisonOriginalCorrected_beforeAFM');
+        % correct the tilted effect of BF 
+        nameFile='resultA3_3_1_comparisonOriginalCorrected_beforeAFM';
+        titleImageOriginal="Original BF image (PRE-AFM)";
+        titleImageCorrected="Corrected BF Image";
+        BF_ImagePRE = correctTiltEffect(BF_ImagePRE,idxMon,folderResultsImg,nameFile,titleImageOriginal,titleImageCorrected);
         if exist("BF_ImagePOST","var")
-            BF_ImagePOST = A3_feature_correctBFtilted(BF_ImagePOST,idxMon,folderResultsImg,'resultA3_3_2_comparisonOriginalCorrected_afterAFM');
+            nameFile='resultA3_3_2_comparisonOriginalCorrected_afterAFM';
+            titleImageOriginal="Original BF image (POST-AFM)";
+            BF_ImagePOST = correctTiltEffect(BF_ImagePOST,idxMon,folderResultsImg,nameFile,titleImageOriginal,titleImageCorrected);
         else
             BF_ImagePOST=[];
         end
@@ -350,6 +355,27 @@ function [Image,metaData]=selectND2file(varargin)
     if p.Results.saveFig
         showData(p.Results.idxMon,false,imadjust(Image),sprintf("%s - imadjusted",p.Results.titleImage),p.Results.folderResultsImg,p.Results.filenameND2)  
     end
+end
+
+function imageCorr = correctTiltEffect(image,idxMon,folderResultsImg,nameFile,titleImageOriginal,titleImageCorrected)  
+    % the function Nplanefitter hasnt been used because it resulted more distorted results especially for binarization
+    x_Bk=1:size(image,2);
+    y_Bk=1:size(image,1);
+    % Prepare data inputs for surface fitting, similar to prepareCurveData but 3D. Transform the 2D image
+    % into 3 arrays:
+    % xData = 1 1 .. 1 2 .. etc = each block is long #row length of image
+    % yData = 1 2 .. length(image) 1 2 .. etc
+    [xData, yData, zData] = prepareSurfaceData( x_Bk, y_Bk, image );
+    ft = fittype( 'poly11' );
+    [fitresult, ~] = fit( [xData, yData], zData, ft );
+    fit_surf=zeros(size(y_Bk,2),size(x_Bk,2));
+    y_Bk_surf=repmat(y_Bk',1,size(x_Bk,2))*fitresult.p01;
+    x_Bk_surf=repmat(x_Bk,size(y_Bk,2),1)*fitresult.p10;
+    fit_surf=plus(min(min(image)),fit_surf);
+    fit_surf=plus(y_Bk_surf,fit_surf);
+    fit_surf=plus(x_Bk_surf,fit_surf);
+    imageCorr=minus(image,fit_surf);
+    showData(idxMon,false,imadjust(image),titleImageOriginal,folderResultsImg,nameFile,'extraData',imadjust(imageCorr),'extraTitles',titleImageCorrected,'noLabels',true,'grayscale',true)
 end
 
 function showAlignOriginalImages(image1,image2,folderResultsImg,titleText,fileText,idxMon,varargin)

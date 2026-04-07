@@ -62,14 +62,15 @@ function dataResultsPlot=A6_correlation_AFM_BF(AFM_data,AFM_IO_Padded,metadataAF
         BF_Before=p.Results.TRITIC_before;
         BF_After=p.Results.TRITIC_after;
         Delta = BF_After-BF_Before;
-    % prepare the fluorescence data X afterHeating experiment. At least one fluorescence image must be provided
+    % In case of fluorescence afterHeating data experiment, Delta can be too risky to be used, especially if timeExp and/or Gain are too high
+    % This because when the image is very bright, even the background can be masked by the high brightness distorting Delta
     elseif flag_heat && (xor(isempty(p.Results.TRITIC_before),isempty(p.Results.TRITIC_after)))     
         % Calc the fluorescence delta by removing the minimum value
         % when (p.Results.TRITIC_before) = 0, take the after, otherwise the before
         if isempty(p.Results.TRITIC_before)
-            Delta = p.Results.TRITIC_after - min(p.Results.TRITIC_after(:));
+            Delta = p.Results.TRITIC_after; % - min(p.Results.TRITIC_after(:));
         else
-            Delta = p.Results.TRITIC_before - min(p.Results.TRITIC_before(:));
+            Delta = p.Results.TRITIC_before; % - min(p.Results.TRITIC_before(:));
         end
         numBins=500;            
     else
