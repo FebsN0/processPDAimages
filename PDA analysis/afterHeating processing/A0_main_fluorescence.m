@@ -23,50 +23,52 @@ if answer==1
     mainPaths=uigetdirMultiSelect(pwd,sprintf('Select the AFM directories which contains different scans of a specific postHeated sample'));
     % Init
     nScans=length(mainPaths);
-    results_Height_fluo_allScans=cell(1,nScans);
-    nameData=cell(1,nScans);
+    allScans_results_Height_fluo=cell(1,nScans);
+    allScans_Metadata_AFM_NIKON=struct;
     mainPathOpticalData=[];
 else 
     %%%% to be completed later
     flag_sameExperimentCondition=false;
 end
 clear answer
-
+%%
 if flag_sameExperimentCondition
     % main cycle is to process each scan
-    for ithScan=1:nScans
+    for iScan=1:nScans
+        clc        
         % extract the path of a specific scan
-        ithMainPathScan=mainPaths{ithScan};
+        ithMainPathScan=mainPaths{iScan};
         tmp=strsplit(ithMainPathScan,'\');
         nameScan=tmp{end}; nameExperiment=tmp{end-2}; nameGroupExperiment=tmp{end-3};
+        fprintf("%%%%%%%%%%%%%%%%%%%%%%%%--------------------%%%%%%%%%%%%%%%%%%%%%%%%\n%%%%%%%%\tCurrent Scan processing\t: %g\t%%%%%%%%\n%%%%%%%%%%%%%%%%%%%%%%%%--------------------%%%%%%%%%%%%%%%%%%%%%%%%\n\n",str2double(nameScan))
         pathDataProcess=fullfile(ithMainPathScan,'HoverMode_OFF');
         clear tmp
         % if the processing of the single scan is already done, skip to the next scan
         if exist(fullfile(pathDataProcess,"5_dataCorrelationFluoHeight.mat"),"file")
             load(fullfile(pathDataProcess,"5_dataCorrelationFluoHeight"),"Data_finalResultsAllTimeExpGain")            
         else
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        %%%%% FIRST STEP: processing the single scan ==> comparison of TRITIC at DIFFERENT exposureTime/Gain %%%%%
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        if exist(fullfile(pathDataProcess,"2_data_postProcessedpostAssembled.mat"),'file')
-            load(fullfile(pathDataProcess,"2_data_postProcessedpostAssembled"),"AFM_images_final","AFM_height_IO","metaData_AFM","SaveFigFolder")    
-        else 
-            if exist(fullfile(pathDataProcess,"1_data_preprocess.mat"),'file')
-                load(fullfile(pathDataProcess,"1_data_preprocess.mat"),"allData","otherParameters","SaveFigFolder")
-            else
-                [allData,otherParameters,SaveFigFolder]=A1_openANDprepareAFMdata('filePath',pathDataProcess);
-                save(fullfile(pathDataProcess,"1_data_preprocess"),"allData","otherParameters","SaveFigFolder")
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%%%% FIRST STEP: processing the single scan ==> comparison of TRITIC at DIFFERENT exposureTime/Gain %%%%%
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            if exist(fullfile(pathDataProcess,"2_data_postProcessedpostAssembled.mat"),'file')
+                load(fullfile(pathDataProcess,"2_data_postProcessedpostAssembled"),"AFM_images_final","AFM_height_IO","metaData_AFM","SaveFigFolder")    
+            else 
+                if exist(fullfile(pathDataProcess,"1_data_preprocess.mat"),'file')
+                    load(fullfile(pathDataProcess,"1_data_preprocess.mat"),"allData","otherParameters","SaveFigFolder")
+                else
+                    [allData,otherParameters,SaveFigFolder]=A1_openANDprepareAFMdata('filePath',pathDataProcess);
+                    save(fullfile(pathDataProcess,"1_data_preprocess"),"allData","otherParameters","SaveFigFolder")
+                end
+                % the additional 'modeScan','postHeatScan' inputs will save time by avoiding to run lateral channel processing
+                [AFM_images_final, AFM_height_IO, metaData_AFM]= A2_processAFMdata(allData,otherParameters,ithMainPathScan,SaveFigFolder,idxMon,'modeScan','postHeatScan');     
+                save(fullfile(pathDataProcess,"2_data_postProcessedpostAssembled"),"AFM_images_final","AFM_height_IO","metaData_AFM","SaveFigFolder")
             end
-            % the additional 'modeScan','postHeatScan' inputs will save time by avoiding to run lateral channel processing
-            [AFM_images_final, AFM_height_IO, metaData_AFM]= A2_processAFMdata(allData,otherParameters,mainPath,SaveFigFolder,idxMon,'modeScan','postHeatScan');     
-            save(fullfile(pathDataProcess,"2_data_postProcessedpostAssembled"),"AFM_images_final","AFM_height_IO","metaData_AFM","SaveFigFolder")
-        end
             clear allData otherParameters
             % end AFM processing.
             fprintf("\nGROUP EXPERIMENT: %s\nNAME EXPERIMENT:  %s\nSCAN ID:          %s\n\n",nameGroupExperiment,nameExperiment,nameScan)
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             %%% START OPTICAL PROCESSING %%%
-            % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             if exist(fullfile(pathDataProcess,"3_dataOptical_BFmask_TRITIC.mat"),'file')
                 load(fullfile(pathDataProcess,"3_dataOptical_BFmask_TRITIC"),"TRITICdata","BF_Image_IO","metaData_NIKON","mainPathOpticalData")
             else
@@ -126,7 +128,7 @@ if flag_sameExperimentCondition
                 TRITICdata=TRITICdata_corr;
                 metadataTRITIC=metadataTRITIC_corr;
                 metaData_NIKON.TRITIC=metadataTRITIC;        
-                clear metadataTRITIC TRITICdata_corr metadataTRITIC_corr idx mask ithExpTime ithGain gainAll expTimeAll
+                clear metadataTRITIC TRITICdata_corr metadataTRITIC_corr idx mask ithExpTime ithGain 
                 save(fullfile(pathDataProcess,"3_dataOptical_BFmask_TRITIC"),"TRITICdata","BF_Image_IO","metaData_NIKON","mainPathOpticalData","-v7.3")
             end
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -145,100 +147,138 @@ if flag_sameExperimentCondition
             % process the correlation with a TRITIC at different time exposure. Use different figure for each used gain  
             Data_finalResultsAllTimeExpGain=cell(size(TRITICdata));
             for ithGain=1:size(TRITICdata,2)
-                gain=metaData_NIKON.TRITIC{1,ithGain}.Gain;
-                % prepare figure for the TRITIC fluorescence intensity distribution to investigate saturation
-                figDistTRITIC_sameScan=figure; axDist=axes(figDistTRITIC_sameScan);
-                hold(axDist,"on")
-                xlabel(axDist,'Absolute fluorescence increase (A.U.)','FontSize',15), ylabel(axDist,"PDF",'FontSize',15)
-                title(axDist,"Distribution Fluorescence (same scan area)","FontSize",20), legend('FontSize',12)
-                subtitle(axDist,sprintf("Same Gain (%s) - Different Exposure Time",gain),"FontSize",15)
-                % prepare the bin sizes so the distributions are more comparable
-                maxTRITIC=max(cellfun(@(x) max(x(:)), TRITICdata),[],'all');
-                minTRITIC=min(cellfun(@(x) min(x(:)), TRITICdata),[],'all');
-                edges=linspace(minTRITIC,maxTRITIC,100);
-                % prepare figure to plot the fluorescence-height correlation in function of intensity
-                figCorrelFluoHeight_sameScan=figure; axCorr=axes(figCorrelFluoHeight_sameScan);
-                hold(axCorr,"on")
-                ylabel(axCorr,'Absolute fluorescence increase (A.U.)','FontSize',15), xlabel(axCorr,"Height (nm)",'FontSize',15)
-                title(axCorr,"Correlation Averaged Fluorescence-Height (same scan area)","FontSize",20), legend('FontSize',12)
-                subtitle(axCorr,sprintf("Same Gain (%s) - Different Exposure Time",gain),"FontSize",15)
-                for ithTimeExp=1:size(TRITICdata,1)
-                    % get the information about time exposure
-                    ithMetadataTRITIC=metaData_NIKON.TRITIC{ithTimeExp,ithGain};
-                    expTime=ithMetadataTRITIC.ExposureTime;
-                    fprintf("Current phase processing\n\tGain: %d\n\tExposureTime: %d\n",gain,expTime)
-                    ithTRITICdata=TRITICdata{ithTimeExp,ithGain};                
-                    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                    %%%% SHOW FLUORESCENCE DISTRIBUTION OF FULL TRITIC IMAGE %%%%
-                    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                    % important to understand the fluorescence saturation
-                    vectDelta=ithTRITICdata(:);    
-                    % find the percentage of saturated values
-                    ratioSat=nnz(vectDelta>edges(end-1))/length(vectDelta)*100;                
-                    % prepare the name for legend
-                    nameScans=sprintf('%dms - ratioSaturation: %.2f%%',round(double(expTime)),ratioSat);
-                    % show distribution of all TRITIC image
-                    histogram(axDist,vectDelta,'BinEdges',edges,"DisplayName",nameScans,"Normalization","pdf",'FaceAlpha',0.2,"FaceColor",globalColor(ithTimeExp))                
-                    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                    %%%% EXTRACT CORRELATION FLUORESCENCE-AFM HEIGHT %%%%
-                    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                    %  originally, TRITIC has full original size, therefore resizing to the AFM (padded) size is required    
-                    ithTRITICdata=fixSize(ithTRITICdata,offset); 
-                    % now TRITIC data is ready ==> correlation FLUORESCENCE AND AFM HEIGHT
-                    Data_finalResults=A6_correlation_AFM_BF(AFM_data_final,AFM_IO_final,metaData_AFM,metaData_NIKON.BF,ithMetadataTRITIC,idxMon,SaveFigFolder,'TRITIC_before',ithTRITICdata,'afterHeating',true);
-                    FluoHeigh=Data_finalResults.Height_FLUO.Height_FLUO_1M;
-                    x=[FluoHeigh.BinCenter]*1e9; % 'Feature height (nm)'
-                    y=[FluoHeigh.MeanBin];
-                    s=[FluoHeigh.STDBin];
-                    % ensure column vectors
-                    x = x(:); y = y(:); s = s(:);
-                    % remove NaNs if needed
-                    valid = ~(isnan(x) | isnan(y) | isnan(s));
-                    x = x(valid); y = y(valid); s = s(valid);
-                    % sort by x in case data are not monotonic
-                    [x, idx] = sort(x); y = y(idx); s = s(idx);
-                    % build shaded region
-                    xpatch = [x; flipud(x)];
-                    ypatch = [y-s; flipud(y+s)];
-                    patch(axCorr, xpatch, ypatch, globalColor(ithTimeExp), 'FaceAlpha', 0.20,'EdgeColor', 'none','HandleVisibility', 'off');
-                    hold(axCorr,'on')
-                    plot(axCorr, x, y,'Color', globalColor(ithTimeExp),'LineWidth', 2,"DisplayName",nameScans);        
-                    Data_finalResultsAllTimeExpGain{ithTimeExp,ithGain}=FluoHeigh;
+                % sometimes, data are corrupted, to avoid to process again, save temporarily the results of this current cycle
+                if exist(fullfile(pathDataProcess,sprintf("TMP_dataCorrelationFluoHeight_%d.mat",ithGain)),"file")
+                    load(fullfile(pathDataProcess,sprintf("TMP_dataCorrelationFluoHeight_%d",ithGain)),"Data_finalResultsAllTimeExpGain")
+                else
+                    gain=metaData_NIKON.TRITIC{1,ithGain}.Gain;
+                    % prepare figure for the TRITIC fluorescence intensity distribution to investigate saturation
+                    figDistTRITIC_sameScan=figure; axDist=axes(figDistTRITIC_sameScan);
+                    hold(axDist,"on")
+                    xlabel(axDist,'Absolute fluorescence increase (A.U.)','FontSize',15), ylabel(axDist,"PDF",'FontSize',15)
+                    title(axDist,"Distribution Fluorescence (Full TRITIC image)","FontSize",20), legend('FontSize',12)
+                    subtitle(axDist,sprintf("Same Gain (%s) - Different Exposure Time",gain),"FontSize",15)
+                    % prepare the bin sizes so the distributions are more comparable
+                    maxTRITIC=max(cellfun(@(x) max(x(:)), TRITICdata),[],'all');
+                    minTRITIC=min(cellfun(@(x) min(x(:)), TRITICdata),[],'all');
+                    edges=linspace(minTRITIC,maxTRITIC,100);
+                    % prepare figure to plot the fluorescence-height correlation in function of intensity
+                    figCorrelFluoHeight_sameScan=figure; axCorr=axes(figCorrelFluoHeight_sameScan);
+                    hold(axCorr,"on")
+                    ylabel(axCorr,'Absolute fluorescence increase (A.U.)','FontSize',15), xlabel(axCorr,"Height (nm)",'FontSize',15)
+                    title(axCorr,"Correlation Averaged Fluorescence-Height (TRITIC over only PDA)","FontSize",20), legend('FontSize',12)
+                    subtitle(axCorr,sprintf("Same Gain (%s) - Different Exposure Time",gain),"FontSize",15)
+                    for ithTimeExp=1:size(TRITICdata,1)
+                        % get the information about time exposure
+                        ithMetadataTRITIC=metaData_NIKON.TRITIC{ithTimeExp,ithGain};
+                        expTime=ithMetadataTRITIC.ExposureTime;
+                        fprintf("Current phase processing\n\tGain: %g\n\tExposureTime: %g\n",str2double(gain),expTime)
+                        ithTRITICdata=TRITICdata{ithTimeExp,ithGain};                
+                        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                        %%%% SHOW FLUORESCENCE DISTRIBUTION OF FULL TRITIC IMAGE %%%%
+                        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                        % important to understand the fluorescence saturation
+                        vectDelta=ithTRITICdata(:);    
+                        % find the percentage of saturated values
+                        ratioSat=nnz(vectDelta>edges(end-1))/length(vectDelta)*100;                
+                        % prepare the name for legend
+                        nameScans=sprintf('%dms - ratioSaturation: %.2f%%',round(double(expTime)),ratioSat);
+                        % show distribution of all TRITIC image
+                        histogram(axDist,vectDelta,'BinEdges',edges,"DisplayName",nameScans,"Normalization","pdf",'FaceAlpha',0.3,"FaceColor",globalColor(ithTimeExp))                
+                        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                        %%%% EXTRACT CORRELATION FLUORESCENCE-AFM HEIGHT %%%%
+                        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                        %  originally, TRITIC has full original size, therefore resizing to the AFM (padded) size is required    
+                        ithTRITICdata=fixSize(ithTRITICdata,offset); 
+                        % now TRITIC data is ready ==> correlation FLUORESCENCE AND AFM HEIGHT
+                        Data_finalResults=A6_correlation_AFM_BF(AFM_data_final,AFM_IO_final,metaData_AFM,metaData_NIKON.BF,ithMetadataTRITIC,idxMon,SaveFigFolder,'TRITIC_before',ithTRITICdata,'afterHeating',true);
+                        FluoHeigh=Data_finalResults.Height_FLUO.Height_FLUO_1M;
+                        x=[FluoHeigh.BinCenter]*1e9; % 'Feature height (nm)'
+                        y=[FluoHeigh.MeanBin];
+                        s=[FluoHeigh.STDBin];
+                        % ensure column vectors
+                        x = x(:); y = y(:); s = s(:);
+                        % remove NaNs if needed
+                        valid = ~(isnan(x) | isnan(y) | isnan(s));
+                        x = x(valid); y = y(valid); s = s(valid);
+                        % sort by x in case data are not monotonic
+                        [x, idx] = sort(x); y = y(idx); s = s(idx);
+                        % build shaded region
+                        xpatch = [x; flipud(x)];
+                        ypatch = [y-s; flipud(y+s)];
+                        patch(axCorr, xpatch, ypatch, globalColor(ithTimeExp), 'FaceAlpha', 0.30,'EdgeColor', 'none','HandleVisibility', 'off');
+                        hold(axCorr,'on')
+                        % find the percentage of saturated values in corrispondence of only PDA (Delta has been masked by using AFM IO mask)
+                        tmp=Data_finalResults.DeltaData.Delta_firstMasking(:);
+                        % since masking introduces nan into matrix to consider only FR, remove them
+                        tmp=tmp(~isnan(tmp));
+                        ratioSat=nnz(tmp>edges(end-1))/length(tmp)*100;          
+                        clear tmp
+                        % prepare the name for legend
+                        nameScans=sprintf('%dms - ratioSaturation: %.2f%%',round(double(expTime)),ratioSat);
+                        % plot the correlation
+                        plot(axCorr, x, y,'Color', globalColor(ithTimeExp),'LineWidth', 2,"DisplayName",nameScans);        
+                        Data_finalResultsAllTimeExpGain{ithTimeExp,ithGain}=FluoHeigh;
+                    end
+                    % better show for the distribution
+                    xlim(axDist,"padded"); ylim(axDist,"tight"), grid(axDist,"on"), grid(axDist,"minor")
+                    legend(axDist,"Location","best")
+                    objInSecondMonitor(figDistTRITIC_sameScan,idxMon);
+                    nameFig=sprintf('resultA6_1_%d_DistributionFluorescenceDiffTimeExp_gain%s',ithGain,gain);
+                    uiwait(warndlg("Adjust eventually the legend position if not good. Click ""OK"" to continue"))
+                    saveFigures_FigAndTiff(figDistTRITIC_sameScan,SaveFigFolder,nameFig)
+                    % better show for the correlation
+                    xlim(axCorr,"padded"); ylim(axCorr,"padded"), grid(axCorr,"on"), grid(axCorr,"minor")
+                    legend(axCorr,"Location","best")
+                    objInSecondMonitor(figCorrelFluoHeight_sameScan,idxMon);
+                    nameFig=sprintf('resultA6_2_%d_CorrelationFluoHeightComparisonDiffTimeExp_gain%s',ithGain,gain);
+                    uiwait(warndlg("Adjust eventually the legend position if not good. Click ""OK"" to continue"))
+                    saveFigures_FigAndTiff(figCorrelFluoHeight_sameScan,SaveFigFolder,nameFig)   
+                    % sometimes, some data are corrupted causing error, to avoid to process again, save temporarily the results of this current cycle
+                    save(fullfile(pathDataProcess,sprintf("TMP_dataCorrelationFluoHeight_%d",ithGain)),"Data_finalResultsAllTimeExpGain","-v7.3")
                 end
-                % better show for the distribution
-                xlim(axDist,"padded"); ylim(axDist,"tight"), grid(axDist,"on"), grid(axDist,"minor")
-                legend(axDist,"Location","best")
-                objInSecondMonitor(figDistTRITIC_sameScan,idxMon);
-                nameFig=sprintf('resultA6_1_%d_DistributionFluorescenceDiffTimeExp_gain%s',ithGain,gain);
-                saveFigures_FigAndTiff(figDistTRITIC_sameScan,SaveFigFolder,nameFig)
-                % better show for the correlation
-                xlim(axCorr,"padded"); ylim(axCorr,"padded"), grid(axCorr,"on"), grid(axCorr,"minor")
-                legend(axCorr,"Location","best")
-                objInSecondMonitor(figCorrelFluoHeight_sameScan,idxMon);
-                nameFig=sprintf('resultA6_2_%d_CorrelationFluoHeightComparisonDiffTimeExp_gain%s',ithGain,gain);
-                saveFigures_FigAndTiff(figCorrelFluoHeight_sameScan,SaveFigFolder,nameFig)            
             end
             save(fullfile(pathDataProcess,"5_dataCorrelationFluoHeight"),"Data_finalResultsAllTimeExpGain","-v7.3")
+            % remove not useful files
+            delete(fullfile(pathDataProcess,"TMP_dataCorrelationFluoHeight*"))
             clear pathDataProcess SaveFigFolder AFM_IO_final AFM_data_final axCorr axDist x y s edges expTime figCorrelFluoHeight_sameScan figDistTRITIC_sameScan
-            clear Data_finalResults ratioSat FluoHeigh gain idx ith* maxTRITIC minTRITIC offset valid vectDelta xpatch ypatch
+            clear Data_finalResults ratioSat FluoHeigh gain idx ith maxTRITIC minTRITIC offset valid vectDelta xpatch ypatch
         end
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%% COMPLETED THE PROCESSING OF THE SINGLE SCAN %%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         % store the result of the single scan into the main cell array
-        results_Height_fluo_allScans{ithScan}=Data_finalResultsAllTimeExpGain;
+        allScans_results_Height_fluo{iScan}=Data_finalResultsAllTimeExpGain;
+        allScans_Metadata_AFM_NIKON{iScan}.AFM=metaData_AFM;
+        allScans_Metadata_AFM_NIKON{iScan}.NIKON=metaData_NIKON;
+    end
+    % in case data is extracted from file, some vars dont exist because created internally
+    if ~exist("gainGroup","var") || ~exist("expTimeGroup","var")
+        % pick the first metadataTRITIC. It assumed that any scans have same TRITIC parameters        
+        metadataTRITIC=allMetadata_AFM_NIKON{1}.NIKON.TRITIC;
+        n = numel(metadataTRITIC);
+        gainAll    = zeros(1, n);
+        expTimeAll = zeros(1, n);      
+        for i = 1:n
+            gainAll(i)    = str2double(metadataTRITIC{i}.Gain);   % convert once
+            expTimeAll(i) = metadataTRITIC{i}.ExposureTime;
+        end
+        clear n i
+        gainGroup=sort(unique(gainAll),'ascend');
+        expTimeGroup=sort(unique(expTimeAll),'descend');
     end
     % before compare different scans of the same sample, select the optimal exposure time 
     resultsChoice=selectOptionsDialog("Which exposure time and/or gain to consider to compare different AFM scan areas?",false,gainGroup,expTimeGroup,'Titles',{'Exposure Time','Gain'});
     selectedGain=gainGroup(resultsChoice{1});
     selectedExpTime=expTimeGroup(resultsChoice{2});
-    clear expTimeGroup gainGroup
-
+    clear expTimeGroup gainGroup iScan ith* resultsChoice tmp i mainPaths mainPathOpticalData metadata* metaData* n name* TRITIC* nScans
     % Find matching index using logical indexing — no inner loop
     mask = (expTimeAll == selectedExpTime) & ...
            (gainAll    == selectedGain);            
     idx = find(mask, 1);   % expect exactly one match
+    % extract the data generated with selected parameters
     
+
     
     selectedMetadataTRITIC=metaData_NIKON.TRITIC{idx};
     selectedDataTRITIC=TRITICdata{idx};
