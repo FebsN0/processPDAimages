@@ -50,7 +50,7 @@ function [AFM_IO_3_BFaligned,AFM_Elab,details_it_reg,rect] = A9_feature_automati
         end
         waitbar(N_cycles_opt/Limit_Cycles,wb,sprintf('Processing the EXP/RED/ROT optimization. Cycle %d / %d',N_cycles_opt,Limit_Cycles));
         % init
-        moving_iterative=cell(1,4); max_c_iterative=zeros(1,4); imax_iterative=zeros(1,4); sz_iterative=zeros(4,2);
+        moving_iterative=cell(1,4); max_c_iterative=zeros(1,4); offset_iterative=zeros(2,4);
         textFprintf={'Expansion','Reduction','Counter ClockWise Rotation','ClockWise Rotation'};
         % 1: Oversize - 2 : Undersize - 3 : PosRot - 4 : NegRot
         moving_iterative{1} = imresize(moving_OPT,size(moving_OPT)+abs(StepSizeMatrix));
@@ -58,10 +58,9 @@ function [AFM_IO_3_BFaligned,AFM_Elab,details_it_reg,rect] = A9_feature_automati
         moving_iterative{3} = imrotate(moving_OPT,Rot_par,'nearest','loose');
         moving_iterative{4} = imrotate(moving_OPT,-Rot_par,'nearest','loose');
         for i=1:4
-            [max_c_it_OI,imax,sz] = A9_feature_crossCorrelationAlignmentAFM(BF_IO,moving_iterative{i},'runAlignAFM',false);
+            [max_c_it_OI,offset] = A5_feature_crossCorrelationAlignmentAFM(BF_IO,moving_iterative{i},'runAlignAFM',false);
             max_c_iterative(i)=max_c_it_OI;
-            imax_iterative(i)=imax;
-            sz_iterative(i,:) = sz;
+            offset_iterative(:,i)=offset;
         end
         % if the max value of the new cross-correlation is better than the previous saved one, then
         % update. Save also the index for a new shift
@@ -71,8 +70,7 @@ function [AFM_IO_3_BFaligned,AFM_Elab,details_it_reg,rect] = A9_feature_automati
             z=z+1;
             [a,b]=max(max_c_iterative);
             max_c_it_OI_prev=a;
-            imax_OI=imax_iterative(b);   % required to shift the image
-            size_OI = sz_iterative(b,:);
+            offset_OI=offset_iterative(:,b);   % required to shift the image
             % save the best moving AFM image
             moving_OPT= moving_iterative{b};
             % adjust any AFM data channels into FIELD AFM_image (Lateral deflection, etc etc) every step based
@@ -106,12 +104,12 @@ function [AFM_IO_3_BFaligned,AFM_Elab,details_it_reg,rect] = A9_feature_automati
             
             % adjust the AFM height 0/1 image, dont run FFT, just alignment section and generate the
             % new AFM_IO corrected and padded with same BF_IO size
-            [~,~,~,~,rect,AFM_IO_3_BFaligned] = A9_feature_crossCorrelationAlignmentAFM(BF_IO,moving_OPT,'runFFT',false,'idxCCMax',imax_OI,'sizeCCMax',size_OI);   
+            [~,~,rect,AFM_IO_3_BFaligned] = A5_feature_crossCorrelationAlignmentAFM(BF_IO,moving_OPT,'runFFT',false,'offset',offset_OI);   
             figure(h_it);
             if exist('pairAFM_BF','var')
                 delete(pairAFM_BF)
             end
-            pairAFM_BF=imshowpair(BF_IO,AFM_IO,'falsecolor');
+            pairAFM_BF=imshowpair(BF_IO,AFM_IO_3_BFaligned,'falsecolor');
             % update the cycle
             N_cycles_opt=N_cycles_opt+1;
         else

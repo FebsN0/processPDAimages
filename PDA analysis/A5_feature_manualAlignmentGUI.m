@@ -1,7 +1,7 @@
 % the output AFM_data will have new fields compared to the input AFM_data
 % AFM_aligned is the version iteratively modified of AFM_scaled
 % AFM_image_padded is AFM_aligned but with the size of AFM_IO_padded, which is the same for the BF_IO
-function varargout=A9_feature_manualAlignmentGUI(AFM_IO_padded,BF_IO,AFM_data,rect,max_c_it_OI,idxMon,newFolder,varargin)
+function varargout=A5_feature_manualAlignmentGUI(AFM_IO_padded,BF_IO,AFM_data,rect,max_c_it_OI,idxMon,newFolder,varargin)
     p=inputParser(); 
     argName = 'saveFig';    defaultVal = 'Yes';     addParameter(p, argName, defaultVal, @(x) ismember(x,{'No','Yes'}));
     parse(p,varargin{:});
@@ -47,7 +47,6 @@ function varargout=A9_feature_manualAlignmentGUI(AFM_IO_padded,BF_IO,AFM_data,re
     % Display the combined image
     hAx = axes('Parent', hFig, 'Units', 'normalized', 'Position', [0.05, 0.3, 0.9, 0.65]);
     
-   
     pairAFM_BF=imshowpair(fixedImg1,AFM_IO_padded,'falsecolor', 'Parent', hAx);
     title(hAx, 'BrightField (green) and AFM (purple) Images');
 
@@ -129,7 +128,7 @@ function varargout=A9_feature_manualAlignmentGUI(AFM_IO_padded,BF_IO,AFM_data,re
 
     % run a cross correlation (xcorr2_fft) and alignment
     function exeSingleCrossCorr(start)
-        [max_c_it_OI,~,~,~,rect,AFM_IO_padded] = A9_feature_crossCorrelationAlignmentAFM(fixedImg1,modifiedImg1);
+        [max_c_it_OI,~,rect,AFM_IO_padded] = A5_feature_crossCorrelationAlignmentAFM(fixedImg1,modifiedImg1);
         figure(f2max)
         % update the counter and the score
         score = max_c_it_OI/maxC_original;

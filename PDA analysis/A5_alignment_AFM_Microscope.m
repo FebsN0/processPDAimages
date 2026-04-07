@@ -108,6 +108,7 @@ function [AFM_IO_3_BFaligned,BF_IO_1_cropped,AFM_Elab,info_allignment,offset]=A5
     % locate, without really adjust the data, to understand how make a better crop
     % rect is required to locate the AFM respect to BF
     [max_c_it_OI,~,rect,AFM_IO_2_BFpadded] = A5_feature_crossCorrelationAlignmentAFM(BF_IO_0_original,AFM_IO_1_BFscaled);
+    rect_firstCorr=rect;
     f1=figure; axFig=axes('Parent', f1);
     figPair=imshowpair(BF_IO_0_original,AFM_IO_2_BFpadded,'falsecolor','Parent',axFig);
     title('Brightfield and AFM images - Post First cross-correlation','FontSize',14)
@@ -272,6 +273,7 @@ function [AFM_IO_3_BFaligned,BF_IO_1_cropped,AFM_Elab,info_allignment,offset]=A5
             break
         end
         AFM_Elab=AFM_Elab_original;
+        rect=rect_firstCorr;
         close(f3)
     end   
 

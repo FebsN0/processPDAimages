@@ -1,4 +1,4 @@
-function varargout = A9_feature_crossCorrelationAlignmentAFM(fixed,moving,varargin)
+function varargout = A5_feature_crossCorrelationAlignmentAFM(fixed,moving,varargin)
 % cross-correlation between the two images
 % OUTPUT:       1 = max_c_it_OI; 
 %               2 = [yoffset xoffset]
