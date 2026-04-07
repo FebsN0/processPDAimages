@@ -16,12 +16,5 @@ function [image_of_interest] = A3_feature_correctBFtilted(image_of_interest,idxM
     fit_surf=plus(y_Bk_surf,fit_surf);
     fit_surf=plus(x_Bk_surf,fit_surf);
     el_image=minus(image_of_interest,fit_surf);
-    % show the comparison between original and fitted BrightField
-    f1=figure("Visible","off");
-    subplot(1,2,1)
-    imshow(imadjust(image_of_interest)),title('Original BF image','FontSize',14)
-    subplot(1,2,2)
-    imshow(imadjust(el_image)),title('Corrected BF Image','FontSize',14)
-    objInSecondMonitor(f1,idxMon);
-    saveFigures_FigAndTiff(f1,pathFile,fileName)
+    
 end
