@@ -14,6 +14,8 @@
 %                   lenghtAxis(2) ==> AXIS X
 %               - labelBar      = text to printed out as lateral bar
 %               - prevFig       = in case the figure should be plotted in an existing fig
+%               - noLabels      = when true, no texts over axis and no label to indicate other info
+%               - grayscale     = when true, show image in grascale values (white to black, for Brightfield images)
 % for extra data
 %               extraData       
 %               extraNorm         
@@ -29,8 +31,10 @@ function fig=showData(idxMon,SeeMe,data1,titleData1,nameDir,nameFig,varargin)
     argName = 'saveFig';            defaultVal = true;  addOptional(p,argName,defaultVal, @(x) islogical(x))  
     argName = 'normalized';         defaultVal=false;   addOptional(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))))
     argName = 'binary';             defaultVal=false;   addOptional(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))))
-    argName = 'lenghtAxis';         defaultVal=[];       addOptional(p,argName,defaultVal, @(x) isnumeric(x))   
+    argName = 'lenghtAxis';         defaultVal=[];      addOptional(p,argName,defaultVal, @(x) isnumeric(x))   
     argName = 'labelBar';           defaultVal='';      addOptional(p,argName,defaultVal, @(x) (isstring(x) || ischar(x)))
+    argName = 'noLabels';           defaultVal=false;   addOptional(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))))
+    argName = 'grayscale';          defaultVal=false;   addOptional(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))))
     % for extra data
     argName = 'extraData';          defaultVal={};      addOptional(p,argName,defaultVal, @(x) iscell(x) || ismatrix(x))
     argName = 'extraNorm';          defaultVal={};      addOptional(p,argName,defaultVal, @(x) (iscell(x) || isnumeric(x) || islogical(x)))
@@ -52,7 +56,10 @@ function fig=showData(idxMon,SeeMe,data1,titleData1,nameDir,nameFig,varargin)
     end
     if p.Results.saveFig,    saveFig=true; else, saveFig=false; end
     if p.Results.normalized, norm1=true; else, norm1=false; end
+    if p.Results.noLabels,   noLabs=true; else, noLabs=false; end
+    if p.Results.grayscale,  grayScale=true; else, grayScale=false; end
     if p.Results.binary,     bin1=true; else, bin1=false; end
+
     lenghtAxis=p.Results.lenghtAxis;
     labelBar1=string(p.Results.labelBar);     
 
@@ -67,7 +74,7 @@ function fig=showData(idxMon,SeeMe,data1,titleData1,nameDir,nameFig,varargin)
     nTotal = 1 + nExtra;   % main image + extras
     % ---- SUBPLOT 1: main data ----
     ax = subplot(1,nTotal,1,'Parent',fig);
-    showSingleData(ax,data1,norm1,titleData1,labelBar1,bin1,lenghtAxis)
+    showSingleData(ax,data1,norm1,titleData1,labelBar1,bin1,lenghtAxis,noLabs,grayScale)
     % ---- SUBPLOTS for EXTRA DATA ----
     for k = 1:nExtra
         axk = subplot(1,nTotal,k+1,'Parent',fig);
@@ -77,7 +84,7 @@ function fig=showData(idxMon,SeeMe,data1,titleData1,nameDir,nameFig,varargin)
         sizeAxisK   = getOrDefault(p.Results.extraLengthAxis,k,[]);
         titleK      = getOrDefault(p.Results.extraTitles, k, '');
         labelK      = getOrDefault(p.Results.extraLabel,  k, '');                             
-        showSingleData(axk,dataK,normK,titleK,labelK,binK,sizeAxisK)
+        showSingleData(axk,dataK,normK,titleK,labelK,binK,sizeAxisK,noLabs,grayScale)
     end   
     % in case the fig is already opened, dont re-update the position. The user may have changed location for a more comfortable area
     if ~flagPrevFig
@@ -102,7 +109,7 @@ function fig=showData(idxMon,SeeMe,data1,titleData1,nameDir,nameFig,varargin)
     end
 end
 
-function showSingleData(ax,data, norm, titleData,labelBar,bin,AxisLength)   
+function showSingleData(ax,data, norm, titleData,labelBar,bin,AxisLength,noLabels,grayScale)   
     %axes(ax) % Make sure plotting happens in this axes
     % Create axis vectors. In case there is no pixel size, then use meter axis
     if isempty(AxisLength)
@@ -146,14 +153,24 @@ function showSingleData(ax,data, norm, titleData,labelBar,bin,AxisLength)
         cLabel = ylabel(c,'Background                                     Foreground');
         cLabel.FontSize=14;        
     else
-        colormap(ax, parula(256));
+        if grayScale
+            colormap(ax, flipud(gray(256)));   % white=high, black=low (brightfield)
+        else
+            colormap(ax, parula(256));
+        end
         if norm
             c.Label.String = 'Normalized';
         else
-            c.Label.String=labelBar;
+            c.Label.String = labelBar;
         end
     end
-    
+    % --- hide colorbar and axis decorations if noLabels ---
+    if noLabels
+        colorbar(ax,'off');
+        set(ax,'XTick',[],'YTick',[],'XTickLabel',[],'YTickLabel',[]);
+        xlabel(ax,''); ylabel(ax,'');
+    end
+
     if ~iscell(titleData)
         % in case there escape char \n, then split in more parts
         parts = strsplit(sprintf(titleData), '\n');  
@@ -173,18 +190,20 @@ function showSingleData(ax,data, norm, titleData,labelBar,bin,AxisLength)
         nXtickElements=7;
     end
 
-    % change the axis from pixel to micrometer unit
-    if ~isempty(AxisLength)
-        xlabel(sprintf('slow direction (%s)',unitsX),'FontSize',14);
-        ylabel(sprintf('fast direction (%s)',unitsY),'FontSize',14);       
-        xticks(round(linspace(0,max(x),nXtickElements)));
-        xtickangle(0)
-        yticks(round(linspace(0,max(y),7)));
-    else
-        xlabel('slow direction','FontSize',14), ylabel('fast direction','FontSize',14)    
-        xticks(round(linspace(min(x),max(x),nXtickElements)));
-        xtickangle(0)
-        yticks(round(linspace(min(x),max(y),7)));
+    % change the axis from pixel to micrometer unit (if noLabs is true, just ignore the following block)
+    if ~noLabels
+        if ~isempty(AxisLength)
+            xlabel(sprintf('slow direction (%s)',unitsX),'FontSize',14);
+            ylabel(sprintf('fast direction (%s)',unitsY),'FontSize',14);       
+            xticks(round(linspace(0,max(x),nXtickElements)));
+            xtickangle(0)
+            yticks(round(linspace(0,max(y),7)));
+        else
+            xlabel('slow direction','FontSize',14), ylabel('fast direction','FontSize',14)    
+            xticks(round(linspace(min(x),max(x),nXtickElements)));
+            xtickangle(0)
+            yticks(round(linspace(min(x),max(y),7)));
+        end
     end
     axis on, axis equal
     xlim tight, ylim tight
