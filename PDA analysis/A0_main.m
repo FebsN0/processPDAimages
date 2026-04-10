@@ -133,7 +133,7 @@ if step2Start<4
 end
 %% Align AFM to BF and extract the coordinates for alignment to be transferred to the other data
 if step2Start<5
-    [AFM_height_IO_final,BF_Image_IO,AFM_data_final,results_AFM_BF_aligment,offset]=A5_alignment_AFM_Microscope(BF_Image_IO,metaData_NIKON.BF,AFM_height_IO,metaData_AFM,dataAFM_latDeflecFitted,SaveFigFolder,idxMon,'Margin',150);
+    [AFM_height_IO_final,BF_Image_IO_final,AFM_data_final,results_AFM_BF_aligment,offset]=A5_alignment_AFM_Microscope(BF_Image_IO,metaData_NIKON.BF,AFM_height_IO,metaData_AFM,dataAFM_latDeflecFitted,SaveFigFolder,idxMon,'Margin',150);
     % adjust size BF and TRITIC
     %BF_Mic_Image_IO=fixSize(BF_Mic_Image_IO,offset);
     TRITIC_Before=fixSize(TRITIC_Before,offset);  
@@ -144,7 +144,7 @@ end
 %% correlation FLUORESCENCE AND AFM DATA
 
 if step2Start<6
-    Data_finalResults=A6_correlation_AFM_BF(AFM_data_final,AFM_height_IO_final,metaData_AFM,metaData_NIKON,idxMon,SaveFigFolder,mainPathOpticalData,timeExp,'TRITIC_before',TRITIC_Before,'TRITIC_after',TRITIC_After,'innerBorderCalc',false);
+    Data_finalResults=A6_correlation_AFM_BF(AFM_data_final,AFM_height_IO_final,BF_Image_IO_final,metaData_AFM,metaData_NIKON,idxMon,SaveFigFolder,mainPathOpticalData,timeExp,'TRITIC_before',TRITIC_Before,'TRITIC_after',TRITIC_After,'innerBorderCalc',false);
 end
 %Data_finalResults=A10_correlation_AFM_BF__OLDVERSION(AFM_A10_data_final,AFM_A10_IO_final,metaData_BF.ImageHeight_umeterXpixel,setpoints,secondMonitorMain,SaveFigFolder,mainPathOpticalData,timeExp,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned,'innerBorderCalc',false);
 

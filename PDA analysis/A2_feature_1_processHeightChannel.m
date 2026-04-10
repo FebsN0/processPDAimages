@@ -209,6 +209,7 @@ function varargout=A2_feature_1_processHeightChannel(filtData,idxMon,SaveFigFold
                 end
                 clear foldHVON
             end
+            close all
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             %%%%%%%%% BUTTERWORTH FILTERING : an automatic semi-binarization ==> transform into nan values over a certain threshold %%%%%%%%
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -232,7 +233,7 @@ function varargout=A2_feature_1_processHeightChannel(filtData,idxMon,SaveFigFold
                         titleData1='Background Height - Butterworth Filtered Height';        
                         nameFile=sprintf('resultA2_2_BackgroundHeight_butterworth_iteration%d',iterationMain);   
                         if isequal(BK_1_butterworthFiltered,BK_2_butterworthFiltered_manualAdj)
-                            showData(idxMon,SeeMe,B*factor,titleData1,SaveFigFolder,nameFile,'normalized',norm,'labelBar',labelHeight);
+                            showData(idxMon,false,B*factor,titleData1,SaveFigFolder,nameFile,'normalized',norm,'labelBar',labelHeight);
                         else
                             titleData2="Background Height - after manual replace/removal step";
                             showData(idxMon,SeeMe,BK_1_butterworthFiltered*factor,titleData1,SaveFigFolder,nameFile,'normalized',norm,'labelBar',labelHeight,...
@@ -389,7 +390,7 @@ function varargout=A2_feature_1_processHeightChannel(filtData,idxMon,SaveFigFold
         % there may be still some anomalies. If so, permamently remove them from the height image
         textTitle={'Optimixed Height Image';'Check if there some parts to transform into NaN in the foreground. The resulting image will be definitive for the current iteration.'};
         [~,height_9_corr] = featureRemovePortions(height_8_LineFitOnFinalMaskBK*1e9,textTitle,idxMon,'normalize',false);       
-        
+        close all
         height_9_corr=height_9_corr/factor;
         
         % Display and save result
