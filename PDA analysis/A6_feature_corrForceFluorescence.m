@@ -50,7 +50,9 @@ function [outputme] = A6_feature_corrForceFluorescence(X_Data,Y_Data,idxMon,newF
         x_bin_start = linspace(min(DataOI(:,1)),max(DataOI(:,1))+0.1*max(DataOI(:,1)), p.Results.NumberOfBins+1);
     end
 
+    outputme=struct();
     for i=1:length(x_bin_start)-1
+        clear flag_Array
         % find value above a specific element of X data
         a=find((DataOI(:,1)>x_bin_start(i)));
         b=find((DataOI(:,1)<=x_bin_start(i+1)));
@@ -58,9 +60,21 @@ function [outputme] = A6_feature_corrForceFluorescence(X_Data,Y_Data,idxMon,newF
         flag_Array(:,1)=DataOI(intersect(a,b),1);
         flag_Array(:,2)=DataOI(intersect(a,b),2);
         % build the data for the barplot
-        BinMean=mean(flag_Array(:,2),'omitnan');
-        BinMean_Norm=BinMean/size(flag_Array,1);
-        BinSTD=std(flag_Array(:,2),'omitnan');
+        tmp=flag_Array(:,2);
+        % Guard against all-NaN columns
+        if all(isnan(tmp))
+            tmp_valid      = [];
+            BinMedian      = NaN;
+            BinMin         = NaN;
+            BinMax         = NaN;
+        else
+            tmp_valid = tmp(~isnan(tmp));  % strip NaNs once for reuse        
+            BinMedian      = median(tmp_valid);                 % NEW IMPORTANT CHANGE
+            % USING STD CAN BE MEASLEADING BECAUSE VERY LIKELY THE DISTRIBUTION IS AFFECTED BY HIGH skewness  
+            BinMin  = prctile(tmp, 25);  % or 5th
+            BinMax = prctile(tmp, 75);  % or 95th
+        end
+      
         % use setpoint as centers
         if ~isempty(p.Results.setpoints)
             BinCenetr_V=setpointN(i);
@@ -68,37 +82,29 @@ function [outputme] = A6_feature_corrForceFluorescence(X_Data,Y_Data,idxMon,newF
             BinCenetr_V=mean(flag_Array(:,1),'omitnan');
         end
             
-        outputme(i)=struct(...
-            'BinStart',...
-            x_bin_start(i),...
-            'BinEnd',...
-            x_bin_start(i+1),...
-            'BinCenter',...
-            BinCenetr_V,...
-            'MeanBin',...
-            BinMean,...
-            'MeanBinNormPixels',...
-            BinMean_Norm,...
-            'STDBin',...
-            BinSTD,....
-            'Array',...
-            flag_Array); %#ok<AGROW>
-        
-        clearvars flag_Array a b c BinMean BinSTD BinCenetr_V BinMean_Norm
+        outputme(i).BinStart=x_bin_start(i);
+        outputme(i).BinEnd=x_bin_start(i+1);
+        outputme(i).BinCenter=BinCenetr_V;
+        outputme(i).BinMedian=BinMedian;
+        outputme(i).Bin75prctile=BinMax;
+        outputme(i).Bin25prctile=BinMin;            
+        outputme(i).Array=tmp_valid;        
     end
     
     % save time and memory in case of heatedSample
     if ~p.Results.flagHeat    
         % extract data
         x_VDH_B=[outputme.BinCenter]*p.Results.xpar;
-        y_VDH_B=[outputme.MeanBin]*p.Results.ypar;
-        stde_VDH_B=[outputme.STDBin]*p.Results.ypar;
-         
+        y_VDH_B=[outputme.BinMedian]*p.Results.ypar;
+        tmp=[outputme.Bin75prctile]*p.Results.ypar;
+        stde_VDH_up=y_VDH_B-tmp;
+        tmp=[outputme.Bin25prctile]*p.Results.ypar;
+        stde_VDH_down=tmp-y_VDH_B;
         ftmp=figure('Visible','off'); hold on
         try
-            errorbar(x_VDH_B,y_VDH_B,stde_VDH_B,'Color',sprintf('%c',p.Results.LineCoulor),'MarkerFaceColor',sprintf('%c',p.Results.MarkerColor),'MarkerEdgeColor',sprintf('%c',p.Results.MarkerColor),'Marker',sprintf('%c',p.Results.MarkerType));
+            errorbar(x_VDH_B,y_VDH_B,stde_VDH_down,stde_VDH_up,'Color',sprintf('%c',p.Results.LineCoulor),'MarkerFaceColor',sprintf('%c',p.Results.MarkerColor),'MarkerEdgeColor',sprintf('%c',p.Results.MarkerColor),'Marker',sprintf('%c',p.Results.MarkerType));
         catch
-            errorbar(x_VDH_B,y_VDH_B,stde_VDH_B,'ok','MarkerFaceColor',[0 0 0]);
+            errorbar(x_VDH_B,y_VDH_B,stde_VDH_down,stde_VDH_up,'ok','MarkerFaceColor',[0 0 0]);
         end
         if(~isempty(p.Results.Xlimit))
             xlim(p.Results.Xlimit)

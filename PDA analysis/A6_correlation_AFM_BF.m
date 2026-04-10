@@ -17,7 +17,7 @@
 %               NOTE: it doesn't matter if before or after scanning
 %       3) process only AFM data
 
-function dataResultsPlot=A6_correlation_AFM_BF(AFM_data,AFM_IO_Padded,metadataAFM,metadataBF,metadataTRITIC,idxMon,folderResultsImg,varargin)
+function dataResultsPlot=A6_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM,metadataBF,metadataTRITIC,idxMon,folderResultsImg,varargin)
     
     p=inputParser();
     addRequired(p,'AFM_data');
@@ -27,11 +27,13 @@ function dataResultsPlot=A6_correlation_AFM_BF(AFM_data,AFM_IO_Padded,metadataAF
     argName = 'Silent';             defaultVal = true;   addParameter(p,argName,defaultVal, @(x) islogical(x));
     argName = 'afterHeating';       defaultVal = false;  addParameter(p,argName,defaultVal, @(x) islogical(x));
     argName = 'innerBorderCalc';    defaultVal = false;  addParameter(p,argName,defaultVal,@(x) islogical(x));
+    argName = 'saveMaskFig';        defaultVal = true;   addParameter(p,argName,defaultVal,@(x) islogical(x));
 
-    parse(p,AFM_data,AFM_IO_Padded,varargin{:});
+    parse(p,AFM_data,AFM_IO,varargin{:});
     clearvars argName defaultVal
     if p.Results.Silent; SeeMe=0; else, SeeMe=1; end
     if p.Results.innerBorderCalc; innerBord=1; else, innerBord=0; end
+    if p.Results.saveMaskFig; saveMaskFig=true; else, saveMaskFig=false; end
     % in case one of the two is missing, substract by min value
     if p.Results.afterHeating; flag_heat=true; else, flag_heat=false; end
     if ~flag_heat
@@ -92,7 +94,7 @@ function dataResultsPlot=A6_correlation_AFM_BF(AFM_data,AFM_IO_Padded,metadataAF
     % The new solution is merging the mask of Delta with any channel before applying it to the single data.
     % In this way, the same mask is applied to any data!
     % crystal/PDA/polymer == 1   ||   background = 0
-    mask_AFM=logical(AFM_IO_Padded);   
+    mask_AFM=logical(AFM_IO);   
 
     % There may be NaN values in height and lateral channel that have been manually removed at the end of the Height/Lateral data processing
     % steps. To avoid vector incompatibilities during the correlation calculation, prepare the mask before starting the additional masking
@@ -112,8 +114,8 @@ function dataResultsPlot=A6_correlation_AFM_BF(AFM_data,AFM_IO_Padded,metadataAF
         % Delta_BK_ADJ=Delta_BK-threshold; Delta_ADJ=Delta-threshold;
         % but it has been decided to keep the values as they are.
         % create the first new mask (AFM IO + Delta Pos)
-        mask_validValues= Delta>0;                      % exclude zeros and negative values
-        mask_first = mask_AFM & mask_validValues;                     % merge the mask with original AFM_IO_Padded        
+        mask_BF_TRITIC = BF_IO & Delta>0;                      % exclude zeros and negative values
+        mask_first = mask_AFM & mask_BF_TRITIC;                % merge the mask with original AFM_IO_Padded        
         % copy Delta and apply first mask (AFM IO + pos values)
         Delta_firstMasking=Delta;        
         Delta_firstMasking(~mask_first)=nan; % FOREGROUND DELTA               
@@ -191,11 +193,13 @@ function dataResultsPlot=A6_correlation_AFM_BF(AFM_data,AFM_IO_Padded,metadataAF
     end
     dataResultsPlot.maskingResults = masking;
     % show the plots of the masks in case of normal AFM scans
-    if ~flag_heat
+    if saveMaskFig
         showData(idxMon,SeeMe,mask_AFM,{'Original Mask';'Generated from AFM-Height Binarization + modification due to registration'},folderResultsImg,'resultA6_1_1_OriginalMask','binary',true,'lenghtAxis',size_meterXpix*size(mask_first))
         showData(idxMon,SeeMe,mask_first,{'First Mask';'From Delta Positive value only'},folderResultsImg,'resultA6_1_2_FirstMask','binary',true,'lenghtAxis',size_meterXpix*size(mask_first))
-        showData(idxMon,SeeMe,mask_second,{'Second Mask';'From any AFM channel with Positive values'},folderResultsImg,'resultA6_1_3_SecondMask','binary',true,'lenghtAxis',size_meterXpix*size(mask_second))
-        showData(idxMon,SeeMe,mask_third,{'Third Mask';'From AFM Height 99° percentile + AFM Lateral < 2*maxSetP'},folderResultsImg,'resultA6_1_4_ThirdMask','binary',true,'lenghtAxis',size_meterXpix*size(mask_third))   
+        if ~flag_heat
+            showData(idxMon,SeeMe,mask_second,{'Second Mask';'From any AFM channel with Positive values'},folderResultsImg,'resultA6_1_3_SecondMask','binary',true,'lenghtAxis',size_meterXpix*size(mask_second))
+            showData(idxMon,SeeMe,mask_third,{'Third Mask';'From AFM Height 99° percentile + AFM Lateral < 2*maxSetP'},folderResultsImg,'resultA6_1_4_ThirdMask','binary',true,'lenghtAxis',size_meterXpix*size(mask_third))   
+        end
     end
     clear masking mask_validValues     
     %%%%%%%---------- Finally, applying the mask_definitive to all the data! ----------%%%%%%%
@@ -236,7 +240,7 @@ function dataResultsPlot=A6_correlation_AFM_BF(AFM_data,AFM_IO_Padded,metadataAF
     % Delta with the first mask to show how really Delta is.
     labelBar="Absolute fluorescence increase (A.U.)";
     size_meterXpix=metadataTRITIC.ImageHeight_umeterXpixel*metadataTRITIC.pixelSizeUnit;
-    % in case of normal AFM scans
+    % in case of normal AFM scans (no when onlyHeat because fluorescence intensity change)
     if ~flag_heat
         % delta BK  
         showData(idxMon,false,Delta_BK,"Delta Fluorescence Background (original AFM-IO mask)",folderResultsImg,'resultA6_2_0_DeltaFluorescenceBackground_originalMask','lenghtAxis',size_meterXpix*size(Delta),'labelBar',labelBar)  
@@ -254,7 +258,7 @@ function dataResultsPlot=A6_correlation_AFM_BF(AFM_data,AFM_IO_Padded,metadataAF
     %%% EXTRACT BORDERS AND DISTINGUISH INNER AND OUTER OF THE DATA %%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
     if innerBord && ~flag_heat
-        calcBorders(AFM_data,AFM_IO_Padded,idx_H,idx_LD,idx_VD,DeltaData,flag_heat,idxMon,SeeMe,folderResultsImg)        
+        calcBorders(AFM_data,AFM_IO,idx_H,idx_LD,idx_VD,DeltaData,flag_heat,idxMon,SeeMe,folderResultsImg)        
     end    
    
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -296,7 +300,7 @@ function dataResultsPlot=A6_correlation_AFM_BF(AFM_data,AFM_IO_Padded,metadataAF
             titleP = sprintf('Height Vs Fluorescence (%s - time exp %g ms)', maskFields{i,3}, timeExp);
             figName = sprintf('Height_Fluo_%s', maskFields{i,4});
             tmp.(['Height_FLUO_' maskFields{i,4}]) = A6_feature_corrForceFluorescence(x,y1,idxMon,folderResultsImg,'NumberOfBins',numBins, ...
-                'xpar',1e9,'XAxL','Feature height (nm)','ypar',1,'YAyL',labelBar,'FigTitle',titleP,'FigFilename',figName,'NumFig',2,'flagHeat',true);            
+                'xpar',1e9,'XAxL','Feature height (nm)','ypar',1,'YAyL',labelBar,'FigTitle',titleP,'FigFilename',figName,'NumFig',2,'flagHeat',flag_heat);            
         end
         dataResultsPlot.Height_FLUO=tmp;
 

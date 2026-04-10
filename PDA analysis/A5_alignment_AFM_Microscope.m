@@ -189,7 +189,7 @@ function [AFM_IO_3_BFaligned,BF_IO_1_cropped,AFM_Elab,info_allignment,offset]=A5
             sprintf('(3) Automatic method\n Thirion''s Demons Algorithm and Diffeomorphism')
                     '(4) Stop here the process. The fist cross-correlatin is okay.'};
         answerMethod=getValidAnswer(question,'',options,3);        
-        clear flag_AFM options question saveFig SeeMe textTitle BF_IO_0_original rect
+        clear flag_AFM options question saveFig SeeMe textTitle rect
         flagDemons=false;
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%%%% manual approach %%%%%%
@@ -276,7 +276,8 @@ function [AFM_IO_3_BFaligned,BF_IO_1_cropped,AFM_Elab,info_allignment,offset]=A5
         rect=rect_firstCorr;
         close(f3)
     end   
-
+    clear BF_IO_0_original
+    
     if answerCrop == 1
         answerCrop= 'Cropped'; applied='Not applied';
     elseif answerCrop == 2

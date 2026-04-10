@@ -169,9 +169,9 @@ function varargout=A5_feature_manualAlignmentGUI(AFM_IO_padded,BF_IO,AFM_data,re
             figure(f2max)
             if ~isempty(idxMon), objInSecondMonitor(f2max,idxMon); end
             title('Trend Cross-correlation score','FontSize',14)
-            saveas(f2max,sprintf('%s/resultA9_4_trendScoreCrossCorrelation_manualApproach.tif',newFolder))
-            % Close the figure
-            delete(hFig); delete(f2max)
+            saveFigures_FigAndTiff(f2max,newFolder,"resultA5_4_trendScoreCrossCorrelation_manualApproach")          
+            % Close the main UI figure
+            delete(hFig);
         end
     end
 
