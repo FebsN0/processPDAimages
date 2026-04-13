@@ -88,34 +88,63 @@ function varargout=A5_feature_manualAlignmentGUI(AFM_IO_padded,BF_IO,AFM_data,re
 
     % resize operations (increase/decrease matrix size by a defined scale)
     function apply_resize(scale)
+        % NOTE: NaN-safe transform
+        % imresize interpolates using neighboring pixels, so NaNs propagate into neighbors and expand over iterations. NaN positions are saved in a binary
+        % mask, NaNs are temporarily replaced with nanmean before resizing, then the transformed mask restores NaNs to their correct positions.
+        nan_mask_mod = isnan(modifiedImg1);
+        modifiedImg1(nan_mask_mod) = nanmean(modifiedImg1(:));
         modifiedImg1 = imresize(modifiedImg1, size(modifiedImg1)+scale);
-        for flag_AFM=1:size(AFM_data,2)
-            AFM_data(flag_AFM).AFM_aligned=imresize(AFM_data(flag_AFM).AFM_aligned,size(AFM_data(flag_AFM).AFM_aligned)+scale);
+        nan_mask_mod = imresize(double(nan_mask_mod), size(modifiedImg1), 'nearest') > 0.5;
+        modifiedImg1(nan_mask_mod) = NaN;
+        for flag_AFM = 1:size(AFM_data,2)
+            img = AFM_data(flag_AFM).AFM_aligned;
+            nan_mask = isnan(img);
+            img(nan_mask) = nanmean(img(:));
+            img = imresize(img, size(img)+scale);
+            nan_mask = imresize(double(nan_mask), size(img), 'nearest') > 0.5;
+            img(nan_mask) = NaN;
+            AFM_data(flag_AFM).AFM_aligned = img;
         end
         % save the operation
-        details_it_reg(counter,1)=1;
-        details_it_reg(counter,2)=scale;
+        details_it_reg(counter,1) = 1;
+        details_it_reg(counter,2) = scale;
         % run CC
         exeSingleCrossCorr(false);
-        counter=counter+1;
+        counter = counter+1;
         update_display();
-    end          
+    end       
+
     % rotate operations (rotate by a defined angle)
     function apply_rotate(angle)
-        modifiedImg1 = imrotate(modifiedImg1, angle,'bilinear','loose');
-        for flag_AFM=1:size(AFM_data,2)
-            AFM_data(flag_AFM).AFM_aligned=imrotate(AFM_data(flag_AFM).AFM_aligned,angle,'bilinear','loose');
+        % NOTE: NaN-safe transform (same rationale as apply_resize)
+        % For imrotate, border_mask additionally catches the zero-padded pixels
+        % introduced at the edges by 'loose', which are not real data.
+        nan_mask_mod = isnan(modifiedImg1);
+        modifiedImg1(nan_mask_mod) = nanmean(modifiedImg1(:));
+        modifiedImg1 = imrotate(modifiedImg1, angle, 'bilinear', 'loose');
+        nan_mask_mod = imrotate(double(nan_mask_mod), angle, 'nearest', 'loose') > 0.5;
+        border_mask = ~(imrotate(ones(size(nan_mask_mod)), angle, 'nearest', 'loose') > 0.5);
+        modifiedImg1(nan_mask_mod | border_mask) = NaN;
+        for flag_AFM = 1:size(AFM_data,2)
+            img = AFM_data(flag_AFM).AFM_aligned;
+            nan_mask = isnan(img);
+            img(nan_mask) = nanmean(img(:));
+            img = imrotate(img, angle, 'bilinear', 'loose');
+            nan_mask    = imrotate(double(nan_mask), angle, 'nearest', 'loose') > 0.5;
+            border_mask = ~(imrotate(ones(size(nan_mask)), angle, 'nearest', 'loose') > 0.5);
+            img(nan_mask | border_mask) = NaN;
+            AFM_data(flag_AFM).AFM_aligned = img;
         end
         % update the total rotation
-        rotation_deg=rotation_deg+angle;
+        rotation_deg = rotation_deg+angle;
         set(hRotText, 'String', ['Rotation: ' num2str(rotation_deg) '°']);
         % save the operation
-        details_it_reg(counter,1)=0;
-        details_it_reg(counter,2)=angle;
+        details_it_reg(counter,1) = 0;
+        details_it_reg(counter,2) = angle;
         % get CC
         exeSingleCrossCorr(false);
-        counter=counter+1;
-        update_display();        
+        counter = counter+1;
+        update_display();
     end
 
     % update the AFM and BF images after each operation
