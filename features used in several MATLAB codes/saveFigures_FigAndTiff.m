@@ -15,6 +15,11 @@ function saveFigures_FigAndTiff(fig,nameDir,nameFig,varargin)
     if isMatlabDarkMode()
         forceLightTheme(fig);
     end
+    % remove interactive icons on the axis
+    ax_all = findall(fig, 'Type', 'axes');
+    for k = 1:numel(ax_all)
+        axtoolbar(ax_all(k),'visible','off');
+    end    
     exportgraphics(fig,fullnameTif,'Resolution',300,'ContentType','image','Padding', 100);
     saveas(fig,fullnameFig)
     if p.Results.closeImmediately
