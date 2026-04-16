@@ -3,25 +3,40 @@ function varargout=A2_processAFMdata(allData,otherParameters,mainPath,SaveFigFol
     warning('off','MATLAB:polyfit:RepeatedPointsOrRescale');
     warning('off','curvefit:fit:IterationLimitReached');            
     warning('off','stats:statrobustfit:IterationLimit');
-
+    modesScan={'normal','friction','afterHeat'};
     p=inputParser(); 
     argName = 'SeeMe';          defaultVal = true;              addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
     argName = 'Normalization';  defaultVal = false;             addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
-    argName = 'modeScan';       defaultVal = 'normalScan';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'normalScan','frictionScan','postHeatScan'}));
+    argName = 'modeScan';       defaultVal = 'normalScan';      addParameter(p,argName,defaultVal, @(x) ismember(string(x),{'normalScan','frictionScan','postHeatScan'}));
     parse(p,varargin{:});
     SeeMe=p.Results.SeeMe;
     norm=p.Results.Normalization;
-    modeScan=p.Results.modeScan;
+    % define type of experiment
+    if strcmp(p.Results.modeScan,modesScan{1})
+        modeScan=1;        % normal
+    elseif strcmp(p.Results.modeScan,modesScan{2})
+        modeScan=2;        % friction
+    else
+        modeScan=3;        % afterHeat
+    end
     clear argName defaultVal p varargin
     % count how many sections has been generated
     numFiles=length(allData);
     % QUESTION process single sections then assembly or assembly then
-    % process? ASK only if the function is running with HOVER MODE ON. In
-    % case of HOVER MODE OFF (friction), skip it because it will 
-    if getValidAnswer("What type of Hover Mode has been made the data to process?","",{"Hover Mode ON","Hover Mode OFF"})==1
-        HVmode="HoverMode_ON";
+    % process? ASK only if main data of normal scans are made in HVon or HVoff. Previous version with friciton calc assumed data were from HVoff while
+    % normal scan data from HVon
+    listing=dir(mainPath);
+    mask = ~cellfun(@isempty, regexpi({listing.name}, '^HOVERMODE_'));
+    if nnz(mask)==2
+        if getValidAnswer("Multiple HoverMode found. Select the mode from which take the data to process.","",{"Hover Mode ON","Hover Mode OFF"})==1
+            HVmode="HoverMode_ON";
+        else
+            HVmode="HoverMode_OFF";
+        end
+    elseif nnz(mask)==1
+            HVmode=listing(mask).name;
     else
-        HVmode="HoverMode_OFF";
+        error("No any HVmode directory found!")
     end
     if numFiles>1
         typeProcessChoice=askTypeProcess(mainPath,SaveFigFolder,HVmode);
@@ -35,53 +50,52 @@ function varargout=A2_processAFMdata(allData,otherParameters,mainPath,SaveFigFol
         if flag_processSingleSection
             for i=1:numFiles
                 if i==1
-                    FitOrderHVON_Height='';
-                    FitOrderHVON_Lat='';
-                    FitOrderHVOFF_Height='';        
+                    FitOrder_Height='';
+                    FitOrder_Lat='';
                 end
                 % take the info from the first section.
-                if i~=1 && isempty(FitOrderHVOFF_Height)
+                if i~=1 && isempty(FitOrder_Height)
                     firstFileHeight=dir(fullfile(startPathSingleSectionFolder,"section_1","*_heightChannelProcessed.mat"));
-                    load(fullfile(firstFileHeight.folder,firstFileHeight.name),"FitOrderHVON_Height");
-                    if answSkipLat~=1
-                        firstFileLat=dir(fullfile(startPathSingleSectionFolder,"section_1","*_lateralChannelProcessed.mat"));
-                        load(fullfile(firstFileLat.folder,firstFileLat.name),"FitOrderHVON_Lat","FitOrderHVOFF_Height");
+                    load(fullfile(firstFileHeight.folder,firstFileHeight.name),"FitOrder_Height");
+                    if exist(dir(fullfile(startPathSingleSectionFolder,"section_1","*_lateralChannelProcessed.mat")),'file')
+                        load(fullfile(firstFileLat.folder,firstFileLat.name),"FitOrder_Lat");
                     end
                 end
                 TypeSectionProcess="SingleSection";
-                % check if results were already made.
-                [~,nameSection,~]=fileparts(allData(i).filenameSection);
-                % path of the subfolder where to store figures for each section
-                SaveFigIthSectionFolder=fullfile(startPathSingleSectionFolder,sprintf("section_%d",i));
-                fileName1=fullfile(SaveFigIthSectionFolder,sprintf("%s_heightChannelProcessed.mat",nameSection));
-                fileName2=fullfile(SaveFigIthSectionFolder,sprintf("%s_lateralChannelProcessed.mat",nameSection));
+                % if not processed, keep true, otherwise false
                 flagProcHeight=true;
-                % if Lateral Channel has already processed, load. NOTE: only
-                % for the first run (HOVER MODE ON), since the second run
-                % (HOVER MODE OFF), process is different
-                if exist(fileName2,"file")
+                % check if results of a specific section were already made.
+                [~,nameSection,~]=fileparts(allData(i).filenameSection);
+                SaveFigIthSectionFolder=fullfile(startPathSingleSectionFolder,sprintf("section_%d",i)); 
+                % pathfile of processed height
+                fileName1=fullfile(SaveFigIthSectionFolder,sprintf("%s_heightChannelProcessed.mat",nameSection));   
+                % in case of normal scan, check if Lateral Channel has already processed ==> load
+                if modeScan==1 && exist(fullfile(SaveFigIthSectionFolder,sprintf("%s_lateralChannelProcessed.mat",nameSection)),"file") 
                     question=sprintf("PostLateralChannel file .mat for the section %d already exists. Take it?",i);
                     if getValidAnswer(question,"",{'y','n'})
                         % each section has allData updated to the relative section.
                         load(fileName2,"allData")
                         continue
                     end
-                elseif exist(fileName1,"file")
+                end
+                % in any scan type, check if Height Channel has already processed ==> load
+                if exist(fileName1,"file")
                     question=sprintf("PostHeightChannel file .mat (HoverModeON-normal) for the section %d already exists. Take it?",i);
                     if getValidAnswer(question,"",{'y','n'})
                         if i==1
-                            load(fileName1,"AFM_HeightFittedMasked","AFM_height_IO","FitOrderHVON_Height")
+                            load(fileName1,"AFM_HeightFittedMasked","AFM_height_IO","FitOrder_Height")
                         else
                             load(fileName1,"AFM_HeightFittedMasked","AFM_height_IO")
                         end
+                        % skip height processing. In case of normal scan, start lateral processing
                         flagProcHeight=false;
                     end
-                end
-                fprintf("\n$$$$$-----------------$$$$\n$$ PROCESSING SECTION %d $$\n$$$$$-----------------$$$$\n",i)
+                end            
+                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                %%%%%%%% PROCESS HEIGHT CHANNEL AND GENERATE MASK %%%%%%%%
+                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%               
                 if flagProcHeight
-                    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                    %%%%%%%% PROCESS HEIGHT CHANNEL AND GENERATE MASK %%%%%%%%
-                    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%               
+                    fprintf("\n$$$$$-----------------------------------$$$$\n$$ PROCESSING HEIGHT CHANNEL OF SECTION %d $$\n$$$$$-----------------------------------$$$$\n",i)                    
                     % First, given the ith-section, create subfolder where store figures for each section and results                
                     if ~exist(SaveFigIthSectionFolder,'dir')
                         mkdir(SaveFigIthSectionFolder)
@@ -90,14 +104,15 @@ function varargout=A2_processAFMdata(allData,otherParameters,mainPath,SaveFigFol
                     dataPreProcess=allData(i).AFMImage_Raw;
                     metaDataPreProcess=allData(i).metadata;                                
                     % note: setpointsList = [] because the function is processing single sections
-                    [AFM_HeightFittedMasked,AFM_height_IO,FitOrderHVON_Height]=A2_feature_1_processHeightChannel(dataPreProcess,idxMon,SaveFigIthSectionFolder,'fitOrder',FitOrderHVON_Height,'imageType',TypeSectionProcess,'metadata',metaDataPreProcess,'SeeMe',false);                
+                    [AFM_HeightFittedMasked,AFM_height_IO,FitOrder_Height]=A2_feature_1_processHeightChannel(dataPreProcess,idxMon,SaveFigIthSectionFolder,modeScan,'fitOrder',FitOrder_Height,'imageType',TypeSectionProcess,'metadata',metaDataPreProcess,'SeeMe',false);                
                     % save the results for the specific section, to avoid to perform manual binarization
-                    save(fullfile(SaveFigIthSectionFolder,sprintf("%s_heightChannelProcessed.mat",nameSection)),"AFM_HeightFittedMasked","AFM_height_IO","FitOrderHVON_Height")                
+                    save(fullfile(SaveFigIthSectionFolder,sprintf("%s_heightChannelProcessed.mat",nameSection)),"AFM_HeightFittedMasked","AFM_height_IO","FitOrder_Height")                
                 end
                 clear question fileName*
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 %%%%%%%% PROCESS LATERAL DEFLECTION CHANNEL (in case of HOVER MODE ON DATA) %%%%%%%%
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%           
+                fprintf("\n$$$$$-----------------$$$$\n$$ PROCESSING LATERAL CHANNEL SECTION %d $$\n$$$$$-----------------$$$$\n",i)
                 metaData_AFM=allData(i).metadata; 
                 if ~exist("answSkipLat","var") && exist(fullfile(mainPath,"HoverMode_OFF"),"dir")
                     question=sprintf("Found HVoff for the same current section. Skip the Lateral Image Processing of %d-th section?",i);
@@ -111,8 +126,8 @@ function varargout=A2_processAFMdata(allData,otherParameters,mainPath,SaveFigFol
                 end
     
                 if ~strcmp(modeScan,'postHeatScan') % save time in case of postHeat AFM data
-                    [AFM_LatDeflecFitted_Force,metricsPlane,metricsLine,FitOrderHVON_Lat,FitOrderHVOFF_Height,avg_fc]=A2_feature_2_processLateralChannel(AFM_HeightFittedMasked,AFM_height_IO,metaData_AFM,idxMon,SaveFigIthSectionFolder,mainPath, ...
-                        'FitOrderHVON_Lat',FitOrderHVON_Lat,'FitOrderHVOFF_Height',FitOrderHVOFF_Height,'SeeMe',false,'idxSectionHVon',i,'flagSingleSectionProcess',true);
+                    [AFM_LatDeflecFitted_Force,metricsPlane,metricsLine,FitOrder_Lat,FitOrder_Height,avg_fc]=A2_feature_2_processLateralChannel(AFM_HeightFittedMasked,AFM_height_IO,metaData_AFM,idxMon,SaveFigIthSectionFolder,mainPath, ...
+                        'FitOrderHVON_Lat',FitOrder_Lat,'FitOrderHVOFF_Height',FitOrder_Height,'SeeMe',false,'idxSectionHVon',i,'flagSingleSectionProcess',true);
                     allData(i).metadata.frictionCoeff_Used=avg_fc;
                     % prepare the info about the used fitting
                     if ~isempty(metricsLine)
@@ -124,7 +139,7 @@ function varargout=A2_processAFMdata(allData,otherParameters,mainPath,SaveFigFol
                     allData(i).metadata.fittingInfo=sprintf("PlaneFit: %s%s",infoPlane,infoLine);
                     allData(i).AFMImage_PostProcess=AFM_LatDeflecFitted_Force;
                     allData(i).AFMmask_heightIO=AFM_height_IO;     
-                    save(fullfile(SaveFigIthSectionFolder,sprintf("%s_lateralChannelProcessed.mat",nameSection)),"allData","FitOrderHVON_Height","FitOrderHVOFF_Height","FitOrderHVON_Lat") 
+                    save(fullfile(SaveFigIthSectionFolder,sprintf("%s_lateralChannelProcessed.mat",nameSection)),"allData","FitOrder_Height","FitOrder_Height","FitOrder_Lat") 
                 end
                 close all            
             end
@@ -140,9 +155,12 @@ function varargout=A2_processAFMdata(allData,otherParameters,mainPath,SaveFigFol
         [AFM_images_assembled,metaData] = A2_feature_sortAndAssemblySections(allData,otherParameters,flag_processSingleSection,modeScan);             
         % in case of no single section processing, now process the assembled image
         if ~flag_processSingleSection
-            [AFM_images_postHeight,AFM_height_IO]=A2_feature_1_processHeightChannel(AFM_images_assembled,idxMon,SaveFigFolder,'SeeMe',SeeMe,'Normalization',norm, ...
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%%%%%%%% HEIGHT PROCESSING AFTER ASSEMBLY %%%%%%%%%
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            [AFM_images_postHeight,AFM_height_IO]=A2_feature_1_processHeightChannel(AFM_images_assembled,idxMon,SaveFigFolder,modeScan,'SeeMe',SeeMe,'Normalization',norm, ...
                 'imageType','Assembled','metadata',metaData);
-            if strcmp(modeScan,'normalScan')
+            if modeScan==1
                 AFM_images_final=A2_feature_2_processLateralChannel(AFM_images_postHeight,AFM_height_IO,metaData_AFM.Alpha,idxMon,SaveFigFolder,mainPath, ...
                     'FitOrder',accuracy,'SeeMe',SeeMe,'Normalization',norm);  
             else
@@ -161,7 +179,7 @@ function varargout=A2_processAFMdata(allData,otherParameters,mainPath,SaveFigFol
             'idxMon',idxMon,'folderSaveFig',SaveFigFolder,'SeeMe',false, ...
             'imageType','Assembled','Normalization',norm,'postProcessed',true)
         % avoid saving because already saving outside this function in A0_main_fluorescence.m
-        if ~strcmp(modeScan,'postHeatScan')
+        if modeScan~=3
             save(fullfile(SaveFigFolder,"data_postProcessedpostAssembled"),"AFM_images_final","AFM_height_IO","metaData")
         end
     else
@@ -175,11 +193,11 @@ function varargout=A2_processAFMdata(allData,otherParameters,mainPath,SaveFigFol
             % in case never processed, start the height channel process. 
             dataPreProcess=allData.AFMImage_Raw;
             metaDataPreProcess=allData.metadata;                                
-            [AFM_HeightFittedMasked,AFM_height_IO]=A2_feature_1_processHeightChannel(dataPreProcess,idxMon,SaveFigFolder,'imageType','Entire','metadata',metaDataPreProcess,'SeeMe',false);                            
+            [AFM_HeightFittedMasked,AFM_height_IO]=A2_feature_1_processHeightChannel(dataPreProcess,idxMon,SaveFigFolder,modeScan,'imageType','Entire','metadata',metaDataPreProcess,'SeeMe',false);                            
             save(fullfile(pathfile,"heightChannelProcessed.mat"),"AFM_HeightFittedMasked","AFM_height_IO","metaDataPreProcess")                
         end
         % in case of frictionScan, stop here the processing. No needed the lateral processing for friction scans
-        if strcmp(modeScan,'frictionScan') 
+        if modeScan==2 
             varargout{1}=AFM_HeightFittedMasked;
             varargout{2}=AFM_height_IO;
             varargout{3}=metaDataPreProcess;
