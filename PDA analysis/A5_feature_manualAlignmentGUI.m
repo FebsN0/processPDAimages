@@ -123,19 +123,21 @@ function varargout=A5_feature_manualAlignmentGUI(AFM_IO_padded,BF_IO,AFM_data,re
         modifiedImg1(nan_mask_mod) = nanmean(modifiedImg1(:));
         modifiedImg1 = imrotate(modifiedImg1, angle, 'bilinear', 'loose');
         nan_mask_mod = imrotate(double(nan_mask_mod), angle, 'nearest', 'loose') > 0.5;
-        border_mask = ~(imrotate(ones(size(nan_mask_mod)), angle, 'nearest', 'loose') > 0.5);
-        modifiedImg1(nan_mask_mod | border_mask) = NaN;
+        % border_mask derived from modifiedImg1 directly — guaranteed same size
+        border_mask = (modifiedImg1 == 0);
+        modifiedImg1(nan_mask_mod | border_mask) = NaN;    
         for flag_AFM = 1:size(AFM_data,2)
             img = AFM_data(flag_AFM).AFM_aligned;
             nan_mask = isnan(img);
             img(nan_mask) = nanmean(img(:));
             img = imrotate(img, angle, 'bilinear', 'loose');
-            nan_mask    = imrotate(double(nan_mask), angle, 'nearest', 'loose') > 0.5;
-            border_mask = ~(imrotate(ones(size(nan_mask)), angle, 'nearest', 'loose') > 0.5);
+            nan_mask    = imrotate(double(nan_mask), angle, 'nearest', 'loose') > 0.5;        
+            % border_mask derived from img directly — guaranteed same size
+            border_mask = (img == 0);
             img(nan_mask | border_mask) = NaN;
             AFM_data(flag_AFM).AFM_aligned = img;
         end
-        % update the total rotation
+                % update the total rotation
         rotation_deg = rotation_deg+angle;
         set(hRotText, 'String', ['Rotation: ' num2str(rotation_deg) '°']);
         % save the operation
