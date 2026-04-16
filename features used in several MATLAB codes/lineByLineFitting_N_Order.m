@@ -3,8 +3,11 @@ function varargout = lineByLineFitting_N_Order(data,limit,varargin)
 % GOAL: extract the background to remove from the data
     warning('off', 'curvefit:prepareFittingData:removingNaNAndInf');
     p=inputParser();
-    argName = 'CheckBordersLine';   defaultVal = false;     addOptional(p,argName,defaultVal, @(x) (islogical(x)));
-    argName = 'idxMon';             defaultVal = [];        addOptional(p,argName,defaultVal, @(x) (isempty(x) || isnumeric(x)));
+    argName = 'CheckBordersLine';               defaultVal = false;     addOptional(p,argName,defaultVal, @(x) (islogical(x)));
+    argName = 'idxMon';                         defaultVal = [];        addOptional(p,argName,defaultVal, @(x) (isempty(x) || isnumeric(x)));
+    argName = 'excludePixelsUpperLimitPerc';    defaultVal = 100;       addOptional(p,argName,defaultVal, @(x) (isempty(x) || isnumeric(x)));
+    argName = 'excludePixelsLowerLimitPerc';    defaultVal = 0;         addOptional(p,argName,defaultVal, @(x) (isempty(x) || isnumeric(x)));
+
     parse(p,varargin{:});
     flagCheckBorder=p.Results.CheckBordersLine;
     num_lines = size(data,2);
@@ -33,11 +36,22 @@ function varargout = lineByLineFitting_N_Order(data,limit,varargin)
         hold(axAnomalies,"on")
     end
     
+    percUp=p.Results.excludePixelsUpperLimitPerc;
+    percLow=p.Results.excludePixelsLowerLimitPerc;
+
+    if percUp<100
+        data(data>prctile(data,percUp,"all"))=nan;
+    end
+    if percLow>0
+        data(data<prctile(data,percLow,"all"))=nan;
+    end
+
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)    
     wb=waitbar(0/num_lines,sprintf('AIC-based background fitting - Line %d of %d completed',0,num_lines),...
             'CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
-    setappdata(wb,'canceling',0);   
+    setappdata(wb,'canceling',0); 
+    countPerc=1;
     for i=1:num_lines
         if(exist('wb','var')) && getappdata(wb, 'canceling')
             delete(wb);   
@@ -137,7 +151,10 @@ function varargout = lineByLineFitting_N_Order(data,limit,varargin)
         end
         allBaseline(:, i) = fittedline;
         % Progress update
-        waitbar(i/num_lines, wb, sprintf('AIC-based background fitting - Line %d of %d completed',i, num_lines));
+        if i==(countPerc*round(10/100*num_lines))
+            waitbar(i/num_lines, wb, sprintf('AIC-based background fitting - Line %d of %d completed',i, num_lines));
+            countPerc=countPerc+1;
+        end
     end
     if flagCheckBorder
         close(fAnomaliesCheck) 

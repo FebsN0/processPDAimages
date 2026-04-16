@@ -21,6 +21,7 @@ function saveFigures_FigAndTiff(fig,nameDir,nameFig,varargin)
         axtoolbar(ax_all(k),'visible','off');
     end    
     exportgraphics(fig,fullnameTif,'Resolution',300,'ContentType','image','Padding', 100);
+    pause(2)
     saveas(fig,fullnameFig)
     if p.Results.closeImmediately
         close(fig)
