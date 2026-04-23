@@ -63,4 +63,14 @@ function forceLightTheme(fig)
     for k = 1:numel(cb)
         cb(k).Color = 'black';
     end
+    % 5) Force sup title to black (sgtitle inside tiledlayout or subplot or direct on figure)
+    tl = findall(fig, 'Type', 'tiledlayout');
+    if ~isempty(tl)
+         tl(1).Title.Color = 'black';
+    else
+        sg = findall(fig, 'Type', 'text', 'Tag', 'suptitle');
+        if ~isempty(sg)
+            [sg.Color] = deal('black');
+        end
+    end
 end

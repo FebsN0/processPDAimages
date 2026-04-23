@@ -1,9 +1,13 @@
-function closest_indices = selectRangeGInput(n_points,dimension,axFig)
+function [closest_indices,obj] = selectRangeGInput(n_points,dimension,axFig)
 % OUTPUT:
 %   closest_indices : if dimension = 1, the output will be the index for each point on the
 %                       corrisponding x axis (1 value for each point)
 %                     if dimension = 2, the output will be the index for each point on the
 %                       corrisponding x and y axis (2 values for each point)
+%   obj             : contains x-y data from which the closest_indices has been extracted. This is useful whenever axFig contains more datasets with different length 
+%                     (different XData size) ==> when the function grabs the first non-constantline child of the axis from which do ginput, save also that specific object's XData
+%                     since the index is not a universal index shared across all datasets.
+%
 % INPUTS
 %   n_points        : how many points will be selected
 %   dimension       : find the closest real indexes by 1-dimensional (x direction) or
@@ -17,8 +21,7 @@ function closest_indices = selectRangeGInput(n_points,dimension,axFig)
     end
     %--------------------------------------------------------------
     % Force the axis to be current and get the first child object.
-    %--------------------------------------------------------------
-    
+    %--------------------------------------------------------------    
     if ~isa(axFig, 'matlab.graphics.axis.Axes')
         error('A figure handler has been provided. It must be an axis handler for better management');          
     end
