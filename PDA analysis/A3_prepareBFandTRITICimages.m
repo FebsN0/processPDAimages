@@ -328,7 +328,24 @@ function varargout=A3_prepareBFandTRITICimages(folderResultsImg,idxMon,groupExpe
         delete(fullfile(folderResultsImg,"TMP_BF_TRITIC_rawFiles.mat"),"file")
     else
         varargout{3}=allImage_TRITIC;
-        varargout{4}=BF_ImagePRE;
+        % in case of heated scans, check if there are two BF (pre and post) images. If so, choose which one to take
+        if flag_PRE_POST           
+            showData(idxMon,true,imadjust(BF_ImagePRE),"BF-pre","","",'grayscale',true,'saveFig',false,'noLabels',true);
+            showData(idxMon,true,imadjust(BF_ImagePOST),"BF-post","","",'grayscale',true,'saveFig',false,'noLabels',true);
+            % if any, find the image of AFM scan to understand how to choose
+            if exist(fullfile(folderResultsImg,"figImages","resultA2_9_HeightFINAL.fig"),"file")
+                figtmp2=openfig(fullfile(folderResultsImg,"figImages","resultA2_9_HeightFINAL.fig"),'visible');                
+                objInSecondMonitor(figtmp2,idxMon)
+            end
+            if getValidAnswer("Found two images for the postHeated samples. Which Brightfield Image to take?","",{"BEFORE","AFTER"})==1
+                varargout{4}=BF_ImagePRE;
+            else
+                varargout{4}=BF_ImagePOST;
+            end
+            close all
+        else
+            varargout{4}=BF_ImagePRE;
+        end
     end
 end
 
@@ -338,7 +355,7 @@ function [Image,metaData]=selectND2file(varargin)
     p=inputParser();
     argName = 'titleImage';         defaultVal = [];            addOptional(p,argName,defaultVal);    
     argName = 'typeImage';          defaultVal = 'BrightField'; addOptional(p,argName,defaultVal,@(x) ismember(x,{'BrightField','TRITIC'}));  % Brightfield or TRITIC
-    argName = 'mode';               defaultVal = [];            addOptional(p,argName,defaultVal,@(x) ismember(x,{[],' Before',' After'}));  % Before or After
+    argName = 'mode';               defaultVal = 'Before';      addOptional(p,argName,defaultVal,@(x) ismember(x,{'Before','After'}));  % Before or After
     argName = 'fullfilePath';       defaultVal = [];            addOptional(p,argName,defaultVal);
     argName = 'saveFig';            defaultVal = true;          addOptional(p,argName,defaultVal, @(x) islogical(x));
     argName = 'idxMon';             defaultVal = [];            addOptional(p,argName,defaultVal);  

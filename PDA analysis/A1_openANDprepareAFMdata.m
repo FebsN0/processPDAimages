@@ -1,6 +1,17 @@
+% Author: Altieri Fabiano
+% Univeristy of Tokyo
+% This function:
+% 1) prepare the directories where to store the data and figures. 
+% 2) open one or more .jpk files and reorganize into struct data for easy readibility
+% INPUT:    (1) 'filePath' : starting directory to look for files to open
+%           (2) 'frictionData' : true/false 
+%
+% OUTPUT:   (1) allData : 1xn struct with 3 fields: filename - metadata - AFMImage_Raw (=struct 1x5 where 5 are the channels)
+%           (2) otherParameters
+%           (3) SaveFigFolder
+
 function varargout = A1_openANDprepareAFMdata(varargin)
-    %%%% prepare the directories where to store the data and figures. Then open .jpk files and prepare them. If there are more
-    %%%% files than one, re-organize in cell array
+    
         
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)    

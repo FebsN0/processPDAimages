@@ -388,7 +388,7 @@ function varargout=A2_feature_1_processHeightChannel(data,idxMon,SaveFigFolder,m
         % Display and save result
         titleData1={'Results Plane Fitting with masked Height';sprintf('Order Plane: %s - iteration %d',metrics.fitOrder,iterationMain)};
         titleData2 = 'Post PlaneFit Masked Height';'Background from OPT-Height Image';
-        titleData3={'Resulting OPT-Height Image'; sprintf('Iteration %d',iterationMain)};              
+        titleData3={'Resulting PlaneFit Height Image'; sprintf('Iteration %d',iterationMain)};              
         nameFile=sprintf('resultA2_6_FittPlaneBKwithFinalMask_corrHeight_iteration%d',iterationMain);           
         showData(idxMon,SeeMe,planeFit*factor,titleData1,SaveFigFolder,nameFile,'normalized',norm,'labelBar',labelHeight,...
             'extraData',{BK_6_definitive_PlaneFit*factor,height_7_planeFitOnFinalMaskBK*factor}, ...

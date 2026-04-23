@@ -1,16 +1,15 @@
 % OUTPUT:
 %   dataResultsPlot = struct which contains the results of:
-%       1) .Delta               = delta fluorescence data
-%       2) .Height_LD               = Height VS Lateral Deflection           
-%       3) .Height99perc_LD_maxVD   = Height (99 percentile removed) VS Lateral Deflection (up to max vertical deflection)
-%       4) .Height_FLUO             = Height VS FLUORESCENCE         
-%       5) .Height99perc_FLUO       = Height (99 percentile removed) VS FLUORESCENCE
+%       1) .maskingResults          = all masks to filter out non valid pixels
+%       2) .DeltaData               = all delta fluorescence data 
+%       3) .AFM_Data                = all AFM data
+%       4) .Height_LD               = Height VS Lateral Deflection           
+%       5) .Height_FLUO             = Height VS FLUORESCENCE
 %       6) .LD_FLUO                 = Lateral Deflection VS FLUORESCENCE
-%       7) .LDmaxVD_FLUO            = Lateral Deflection (up to max vertical deflection) VS FLUORESCENCE 
-%       8) .VD_FLUO                 = Vertical Deflection VS FLUORESCENCE
-%       9) .VD_LD                   = Vertical Deflection VS Lateral Deflection
-%      10) .VD_LDmaxVD              = Vertical Deflection VS Lateral Deflection (up to max vertical deflection)
+%      10) .VD_FLUO                 = Vertical Deflection VS FLUORESCENCE
+%      11) .VD_LD                   = Vertical Deflection VS Lateral Deflection
 %
+%   NOTE: all data contains all mask operations, i.e. LD_FLUO 1st masked, LD_FLUO 2nd masked, etc ..
 % the following script process data from different situation:
 %       1) normal experiment:   AFM + pre and post scan fluorescence image  + BF image
 %       2) after heating:       AFM + single scan fluorescence image        + BF image

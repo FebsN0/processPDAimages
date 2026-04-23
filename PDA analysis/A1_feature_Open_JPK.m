@@ -1,9 +1,6 @@
-        % varargout = return any number of output arguments
-function [varargout]=A1_feature_Open_JPK(pathJpk,varargin)
-
-    
-% the python file is assumed to be in a directory called "PythonCodes". Find it to a max distance of 4 upper
-% folders
+% varargout = return any number of output arguments
+function [varargout]=A1_feature_Open_JPK(pathJpk,varargin)  
+% the python file is assumed to be in a directory called "PythonCodes". Find it to a max distance of 4 upper folders
     % Maximum levels to search
     maxLevels = 4; originalPos=pwd; found=false;
     for i=1:maxLevels
@@ -49,7 +46,6 @@ function [varargout]=A1_feature_Open_JPK(pathJpk,varargin)
 % Important implementation: using python to extract metadata
 % run on Command Window "pyversion". If it return nothing, python may be not installed or you dont have the
 % rignt version. Check on the website https://www.mathworks.com/support/requirements/python-compatibility.html
-% 
 
 
 %%%%%%%%%%%%%%%%%%% UPDATES %%%%%%%%%%%%%%%%%%%%%
