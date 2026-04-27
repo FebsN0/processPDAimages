@@ -1,4 +1,4 @@
-function varargout=A2_feature_1_processHeightChannel(data,idxMon,SaveFigFolder,modeScan,varargin)
+function varargout=A2_1_processHeight(data,idxMon,SaveFigFolder,modeScan,varargin)
 % The function extracts Images from the experiments.
 % It removes baseline and extracts foreground from the AFM image.
 %
@@ -461,10 +461,10 @@ function varargout=A2_feature_1_processHeightChannel(data,idxMon,SaveFigFolder,m
                     % The height channel will be changed with the new optimized final height previosuly obtained.
                     % The height will keep the size. Therefore, if HV OFF and resizing, the height is ok. But for the other channels, they
                     % have been already copied!
-                    AFM_Images_final(i).AFM_images_2_PostProcessed=height_FINAL;
+                    AFM_Images_final(i).AFM_images_2_PostHeightProcessed=height_FINAL;
                 elseif ~strcmp(binarizationMethod,"Extracted from HV ON mask") 
                     % Copy the the original data as new column except height. 
-                    AFM_Images_final(i).AFM_images_2_PostProcessed=AFM_Images_final(i).AFM_images_1_original; 
+                    AFM_Images_final(i).AFM_images_2_PostHeightProcessed=AFM_Images_final(i).AFM_images_1_original; 
                 end
             end
             varargout{1}=AFM_Images_final;

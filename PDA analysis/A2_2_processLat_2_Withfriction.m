@@ -4,7 +4,7 @@
 % Check manually the processed image afterwards and compare with the AFM VD
 % image!
 
-function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,metadata,idxMon,SaveFigFolder,mainPath,varargin)
+function varargout=A2_2_processLat_2_Withfriction(AFM_data,AFM_height_IO,metadata,idxMon,SaveFigFolder,mainPath,varargin)
     % in case of code error, the waitbar won't be removed. So the following command force its closure
     warning ('off','all'); 
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
@@ -218,7 +218,7 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,met
                 if ~exist(fullfile(mainPath,'HoverMode_OFF'),"dir")
                     error('The directory HoverMode_OFF doesn''t exist. Select another option')
                 end
-                [avg_fc,FitOrderHVOFF_Height] = A2_feature_2_1_FrictionCalcFromSameScanHVOFF(idxMon,mainPath,flagSingleSectionProcess,'idxSectionHVon',idxSectionHVon,'FitOrderHVOFF_Height',FitOrderHVOFF_Height);
+                [avg_fc,FitOrderHVOFF_Height] = featureFrictionCalc0_FromSameScanHVOFF(idxMon,mainPath,flagSingleSectionProcess,'idxSectionHVon',idxSectionHVon,'FitOrderHVOFF_Height',FitOrderHVOFF_Height);
                 if isempty(avg_fc)
                     fprintf('For some reasons, the scan in HoverMode OFF is messed up. Choose a standard value if possible')
                     continue
@@ -297,6 +297,8 @@ function varargout=A2_feature_2_processLateralChannel(AFM_data,AFM_height_IO,met
     % save the corrected lateral force into cropped AFM image
     AFM_Elab=AFM_data;    
     AFM_Elab(strcmpi([AFM_data.Channel_name],'Lateral Deflection') & strcmpi([AFM_data.Trace_type],'Trace')).AFM_images_2_PostProcessed=lateral_FINAL;
+    
+    
     varargout{1}=AFM_Elab; 
     varargout{2}=metricsBestPlaneFit;
     varargout{3}=metricsBestLineFit;
