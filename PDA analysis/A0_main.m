@@ -76,33 +76,46 @@ clear vers pv* pe
 idxMon=objInSecondMonitor;
 pause(1)
 
-mainPath=uigetdir(pwd,sprintf('Locate the main scan directory which contains both HVon and HVoff directories'));
-tmp=strsplit(mainPath,'\');
-nameScan=tmp{end}; nameExperiment=tmp{end-2}; clear tmp
-question=sprintf('Name experiment: %s\nScan i-th: %s\nIs everything okay?',nameExperiment,nameScan);
-if ~getValidAnswer(question,'',{'Yes','No'})
-    while true
-        nameExperiment=inputdlg('Enter manually name experiment');
-        if isempty(nameExperiment) || isempty(nameExperiment{1})
-            disp('Input not valid')
-        else
-            break
+mainPath=uigetdir(pwd,sprintf('Locate the directory of a scan of a specific experiment condition which contains HVon/HVoff directories.'));
+if exist(fullfile(mainPath,"infoDataprocessing.mat"),"file")
+    load(fullfile(mainPath,"infoDataprocessing"),"nameExperiment","nameScan")
+else
+    tmp=strsplit(mainPath,'\');
+    nameScan=tmp{end}; nameExperiment=tmp{end-2};
+    question=sprintf('Name experiment: %s\nScan i-th: %s\nIs everything okay?',nameExperiment,nameScan);
+    if ~getValidAnswer(question,'',{'Yes','No'})
+        while true
+            res=inputdlg({"ID scan","Name experiment (ex. TRCDA)"},"Enter manually names",[1 80; 1 80],{nameScan,mainPath});
+            if any(cellfun(@(x) isempty(x), res))
+                disp('Input not valid')
+            else
+                nameScan=res{1};
+                nameExperiment=res{2};
+                break
+            end
         end
     end
+    save(fullfile(mainPath,"infoDataprocessing"),"nameExperiment","nameScan")
 end
-clear question
+clear question res tmp
 %%
 % check if data already exist. If so, upload.
+HVmodesInfo=checkHVmode(mainPath);
 step2Start=checkExistingData(mainPath,nameExperiment,nameScan);
-
 %% Aseembly sections if any, binarize height image and optimize it
 if step2Start<1  
     % extract the data, metadata, other parameters and the directory where to store the figures from .jpk files
-    [allData,otherParameters,SaveFigFolder]=A1_openANDprepareAFMdata('filePath',fullfile(mainPath,'HoverMode_ON'));
+    if strcmp(HVmodesInfo.mainData,"OFF")
+        mainHVmode = HVmodesInfo.dirOFF{:};
+    else
+        mainHVmode = HVmodesInfo.dirON{:};
+    end
+    [allData,otherParameters,SaveFigFolder]=A1_openANDprepareAFMdata('filePath',fullfile(mainPath,mainHVmode));
     save(fullfile(SaveFigFolder,'resultsData_1_extractAFMdata'),"allData","otherParameters","SaveFigFolder")
 end
+%%
 if step2Start<2  
-    [dataAFM_latDeflecFitted, AFM_height_IO, metaData_AFM]= A2_processAFMdata(allData,otherParameters,mainPath,SaveFigFolder,idxMon);     
+    [dataAFM_latDeflecFitted, AFM_height_IO, metaData_AFM]= A2_0_main_processAFMdata(allData,otherParameters,mainPath,SaveFigFolder,HVmodesInfo,idxMon);     
     clear BW maskedImage accuracy 
     save(fullfile(SaveFigFolder,'resultsData_2_assemblyProcessAFMdata'))
 end
@@ -159,78 +172,72 @@ cleanupObj = onCleanup(@() warning(orig));  % will restore original state
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%% FUNCTIONS %%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function idxLastOperation=checkExistingData(mainPath,nameExperiment,nameScan)
-    if ~exist(fullfile(mainPath,'HoverMode_ON'),"dir" )
-        % HoverMode_ON is the directory which contains the .jpk file in Hover Mode ON, so the first scan (the second scan is Hover Mode off. Required for calc the friction coefficient
-        error('Data Scan %s Hover Mode ON doesn''t exist. Check the directory',nameScan)
-    else
-        % check if some data already exist to avoid to do again some parts of the postprocessing          
-        % if A1 (extract data) is already done
-        filePostA1  =  'resultsData_1_extractAFMdata.mat';
-        question1   =   sprintf('(A1) AFM data extraction (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
-        options1    =   {'(A2) Run next step: Assembly-Process AFM data','(A1) Redo Extraction AFM data'};
-        % if A2 (process-assembly) is already done
-        filePostA2  =  'resultsData_2_assemblyProcessAFMdata.mat';
-        question2   =   sprintf('(A2) Assembly - Process of AFM data (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
-        options2    =   {'(A3) Run next step: prepare TRITIC data','(A2) Redo Assembly-Process AFM data'};
-        % if A3 (prepare TRITIC and BF data)
-        filePostA3  =  'resultsData_3_BF_TRITIC_ready.mat';
-        question3   =   sprintf('(A3) BF and TRITIC images preparation (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
-        options3    =   {'(A4) Run next step: TRITIC binarization','(A3) Redo preparation BF-TRITIC data'};
-        % if A4 (binarization TRITIC and BF data)
-        filePostA4  =  'resultsData_4_BF_TRITIC_binarization.mat';
-        question4   =   sprintf('(A4) BF and TRITIC images binarization (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
-        options4    =   {'(A5) Run next step:  AFM-TRITIC alignment','(A4) Redo BF-TRITIC data binarization'};        
-        % if A5 (conversion of lateral data from Volt into Force according to the friction by processing HVoff) is already done
-        filePostA5  =  'resultsData_5_AFM_TRITIC_alignment.mat';
-        question5   =   sprintf('(A5) AFM-TRITIC alignment (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
-        options5    =   {'(A6) Run next step: Force-Fluorescence correlation','(A5) Redo AFM-TRITIC alignment'};            
-        % if A5 (final data) is already obtained
-        filePostA6end = 'resultsData_END_Force_Fluorescence_Correlation.mat';        
-        question6     =   sprintf('(A6) Force-Fluorescence correlation (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
-        options6      =   {'(END) Stop the process','(A6) Redo Force-Fluorescence correlation'};
-        % prepare list
-        fileList={filePostA1,filePostA2,filePostA3,filePostA4,filePostA5,filePostA6end};
-        questionList={question1,question2,question3,question4,question5,question6};
-        optionsList={options1,options2,options3,options4,options5,options6};
-        % find the paths of the files. If not available, the i-th step cell will be empty. Therefore, more easy to find the last file
-        flagPresenceFile=cellfun(@(x) fullfile({dir(fullfile(mainPath,'Results Processing AFM and fluorescence images*',x)).folder},x), ...
-            fileList,'UniformOutput',false);        
-        idxLastOperation=find(cellfun(@(x) ~isempty(x), flagPresenceFile),1,"last");
-
-        if ~isempty(idxLastOperation)
-            if getValidAnswer(questionList{idxLastOperation},'',optionsList{idxLastOperation})==1
-            % first option choosen (CONTINUE)
-                if idxLastOperation==6 %last step already done
-                    error('Stopped by user.')
-                end
-                % take the last dataset
-                tmpData=load(flagPresenceFile{idxLastOperation}{:});
-            else
-                % second option choosen (REDO)
-                if idxLastOperation==1
-                    % in case of redo first step, complete restart
-                    idxLastOperation=0;
-                else
-                    % take the dataset before the last
-                    tmpData=load(flagPresenceFile{idxLastOperation-1}{:});                      
-                end
+function idxLastOperation=checkExistingData(mainPath,nameExperiment,nameScan)          
+    % check if some data already exist to avoid to do again some parts of the postprocessing          
+    % if A1 (extract data) is already done
+    filePostA1  =  'resultsData_1_extractAFMdata.mat';
+    question1   =   sprintf('(A1) AFM data extraction (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
+    options1    =   {'(A2) Run next step: Assembly-Process AFM data (single section processing may already have been started).','(A1) Redo Extraction AFM data'};
+    % if A2 (process-assembly) is already done
+    filePostA2  =  'resultsData_2_assemblyProcessAFMdata.mat';
+    question2   =   sprintf('(A2) Assembly - Process of AFM data (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
+    options2    =   {'(A3) Run next step: prepare TRITIC data','(A2) Redo Assembly-Process AFM data'};
+    % if A3 (prepare TRITIC and BF data)
+    filePostA3  =  'resultsData_3_BF_TRITIC_ready.mat';
+    question3   =   sprintf('(A3) BF and TRITIC images preparation (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
+    options3    =   {'(A4) Run next step: TRITIC binarization','(A3) Redo preparation BF-TRITIC data'};
+    % if A4 (binarization TRITIC and BF data)
+    filePostA4  =  'resultsData_4_BF_TRITIC_binarization.mat';
+    question4   =   sprintf('(A4) BF and TRITIC images binarization (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
+    options4    =   {'(A5) Run next step:  AFM-TRITIC alignment','(A4) Redo BF-TRITIC data binarization'};        
+    % if A5 (conversion of lateral data from Volt into Force according to the friction by processing HVoff) is already done
+    filePostA5  =  'resultsData_5_AFM_TRITIC_alignment.mat';
+    question5   =   sprintf('(A5) AFM-TRITIC alignment (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
+    options5    =   {'(A6) Run next step: Force-Fluorescence correlation','(A5) Redo AFM-TRITIC alignment'};            
+    % if A5 (final data) is already obtained
+    filePostA6end = 'resultsData_END_Force_Fluorescence_Correlation.mat';        
+    question6     =   sprintf('(A6) Force-Fluorescence correlation (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
+    options6      =   {'(END) Stop the process','(A6) Redo Force-Fluorescence correlation'};
+    % prepare list
+    fileList={filePostA1,filePostA2,filePostA3,filePostA4,filePostA5,filePostA6end};
+    questList={question1,question2,question3,question4,question5,question6};
+    optList={options1,options2,options3,options4,options5,options6};
+    clear filePost* question* option*
+    % find the paths of the files. If not available, the i-th step cell will be empty. Therefore, more easy to find the last file
+    flagPresenceFile=cellfun(@(x) fullfile({dir(fullfile(mainPath,'Results Processing AFM and fluorescence images*',x)).folder},x), ...
+        fileList,'UniformOutput',false);        
+    idxLastOperation=find(cellfun(@(x) ~isempty(x), flagPresenceFile),1,"last");
+    if ~isempty(idxLastOperation)
+        if getValidAnswer(questList{idxLastOperation},'',optList{idxLastOperation})==1
+        % first option choosen (CONTINUE)
+            if idxLastOperation==6 %last step already done
+                error('Stopped by user.')
             end
+            % take the last dataset
+            tmpData=load(flagPresenceFile{idxLastOperation}{:});
         else
-            idxLastOperation=0;
-        end
-        % move the data on the main workspace (here we are still inside a
-        % function, so the variables must be copied outside).
-        % no need to delete some vars created here. Only those from tmpData
-        % will be copied
-        if exist('tmpData','var')
-            fieldNamesC = fieldnames(tmpData);
-            for i = 1:length(fieldNamesC)
-                assignin('base', fieldNamesC{i}, tmpData.(fieldNamesC{i}));
+            % second option choosen (REDO)
+            if idxLastOperation==1
+                % in case of redo first step, complete restart
+                idxLastOperation=0;
+            else
+                % take the dataset before the last
+                tmpData=load(flagPresenceFile{idxLastOperation-1}{:});                      
             end
-        end        
+        end
+    else
+        idxLastOperation=0;
     end
-    clear options question
+    % move the data on the main workspace (here we are still inside a
+    % function, so the variables must be copied outside).
+    % no need to delete some vars created here. Only those from tmpData
+    % will be copied
+    if exist('tmpData','var')
+        fieldNamesC = fieldnames(tmpData);
+        for i = 1:length(fieldNamesC)
+            assignin('base', fieldNamesC{i}, tmpData.(fieldNamesC{i}));
+        end
+    end        
 end
 
 function BF_final=compareAndChooseBF(AFM_height_IO,TRITICdata,BFdata,folderResultsImg,idxMon)
