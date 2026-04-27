@@ -1,5 +1,5 @@
 %%%%%%%% CLEARING STEPS %%%%%%%%      
-function [vertForce_forthClearing,force_forthClearing]=featureFrictionCalc1_clearingAndPlotData(vertical_Trace,vertical_ReTrace,setpoints,force,idxSection,newFolder,idxMon)
+function [vertForce_forthClearing,force_forthClearing]=A2_2_processLat_1_feature_ClearAndPlotForce(vertical_Trace,vertical_ReTrace,force,idxSection,newFolder,nameFig,idxMon)
 % NOTE: doesnt matter the used method. Its just the mask applying and removal of common outliers
 % Remove outliers among Vertical Deflection data using a defined threshold of 4nN 
 % ==> trace and retrace in vertical deflection should be almost the same.
@@ -24,11 +24,10 @@ function [vertForce_forthClearing,force_forthClearing]=featureFrictionCalc1_clea
     % trace and retrace vertical data
     vertForceT=vertical_Trace;      vertForceT(:,Idx==0)=0;
     vertForceR=vertical_ReTrace;    vertForceR(:,Idx==0)=0;
-    vertForce_firstClearing = (vertForceT + vertForceR) / 2;
-    
+    vertForce_firstClearing = (vertForceT + vertForceR) / 2;    
     %%%%%% SECOND CLEARING %%%%%%%
     % remove outliers. NOTE: such a function consider outliers line by line. Therefore, transform force as single vector rather than matrix
-    % for better statistics
+    % for better statistics ==> single massive cycle
     vertForce_secondClearing=vertForce_firstClearing;
     force_vector=reshape(force_firstClearing,1,[]);
     [numRemovedElements_2,force_secondClearing_vector]=dynamicOutliersRemoval(force_vector');
@@ -36,22 +35,32 @@ function [vertForce_forthClearing,force_forthClearing]=featureFrictionCalc1_clea
     vertForce_secondClearing(isnan(force_secondClearing))=nan;
     numRemovedElements_2=numRemovedElements_2/totElementsBeforeClearing*100;
     %%%%%% THIRD CLEARING %%%%%%%
-    % remove from lateral data those values 40% higher than the setpoint
-    perc=7/5; % 40% more than the value
+    % aggressive cleaning. Therefore, let the user choose if it is good idea to clear
     force_thirdClearing=force_secondClearing;
     vertForce_thirdClearing=vertForce_secondClearing;
     tmp=nnz(~isnan(force_secondClearing));
-    for i=1:size(idxSection,2)
-        startIdx=idxSection{1}(1,i);
-        lastIdx=idxSection{1}(2,i);
-        maxlimit=setpoints(i)*perc;
-        force_tmp=force_thirdClearing(:,startIdx:lastIdx);
-        force_tmp(force_tmp>maxlimit)=nan;
-        force_thirdClearing(:,startIdx:lastIdx)=force_tmp;     
+    numRemovedElements_3=0;
+    if getValidAnswer("Third Lateral Force clearing step.\nDo you want to perform a more aggressive clearing which remove values higher than a user-defined percentile?",'',{"Y","N"})
+        while true
+            perc = str2double(inputdlg('Enter a percentile value to exclude lateral force data above that threshold. Use the distribution data for better guidance.','',[1 50],"90"));
+            if any(isnan(perc)) || perc <= 0 || perc >= 100
+                questdlg('Invalid input! Please enter a numeric value','','OK','OK');
+            else
+                break
+            end
+        end        
+        for i=1:size(idxSection,2)
+            startIdx=idxSection(1,i);
+            lastIdx=idxSection(2,i);                      
+            force_tmp=force_thirdClearing(:,startIdx:lastIdx);
+            maxlimit=prctile(force_tmp(:),perc);
+            force_tmp(force_tmp>maxlimit)=nan;
+            force_thirdClearing(:,startIdx:lastIdx)=force_tmp;     
+        end
+        vertForce_thirdClearing(isnan(force_thirdClearing))=nan;
+        numRemovedElements_3=tmp-nnz(~isnan(force_thirdClearing));
+        numRemovedElements_3=numRemovedElements_3/totElementsBeforeClearing*100;
     end
-    vertForce_thirdClearing(isnan(force_thirdClearing))=nan;
-    numRemovedElements_3=tmp-nnz(~isnan(force_thirdClearing));
-    numRemovedElements_3=numRemovedElements_3/totElementsBeforeClearing*100;
     %%%%%% FORTH CLEARING %%%%%%%
     % remove manually regions
     tmp=nnz(~isnan(force_thirdClearing));
@@ -66,13 +75,16 @@ function [vertForce_forthClearing,force_forthClearing]=featureFrictionCalc1_clea
     restClearing=nnz(~isnan(force_forthClearing));
     if restClearing < 5*totElementsBeforeClearing/100
         warndlg(sprintf("ALARM: after clearing, background lateral/vertical data have less than 5%% (%d) of the total elements before cleaning (%d).\nSomething wrong in the data!",restClearing,totElementsBeforeClearing))
-    end        
-    nameFig="resultA3_friction_2_LateralAndVerticalData_postCleared";
+    end            
     titleData1="Lateral Force - raw";
     titleData2={"Lateral Force - 1st+2nd clearing";sprintf("VD-4nN (%.2f%%), LD outliers (%.2f%%)",numRemovedElements_1,numRemovedElements_2)};
-    titleData3={"Lateral Force - 3rd+4th clearing";sprintf("LD>120%%*setpoint (%.2f%%), manualRemoval (%.2f%%)",numRemovedElements_3,numRemovedElements_4)};    
+    if exist("perc","var") && isnumeric(perc)
+        titleData3={"Lateral Force - 3rd+4th clearing";sprintf("Removed %.2fth percentile (%.2f%%); manualRemoval (%.2f%%)",perc,numRemovedElements_3,numRemovedElements_4)};    
+    else
+        titleData3={"Lateral Force - 3rd+4th clearing";sprintf("No 3rd clearing; manualRemoval (%.2f%%)",numRemovedElements_4)};    
+    end    
     labelText="Force [nN]";
-    showData(idxMon,true,force,titleData1,newFolder,nameFig,"labelBar",labelText,...
+    showData(idxMon,false,force,titleData1,newFolder,nameFig,"labelBar",labelText,...
         "extraData",{force_secondClearing,force_forthClearing},...
         "extraTitles",{titleData2,titleData3},"extraLabel",{labelText,labelText});
 end
