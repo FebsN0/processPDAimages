@@ -1,4 +1,4 @@
-function varargout = A2_feature_sortAndAssemblySections(allData,otherParameters,flag_processSingleSection,modeScan)
+function varargout = A2_sortAndAssemblySections(allData,otherParameters,flag_processSingleSection,modeScan)
 % First part is sorting in function of the y-position of the sections
 % Second part is assembling the sections
     numFiles=length(allData);
@@ -67,23 +67,27 @@ function varargout = A2_feature_sortAndAssemblySections(allData,otherParameters,
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%%% PREPARE THE DATA AS: RAW - ORIGINAL (preprocessing) - POST_PROCESSED %%%%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
     % Init vars where store the assembled sections by copying common data fields.
     % Copy just the first row (The data will be overwritten later during assembly):
     %   Channel_name
     %   Trace_type
     %   AFM data
     wantedFields = {'Channel_name','Trace_type'};
-    tmp=allDataOrdered(1).AFMImage_Raw;
-    dataAssembled = rmfield(tmp, setdiff(fieldnames(tmp), wantedFields));
     if ~flag_processSingleSection
+        tmp=allDataOrdered(1).AFMImage_Raw;
+        dataAssembled = rmfield(tmp, setdiff(fieldnames(tmp), wantedFields));
         [dataAssembled.Raw_afm_image]=deal(zeros(0,1));   
         [dataAssembled.AFM_image]=deal(zeros(0,1));
     else
+        tmp=allDataOrdered(1).AFMImage_PostProcess;
+        dataAssembled = rmfield(tmp, setdiff(fieldnames(tmp), wantedFields));
         [dataAssembled.AFM_images_0_raw]=deal(zeros(0,1));   
         [dataAssembled.AFM_images_1_original]=deal(zeros(0,1));
-        if ~strcmp(modeScan,"frictionScan") % friction data does not contain lateral processing
-            [dataAssembled.AFM_images_2_PostProcessed]=deal(zeros(0,1));       
+        if modeScan==1 % friction data does not contain lateral processing
+            [dataAssembled.AFM_images_2_PostHeightProcessed]=deal(zeros(0,1));
+            [dataAssembled.AFM_images_2_PostLateralProcessed_0_entire]=deal(zeros(0,1));
+            [dataAssembled.AFM_images_2_PostLateralProcessed_1_mask]=deal(zeros(0,1));
+            [dataAssembled.AFM_images_2_PostLateralProcessed_2_clear]=deal(zeros(0,1));
         end
         [dataAssembled.AFMmask_heightIO]=deal(zeros(0,1));  
         % in case of already processed single section, the masks of each section are already ready to be assembled. Metadata is required
@@ -99,7 +103,10 @@ function varargout = A2_feature_sortAndAssemblySections(allData,otherParameters,
         concatenatedData_Raw_afm_image=zeros(xpix_total, ypix_total);
         concatenatedData_AFM_image_START=zeros(xpix_total, ypix_total);
         if flag_processSingleSection
-            concatenatedData_AFM_image_END=zeros(xpix_total, ypix_total);
+            concatenatedData_AFM_image_postHeight=zeros(xpix_total, ypix_total);
+            concatenatedData_AFM_image_postLat_0_entire=zeros(xpix_total, ypix_total);
+            concatenatedData_AFM_image_postLat_1_mask=zeros(xpix_total, ypix_total);
+            concatenatedData_AFM_image_postLat_2_clear=zeros(xpix_total, ypix_total);
             % manage the mask only once
             if th_channel==1
                 concatenatedMask=zeros(xpix_total, ypix_total);
@@ -117,25 +124,43 @@ function varargout = A2_feature_sortAndAssemblySections(allData,otherParameters,
                 tmp=allDataOrdered(th_section).AFMImage_PostProcess(th_channel);
                 tmp_raw=tmp.AFM_images_0_raw;
                 tmp_start=tmp.AFM_images_1_original;
-                tmp_end=tmp.AFM_images_2_PostProcessed;
+                tmp_postHeight=tmp.AFM_images_2_PostHeightProcessed;
+                tmp_postLateral_1_entire=tmp.AFM_images_3_PostLatProcessed_0_entire;
+                tmp_postLateral_2_mask=tmp.AFM_images_3_PostLatProcessed_1_mask;
+                tmp_postLateral_3_clear=tmp.AFM_images_3_PostLatProcessed_2_cleared;
                 % manage the mask only once
                 if th_channel==1
                     tmp_mask=allDataOrdered(th_section).AFMmask_heightIO;                    
                 end
-            end
-            yLen=size(tmp_start,2);
-            colEnd = colStart + yLen-1;
+            end            
+            yLen = metaDataAssembled.y_scan_pixels(2,th_section)-metaDataAssembled.y_scan_pixels(1,th_section)+1;
+            colEnd=colStart+yLen-1;
             % concatenate
-            concatenatedData_Raw_afm_image(:,colStart:colEnd)=tmp_raw;
-            concatenatedData_AFM_image_START(:,colStart:colEnd)=tmp_start;
+            if ~isempty(tmp_start)
+                concatenatedData_AFM_image_START(:,colStart:colEnd)=tmp_start;
+            end
+            if ~isempty(tmp_postHeight)
+                concatenatedData_Raw_afm_image(:,colStart:colEnd)=tmp_raw;
+            end            
             if flag_processSingleSection
-                concatenatedData_AFM_image_END(:,colStart:colEnd)=tmp_end;
+                if ~isempty(tmp_postHeight)
+                    concatenatedData_AFM_image_postHeight(:,colStart:colEnd)=tmp_postHeight;
+                end
+                if ~isempty(tmp_postLateral_1_entire)
+                    concatenatedData_AFM_image_postLat_0_entire(:,colStart:colEnd)=tmp_postLateral_1_entire;
+                end
+                if ~isempty(tmp_postLateral_2_mask)
+                    concatenatedData_AFM_image_postLat_1_mask(:,colStart:colEnd)=tmp_postLateral_2_mask;
+                end
+                if ~isempty(tmp_postLateral_3_clear)
+                    concatenatedData_AFM_image_postLat_2_clear(:,colStart:colEnd)=tmp_postLateral_3_clear;
+                end
                 % manage the mask only once
                 if th_channel==1
                     concatenatedMask(:,colStart:colEnd)=tmp_mask;
                 end
             end
-            colStart = colEnd+1;
+            colStart=colEnd+1;
         end
         % now the data has been concatenated. Store in the final var
         if ~flag_processSingleSection
@@ -143,14 +168,22 @@ function varargout = A2_feature_sortAndAssemblySections(allData,otherParameters,
             [dataAssembled(th_channel).AFM_image]=concatenatedData_AFM_image_START;
         else
             dataAssembled(th_channel).AFM_images_0_raw=concatenatedData_Raw_afm_image;
-            dataAssembled(th_channel).AFM_images_1_original=concatenatedData_AFM_image_START;
-            if flag_processSingleSection
-                dataAssembled(th_channel).AFM_images_2_PostProcessed=concatenatedData_AFM_image_END;
-                % manage the mask only once
-                if th_channel==1
-                    dataAssembled.AFMmask_heightIO=concatenatedMask;
-                end
-            end    
+            dataAssembled(th_channel).AFM_images_1_original                      =concatenatedData_AFM_image_START;
+            dataAssembled(th_channel).AFM_images_2_PostHeightProcessed           =concatenatedData_AFM_image_postHeight;
+            if nnz(concatenatedData_AFM_image_postLat_0_entire)~=0
+                dataAssembled(th_channel).AFM_images_2_PostLateralProcessed_0_entire =concatenatedData_AFM_image_postLat_0_entire;
+            end
+            if nnz(concatenatedData_AFM_image_postLat_1_mask)~=0
+                dataAssembled(th_channel).AFM_images_2_PostLateralProcessed_1_mask   =concatenatedData_AFM_image_postLat_1_mask;
+            end
+            if nnz(concatenatedData_AFM_image_postLat_2_clear)~=0
+                dataAssembled(th_channel).AFM_images_2_PostLateralProcessed_2_clear  =concatenatedData_AFM_image_postLat_2_clear;
+            end
+
+            % manage the mask only once
+            if th_channel==1
+                dataAssembled(th_channel).AFMmask_heightIO=concatenatedMask;
+            end   
         end
     end
     varargout{1}=dataAssembled;    

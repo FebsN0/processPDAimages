@@ -40,17 +40,12 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
         if p.Results.postProcessed
             flagPostProcessed=true;
             textTypeData='PostProcessed';
-            stepProcess='2_end';
+            stepProcess='2';
             AFM_height_IO=p.Results.AFM_IO;
         else
             flagPostProcessed=false;
             stepProcess='1';
             textTypeData='Raw';
-        end
-        % in case the data has been assembled and then processed, figures are already saved, therefore, avoid to generate same figures again
-        skipChannelFigs=false;
-        if flagPostProcessed && strcmp(imageType,'Assembled')
-            skipChannelFigs=true;
         end
     end
     clearvars argName defaultVal p
@@ -64,8 +59,7 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
                 strcmpi(fieldNames{j},'Offset') || strcmpi(fieldNames{j},'AFM_image')) && (size(data, 2) == 5 || size(data, 2) == 10))       % first call there are 10 fields. After only 5 are left
                 error('Invalid Input!');
             end
-        end
-    
+        end   
         %find only those rows of interest (trace: latDefle, Height and vertDefle, retrace: latDefle, vertDefle)
         traceMask=strcmpi([data.Trace_type],'Trace');
         channelMask1= strcmpi([data.Channel_name],'Height (measured)');
@@ -78,47 +72,60 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
     % part assumes they already assembled. The following part does nothing to the data but solely extract them to make figures.
     % If savFig is false, then not save. However, vertical distribution is always plotted regardless the saveFig result.
     % Therefore, the following line is outside the figure processing        
-        if flagPostProcessed
-            fieldToUse='AFM_images_2_PostProcessed';
+        allTitles={sprintf('Height (measured) channel (%s - %s)',textTypeData,imageType)};
+        allNameFig={sprintf('resultA%s_1_%s_HeightChannel_%s',stepProcess,textTypeData,imageType)};
+        allLabelBar={sprintf('Height [nm]')};
+        if flagPostProcessed     
+            fieldToUse={'AFM_images_2_PostLateralProcessed_0_entire','AFM_images_2_PostLateralProcessed_1_mask','AFM_images_2_PostLateralProcessed_2_clear'};
+            blockAllData=cell(1,1+length(fieldToUse)*2);
+            data_Height=data(strcmp([data.Channel_name],'Height (measured)')).AFM_images_2_PostHeightProcessed;
+            blockAllData{1}=data_Height; j=1;     
+            for i=2:2:length(blockAllData)
+                blockAllData{i}=data(strcmp([data.Channel_name],'Vertical Force')).(fieldToUse{j});
+                tmp=strsplit(fieldToUse{j},'_');
+                allTitles{i}=sprintf('Vertical Force %s (%s - %s)',tmp{end},textTypeData,imageType);
+                allNameFig{i}=sprintf('resultA%s_%d_%s_VertForce_%s_%s',stepProcess,i,textTypeData,tmp{end},imageType);
+                allLabelBar{i}='Force [nN]';
+                blockAllData{i+1}=data(strcmp([data.Channel_name],'Lateral Force')).(fieldToUse{j});
+                allTitles{i+1}=sprintf('Lateral Force %s (%s - %s)',tmp{end},textTypeData,imageType);
+                allNameFig{i+1}=sprintf('resultA%s_%d_%s_LatForce_%s_%s',stepProcess,i+1,textTypeData,tmp{end},imageType);
+                allLabelBar{i+1}='Force [nN]';
+                j=j+1;
+            end
+            factor=[1e9,1,1,1,1,1,1];
         else
-            fieldToUse='AFM_images_1_original';
-        end            
-        data_VD_trace=  data(strcmp([data.Channel_name],'Vertical Deflection') & strcmp([data.Trace_type],'Trace')).(fieldToUse);
-        data_Height=    data(strcmp([data.Channel_name],'Height (measured)')).(fieldToUse);
-        data_LD_trace=  data(strcmp([data.Channel_name],'Lateral Deflection') & strcmp([data.Trace_type],'Trace')).(fieldToUse);
-        data_LD_retrace=data(strcmp([data.Channel_name],'Lateral Deflection') & strcmp([data.Trace_type],'ReTrace')).(fieldToUse);
-        data_VD_retrace=data(strcmp([data.Channel_name],'Vertical Deflection') & strcmp([data.Trace_type],'ReTrace')).(fieldToUse);       
+            fieldToUse='AFM_images_1_original';                        
+            data_Height=    data(strcmp([data.Channel_name],'Height (measured)')).(fieldToUse);            
+            % VD trace
+            data_VD_trace=  data(strcmp([data.Channel_name],'Vertical Deflection') & strcmp([data.Trace_type],'Trace')).(fieldToUse);
+            allTitles{2}=sprintf('Vertical Deflection trace channel (%s - %s)',textTypeData,imageType);
+            allNameFig{2}=sprintf('resultA%s_2_%s_VDChannel_trace_%s',stepProcess,textTypeData,imageType);
+            allLabelBar{2}='Force [nN]';
+            % VD retrace
+            data_VD_retrace=data(strcmp([data.Channel_name],'Vertical Deflection') & strcmp([data.Trace_type],'ReTrace')).(fieldToUse);
+            allTitles{3}=sprintf('Vertical Deflection Retrace channel (%s - %s)',textTypeData,imageType);
+            allNameFig{3}=sprintf('resultA%s_3_%s_VDChannel_retrace_%s',stepProcess,textTypeData,imageType);
+            allLabelBar{3}='Force [nN]';
+            % LD retrace
+            data_LD_trace=  data(strcmp([data.Channel_name],'Lateral Deflection') & strcmp([data.Trace_type],'Trace')).(fieldToUse);            
+            allTitles{4}=sprintf('Lateral Deflection Trace channel (%s - %s)',textTypeData,imageType);
+            allNameFig{4}=sprintf('resultA%s_4_%s_LDChannel_trace_%s',stepProcess,textTypeData,imageType);
+            allLabelBar{4}='Voltage [V]';  
+            % LD retrace
+            data_LD_retrace=data(strcmp([data.Channel_name],'Lateral Deflection') & strcmp([data.Trace_type],'ReTrace')).(fieldToUse);
+            allTitles{5}=sprintf('Lateral Deflection ReTrace channel (%s - %s)',textTypeData,imageType);
+            allNameFig{5}=sprintf('resultA%s_5_%s_LDChannel_retrace_%s',stepProcess,textTypeData,imageType);
+            allLabelBar{5}='Voltage [V]';
+            % prepare the block
+            blockAllData={data_Height,data_VD_trace,data_VD_retrace,data_LD_trace,data_LD_retrace};
+            factor=[1e9,1e9,1e9,1,1];                       
+        end           
         clear fieldToUse
-        if ~skipChannelFigs
-            % start to show the data
-            data=data_Height*1e9;
-            titleData=sprintf('Height (measured) channel (%s - %s)',textTypeData,imageType);
-            nameFig=sprintf('resultA%s_1_%s_HeightChannel_%s',stepProcess,textTypeData,imageType);
-            labelBar=sprintf('Height (nm)');
-            showData(idxMon,SeeMe,data,titleData,folderSaveFig,nameFig,'normalized',norm,'labelBar',labelBar);
-            % Lateral Deflection Trace
-            data=data_LD_trace;
-            titleData=sprintf('Lateral Deflection Trace channel (%s - %s)',textTypeData,imageType);
-            nameFig=sprintf('resultA%s_2_%s_LDChannel_trace_%s',stepProcess,textTypeData,imageType);
-            labelBar='Voltage [V]';
-            showData(idxMon,SeeMe,data,titleData,folderSaveFig,nameFig,'normalized',norm,'labelBar',labelBar);
-            % Lateral Deflection ReTrace
-            data=data_LD_retrace;
-            titleData=sprintf('Lateral Deflection Retrace channel (%s - %s)',textTypeData,imageType);
-            nameFig=sprintf('resultA%s_3_%s_LDChannel_retrace_%s',stepProcess,textTypeData,imageType);
-            showData(idxMon,false,data,titleData,folderSaveFig,nameFig,'normalized',norm,'labelBar',labelBar);
-            % Vertical Deflection trace
-            data=data_VD_trace*1e9;
-            titleData=sprintf('Vertical Deflection trace channel (%s - %s)',textTypeData,imageType);
-            nameFig=sprintf('resultA%s_4_%s_VDChannel_trace_%s',stepProcess,textTypeData,imageType);
-            labelBar='Force [nN]';
-            showData(idxMon,false,data,titleData,folderSaveFig,nameFig,'normalized',norm,'labelBar',labelBar);
-            % Vertical Deflection Retrace
-            data=data_VD_retrace*1e9;
-            titleData=sprintf('Vertical Deflection retrace channel (%s - %s)',textTypeData,imageType);
-            nameFig=sprintf('resultA%s_5_%s_VDChannel_retrace_%s',stepProcess,textTypeData,imageType);
-            showData(idxMon,false,data,titleData,folderSaveFig,nameFig,'normalized',norm,'labelBar',labelBar);          
-        end
+        % show results
+        for i=1:length(blockAllData)
+            data_tmp=blockAllData{i}*factor(i);
+            showData(idxMon,SeeMe,data_tmp,allTitles{i},folderSaveFig,allNameFig{i},'normalized',norm,'labelBar',allLabelBar{i});
+        end         
         %%%%% perform the following step ONLY after assembly %%%%%
         if ~strcmp(imageType,"SingleSection")
             if ~flagPostProcessed
@@ -229,33 +236,25 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
                 else
                     f_heightDistribution=figure('Visible','off');
                 end
-                percentile=99.5;
-                % prepare the data
                 H_BK=data_Height(AFM_height_IO==0);
                 H_FR=data_Height(AFM_height_IO==1);    
-                thresholdBK = prctile(H_BK(:), percentile);
-                thresholdPDA = prctile(H_FR(:), percentile);
                 % outliers removal
-                H_BK(H_BK >= thresholdBK) = NaN; 
-                H_FR(H_FR >= thresholdPDA) = NaN; 
                 H_BK = H_BK(~isnan(H_BK))*1e9;
                 H_FR = H_FR(~isnan(H_FR))*1e9;
-                edgesBK=min(H_BK):1:max(H_BK);
-                edgesPDA=min(H_FR):1:max(H_FR);
+                edgesBK=min(H_BK):2:max(H_BK);
+                edgesPDA=min(H_FR):2:max(H_FR);
                 hold on    
-                histogram(H_BK,edgesBK,'DisplayName','Distribution height','Normalization','percentage');
-                histogram(H_FR,edgesPDA,'DisplayName','Distribution height','Normalization','percentage');
-                legend({'Background','Foreground'},'FontSize',15)
-                xlabel(sprintf('Feature height (nm)'),'FontSize',15), ylabel('Percentage %','FontSize',15), grid minor, grid on
-                title(sprintf('Distribution PostProcessed Height (Showed Percentile %.1f°)',percentile),'FontSize',20)
+                histogram(H_BK,edgesBK,'DisplayName','Background Height','Normalization','percentage');
+                histogram(H_FR,edgesPDA,'DisplayName','Foreground Height','Normalization','percentage');
+                legend('FontSize',15)
+                xlabel(sprintf('Feature height [nm]'),'FontSize',15), ylabel('Percentage %','FontSize',15), grid minor, grid on
+                title("Distribution PostProcessed Height",'FontSize',20)
                 objInSecondMonitor(f_heightDistribution,idxMon);     
-                saveFigures_FigAndTiff(f_heightDistribution,folderSaveFig,'resultA2_end_6_OptHeightDistribution_FR_BK')
-                % Since now there is the assembled mask, in case of single section postprocessed
-                if ~skipChannelFigs
-                    titleData='Final Binary AFM IO Image';
-                    nameFig='resultA2_end_7_mask';
-                    showData(idxMon,SeeMe,AFM_height_IO,titleData,folderSaveFig,nameFig,'binary',true);   
-                end
+                saveFigures_FigAndTiff(f_heightDistribution,folderSaveFig,'resultA2_9_OptHeightDistribution_FR_BK')
+                % Since now there is the assembled mask
+                titleData='Final Binary AFM IO Image';
+                nameFig='resultA2_8_finalMask';
+                showData(idxMon,SeeMe,AFM_height_IO,titleData,folderSaveFig,nameFig,'binary',true);   
             end
         end
     end

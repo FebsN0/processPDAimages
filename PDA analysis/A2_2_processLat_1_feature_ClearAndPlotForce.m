@@ -24,7 +24,7 @@ function [vertForce_forthClearing,force_forthClearing]=A2_2_processLat_1_feature
     % trace and retrace vertical data
     vertForceT=vertical_Trace;      vertForceT(:,Idx==0)=0;
     vertForceR=vertical_ReTrace;    vertForceR(:,Idx==0)=0;
-    vertForce_firstClearing = (vertForceT + vertForceR) / 2;    
+    vertForce_firstClearing = ((vertForceT + vertForceR) / 2)*1e9;    
     %%%%%% SECOND CLEARING %%%%%%%
     % remove outliers. NOTE: such a function consider outliers line by line. Therefore, transform force as single vector rather than matrix
     % for better statistics ==> single massive cycle

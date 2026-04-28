@@ -116,7 +116,7 @@ end
 %%
 if step2Start<2  
     [dataAFM_latDeflecFitted, AFM_height_IO, metaData_AFM]= A2_0_main_processAFMdata(allData,otherParameters,mainPath,SaveFigFolder,HVmodesInfo,idxMon);     
-    clear BW maskedImage accuracy 
+    clear BW maskedImage 
     save(fullfile(SaveFigFolder,'resultsData_2_assemblyProcessAFMdata'))
 end
 

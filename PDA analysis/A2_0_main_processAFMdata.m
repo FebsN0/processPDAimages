@@ -48,7 +48,7 @@ function varargout=A2_0_main_processAFMdata(allData,otherParameters,mainPath,Sav
                 if i~=1 && isempty(FitOrder_Height)
                     firstFileHeight=dir(fullfile(startPathSingleSectionFolder,"section_1","*_heightChannelProcessed.mat"));
                     load(fullfile(firstFileHeight.folder,firstFileHeight.name),"FitOrder_Height");
-                    if exist(dir(fullfile(startPathSingleSectionFolder,"section_1","*_lateralChannelProcessed.mat")),'file')
+                    if ~strcmp(HVmodesInfo.mainData,"OFF") && exist(dir(fullfile(startPathSingleSectionFolder,"section_1","*_lateralChannelProcessed.mat")),'file')
                         load(fullfile(firstFileLat.folder,firstFileLat.name),"FitOrder_Lat");
                     end
                 end
@@ -64,6 +64,7 @@ function varargout=A2_0_main_processAFMdata(allData,otherParameters,mainPath,Sav
                     question=sprintf("PostLateralChannel file .mat for the section %d already exists. Take it?",i);
                     if getValidAnswer(question,"",{'y','n'})
                         % each section has allData updated to the relative section.
+                        fileName2=fullfile(SaveFigIthSectionFolder,sprintf("%s_lateralChannelProcessed.mat",nameSection));
                         load(fileName2,"allData")
                         continue
                     end
@@ -124,14 +125,18 @@ function varargout=A2_0_main_processAFMdata(allData,otherParameters,mainPath,Sav
                 else
                     if strcmp(HVmodesInfo.mainData,"OFF")
                         nameFig_base="resultA3";
-                        [~,force_2_clear,force_1_masked,vertForce_2_clear,vertForce_1_masked]=A2_2_processLat_1_LatVolt2LatForce(AFMdata_postHeightFit,AFM_height_IO,metaData_AFM,SaveFigIthSectionFolder,nameFig_base,idxMon,modeScan);
+                        dataFinal=A2_2_processLat_1_LatVolt2LatForce(AFMdata_postHeightFit,AFM_height_IO,metaData_AFM,SaveFigIthSectionFolder,nameFig_base,idxMon,modeScan);                        
                         tmp=AFMdata_postHeightFit;      
                         tmp(end+1).Channel_name="Vertical Force"; %#ok<AGROW>
-                        tmp(strcmpi([tmp.Channel_name],'Vertical Force')).AFM_images_3_PostLatProcessed_1_mask=vertForce_1_masked;
-                        tmp(strcmpi([tmp.Channel_name],'Vertical Force')).AFM_images_3_PostLatProcessed_2_cleared=vertForce_2_clear;
+                        tmp(end).Trace_type="none";
+                        tmp(strcmpi([tmp.Channel_name],'Vertical Force')).AFM_images_3_PostLatProcessed_0_entire=dataFinal.vertForce_0_entire;
+                        tmp(strcmpi([tmp.Channel_name],'Vertical Force')).AFM_images_3_PostLatProcessed_1_mask=dataFinal.vertForce_1_masked;
+                        tmp(strcmpi([tmp.Channel_name],'Vertical Force')).AFM_images_3_PostLatProcessed_2_cleared=dataFinal.vertForce_2_clear;
                         tmp(end+1).Channel_name="Lateral Force"; %#ok<AGROW>
-                        tmp(strcmpi([tmp.Channel_name],'Lateral Force')).AFM_images_3_PostLatProcessed_1_mask=force_1_masked;
-                        tmp(strcmpi([tmp.Channel_name],'Lateral Force')).AFM_images_3_PostLatProcessed_2_cleared=force_2_clear;
+                        tmp(end).Trace_type="none";
+                        tmp(strcmpi([tmp.Channel_name],'Lateral Force')).AFM_images_3_PostLatProcessed_0_entire=dataFinal.force_0_entire;
+                        tmp(strcmpi([tmp.Channel_name],'Lateral Force')).AFM_images_3_PostLatProcessed_1_mask=dataFinal.force_1_masked;
+                        tmp(strcmpi([tmp.Channel_name],'Lateral Force')).AFM_images_3_PostLatProcessed_2_cleared=dataFinal.force_2_clear;
                         AFMdata_final=tmp;
                         allData(i).metadata.frictionCoeff_Used="No FC calculation. Lateral Force directly from data.";
                     else
@@ -155,7 +160,7 @@ function varargout=A2_0_main_processAFMdata(allData,otherParameters,mainPath,Sav
                 close all            
             end
             % processing any single section completed
-            if answSkipLat == 2 && ~strcmp(HVmodesInfo.mainData,"OFF")
+            if ~strcmp(HVmodesInfo.mainData,"OFF")
                 uiwait(warndlg("The HeightChannel processing of every section has terminated. Continue with Friction Calculation script for the same scan"))
                 A0_main_friction(mainPath,idxMon,2)
                 uiwait(warndlg("Friction main code completed. One ore more friction coefficients are ready to be used. Restart A0_main.m code and reply 'No' in the skipping lateral postprocessing"))
@@ -163,7 +168,7 @@ function varargout=A2_0_main_processAFMdata(allData,otherParameters,mainPath,Sav
             end            
         end
         % ASSEMBLY!
-        [AFM_images_assembled,metaData] = A2_feature_sortAndAssemblySections(allData,otherParameters,flag_processSingleSection,modeScan);             
+        [AFM_images_assembled,metaData] = A2_sortAndAssemblySections(allData,otherParameters,flag_processSingleSection,modeScan);             
         % in case of no single section processing, now process the assembled image
         if ~flag_processSingleSection
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -180,20 +185,18 @@ function varargout=A2_0_main_processAFMdata(allData,otherParameters,mainPath,Sav
         else
             % show and save figures post assembly BEFORE processing in case of singleSection processing.
             % In case of processing after assembling, it will be done already inside A2_feature_1_processHeightChannel
-            A1_feature_CleanOrPrepFiguresRawData(AFM_images,'AFM_IO',AFM_height_IO,'metadata',metaData, ...
+            AFM_height_IO=AFM_images_assembled.AFMmask_heightIO;            
+            A1_feature_CleanOrPrepFiguresRawData(AFM_images_assembled,'AFM_IO',AFM_height_IO,'metadata',metaData, ...
             'idxMon',idxMon,'folderSaveFig',SaveFigFolder,'SeeMe',false, ...
             'imageType','Assembled','Normalization',norm,'postProcessed',false)
-            AFM_images_final=AFM_images;
+            AFM_images_final=AFM_images_assembled;
         end
         % show results post processing. Common for both processing type (singleSection or postAssembly)
         A1_feature_CleanOrPrepFiguresRawData(AFM_images_final,'AFM_IO',AFM_height_IO,'metadata',metaData, ...
             'idxMon',idxMon,'folderSaveFig',SaveFigFolder,'SeeMe',false, ...
             'imageType','Assembled','Normalization',norm,'postProcessed',true)
-        % avoid saving because already saving outside this function in A0_main_fluorescence.m
-        if modeScan~=3
-            save(fullfile(SaveFigFolder,"data_postProcessedpostAssembled"),"AFM_images_final","AFM_height_IO","metaData")
-        end
     else
+        % in case of single file
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%%%%%%% HEIGHT PROCESSING %%%%%%%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
