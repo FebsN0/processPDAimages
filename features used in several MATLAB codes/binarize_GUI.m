@@ -50,6 +50,9 @@ function[IO_Image, detailOperations] = binarize_GUI(image,typeImage)
         c.Label.String="Height [nm]";
     else
         imshow(image, 'Parent', axOriginal);
+        % Add invisible colorbar to match width of binarized axis
+        cDummy = colorbar(axOriginal);
+        cDummy.Visible = 'off';
     end
     axis(axOriginal, 'image');
     axOriginal.Toolbar.Visible = 'on';
@@ -403,28 +406,40 @@ function[IO_Image, detailOperations] = binarize_GUI(image,typeImage)
     end
 
     function onUserClose(~,~)
-        % Close button or window close (X)
-        mainFig.UserData = [];    
-        uiresume(mainFig);        
+        mainFig.UserData = [];
+        if isvalid(mainFig)
+            uiresume(mainFig);
+            delete(mainFig);   % close immediately on X button
+        end
     end
     
     % blocks the calling function, but NOT the GUI.
-    uiwait(mainFig);
-    % Retrieve results (safe, since GUI already finished)
-    if isempty(mainFig.UserData)
-        error('Interrupted by User or not generated anything')
-    else
-        IO_Image = mainFig.UserData{1};
-        binarizationMethod_text = mainFig.UserData{2};
-        morphologicalOperations_text=mainFig.UserData{3};
-        if ~isempty(morphologicalOperations_text)
-            detailOperations=sprintf("%s (Morph.Ops applied)",binarizationMethod_text);
+    try
+        uiwait(mainFig);
+        % Retrieve results (safe, since GUI already finished)
+        if  ~isvalid(mainFig) || isempty(mainFig.UserData)
+            error('Interrupted by User or not generated anything')
         else
-            detailOperations=binarizationMethod_text;
+            IO_Image = mainFig.UserData{1};
+            binarizationMethod_text = mainFig.UserData{2};
+            morphologicalOperations_text=mainFig.UserData{3};
+            if ~isempty(morphologicalOperations_text)
+                detailOperations=sprintf("%s (Morph.Ops applied)",binarizationMethod_text);
+            else
+                detailOperations=binarizationMethod_text;
+            end
         end
+    catch ME
+        % cleanup always happens here, then rethrow to caller, no matter what happened
+        if isvalid(mainFig)
+            delete(mainFig);
+        end
+        rethrow(ME);  % propagate the error to the caller
     end
-    % Safe to delete GUI AFTER retrieving data
-    delete(mainFig);
+    % if no error, cleanup happens here
+    if isvalid(mainFig)
+        delete(mainFig);
+    end
 end
 
 
