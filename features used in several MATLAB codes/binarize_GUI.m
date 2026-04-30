@@ -213,7 +213,7 @@ function[IO_Image, detailOperations] = binarize_GUI(image,typeImage)
             % Compute threshold
             thSeg = E(closest_idx);
             segImage = image >= thSeg;        
-            binarizationMethod_text = "Binarization: Manual Gloabl Threshold";
+            binarizationMethod_text = "Binarization: Manual Global Threshold";
             updateBinImage(segImage,binarizationMethod_text,morphologicalOperations_text)
             % Restore title
             title(axHist, 'Intensity Distribution (imadjusted)', 'FontSize', 13);
