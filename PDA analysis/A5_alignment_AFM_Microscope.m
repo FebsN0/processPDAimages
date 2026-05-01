@@ -1,5 +1,5 @@
 % to align AFM height IO image to BF IO image, the main alignment
-function [AFM_IO_3_BFaligned,BF_IO_1_cropped,AFM_Elab,info_allignment,offset]=A5_alignment_AFM_Microscope(BF_IO_0_original,metaData_BF,AFM_IO_0_mask,metaData_AFM,AFM_Elab,newFolder,idxMon,varargin)
+function [AFM_IO_3_BFaligned,BF_IO_1_cropped,AFM_final,info_allignment,offset]=A5_alignment_AFM_Microscope(BF_IO_0_original,metaData_BF,AFM_IO_0_mask,metaData_AFM,AFM_1_original,newFolder,idxMon,varargin)
     % OUTPUT DETAILS
     %   - AFM_IO_padded :   AFM height 0/1 data ALIGNED with BF 0/1 data BUT the image is slighly bigger (in
     %                       case of margin or only crop) which values, outside AFM height is only 0. Briefly,
@@ -31,10 +31,10 @@ function [AFM_IO_3_BFaligned,BF_IO_1_cropped,AFM_Elab,info_allignment,offset]=A5
     argName = 'Silent';     defaultVal = 'No';      addParameter(p, argName, defaultVal, @(x) ismember(x,{'No','Yes'}));
     % how much bigger by fixed margin should be the BF compared to AFM size. Kind of fixed cropping
     argName = 'Margin';     defaultVal = 100;       addParameter(p,argName,defaultVal,@(x) isnumeric(x) && (x >= 0));
-    parse(p,BF_IO_0_original,metaData_BF,AFM_IO_0_mask,metaData_AFM,AFM_Elab,varargin{:});
+    parse(p,BF_IO_0_original,metaData_BF,AFM_IO_0_mask,metaData_AFM,AFM_1_original,varargin{:});
     clear argName defaultVal varargin
     if(strcmp(p.Results.Silent,'Yes')), SeeMe=false; else, SeeMe=true; end
-
+    nChannels=length(AFM_1_original);
     % x and y lengths of AFM image are in meters ==> convert to um 
     metaData_AFM.x_scan_length=metaData_AFM.x_scan_length_m*1e6;
     metaData_AFM.y_scan_length=metaData_AFM.y_scan_length_m*1e6;
@@ -74,7 +74,7 @@ function [AFM_IO_3_BFaligned,BF_IO_1_cropped,AFM_Elab,info_allignment,offset]=A5
     BFRatioVertical=settings.MH/settings.MicPxH;                % size in um of single pixel based on entire image (vertical - BF  image)
     AFMRatioHorizontal=settings.AFMW/settings.AFMPxW;           % size in um of single pixel based on entire image (horizontal - AFM image
     AFMRatioVertical=settings.AFMH/settings.AFMPxH;             % size in um of single pixel based on entire image (vertical   - AFM image)
-    clear settings
+    clear settings    
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%%%%%%%%%%%%%%%%%%%%%% FIRST MODIFICATION %%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  SCALING %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -93,10 +93,12 @@ function [AFM_IO_3_BFaligned,BF_IO_1_cropped,AFM_Elab,info_allignment,offset]=A5
     end
     % apply the scale to AFM_IO and AFM data
     AFM_IO_1_BFscaled=imresize(AFM_IO_0_mask,scale);
-    for flag_AFM=1:size(AFM_Elab,2)
+    AFM_2_scaled=cell(1,nChannels);
+    for flag_AFM=1:nChannels
         % scale the AFM channels. It doesnt mean that the matrix size of AFM and BF images will be the same.
         % Indipendent from BF processing
-        AFM_Elab(flag_AFM).AFM_scaled=imresize(AFM_Elab(flag_AFM).AFM_images_2_PostProcessed,scale);
+        tmp=imresize(AFM_1_original{flag_AFM},scale);
+        AFM_2_scaled{flag_AFM}=tmp;
     end
     clear BFRatioHorizontal BFRatioVertical AFMRatioHorizontal AFMRatioVertical scaleAFM2BF_H scaleAFM2BF_V scale y_scan_pixelsCorrected flag_AFM
     
@@ -114,72 +116,68 @@ function [AFM_IO_3_BFaligned,BF_IO_1_cropped,AFM_Elab,info_allignment,offset]=A5
     title('Brightfield and AFM images - Post First cross-correlation','FontSize',14)
     objInSecondMonitor(f1,idxMon);
     saveFigures_FigAndTiff(f1,newFolder,"resultA5_1_BForiginal_AFMresize_firstCrossCorrelation",'closeImmediately',false)    
-    AFM_Elab_original=AFM_Elab;
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%   SECOND STEP   %%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%  CROP AFM_IO AND BF_IO  %%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    question='Choose one of the following options before run the optimization';
+    options={ ...
+        sprintf('1) Crop manually the BF image'), ...
+        sprintf('2) Use a defined margin (%d pixels)?',p.Results.Margin), ... 
+        sprintf('3) None')};
+    answerCrop = getValidAnswer(question, '', options,2);        
+    if answerCrop == 1
+    % crop the right area containing the AFM image, if not, restart
+        uiwait(msgbox('Crop the area of interest containing the stimulated part',''));
+        [~,specs]=imcrop(figPair);
+        % extract the cropped area
+        XBegin=round(specs(1));
+        YBegin=round(specs(2));
+        XEnd=round(specs(1))+round(specs(3));
+        YEnd=round(specs(2))+round(specs(end));
+        % if cropped outise image
+        if(YEnd>size(BF_IO_0_original,1)), YEnd=size(BF_IO_0_original,1); end
+        if(XEnd>size(BF_IO_0_original,2)), XEnd=size(BF_IO_0_original,2); end
+        % crop the BF original
+        BF_IO_1_cropped=BF_IO_0_original(YBegin:YEnd,XBegin:XEnd);
+        % create AFM image with same BF cropped size. Here alignment by cross-correlation is required at
+        % the contrary of the other margin method because it is better
+        [~,~,locationAFM2toBF1,AFM_IO_2_BFpadded] = A5_feature_crossCorrelationAlignmentAFM(BF_IO_1_cropped,AFM_IO_1_BFscaled);
+    elseif answerCrop == 2
+    % extract the BF with border depending on the margin
+        % save the coordinates of AFM resized in the 2D space of BF original
+        xbegin = rect(1); xend = rect(2);
+        ybegin = rect(3); yend = rect(4);
+        % FIX LEFT BORDER: if the BF border is very close and less than margin, then "modify" the margin to the extreme BF border
+        if (xbegin-p.Results.Margin>=1), XBegin=xbegin-p.Results.Margin; else, XBegin=1; end
+        % FIX RIGHT BORDER
+        if (size(BF_IO_0_original,2)-xend > p.Results.Margin), XEnd=xend+p.Results.Margin; else, XEnd=size(BF_IO_0_original,2); end
+        % FIX BOTTOM BORDER
+        if (ybegin-p.Results.Margin>=1), YBegin=ybegin-p.Results.Margin; else, YBegin=1; end
+        % FIX TOP BORDER
+        if (size(BF_IO_0_original,1)-yend > p.Results.Margin), YEnd=yend+p.Results.Margin; else, YEnd=size(BF_IO_0_original,1); end
+        % crop the BF IO using the margin
+        BF_IO_1_cropped=BF_IO_0_original(YBegin:YEnd,XBegin:XEnd);
+        % new crosscorrelation to locate the AFM to the new BF                        
+        [~,~,locationAFM2toBF1,AFM_IO_2_BFpadded] = A5_feature_crossCorrelationAlignmentAFM(BF_IO_1_cropped,AFM_IO_1_BFscaled);
+    else
+        % do nothing
+        BF_IO_1_cropped=BF_IO_0_original;
+        locationAFM2toBF1=rect;            
+    end
+    % store the new dimensions of BF to adjust the TRITIC matrix 
+    if answerCrop == 3
+        offset=[];
+    else
+        offset=[YBegin,YEnd,XBegin,XEnd];              
+    end
+    close(f1)    
+    clear yend ybegin xend xbegin tmp_*
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%  THIRD STEP  %%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%  AFM_IO and BF_IO ALIGNMENT  %%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     while true
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        %%%%%%%%%%%%%%%%%%%%%%%%%%   SECOND STEP   %%%%%%%%%%%%%%%%%%%%%%%%%%
-        %%%%%%%%%%%%%%%%%%%%%%  CROP AFM_IO AND BF_IO  %%%%%%%%%%%%%%%%%%%%%%
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        f1.Visible = 'on';
-        figure(f1)
-        question='Choose one of the following options before run the optimization';
-        options={ ...
-            sprintf('1) Crop manually the BF image'), ...
-            sprintf('2) Use a defined margin (%d pixels)?',p.Results.Margin), ... 
-            sprintf('3) None')};
-        answerCrop = getValidAnswer(question, '', options,2);        
-        if answerCrop == 1
-        % crop the right area containing the AFM image, if not, restart
-            uiwait(msgbox('Crop the area of interest containing the stimulated part',''));
-            [~,specs]=imcrop(figPair);
-            % extract the cropped area
-            XBegin=round(specs(1));
-            YBegin=round(specs(2));
-            XEnd=round(specs(1))+round(specs(3));
-            YEnd=round(specs(2))+round(specs(end));
-            % if cropped outise image
-            if(YEnd>size(BF_IO_0_original,1)), YEnd=size(BF_IO_0_original,1); end
-            if(XEnd>size(BF_IO_0_original,2)), XEnd=size(BF_IO_0_original,2); end
-            % crop the BF original
-            BF_IO_1_cropped=BF_IO_0_original(YBegin:YEnd,XBegin:XEnd);
-            % create AFM image with same BF cropped size. Here alignment by cross-correlation is required at
-            % the contrary of the other margin method because it is better
-            [~,~,locationAFM2toBF1,AFM_IO_2_BFpadded] = A5_feature_crossCorrelationAlignmentAFM(BF_IO_1_cropped,AFM_IO_1_BFscaled);
-        elseif answerCrop == 2
-        % extract the BF with border depending on the margin
-            % save the coordinates of AFM resized in the 2D space of BF original
-            xbegin = rect(1); xend = rect(2);
-            ybegin = rect(3); yend = rect(4);
-            % FIX LEFT BORDER: if the BF border is very close and less than margin, then "modify" the margin to the extreme BF border
-            if (xbegin-p.Results.Margin>=1), XBegin=xbegin-p.Results.Margin; else, XBegin=1; end
-            % FIX RIGHT BORDER
-            if (size(BF_IO_0_original,2)-xend > p.Results.Margin), XEnd=xend+p.Results.Margin; else, XEnd=size(BF_IO_0_original,2); end
-            % FIX BOTTOM BORDER
-            if (ybegin-p.Results.Margin>=1), YBegin=ybegin-p.Results.Margin; else, YBegin=1; end
-            % FIX TOP BORDER
-            if (size(BF_IO_0_original,1)-yend > p.Results.Margin), YEnd=yend+p.Results.Margin; else, YEnd=size(BF_IO_0_original,1); end
-            % crop the BF IO using the margin
-            BF_IO_1_cropped=BF_IO_0_original(YBegin:YEnd,XBegin:XEnd);
-            % new crosscorrelation to locate the AFM to the new BF                        
-            [~,~,locationAFM2toBF1,AFM_IO_2_BFpadded] = A5_feature_crossCorrelationAlignmentAFM(BF_IO_1_cropped,AFM_IO_1_BFscaled);
-        else
-            % do nothing
-            BF_IO_1_cropped=BF_IO_0_original;
-            locationAFM2toBF1=rect;            
-        end
-        % store the new dimensions of BF to adjust the TRITIC matrix 
-        if answerCrop == 3
-            offset=[];
-        else
-            offset=[YBegin,YEnd,XBegin,XEnd];              
-        end
-        
-        f1.Visible = 'off';
-        clear yend ybegin xend xbegin tmp_*
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%  THIRD STEP  %%%%%%%%%%%%%%%%%%%%%%%%%%%
-        %%%%%%%%%%%%%%%%%%%  AFM_IO and BF_IO ALIGNMENT  %%%%%%%%%%%%%%%%%%%
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%% NOTE: although the AFM and BF images have same sizes, the true content of AFM is smaller and coincides
         %%% with the AFM_IO_1_BFscaled        
         question='Maximizing the cross-correlation between the BF and AFM images.'; ...
@@ -189,21 +187,21 @@ function [AFM_IO_3_BFaligned,BF_IO_1_cropped,AFM_Elab,info_allignment,offset]=A5
             sprintf('(3) Automatic method\n Thirion''s Demons Algorithm and Diffeomorphism')
                     '(4) Stop here the process. The fist cross-correlatin is okay.'};
         answerMethod=getValidAnswer(question,'',options,3);        
-        clear flag_AFM options question saveFig SeeMe textTitle rect
+        clear options question saveFig SeeMe textTitle rect
         flagDemons=false;
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%%%% manual approach %%%%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         if answerMethod==1
             % the output AFM_Elab will contain the corrected aligned data. Rect is required to 
-            [AFM_IO_3_BFaligned,AFM_Elab,details_it_reg,rect]=A5_feature_manualAlignmentGUI(AFM_IO_2_BFpadded,BF_IO_1_cropped,AFM_Elab,locationAFM2toBF1,max_c_it_OI,idxMon,newFolder);                         
+            [AFM_IO_3_BFaligned,AFM_3_aligned,details_it_reg,rect]=A5_feature_manualAlignmentGUI(AFM_IO_2_BFpadded,BF_IO_1_cropped,AFM_2_scaled,locationAFM2toBF1,max_c_it_OI,idxMon,newFolder);                         
             textTitle='Brightfield IO - AFM IO -Final Alignment (Manual Approach)';
         %%%%%%%%%%%%%%%%%%%%%%%%%%
         %%% automatic approach %%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%
         elseif answerMethod == 2
             textTitle='Brightfield IO - AFM IO -Final Alignment (Automatic Approach)';
-            [AFM_IO_3_BFaligned,AFM_Elab,details_it_reg,rect]=A5_feature_automaticLinearAlignment(AFM_IO_2_BFpadded,BF_IO_1_cropped,AFM_Elab,locationAFM2toBF1,max_c_it_OI,idxMon,newFolder);
+            [AFM_IO_3_BFaligned,AFM_3_aligned,details_it_reg,rect]=A5_feature_automaticLinearAlignment(AFM_IO_2_BFpadded,BF_IO_1_cropped,AFM_2_scaled,locationAFM2toBF1,max_c_it_OI,idxMon,newFolder);
         %%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%% Demon's approach %%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%                       
@@ -225,14 +223,17 @@ function [AFM_IO_3_BFaligned,BF_IO_1_cropped,AFM_Elab,info_allignment,offset]=A5
             end
             textTitle='Brightfield IO - AFM IO - Final Alignment (Automatic Demon''s Algorithm Approach)';
             % first, create the pad version where there is in the middle the AFM data, then transforms image according to the displacement field.
-            for flag_AFM=1:size(AFM_Elab,2)
+            AFM_3_aligned=cell(1,nChannels);
+            for flag_AFM=1:nChannels
                 % first create zero matrix with the same dimension of the AFM IO mask
-                AFM_Elab(flag_AFM).AFM_padded=zeros(size(AFM_IO_3_BFaligned));
+                tmp_padded=zeros(size(AFM_IO_3_BFaligned));
                 % move the AFM data channel to the same position of AFM IO mask
-                AFM_Elab(flag_AFM).AFM_padded(locationAFM2toBF1(3):locationAFM2toBF1(4),locationAFM2toBF1(1):locationAFM2toBF1(2))=AFM_Elab(flag_AFM).AFM_scaled;
-                adjDataTmp = imwarp(AFM_Elab(flag_AFM).AFM_padded,DisplacementField);
-                AFM_Elab(flag_AFM).AFM_padded=adjDataTmp;               
-            end
+                tmp_scaled=AFM_2_scaled{flag_AFM};
+                tmp_padded(locationAFM2toBF1(3):locationAFM2toBF1(4),locationAFM2toBF1(1):locationAFM2toBF1(2))=tmp_scaled;
+                % apply the displacementField to the data
+                adjDataTmp = imwarp(tmp_padded,DisplacementField);
+                AFM_3_aligned{flag_AFM}=adjDataTmp;
+            end                              
             flagDemons=true;
             details_it_reg=nan;
             clear adjDataTmp DisplacementField
@@ -241,17 +242,18 @@ function [AFM_IO_3_BFaligned,BF_IO_1_cropped,AFM_Elab,info_allignment,offset]=A5
         %%%%%%%%%%%%%%%%%%%%%%%%%% 
         else
             AFM_IO_3_BFaligned=AFM_IO_2_BFpadded;
-            for flag_AFM=1:size(AFM_Elab,2)
-                AFM_Elab(flag_AFM).AFM_aligned=AFM_Elab(flag_AFM).AFM_scaled;
-            end
+            AFM_3_aligned=AFM_2_scaled;
             rect=locationAFM2toBF1;
             details_it_reg=nan;            
         end
         if ~flagDemons
-            % pad AFM data too in right location respect to AFM_IO_3 and BF_IO_2 too
-            for flag_AFM=1:size(AFM_Elab,2)
-                AFM_Elab(flag_AFM).AFM_padded=zeros(size(AFM_IO_3_BFaligned));
-                AFM_Elab(flag_AFM).AFM_padded(rect(3):rect(4),rect(1):rect(2))=AFM_Elab(flag_AFM).AFM_aligned;
+            % AFM data is aligned but not padded, i.e. not having same dimension of the AFM_IO_BFaligned
+            % so it is required to allocate the resulting aligned AFM data within the entire padded space
+            for flag_AFM=1:nChannels
+                tmp_padded=zeros(size(AFM_IO_3_BFaligned));
+                tmp_aligned=AFM_3_aligned{flag_AFM};
+                tmp_padded(rect(3):rect(4),rect(1):rect(2))=tmp_aligned;
+                AFM_3_aligned{flag_AFM}=tmp_padded;
             end
         end    
         % moving final in Manual era AFM_IO con la dimensione originale. In questo non piu utile perche si vuole prendere quella padded                                
@@ -272,7 +274,6 @@ function [AFM_IO_3_BFaligned,BF_IO_1_cropped,AFM_Elab,info_allignment,offset]=A5
             close all
             break
         end
-        AFM_Elab=AFM_Elab_original;
         rect=rect_firstCorr;
         close(f3)
     end   
@@ -310,4 +311,8 @@ function [AFM_IO_3_BFaligned,BF_IO_1_cropped,AFM_Elab,info_allignment,offset]=A5
     'OperationPerformed', details_it_reg, ...
     'TotalRotation', rotation_deg_tot, ...
     'TotalResize', total_resize);
+    % save all AFM results
+    AFM_final=struct();
+    AFM_final.AFM_1_scaled=AFM_2_scaled;
+    AFM_final.AFM_2_aligned=AFM_3_aligned;
 end

@@ -1,4 +1,4 @@
-function [AFM_IO_3_BFaligned,AFM_Elab,details_it_reg,rect] = A5_feature_automaticLinearAlignment(AFM_IO,BF_IO,AFM_Elab,locationAFM2toBF1,max_c_it_OI,idxMon,newFolder)
+function [AFM_IO_3_BFaligned,AFM_end,details_it_reg,rect] = A5_feature_automaticLinearAlignment(AFM_IO,BF_IO,AFM_start,locationAFM2toBF1,max_c_it_OI,idxMon,newFolder)
     wb=waitbar(0,'Initializing Iterative Cross Correlation','CreateCancelBtn','setappdata(gcbf,''canceling'',1)');
     setappdata(wb,'canceling',0);         
     rotation_deg_tot=0;                
@@ -38,9 +38,9 @@ function [AFM_IO_3_BFaligned,AFM_Elab,details_it_reg,rect] = A5_feature_automati
     addpoints(h,0,1)
     ylabel('Cross-correlation score (%)','FontSize',12), xlabel('# cycles','FontSize',12)        
     % prepare the field where store the iteratively modified AFM data
-    for flag_AFM=1:size(AFM_Elab,2)
-        AFM_Elab(flag_AFM).AFM_aligned=AFM_Elab(flag_AFM).AFM_scaled;
-    end
+    AFM_end=AFM_start;
+    % find the logical channels
+    flagLogical=cellfun(@islogical,AFM_start);
     while(N_cycles_opt<=Limit_Cycles)
         if(exist('wb','var'))
             %if cancel is clicked, stop
@@ -87,46 +87,54 @@ function [AFM_IO_3_BFaligned,AFM_Elab,details_it_reg,rect] = A5_feature_automati
                 % EXPANSION/REDUCTION
                 case {1,2}
                     if b == 1, StepSizeMatrix = abs(StepSizeMatrix); else, StepSizeMatrix = -abs(StepSizeMatrix); end
-                    for flag_AFM = 1:size(AFM_Elab,2)
-                        img = AFM_Elab(flag_AFM).AFM_aligned;
-                        % Build NaN mask and fill NaNs before resizing
-                        nan_mask = isnan(img);
-                        fill_val = nanmean(img(:));        % or 0, or nanmedian
-                        img(nan_mask) = fill_val;          
-                        % Resize both image and mask
+                    for flag_AFM = 1:length(AFM_end)
+                        img = AFM_end{flag_AFM};
                         new_size = size(img) + StepSizeMatrix;
-                        img_r    = imresize(img,      new_size);
-                        mask_r   = imresize(double(nan_mask), new_size) > 0.5;  % nearest-ish threshold           
-                        % Restore NaNs
-                        img_r(mask_r) = NaN;
-                        AFM_Elab(flag_AFM).AFM_aligned = img_r;
+                        if flagLogical(flag_AFM)
+                            AFM_end{flag_AFM} = imresize(img, new_size, 'nearest') > 0.5;
+                        else
+                            % Build NaN mask and fill NaNs before resizing
+                            nan_mask = isnan(img);
+                            fill_val = nanmean(img(:));        % or 0, or nanmedian
+                            img(nan_mask) = fill_val;          
+                            % Resize both image and mask
+                            img_r    = imresize(img,      new_size);
+                            mask_r   = imresize(double(nan_mask), new_size) > 0.5;  % nearest-ish threshold           
+                            % Restore NaNs
+                            img_r(mask_r) = NaN;
+                            % save the result of the image alteration
+                            AFM_end{flag_AFM} = img_r;
+                        end
                     end
                     details_it_reg(z,1) = 1;
                     details_it_reg(z,2) = StepSizeMatrix;
             % CLOCKWISE/COUNTER-CLOCKWISE ROTATION
             case {3,4}
                 if b == 3, Rot_par = abs(Rot_par); else, Rot_par = -abs(Rot_par); end
-                for flag_AFM = 1:size(AFM_Elab,2)
-                    img = AFM_Elab(flag_AFM).AFM_aligned;      
+                for flag_AFM = 1:length(AFM_end)
+                    img =  AFM_end{flag_AFM};      
                     % Build NaN mask and fill NaNs before rotating
-                    nan_mask = isnan(img);
-                    fill_val = nanmean(img(:));
-                    img(nan_mask) = fill_val;
-                    % Rotate both image and mask
-                    img_r  = imrotate(img,            Rot_par, 'bilinear', 'loose');
-                    mask_r = imrotate(double(nan_mask), Rot_par, 'nearest',  'loose') > 0.5;
-                    % imrotate pads with 0; also mark those new-border pixels as NaN
-                    border_mask = (img_r == 0) & ~(imrotate(ones(size(img)), Rot_par, 'nearest', 'loose') > 0.5);
-                    mask_r = mask_r | border_mask;
-                    img_r(mask_r) = NaN;
-                    AFM_Elab(flag_AFM).AFM_aligned = img_r;
+                    if flagLogical(flag_AFM)
+                        AFM_end{flag_AFM} = imrotate(img, Rot_par, 'nearest', 'loose') > 0.5;
+                    else
+                        nan_mask = isnan(img);
+                        fill_val = nanmean(img(:));
+                        img(nan_mask) = fill_val;
+                        % Rotate both image and mask
+                        img_r  = imrotate(img,            Rot_par, 'bilinear', 'loose');
+                        mask_r = imrotate(double(nan_mask), Rot_par, 'nearest',  'loose') > 0.5;
+                        % imrotate pads with 0; also mark those new-border pixels as NaN
+                        border_mask = (img_r == 0) & ~(imrotate(ones(size(img)), Rot_par, 'nearest', 'loose') > 0.5);
+                        mask_r = mask_r | border_mask;
+                        img_r(mask_r) = NaN;
+                        AFM_end{flag_AFM} = img_r;
+                    end
                 end
                 details_it_reg(z,1) = 0;
                 details_it_reg(z,2) = Rot_par;
                 rotation_deg_tot = rotation_deg_tot + Rot_par;
             end
             fprintf('\n %s Scaling Optimization Found.\n\tMatrix Size: %dx%d\n\tTotal rotation:%0.2f°\n', textFprintf{b}, size(moving_OPT),rotation_deg_tot)
-
             % update the score
             figure(f2max)
             score = max_c_it_OI_prev/maxC_original;

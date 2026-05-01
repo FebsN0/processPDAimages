@@ -1,7 +1,7 @@
 % the output AFM_data will have new fields compared to the input AFM_data
 % AFM_aligned is the version iteratively modified of AFM_scaled
 % AFM_image_padded is AFM_aligned but with the size of AFM_IO_padded, which is the same for the BF_IO
-function varargout=A5_feature_manualAlignmentGUI(AFM_IO_padded,BF_IO,AFM_data,rect,max_c_it_OI,idxMon,newFolder,varargin)
+function varargout=A5_feature_manualAlignmentGUI(AFM_IO_padded,BF_IO,AFM_start,rect,max_c_it_OI,idxMon,newFolder,varargin)
     p=inputParser(); 
     argName = 'saveFig';    defaultVal = 'Yes';     addParameter(p, argName, defaultVal, @(x) ismember(x,{'No','Yes'}));
     parse(p,varargin{:});
@@ -17,22 +17,22 @@ function varargout=A5_feature_manualAlignmentGUI(AFM_IO_padded,BF_IO,AFM_data,re
                              'Units', 'normalized', 'Position', [0.4, 0.25, 0.2, 0.05]);
     % init the trend plot
     maxC_original=max_c_it_OI;
-    f2max=figure;
-    h = animatedline('Marker','o');
+    fig_TrendCC=figure; ax_TrendCC=axes(fig_TrendCC);
+    h = animatedline(ax_TrendCC,'Marker','o');
     addpoints(h,0,1)
-    ylabel('Normalized Cross-correlation Score','FontSize',12), xlabel('# cycles','FontSize',12)  
+    ylabel(ax_TrendCC,'Normalized Cross-correlation Score','FontSize',12), xlabel(ax_TrendCC,'# cycles','FontSize',12)
+    title(ax_TrendCC,'Trend Cross-correlation score','FontSize',14)
     hScoreCCText = uicontrol('Parent', hFig, 'Style', 'text', 'String', 'Score (normalized): 1', ...
                              'Units', 'normalized', 'Position', [0.4, 0.225, 0.2, 0.05]);
     % keep trach the total rotation and matrix size changes
-    rotation_deg=0;
+    totRotation_deg=0;
     hRotText = uicontrol('Parent', hFig, 'Style', 'text', 'String', 'Rotation: 0°', ...
                              'Units', 'normalized', 'Position', [0.4, 0.20, 0.2, 0.05]);
-    % copy the scaled matrixs so they will be iteratively modified
-    for idx=1:size(AFM_data,2)
-        AFM_data(idx).AFM_aligned=AFM_data(idx).AFM_scaled;
-    end
-    % save the original AFM_data
-    AFM_data_original=AFM_data;
+    % init the aligned matrixs. Create a copy of it that will be iteratively modified. AFM_start is the original (scaled)
+    nChannels=length(AFM_start);
+    AFM_end=AFM_start;
+    % find the logical channels
+    flagLogical=cellfun(@islogical,AFM_start);
     % Load two images
     fixedImg1 = BF_IO;
     % extract only the AFM mask
@@ -96,14 +96,23 @@ function varargout=A5_feature_manualAlignmentGUI(AFM_IO_padded,BF_IO,AFM_data,re
         modifiedImg1 = imresize(modifiedImg1, size(modifiedImg1)+scale);
         nan_mask_mod = imresize(double(nan_mask_mod), size(modifiedImg1), 'nearest') > 0.5;
         modifiedImg1(nan_mask_mod) = NaN;
-        for flag_AFM = 1:size(AFM_data,2)
-            img = AFM_data(flag_AFM).AFM_aligned;
-            nan_mask = isnan(img);
-            img(nan_mask) = nanmean(img(:));
-            img = imresize(img, size(img)+scale);
-            nan_mask = imresize(double(nan_mask), size(img), 'nearest') > 0.5;
-            img(nan_mask) = NaN;
-            AFM_data(flag_AFM).AFM_aligned = img;
+        for flag_AFM = 1:nChannels
+            img = AFM_end{flag_AFM};
+            new_size = size(img) + scale;
+            if flagLogical(flag_AFM)
+                AFM_end{flag_AFM} = imresize(img, new_size, 'nearest') > 0.5;
+            else
+            % Build NaN mask and fill NaNs before resizing
+                nan_mask = isnan(img);
+                img(nan_mask) = nanmean(img(:));  % or 0, or nanmedian
+                % Resize both image and mask
+                img_r    = imresize(img,new_size);
+                mask_r   = imresize(double(nan_mask), new_size) > 0.5;  % nearest-ish threshold           
+                % Restore NaNs
+                img_r(mask_r) = NaN;
+                % save the result of the image alteration
+                AFM_end{flag_AFM} = img_r;
+            end
         end
         % save the operation
         details_it_reg(counter,1) = 1;
@@ -121,25 +130,30 @@ function varargout=A5_feature_manualAlignmentGUI(AFM_IO_padded,BF_IO,AFM_data,re
         % introduced at the edges by 'loose', which are not real data.
         nan_mask_mod = isnan(modifiedImg1);
         modifiedImg1(nan_mask_mod) = nanmean(modifiedImg1(:));
-        modifiedImg1 = imrotate(modifiedImg1, angle, 'bilinear', 'loose');
+        img_rot = imrotate(modifiedImg1, angle, 'bilinear', 'loose');
         nan_mask_mod = imrotate(double(nan_mask_mod), angle, 'nearest', 'loose') > 0.5;
-        % border_mask derived from modifiedImg1 directly — guaranteed same size
-        border_mask = (modifiedImg1 == 0);
-        modifiedImg1(nan_mask_mod | border_mask) = NaN;    
-        for flag_AFM = 1:size(AFM_data,2)
-            img = AFM_data(flag_AFM).AFM_aligned;
-            nan_mask = isnan(img);
-            img(nan_mask) = nanmean(img(:));
-            img = imrotate(img, angle, 'bilinear', 'loose');
-            nan_mask    = imrotate(double(nan_mask), angle, 'nearest', 'loose') > 0.5;        
-            % border_mask derived from img directly — guaranteed same size
-            border_mask = (img == 0);
-            img(nan_mask | border_mask) = NaN;
-            AFM_data(flag_AFM).AFM_aligned = img;
+        border_mask = ~(imrotate(ones(size(modifiedImg1)), angle, 'nearest', 'loose') > 0.5);
+        modifiedImg1 = img_rot;       
+        modifiedImg1(nan_mask_mod | border_mask) = NaN;
+        for flag_AFM = 1:nChannels
+            img =  AFM_end{flag_AFM};      
+            % Build NaN mask and fill NaNs before rotating
+            if flagLogical(flag_AFM)
+                AFM_end{flag_AFM} = imrotate(img,angle, 'nearest','loose') > 0.5;
+            else
+                nan_mask = isnan(img);
+                img(nan_mask) = nanmean(img(:));
+                img_r  = imrotate(img,              angle, 'bilinear', 'loose');
+                mask_r = imrotate(double(nan_mask), angle, 'nearest',  'loose') > 0.5;
+                border_mask = (img_r == 0) & ~(imrotate(ones(size(img)), angle, 'nearest', 'loose') > 0.5);
+                mask_r = mask_r | border_mask;
+                img_r(mask_r) = NaN;
+                AFM_end{flag_AFM} = img_r;
+            end
         end
-                % update the total rotation
-        rotation_deg = rotation_deg+angle;
-        set(hRotText, 'String', ['Rotation: ' num2str(rotation_deg) '°']);
+        % update the total rotation
+        totRotation_deg = totRotation_deg+angle;
+        set(hRotText, 'String', ['Rotation: ' num2str(totRotation_deg) '°']);
         % save the operation
         details_it_reg(counter,1) = 0;
         details_it_reg(counter,2) = angle;
@@ -159,16 +173,19 @@ function varargout=A5_feature_manualAlignmentGUI(AFM_IO_padded,BF_IO,AFM_data,re
 
     % run a cross correlation (xcorr2_fft) and alignment
     function exeSingleCrossCorr(start)
-        [max_c_it_OI,~,rect,AFM_IO_padded] = A5_feature_crossCorrelationAlignmentAFM(fixedImg1,modifiedImg1);
-        figure(f2max)
+        modifiedImg1_CC = modifiedImg1;
+        modifiedImg1_CC(isnan(modifiedImg1_CC)) = 0;
+        [max_c_it_OI,~,rect,AFM_IO_padded] = A5_feature_crossCorrelationAlignmentAFM(fixedImg1,modifiedImg1_CC);
+        
         % update the counter and the score
         score = max_c_it_OI/maxC_original;
         % update the trend
         if ~start
+            pause(1)
             set(hCounterText, 'String', ['Counter: ' num2str(counter)]);
             set(hScoreCCText, 'String', ['Score (normalized): ' num2str(score)]);
             addpoints(h,counter, score)
-            drawnow        
+            drawnow      
         end
     end   
 
@@ -177,38 +194,40 @@ function varargout=A5_feature_manualAlignmentGUI(AFM_IO_padded,BF_IO,AFM_data,re
         % init every variables
         counter=1;                  set(hCounterText, 'String', ['Counter: ' num2str(0)]);
         details_it_reg =[];
-        rotation_deg=0;             set(hRotText, 'String', ['Rotation: ' num2str(0) '°']);
+        totRotation_deg=0;             set(hRotText, 'String', ['Rotation: ' num2str(0) '°']);
         score=1;                    set(hScoreCCText, 'String', ['Score (normalized): ' num2str(score)]);
         % original images
         fixedImg1 = BF_IO;
         modifiedImg1 = AFM_IO_resized_original;
-        AFM_data=AFM_data_original;
+        AFM_end=AFM_start;
         % restore the pre-crossCorrelation
         AFM_IO_padded=[];
         exeSingleCrossCorr(true)
         update_display();
-        % restart figures
-        close(f2max)
-        f2max=figure;
-        h = animatedline('Marker','o');
-        addpoints(h,0,1)
-        ylabel('Normalized Cross-correlation Score','FontSize',12), xlabel('# cycles','FontSize',12) 
+        % restart trend plot
+        clearpoints(h);
+        addpoints(h, 0, 1);
+        drawnow
     end
     % last operations when terminated
     function on_close()
         if saveFig
-            figure(f2max)
-            if ~isempty(idxMon), objInSecondMonitor(f2max,idxMon); end
-            title('Trend Cross-correlation score','FontSize',14)
-            saveFigures_FigAndTiff(f2max,newFolder,"resultA5_4_trendScoreCrossCorrelation_manualApproach")          
-            % Close the main UI figure
-            delete(hFig);
+            figure(fig_TrendCC)
+            if ~isempty(idxMon), objInSecondMonitor(fig_TrendCC,idxMon); end            
+            saveFigures_FigAndTiff(fig_TrendCC,newFolder,"resultA5_4_trendScoreCrossCorrelation_manualApproach")          
         end
+        uiresume(hFig);
+        delete(hFig);
     end
-
-    uiwait(msgbox('Click to continue when the manual method is terminated',''));
+    % at the bottom of the main function, replace pause(2) with:
+    uiwait(hFig);
+    pause(2)
     varargout{1}= AFM_IO_padded;
-    varargout{2}= AFM_data;
+    varargout{2}= AFM_end;
     varargout{3}= details_it_reg;
     varargout{4}= rect;
 end
+
+
+    
+    
