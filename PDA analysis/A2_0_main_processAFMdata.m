@@ -106,7 +106,6 @@ function varargout=A2_0_main_processAFMdata(allData,otherParameters,mainPath,Sav
                 metaData_AFM=allData(i).metadata; 
                 % if data for normal scan is from HVmodeOFF, not required to extract friction coeff ==> just trace-retrace data and it doesnt matter
                 % if single section processing or after assembling since V->N conversion is pixelXpixel operation, therefore no planeFit.
-
                 answSkipLat=2; % 1 = skip, 2 = process               
                 if strcmp(HVmodesInfo.mainData,"ON") && modeScan==1 && i==1
                 % if processing HV mode ON (main) and OFF (friction) exist
@@ -185,14 +184,26 @@ function varargout=A2_0_main_processAFMdata(allData,otherParameters,mainPath,Sav
         else
             % show and save figures post assembly BEFORE processing in case of singleSection processing.
             % In case of processing after assembling, it will be done already inside A2_feature_1_processHeightChannel
-            AFM_height_IO=AFM_images_assembled.AFMmask_heightIO;            
-            A1_feature_CleanOrPrepFiguresRawData(AFM_images_assembled,'AFM_IO',AFM_height_IO,'metadata',metaData, ...
+            A1_feature_CleanOrPrepFiguresRawData(AFM_images_assembled,'metadata',metaData, ...
             'idxMon',idxMon,'folderSaveFig',SaveFigFolder,'SeeMe',false, ...
             'imageType','Assembled','Normalization',norm,'postProcessed',false)
             AFM_images_final=AFM_images_assembled;
         end
+        % prepare also the definitive mask which include the excluded pixels from cleared Height and Force channels
+        tmpH=AFM_images_final(strcmp([AFM_images_final.Channel_name],"Height (measured)")).AFM_images_2_PostHeightProcessed;    
+        mask_cleared_H=~isnan(tmpH); % no original corrected height channel ==> already includes excluded pixels but fews so not problematic
+        if  modeScan==1
+            tmpClearedPixels=AFM_images_final(strcmp([AFM_images_final.Channel_name],"Lateral Force")).AFM_images_2_PostLateralProcessed_2_clear;    
+            mask_cleared_LF=~isnan(tmpClearedPixels); % no necessary for VF since same masking and clearing
+            % merge the definitive mask
+            AFM_height_IO_cleared=~(~mask_cleared_H|~mask_cleared_LF);
+        else
+            AFM_height_IO_cleared=mask_cleared_H;
+        end
+        % save the definitive mask
+        AFM_images_final(strcmp([AFM_images_final.Channel_name],"Height (measured)")).AFMmask_heightIO_cleared=AFM_height_IO_cleared;
         % show results post processing. Common for both processing type (singleSection or postAssembly)
-        A1_feature_CleanOrPrepFiguresRawData(AFM_images_final,'AFM_IO',AFM_height_IO,'metadata',metaData, ...
+        A1_feature_CleanOrPrepFiguresRawData(AFM_images_final,'metadata',metaData, ...
             'idxMon',idxMon,'folderSaveFig',SaveFigFolder,'SeeMe',false, ...
             'imageType','Assembled','Normalization',norm,'postProcessed',true)
     else
@@ -213,17 +224,14 @@ function varargout=A2_0_main_processAFMdata(allData,otherParameters,mainPath,Sav
         % in case of frictionScan, stop here the processing. No needed the lateral processing for friction scans
         if modeScan==2 
             varargout{1}=AFMdata_postHeightFit;
-            varargout{2}=AFM_height_IO;
-            varargout{3}=metaDataPreProcess;
+            varargout{2}=metaDataPreProcess;
             return
         end
         % continue lateral processing
- 
     end
     % return outputs
     varargout{1}=AFM_images_final;
-    varargout{2}=AFM_height_IO;
-    varargout{3}=metaData;
+    varargout{2}=metaData;
     % reactivate the annoying warnings
     warning('on','MATLAB:polyfit:RepeatedPointsOrRescale');
     warning('on','curvefit:fit:IterationLimitReached');            

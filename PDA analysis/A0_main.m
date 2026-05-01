@@ -78,24 +78,26 @@ pause(1)
 
 mainPath=uigetdir(pwd,sprintf('Locate the directory of a scan of a specific experiment condition which contains HVon/HVoff directories.'));
 if exist(fullfile(mainPath,"infoDataprocessing.mat"),"file")
-    load(fullfile(mainPath,"infoDataprocessing"),"nameExperiment","nameScan")
+    load(fullfile(mainPath,"infoDataprocessing"),"nameGroupExperiment","nameExperiment","nameScan")
 else
     tmp=strsplit(mainPath,'\');
-    nameScan=tmp{end}; nameExperiment=tmp{end-2};
-    question=sprintf('Name experiment: %s\nScan i-th: %s\nIs everything okay?',nameExperiment,nameScan);
+    nameScan=tmp{end}; nameExperiment=tmp{end-2}; nameGroupExperiment=tmp{end-3};
+    question=sprintf('Name Group all exps: %s\nName experiment: %s\nScan i-th: %s\nIs everything okay?',nameGroupExperiment,nameExperiment,nameScan);
+    display(tmp)
     if ~getValidAnswer(question,'',{'Yes','No'})
         while true
-            res=inputdlg({"ID scan","Name experiment (ex. TRCDA)"},"Enter manually names",[1 80; 1 80],{nameScan,mainPath});
+            res=inputdlg({"Name Group all exps","Name experiment (ex. TRCDA)","ID scan"},"Enter manually names",[1 80; 1 80; 1 80],{nameGroupExperiment,nameExperiment,nameScan,});
             if any(cellfun(@(x) isempty(x), res))
                 disp('Input not valid')
             else
-                nameScan=res{1};
+                nameGroupExperiment=res{1};
                 nameExperiment=res{2};
+                nameScan=res{3};                
                 break
             end
         end
     end
-    save(fullfile(mainPath,"infoDataprocessing"),"nameExperiment","nameScan")
+    save(fullfile(mainPath,"infoDataprocessing"),"nameGroupExperiment","nameExperiment","nameScan")
 end
 clear question res tmp
 %%
@@ -115,48 +117,113 @@ if step2Start<1
 end
 %%
 if step2Start<2  
-    [dataAFM_latDeflecFitted, AFM_height_IO, metaData_AFM]= A2_0_main_processAFMdata(allData,otherParameters,mainPath,SaveFigFolder,HVmodesInfo,idxMon);     
+    [data_AFM,metaData_AFM]= A2_0_main_processAFMdata(allData,otherParameters,mainPath,SaveFigFolder,HVmodesInfo,idxMon);     
     clear BW maskedImage 
-    save(fullfile(SaveFigFolder,'resultsData_2_assemblyProcessAFMdata'))
+    save(fullfile(SaveFigFolder,'resultsData_2_assemblyProcessAFMdata'),"data_AFM","metaData_AFM")
 end
-
-%% Extract the Brightfield data and correctly align them (especially after-before TRITIC since longer time passed)
+clear allData otherParameters HVmodesInfo
+%% Extract the Brightfield data and correctly align them (especially after-before TRITIC since longer time passed)         
 % includes A6 and A7
 if step2Start<3
-    fprintf('\nAFM data is taken from the following experiment:\n\tEXPERIMENT: %s\t\tSCAN i-th:\t %s\n\n',nameExperiment,nameScan) 
-    [metaData_NIKON,mainPathOpticalData,timeExp,TRITICdata,BFdata]=A3_prepareBFandTRITICimages(SaveFigFolder,idxMon,nameExperiment,nameScan); 
-    save(fullfile(SaveFigFolder,'resultsData_3_BF_TRITIC_ready'))
+    fprintf("\n%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%--------------------%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n" + ...
+        "%%%%%%%%" + ...
+        "----  Current Scan  processing details  ----%%%%%%%%\n" + ...
+        "%%%%%%%% GROUP EXPERIMENT: %s\t%%%%%%%%\n" + ...
+        "%%%%%%%% NAME  EXPERIMENT: %s\t\t%%%%%%%%\n" + ...
+        "%%%%%%%% SCAN  ID:         %s\t\t\t%%%%%%%%\n" + ...
+        "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%--------------------%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n\n",...
+        nameGroupExperiment,nameExperiment,nameScan);
+    % extract and prepare the data
+        [metaData_NIKON,BFdata,TRITICdata,mainPathOpticalData]=A3_1_prepareBFandTRITICimages(SaveFigFolder,idxMon,nameGroupExperiment,nameExperiment,nameScan);    
+        % there might be many TRITIC files with different exposure times ==> choose the good one by checking TRITIC distribution and eventually saturation
+        [metaData_NIKON,TRITICdata]=A3_2_checkIntensityTRITIC(metaData_NIKON,TRITICdata,SaveFigFolder,idxMon);
+        save(fullfile(SaveFigFolder,'resultsData_3_1_BF_allTRITIC_extractedPrepared'),"metaData_NIKON","BFdata","TRITICdata","mainPathOpticalData",'-v7.3')
 end
-
 %%
 if step2Start<4
-    % in case there are two BF images (PRE and POST), choose which one to use for binarization and all the next steps. Use AFM mask for better help
-    if numel(fieldnames(BFdata))==2
-        BF_Image_aligned=compareAndChooseBF(AFM_height_IO,TRITICdata,BFdata,SaveFigFolder,idxMon);        
+% in case there are more TRITIC Images at different exposure times, just pick the strongest clear AFTER AFM STIMULATION
+% (even if there is saturation) just to guide the cropping before binarize to save computational time.
+    if numel(TRITICdata.pre)~=1
+        TRITIC_After=TRITICdata.post{1,end}; % first row: high expTime, last col: high gain
     else
-        field=fieldnames(BFdata);
-        BF_Image_aligned=BFdata.(field{1});
-    end
-    TRITIC_Before=TRITICdata.PRE;
-    TRITIC_After=TRITICdata.POST;    
+        TRITIC_After=TRITICdata.post{1};    
+    end        
     % Produce the binary IO of Brightfield
-    [BF_Image_IO,TRITIC_Before,TRITIC_After]=A4_Mic_to_Binary(BF_Image_aligned,idxMon,SaveFigFolder,'TRITIC_before',TRITIC_Before,'TRITIC_after',TRITIC_After); 
-    clear BF_Image_aligned 
-    save(fullfile(SaveFigFolder,'resultsData_4_BF_TRITIC_binarization'))
+    [BF_Image_IO,cropAreaInfo]=A4_Mic_to_Binary(BFdata,idxMon,SaveFigFolder,'TRITIC_after',TRITIC_After); 
+    % apply the same crop made in BF image to the TRITIC data to save computational time
+    if ~isempty(cropAreaInfo)
+        XBegin=cropAreaInfo(1); XEnd=cropAreaInfo(2);
+        YBegin=cropAreaInfo(3); YEnd=cropAreaInfo(4);
+        TRITICdata_crop.pre=cell(size(TRITICdata.pre));
+        TRITICdata_crop.post=cell(size(TRITICdata.post));
+        for i=1:numel(TRITICdata.pre)
+            tmp=TRITICdata.pre{i};
+            tmp_crop=tmp(XBegin:XEnd,YBegin:YEnd); 
+            TRITICdata_crop.pre{i}=tmp_crop;
+            tmp=TRITICdata.post{i};
+            tmp_crop=tmp(XBegin:XEnd,YBegin:YEnd); 
+            TRITICdata_crop.post{i}=tmp_crop;
+        end
+        clear tmp* i cropAreaInfo TRITICdata
+        TRITICdata=TRITICdata_crop;
+        clear TRITICdata_crop
+    end
+    clear TRITIC_After
+    save(fullfile(SaveFigFolder,'resultsData_3_2_BFbinarized'),"BF_Image_IO","TRITICdata")
 end
-%% Align AFM to BF and extract the coordinates for alignment to be transferred to the other data
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% ALIGNMENT AFM and BF IO IMAGES %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if step2Start<5
-    [AFM_height_IO_final,BF_Image_IO_final,AFM_data_final,results_AFM_BF_aligment,offset]=A5_alignment_AFM_Microscope(BF_Image_IO,metaData_NIKON.BF,AFM_height_IO,metaData_AFM,dataAFM_latDeflecFitted,SaveFigFolder,idxMon,'Margin',150);
-    % adjust size BF and TRITIC
+    % prepare the AFM data taking only the necessary ones: Height, Lateral Force and Vertical Force.
+    % NOTE: VF and LF ENTIRE images to prevent the NaN excessive distorsion during AFM-BF IO alignment. The most important thing is the masks alignment, because
+    % the AFM mask already contains the excluded pixels in AFM-LF, not the cleared because the cleared images contains NaN)   
+    tmpH=data_AFM(strcmp([data_AFM.Channel_name],"Height (measured)")).AFM_images_2_PostHeightProcessed;    
+    tmpVF=data_AFM(strcmp([data_AFM.Channel_name],"Vertical Force")).AFM_images_2_PostLateralProcessed_0_entire;
+    tmpLF=data_AFM(strcmp([data_AFM.Channel_name],"Lateral Force")).AFM_images_2_PostLateralProcessed_0_entire;    
+    tmpIOclear=data_AFM(strcmp([data_AFM.Channel_name],"Height (measured)")).AFMmask_heightIO_cleared;    
+    % cell array to be modified with the matrix modification
+    AFM_StartData={tmpH,tmpVF,tmpLF,tmpIOclear};
+    % original mask (there is only one data in the struct) ==> used for alignment
+    AFM_height_IO=data_AFM(strcmp([data_AFM.Channel_name],"Height (measured)")).AFMmask_heightIO;    
+    % start the alignment (use the original AFM mask with the BF mask)
+    [AFM_height_IO_End,BF_Image_IO_End,AFM_EndData,~,offset]=A5_alignment_AFM_Microscope(BF_Image_IO,metaData_NIKON.BF,AFM_height_IO,metaData_AFM,AFM_StartData,SaveFigFolder,idxMon,'Margin',150);                
+    clear tmp*
+    save(fullfile(SaveFigFolder,'resultsData_4_AFM_BF_alignment.mat'),"AFM_height_IO_End","BF_Image_IO_End","AFM_EndData","offset")
+end
+%%
+if step2Start<6
+
+        % adjust size BF and TRITIC
     %BF_Mic_Image_IO=fixSize(BF_Mic_Image_IO,offset);
     TRITIC_Before=fixSize(TRITIC_Before,offset);  
-    TRITIC_After=fixSize(TRITIC_After,offset);  
-    clear dataAFM_latDeflecFitted allData AFM_height_IO BFdata 
-    save(fullfile(SaveFigFolder,'resultsData_5_AFM_TRITIC_alignment.mat'))
+    TRITIC_After=fixSize(TRITIC_After,offset); 
+    % ANALYSE THE TRITIC exposure time for better choice
+
+    % Align the Brightfield and TRITIC Images
+    [aligned_BFimage,aligned_TRITICimages] = A3_3_alignBFandTRITIC(BFdata, TRITICdata, SaveFigFolder);
+    
+
+
+
+
+            % PLOT FLUORESCENCE IMAGES
+    titleImagePRE=sprintf('TRITIC Before Stimulation - timeExp: %s - gain: %s',timeExp,gain);
+    titleImagePOST=sprintf('TRITIC After Stimulation - timeExp: %s - gain: %s',timeExp,gain);
+    filenameND2_PRE='resultA3_3_1_TRITIC_Before_Stimulation';
+    filenameND2_POST='resultA3_3_2_TRITIC_Before_Stimulation';
+end
+
+%% Align AFM to BF and extract the coordinates for alignment to be transferred to the other data
+if step2Start<6
+ 
+    clear data_AFM AFM_height_IO BFdata 
+    
 end
 %% correlation FLUORESCENCE AND AFM DATA
 
-if step2Start<6
+if step2Start<7
     Data_finalResults=A6_correlation_AFM_BF(AFM_data_final,AFM_height_IO_final,BF_Image_IO_final,metaData_AFM,metaData_NIKON,idxMon,SaveFigFolder,mainPathOpticalData,timeExp,'TRITIC_before',TRITIC_Before,'TRITIC_after',TRITIC_After,'innerBorderCalc',false);
 end
 %Data_finalResults=A10_correlation_AFM_BF__OLDVERSION(AFM_A10_data_final,AFM_A10_IO_final,metaData_BF.ImageHeight_umeterXpixel,setpoints,secondMonitorMain,SaveFigFolder,mainPathOpticalData,timeExp,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned,'innerBorderCalc',false);
@@ -181,107 +248,66 @@ function idxLastOperation=checkExistingData(mainPath,nameExperiment,nameScan)
     % if A2 (process-assembly) is already done
     filePostA2  =  'resultsData_2_assemblyProcessAFMdata.mat';
     question2   =   sprintf('(A2) Assembly - Process of AFM data (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
-    options2    =   {'(A3) Run next step: prepare TRITIC data','(A2) Redo Assembly-Process AFM data'};
-    % if A3 (prepare TRITIC and BF data)
-    filePostA3  =  'resultsData_3_BF_TRITIC_ready.mat';
-    question3   =   sprintf('(A3) BF and TRITIC images preparation (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
-    options3    =   {'(A4) Run next step: TRITIC binarization','(A3) Redo preparation BF-TRITIC data'};
-    % if A4 (binarization TRITIC and BF data)
-    filePostA4  =  'resultsData_4_BF_TRITIC_binarization.mat';
-    question4   =   sprintf('(A4) BF and TRITIC images binarization (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
-    options4    =   {'(A5) Run next step:  AFM-TRITIC alignment','(A4) Redo BF-TRITIC data binarization'};        
-    % if A5 (conversion of lateral data from Volt into Force according to the friction by processing HVoff) is already done
-    filePostA5  =  'resultsData_5_AFM_TRITIC_alignment.mat';
-    question5   =   sprintf('(A5) AFM-TRITIC alignment (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
-    options5    =   {'(A6) Run next step: Force-Fluorescence correlation','(A5) Redo AFM-TRITIC alignment'};            
-    % if A5 (final data) is already obtained
-    filePostA6end = 'resultsData_END_Force_Fluorescence_Correlation.mat';        
-    question6     =   sprintf('(A6) Force-Fluorescence correlation (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
-    options6      =   {'(END) Stop the process','(A6) Redo Force-Fluorescence correlation'};
+    options2    =   {'(A3-1) Run next step: prepare BF and TRITIC data','(A2) Redo Assembly-Process AFM data'};
+    % if A3_1 (prepare TRITIC and BF data)
+    filePostA3_1  =  'resultsData_3_1_BF_allTRITIC_extractedPrepared.mat';
+    question3_1   =   sprintf('(A3-1) BF and TRITIC images extraction and preparation (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
+    options3_1    =   {'(A3-2) Run next step: Brightfield binarization','(A3-1) Redo preparation BF-TRITIC data'};
+    % if A3_2 (binarize BF)
+    filePostA3_2 =  'resultsData_3_2_BFbinarized.mat';
+    question3_2  =   sprintf('(A3-2) BF binarization (and eventually TRITIC cropping) (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
+    options3_2   =   {'(A4) Run next step: AFM-BF alignment','(A3-2) Redo BF binarization'};
+    % if A4 (AFM-TRITIC alignment)
+    filePostA4  =  'resultsData_4_AFM_BF_alignment.mat';
+    question4   =   sprintf('(A4) AFM-BF alignment (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
+    options4    =  {'(A5) Run next step: Choose right TRITIC Exposure Time and final BF-TRITIC alignment','(A3_2) AFM-TRITIC alignment'};            
+
+    
+    % if A5 (TRITIC analysis and choice exposure time)
+    filePostA5 =  'resultsData_5_TRITICexpTimeAnalysis_BFAndTRITIC_Alignment.mat';
+    question5  =   sprintf('(A5) TRITIC analysis and BF-TRITIC alignment (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
+    options5   =   {'','(A3-3) Redo TRITIC analysis'};       
+       % if A5 (Force-Fluorescence correlation) - FINAL
+    filePostA6  =  'resultsData_5_Force_Fluorescence_Correlation.mat';
+    question6   =   sprintf('(A5) Force-Fluorescence correlation (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
+    options6    =   {'(END) Stop the process!','(A5) Redo Force-Fluorescence correlationt'};            
     % prepare list
-    fileList={filePostA1,filePostA2,filePostA3,filePostA4,filePostA5,filePostA6end};
-    questList={question1,question2,question3,question4,question5,question6};
-    optList={options1,options2,options3,options4,options5,options6};
+    fileList={filePostA1,filePostA2,filePostA3_1,filePostA3_2,filePostA4,filePostA5,filePostA6};
+    questList={question1,question2,question3_1,question3_2,question4,question5,question6};
+    optList={options1,options2,options3_1,options3_2,options4,options5,options6};
     clear filePost* question* option*
     % find the paths of the files. If not available, the i-th step cell will be empty. Therefore, more easy to find the last file
     flagPresenceFile=cellfun(@(x) fullfile({dir(fullfile(mainPath,'Results Processing AFM and fluorescence images*',x)).folder},x), ...
         fileList,'UniformOutput',false);        
     idxLastOperation=find(cellfun(@(x) ~isempty(x), flagPresenceFile),1,"last");
     if ~isempty(idxLastOperation)
-        if getValidAnswer(questList{idxLastOperation},'',optList{idxLastOperation})==1
+        answ=getValidAnswer(questList{idxLastOperation},'',optList{idxLastOperation});
+        if answ==1 && idxLastOperation==6 %last step already done
         % first option choosen (CONTINUE)
-            if idxLastOperation==6 %last step already done
-                error('Stopped by user.')
-            end
-            % take the last dataset
-            tmpData=load(flagPresenceFile{idxLastOperation}{:});
-        else
+            error('Stopped by user.')            
+        elseif answ==2
             % second option choosen (REDO)
             if idxLastOperation==1
                 % in case of redo first step, complete restart
                 idxLastOperation=0;
+                return
             else
-                % take the dataset before the last
-                tmpData=load(flagPresenceFile{idxLastOperation-1}{:});                      
+                idxLastOperation=idxLastOperation-1;
             end
+        end
+        % take all dataset until last
+        for i=1:idxLastOperation
+            tmpData=load(flagPresenceFile{i}{:});                      
+            % move the data on the main workspace (here we are still inside a function, so the variables must be copied outside).
+            % no need to delete some vars created here. Only those from tmpData will be copied
+            if exist('tmpData','var')
+                fieldNamesC = fieldnames(tmpData);
+                for j = 1:length(fieldNamesC)
+                    assignin('base', fieldNamesC{j}, tmpData.(fieldNamesC{j}));
+                end
+            end   
         end
     else
         idxLastOperation=0;
-    end
-    % move the data on the main workspace (here we are still inside a
-    % function, so the variables must be copied outside).
-    % no need to delete some vars created here. Only those from tmpData
-    % will be copied
-    if exist('tmpData','var')
-        fieldNamesC = fieldnames(tmpData);
-        for i = 1:length(fieldNamesC)
-            assignin('base', fieldNamesC{i}, tmpData.(fieldNamesC{i}));
-        end
-    end        
+    end   
 end
-
-function BF_final=compareAndChooseBF(AFM_height_IO,TRITICdata,BFdata,folderResultsImg,idxMon)
-    % prepare data
-    TRITICpost=TRITICdata.POST;
-    BFpre=BFdata.PRE;  BFpost=BFdata.POST;
-    % show binarized AFM
-    fAFM=figure; axAFM=axes(fAFM);
-    imagesc(axAFM,AFM_height_IO), title(axAFM,"binarized AFM Height",'FontSize',15)
-    axis(axAFM,"on"), axis(axAFM,"equal"), xlim(axAFM,"tight"), ylim(axAFM,"tight")
-    % show BFpre overlapped with TRITICpost, then BFpost
-    fcompare=figure;
-    ax1=subplot(121);
-    imshow(imfuse(imadjust(BFpre),imadjust(TRITICpost)))
-    title("BFpre - TRITICpost","FontSize",12)
-    ax2=subplot(122);
-    imshow(imfuse(imadjust(BFpost),imadjust(TRITICpost)))
-    title("BFpost - TRITICpost","FontSize",12)
-    textTitle="Comparison BFpre and BFpost with TRITICpost overlapped";
-    sgtitle(textTitle,"FontSize",20)
-    options={"PRE","POST"};
-    % see the figures and choose. Extract the definitive BF data
-    choice=getValidAnswer("Which BF image do you want to use for the next steps?",'',options);
-    zoom(ax1, 'reset'); axis(ax1, 'image');
-    zoom(ax2, 'reset'); axis(ax2, 'image');
-    fieldsN=fieldnames(BFdata);        
-    BF_final=BFdata.(fieldsN{choice});
-    % Highlight the chosen subplot
-    axesHandles = [ax1, ax2];
-    delete(findall(gcf, 'Tag', 'SelectionBox'));
-    pos = get(axesHandles(choice), 'Position');
-    % Create a green rectangle around it
-    annotation('rectangle', pos, ...
-        'Color', 'g', ...
-        'LineWidth', 3, ...
-        'Tag', 'SelectionBox');
-    % (Optional) Bring rectangle to front
-    uistack(findall(gcf, 'Tag', 'SelectionBox'), 'top');
-    % prepare the final plot and save
-    textTitle=sprintf("Selected BF_%s for the next steps!",options{choice});
-    sgtitle(textTitle,"FontSize",20,'interpreter','no')
-    objInSecondMonitor(fcompare,idxMon)
-    nameFile="resultA3_7_DefinitiveSelectionFromComparison_BFpreBFpost_TRITICafterOverlapped";
-    saveFigures_FigAndTiff(fcompare,folderResultsImg,nameFile)   
-    close all
-end
-

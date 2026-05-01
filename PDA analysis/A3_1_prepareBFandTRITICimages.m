@@ -166,8 +166,7 @@ function varargout=A3_1_prepareBFandTRITICimages(folderResultsImg,idxMon,groupEx
     varargout{1}=metadata;
     varargout{2}=Image_BF;   
     varargout{3}=Images_TRITIC;
-    varargout{4}=flag_BF_PRE_POST;
-    varargout{5}=mainPathOpticalData;            
+    varargout{4}=mainPathOpticalData;            
 end
 
 
