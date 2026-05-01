@@ -13,7 +13,6 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
     %init instance of inputParser
     p=inputParser();
     addRequired(p, 'data', @(x) isstruct(x));
-    argName = 'AFM_IO';         defaultVal = [];        addParameter(p,argName,defaultVal, @(x) ismatrix(x));
     argName = 'idxMon';         defaultVal = [];        addParameter(p,argName,defaultVal);
     argName = 'folderSaveFig';  defaultVal = [];        addParameter(p,argName,defaultVal);
     argName = 'cleanOnly';      defaultVal = false;     addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
@@ -40,8 +39,7 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
         if p.Results.postProcessed
             flagPostProcessed=true;
             textTypeData='PostProcessed';
-            stepProcess='2';
-            AFM_height_IO=p.Results.AFM_IO;
+            stepProcess='2';            
         else
             flagPostProcessed=false;
             stepProcess='1';
@@ -78,6 +76,8 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
         if flagPostProcessed     
             fieldToUse={'AFM_images_2_PostLateralProcessed_0_entire','AFM_images_2_PostLateralProcessed_1_mask','AFM_images_2_PostLateralProcessed_2_clear'};
             blockAllData=cell(1,1+length(fieldToUse)*2);
+            AFM_height_IO=data(strcmp([data.Channel_name],'Height (measured)')).AFMmask_heightIO;
+            AFM_height_IO_cleared=data(strcmp([data.Channel_name],'Height (measured)')).AFMmask_heightIO_cleared;
             data_Height=data(strcmp([data.Channel_name],'Height (measured)')).AFM_images_2_PostHeightProcessed;
             blockAllData{1}=data_Height; j=1;     
             for i=2:2:length(blockAllData)
@@ -250,11 +250,14 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
                 xlabel(sprintf('Feature height [nm]'),'FontSize',15), ylabel('Percentage %','FontSize',15), grid minor, grid on
                 title("Distribution PostProcessed Height",'FontSize',20)
                 objInSecondMonitor(f_heightDistribution,idxMon);     
-                saveFigures_FigAndTiff(f_heightDistribution,folderSaveFig,'resultA2_9_OptHeightDistribution_FR_BK')
+                saveFigures_FigAndTiff(f_heightDistribution,folderSaveFig,'resultA2_10_OptHeightDistribution_FR_BK')
                 % Since now there is the assembled mask
                 titleData='Final Binary AFM IO Image';
                 nameFig='resultA2_8_finalMask';
-                showData(idxMon,SeeMe,AFM_height_IO,titleData,folderSaveFig,nameFig,'binary',true);   
+                showData(idxMon,SeeMe,AFM_height_IO,titleData,folderSaveFig,nameFig,'binary',true); 
+                titleData='Final Binary AFM IO Image (cleared)';
+                nameFig='resultA2_9_finalMask_cleared';
+                showData(idxMon,SeeMe,AFM_height_IO_cleared,titleData,folderSaveFig,nameFig,'binary',true);                 
             end
         end
     end
