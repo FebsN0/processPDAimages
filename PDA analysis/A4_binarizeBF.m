@@ -9,7 +9,7 @@
 %       BF_IO of BF image
 %       cropInfo : coordinates of the cropped area (empty in case of postHeated scan)
 %       
-function varargout=A3_3_binarizeBF(imageBF,idxMon,folderResultsImg,varargin)
+function varargout=A4_binarizeBF(imageBF,idxMon,folderResultsImg,varargin)
     p=inputParser();
     %Add default mandatory parameters.
     addRequired(p, 'imageBF_aligned');    
@@ -61,8 +61,7 @@ function varargout=A3_3_binarizeBF(imageBF,idxMon,folderResultsImg,varargin)
         end
         ftmp=figure;
         figure_image=imshow(imadjust(imageBF));
-        title('BrightField - CROP THE IMAGE','FontSize',20)
-        subtitle('Post AFM figure has been opened too, use it for a better crop','FontSize',16)
+        title('BF image - CROP IT! Check the TRITIC image that has been opened too','FontSize',20)
         objInSecondMonitor(ftmp,idxMon);
         [~,specs]=imcrop(figure_image);
         close(ftmp)
@@ -109,6 +108,6 @@ function varargout=A3_3_binarizeBF(imageBF,idxMon,folderResultsImg,varargin)
         close(ftmp)
         ftmp=showData(idxMon,false,imadjust(image2bin),titleData1,'','','extraData',BF_IO_corr,'extraBinary',true,'extraTitles',{titleData2},'saveFig',false,'grayScale',true);
     end
-    saveFigures_FigAndTiff(ftmp,folderResultsImg,'resultA3_4_OriginalBrightField_BackgroundForeground')
+    saveFigures_FigAndTiff(ftmp,folderResultsImg,'resultA4_OriginalBrightField_BackgroundForeground')
     varargout{1}=BF_IO_corr;
 end
