@@ -182,7 +182,8 @@ function [moving_adj,fixed_adj,offset]=alignBinarizedImages(moved,fixed,idxMon,v
                 axData_Bin=nexttile([1 1]);                
                 tmpImg = imshow(zeros(size(originalData)),'Parent',axData_Bin);   % placeholder matrix
                 title(axData_Bin,sprintf('Result Binarization of %s',text{i}), 'FontSize',12)
-                while satisfied==1                                    
+                while satisfied==1       
+                    pause(2)
                     closest_indices=selectRangeGInput(1,1,axHist);
                     if exist('currLine','var') && ~isempty(currLine) && isvalid(currLine)
                         delete(currLine); delete(currScatt)                                            

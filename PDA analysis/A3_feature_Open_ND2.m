@@ -1,17 +1,15 @@
 %Function to open and import Nikon ND2 files
 %Written by Dr. Roberto D. Ortuso, University of Geneva.
 
-function [IOI,complete_path_to_afm_file,metadataND2]=A3_feature_Open_ND2(varargin)
+function [IOI,complete_path_to_afm_file,metadataND2,fileMetadataOtherImage]=A3_feature_Open_ND2(varargin)
+    p=inputParser();    % init instance of inputParser    
+    argName = 'fileMetadataOtherImage';         defaultVal = "";              addOptional(p,argName,defaultVal, @(x) isstring(x) || ischar(x));
+    argName = 'complete_path_to_afm_file';      defaultVal = "";              addOptional(p,argName,defaultVal, @(x) isstring(x) || ischar(x));
 
-    if(~isempty(varargin))
-        if(isfile(varargin{1,1}))
-            [~,~,extension]=fileparts(varargin{1,1});
-            if(strcmp(extension,'.nd2'))
-                complete_path_to_afm_file=varargin{1,1};
-            end
-        end
-    end
-
+    % validate and parse the inputs
+    parse(p,varargin{:});
+    fileMetadataOtherImage=p.Results.fileMetadataOtherImage;
+    complete_path_to_afm_file=p.Results.complete_path_to_afm_file;
 
     % addpath('Z:\Microscope\bfmatlab');
     function [result] = bfopen(id, varargin)
@@ -242,9 +240,9 @@ function [IOI,complete_path_to_afm_file,metadataND2]=A3_feature_Open_ND2(varargi
         r.close();
     end   
     
+    % in case of manual selection of the single file
     if(~exist('complete_path_to_afm_file','var'))
-        [afm_file_name,afm_file_path,afm_file_index]=uigetfile('*.nd2','Choose AFM File');
-        
+        [afm_file_name,afm_file_path,afm_file_index]=uigetfile('*.nd2','Choose AFM File');        
         if(afm_file_index==0)
             error('No File Selected')
         else
@@ -262,24 +260,39 @@ function [IOI,complete_path_to_afm_file,metadataND2]=A3_feature_Open_ND2(varargi
     % https://docs.openmicroscopy.org/bio-formats/5.7.1/developers/matlab-dev.html#ome-metadata
     % To access physical voxel and stack sizes of the data:
     stackSizeX = omeMeta.getPixelsSizeX(0).getValue(); % image width, pixels
-    stackSizeY = omeMeta.getPixelsSizeY(0).getValue(); % image height, pixels
-  
-    voxelSizeXdefaultUnit = omeMeta.getPixelsPhysicalSizeX(0).unit().getSymbol();       % returns the default unit type
-    if strcmpi(voxelSizeXdefaultUnit,"nm")
-        voxelSizeXdefaultUnit=1e-9;
-    elseif strcmpi(voxelSizeXdefaultUnit,"µm")
-        voxelSizeXdefaultUnit=1e-6;
-    elseif strcmpi(voxelSizeXdefaultUnit,"mm")
-        voxelSizeXdefaultUnit=1e-3;
+    stackSizeY = omeMeta.getPixelsSizeY(0).getValue(); % image height, pixels    
+    % sometimes, when NIKON is not properly setup, some metadata might missing, in particular unit pixel in micron. If so, just take it from the
+    % metadata of another already processed image
+    if ~isempty(omeMeta.getPixelsPhysicalSizeX(0))
+        unit_type=0;
+        voxelSizeXdefaultUnit = omeMeta.getPixelsPhysicalSizeX(0).unit().getSymbol();       % returns the default unit type
+        if strcmpi(voxelSizeXdefaultUnit,"nm") || unit_type==1
+            voxelSizeXdefaultUnit=1e-9;
+        elseif strcmpi(voxelSizeXdefaultUnit,"µm") || unit_type==2
+            voxelSizeXdefaultUnit=1e-6;
+        elseif strcmpi(voxelSizeXdefaultUnit,"mm") || unit_type==3
+            voxelSizeXdefaultUnit=1e-3;
+        end
+        voxelSizeX = omeMeta.getPixelsPhysicalSizeX(0).value(ome.units.UNITS.MICROMETER);   % in µm
+        voxelSizeXdouble = voxelSizeX.doubleValue();                                        % The numeric value represented by this object after conversion to type double
+        voxelSizeY = omeMeta.getPixelsPhysicalSizeY(0).value(ome.units.UNITS.MICROMETER);   % in µm
+        voxelSizeYdouble = voxelSizeY.doubleValue();  
+    else
+        if isequal(fileMetadataOtherImage,"")
+            waitfor(warndlg("Optical metadata of the current image doesn't contain for unknown reasons information regarding size of pixel in terms of micron. " + ...
+            "The only solution is to extract such information from metadata of another image, also with different condition but made with the NIKON microscope with identical setup. " + ...
+            "For example, if the current image is within TRCDA:DOPC, take metadata of a scan from TRCDA:DMPC. This metadata will be used for the rest of the optical images extraction."))             
+            [file, path] = uigetfile('.mat','Choose a file to open');
+            fileMetadataOtherImage=fullfile(path,file);  
+        end
+        metadataFromAnotherImage=load(fileMetadataOtherImage,"metadata");
+        fieldname=fieldnames(metadataFromAnotherImage.metadata);
+        voxelSizeXdefaultUnit=metadataFromAnotherImage.metadata.(fieldname{1}).pixelSizeUnit;
+        voxelSizeXdouble=metadataFromAnotherImage.metadata.(fieldname{1}).ImageWidth_umeterXpixel;
+        voxelSizeYdouble=metadataFromAnotherImage.metadata.(fieldname{1}).ImageHeight_umeterXpixel;
     end
-    
-    exposureTime = omeMeta.getPlaneExposureTime(0,0).value(ome.units.UNITS.MILLISECOND);
-    voxelSizeX = omeMeta.getPixelsPhysicalSizeX(0).value(ome.units.UNITS.MICROMETER);   % in µm
-    voxelSizeXdouble = voxelSizeX.doubleValue();                                        % The numeric value represented by this object after conversion to type double
-    voxelSizeY = omeMeta.getPixelsPhysicalSizeY(0).value(ome.units.UNITS.MICROMETER);   % in µm
-    voxelSizeYdouble = voxelSizeY.doubleValue();                                        % The numeric value represented by this object after conversion to type double
+    exposureTime = omeMeta.getPlaneExposureTime(0,0).value(ome.units.UNITS.MILLISECOND);                                      % The numeric value represented by this object after conversion to type double
     gain=file_info{1,5};
-
     metadataND2=struct(...
                     'ExposureTime', double(exposureTime), ...
                     'ImageWidthPixels',stackSizeX, ...

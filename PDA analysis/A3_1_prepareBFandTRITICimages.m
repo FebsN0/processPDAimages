@@ -1,5 +1,4 @@
 function varargout=A3_1_prepareBFandTRITICimages(folderResultsImg,idxMon,groupExperiment,nameExperiment,nameScan,varargin)
-% flag_BF_PRE_POST is for alignment between BF pre and BF post, rather than BF pre and TRITIC post
     p=inputParser();
     argName = 'pathOpticalImages';         defaultVal = [];        addOptional(p,argName,defaultVal);
     argName = 'postHeatProcessing';        defaultVal = false;     addOptional(p,argName,defaultVal, @(x) islogical(x));
@@ -13,7 +12,7 @@ function varargout=A3_1_prepareBFandTRITICimages(folderResultsImg,idxMon,groupEx
     postHeat=p.Results.postHeatProcessing;
     clear argName text defaultVal p varargin
     if exist(fullfile(filePathND2,"BFdata.mat"),"file")
-        load(fullfile(filePathND2,"BFdata.mat"),"metadata","Image_BF","flag_BF_PRE_POST")            
+        load(fullfile(filePathND2,"BFdata.mat"),"metadata","Image_BF")            
     else        
         % .nd2 files inside dir
         fileList = dir(fullfile(filePathND2, '*.nd2'));
@@ -26,21 +25,20 @@ function varargout=A3_1_prepareBFandTRITICimages(folderResultsImg,idxMon,groupEx
         idxBF=~cellfun(@isempty,matches);
         % in case there are no files with BF in the filename of the files, then
         % manual selection
+        fileMetadataOtherImage="";
         if nnz(idxBF)==0 
             i=1;
             while true
                 if i==1
                     filenameND2='resultA3_1_1_BrightField_preAFM';
-                    [BF_ImagePRE,metaData_BF]=selectND2file( ...
+                    [BF_ImagePRE,metaData_BF,fileMetadataOtherImage]=selectND2file( ...
                         'folderResultsImg',folderResultsImg,'filenameND2',filenameND2,'idxMon',idxMon, ...
-                        'titleImage','BrightField - original - preAFM','typeImage','BrightField','mode','Before');
-                    flag_BF_PRE_POST = 0;
+                        'titleImage','BrightField - original - preAFM','typeImage','BrightField','mode','Before','fileMetadataOtherImage',fileMetadataOtherImage);
                 else
                     filenameND2='resultA3_1_2_BrightField_postAFM';
-                    BF_ImagePOST=selectND2file( ...
+                    [BF_ImagePOST,~,fileMetadataOtherImage]=selectND2file( ...
                         'folderResultsImg',folderResultsImg,'filenameND2',filenameND2,'idxMon',idxMon, ...
-                        'titleImage','BrightField - original - postAFM','typeImage','BrightField','mode','After');
-                    flag_BF_PRE_POST = 1;
+                        'titleImage','BrightField - original - postAFM','typeImage','BrightField','mode','After','fileMetadataOtherImage',fileMetadataOtherImage);
                 end            
                 if getValidAnswer("End the selection of BF files?",'',{'y','n'}) || i>2
                     break
@@ -57,21 +55,18 @@ function varargout=A3_1_prepareBFandTRITICimages(folderResultsImg,idxMon,groupEx
             end        
             fullfilePath=fullfile(filePathND2,beforeFiles{:});
             filenameND2='resultA3_1_1_BrightField_preAFM'; 
-            [BF_ImagePRE,metaData_BF]=selectND2file('fullfilePath',fullfilePath,...
+            [BF_ImagePRE,metaData_BF,fileMetadataOtherImage]=selectND2file('fullfilePath',fullfilePath,...
                 'folderResultsImg',folderResultsImg,'filenameND2',filenameND2,'idxMon',idxMon, ...
-                'titleImage','BrightField - original - preAFM');
+                'titleImage','BrightField - original - preAFM','fileMetadataOtherImage',fileMetadataOtherImage);
             % if exist, extract postAFM BF acquisition
             if any(contains(fileBF, {'post','after'}))            
                 idxBFmode=contains(fileBF, {'post','after'});
                 afterFiles=fileBF(idxBFmode);
                 fullfilePath=fullfile(filePathND2,afterFiles{:});
                 filenameND2='resultA3_1_2_BrightField_postAFM';
-                BF_ImagePOST=selectND2file('fullfilePath',fullfilePath,...
+                [BF_ImagePOST,~,fileMetadataOtherImage]=selectND2file('fullfilePath',fullfilePath,...
                     'folderResultsImg',folderResultsImg,'filenameND2',filenameND2,'idxMon',idxMon, ...
-                    'titleImage','BrightField - original - postAFM','mode','After');
-                flag_BF_PRE_POST = 1;  % flag post
-            else            
-                flag_BF_PRE_POST = 0;
+                    'titleImage','BrightField - original - postAFM','mode','After','fileMetadataOtherImage',fileMetadataOtherImage);           
             end
         end
         metadata=struct();
@@ -91,7 +86,7 @@ function varargout=A3_1_prepareBFandTRITICimages(folderResultsImg,idxMon,groupEx
         if ~postHeat
             Image_BF.post=BF_ImagePOST;
         end
-        save(fullfile(filePathND2,"BFdata"),"metadata","Image_BF","flag_BF_PRE_POST")
+        save(fullfile(filePathND2,"BFdata"),"metadata","Image_BF")
     end
     clear patternBF beforeFiles fileBF filenameND2 fullfilePath afterFiles idxBFmode idxBF matches metaData_BF titleImage
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -139,11 +134,11 @@ function varargout=A3_1_prepareBFandTRITICimages(folderResultsImg,idxMon,groupEx
             % since there may lot of TRITIC images at different exp time, save memory and data processing time
             for i=1:length(beforeFiles)
                 % each column represent different condition at the same exposure time, usually different gain
-                [Image_TRITIC,metaData_TRITIC]=selectND2file('fullfilePath',beforeFiles{i},'saveFig',false);                     
+                [Image_TRITIC,metaData_TRITIC,fileMetadataOtherImage]=selectND2file('fullfilePath',beforeFiles{i},'saveFig',false,'fileMetadataOtherImage',fileMetadataOtherImage);                     
                 allMetadata_TRITIC_pre{time_th,i}=metaData_TRITIC;
                 allExpTime_TRITIC_pre{time_th,i}=Image_TRITIC;
                 if ~postHeat
-                    [Image_TRITIC,metaData_TRITIC]=selectND2file('fullfilePath',afterFiles{i},'saveFig',false);    
+                    [Image_TRITIC,metaData_TRITIC,fileMetadataOtherImage]=selectND2file('fullfilePath',afterFiles{i},'saveFig',false,'fileMetadataOtherImage',fileMetadataOtherImage);    
                     allMetadata_TRITIC_post{time_th,i}=metaData_TRITIC;
                     allExpTime_TRITIC_post{time_th,i}=Image_TRITIC;
                 end
@@ -170,7 +165,7 @@ function varargout=A3_1_prepareBFandTRITICimages(folderResultsImg,idxMon,groupEx
 end
 
 
-function [Image,metaData]=selectND2file(varargin)
+function [Image,metaData,fileMetadataOtherImage]=selectND2file(varargin)
 % the function extract the given .nd2 image file and generate the picture with a given title
     p=inputParser();
     argName = 'titleImage';         defaultVal = [];            addOptional(p,argName,defaultVal);    
@@ -181,14 +176,16 @@ function [Image,metaData]=selectND2file(varargin)
     argName = 'idxMon';             defaultVal = [];            addOptional(p,argName,defaultVal);  
     argName = 'folderResultsImg';   defaultVal = [];            addOptional(p,argName,defaultVal);  
     argName = 'filenameND2';        defaultVal = [];            addOptional(p,argName,defaultVal);  
+    argName = 'fileMetadataOtherImage';              defaultVal = "";              addOptional(p,argName,defaultVal, @(x) isstring(x) || ischar(x));
     parse(p,varargin{:});   
     fullfilePath=p.Results.fullfilePath;
+    fileMetadataOtherImage=p.Results.fileMetadataOtherImage;
     if isempty(fullfilePath)
         text= sprintf('Select the %s Image%s AFM acquisition',p.Results.typeImage,p.Results.mode);
         [fileName, filePathData] = uigetfile({'*.nd2'},text);
         fullfilePath=fullfile(filePathData,fileName);
     end
-    [Image,~,metaData]=A3_feature_Open_ND2(fullfilePath);
+    [Image,~,metaData,fileMetadataOtherImage]=A3_feature_Open_ND2('complete_path_to_afm_file',fullfilePath,'fileMetadataOtherImage',fileMetadataOtherImage);
     if p.Results.saveFig
         showData(p.Results.idxMon,false,imadjust(Image),sprintf("%s - imadjusted",p.Results.titleImage),p.Results.folderResultsImg,p.Results.filenameND2,'noLabels',true,'grayscale',true)  
     end
