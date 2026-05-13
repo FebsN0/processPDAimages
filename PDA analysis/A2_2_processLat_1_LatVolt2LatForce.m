@@ -95,7 +95,7 @@ function [dataForce,idxSection]=A2_2_processLat_1_LatVolt2LatForce(AFM_data,AFM_
     title(axDistN,"Lateral Force",'FontSize',18)    
     nameFig2=nameFig_base+"_4_LateralDataDistributionValues";
     grid(axDistN,"on"), grid(axDistN,"minor")
-    objInSecondMonitor(axDistV,idxMon)
+    objInSecondMonitor(figDistr,idxMon)
     % apply indipently of the used method different cleaning outliers steps
     %   first clearing: filter out anomalies among vertical data by threshold betweem trace and retrace
     %   second clearing: filter out force with 20% more than the setpoint for the specific section
