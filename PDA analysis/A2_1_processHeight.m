@@ -82,7 +82,7 @@ function varargout=A2_1_processHeight(data,idxMon,SaveFigFolder,modeScan,varargi
     
     tmp_img_0=data(1).Raw_afm_image;
     % check the orientation of the images to avoid wrong fitting direction
-    showData(idxMon,1,tmp_img_0,"Raw Data - Check orientation","","","saveFig",false)
+    showData(idxMon,1,tmp_img_0,"Raw Data - Check orientation","","","saveFig",false);
     if getValidAnswer("Is the orientation of the data coincident with the fast and slow scan directions?","",{"Yes, keep in.","No, change orientation."},1)==1
         orient=false;
     else
@@ -314,13 +314,13 @@ function varargout=A2_1_processHeight(data,idxMon,SaveFigFolder,modeScan,varargi
                 % REMOVE th percentile from height channel through slider for better visualization (not in the AFM-IO because it will be used later and it is informative keep it as it is
                 titleData1 = 'Height Image';
                 titleTemplate = 'Height Image - clipped above %.2fth percentile';
-                [th,height_7_forBinarization_betterVisual] = percentileClipSlider(idxMon,height_7_forBinarization*factor, ...
+                [~,height_7_forBinarization_betterVisual,thValues] = percentileClipSlider(idxMon,height_7_forBinarization*factor, ...
                 titleData1, titleTemplate, "Height (nm)", lengthAxis,'pLowMax',10, 'pMin', 90, 'pMax', 100);                   
                 disp('Processing now the binarization of Height channel after LineByLine Fitting with Butterworth-filtered Height')
                 [AFM_height_IO,binarizationMethod]=binarizeImageMain(height_7_forBinarization_betterVisual,idxMon,'Height',iterationMain); 
                 % restore the pixel previously removed.
-                AFM_height_IO(height_7_forBinarization*factor>=th(2))=true;
-                AFM_height_IO(height_7_forBinarization*factor<=th(1))=false;
+                AFM_height_IO(height_7_forBinarization*factor>=thValues(2))=true;
+                AFM_height_IO(height_7_forBinarization*factor<=thValues(1))=false;
             end  
             if answerFromHVon
                 heightTmp=height_6_areaRemoved;
@@ -341,7 +341,7 @@ function varargout=A2_1_processHeight(data,idxMon,SaveFigFolder,modeScan,varargi
             BK_5_heightMasked(AFM_height_IO==1)=NaN;
             % first output is a matrix of selected regions. It will not be used
             [~,AFM_height_IO_corr,BK_5_heightMasked_corr,~] = featureRemovePortions(AFM_height_IO,textTitleIO,idxMon, ...
-                'additionalImagesToShow',{BK_5_heightMasked*factor,heightTmp*factor}, ...
+                'additionalImagesToShow',{BK_5_heightMasked,heightTmp}, ...
                 'additionalImagesTitleToShow',{'Masked Height Image\n(Black regions = NaN or manually removed areas)','Height Image'},...
                 'originalDataIndex',3,'normalize', false);        
             % show final mask and masked raw heightin comparison with the original height 
