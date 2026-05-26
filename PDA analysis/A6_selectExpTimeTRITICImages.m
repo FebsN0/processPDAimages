@@ -6,9 +6,25 @@ function varargout=A6_selectExpTimeTRITICImages(TRITICdata,BF_IO,metadata_NIKON,
 % in case of normal scans, TRITICdata has pre and post AFM scan, whereas postHeated scans only pre AFM scan. 
 % since the routine is the same for both, the first for cycle prepare just the data and plot all together for each case
 % once completed, then the user has to select the proper optical parameters
-mainFolderExps=uigetdir(fileparts(fileparts(SaveFigFolder)),"Select the folder which contains ALL EXPERIMENTS dirs (i.e. TRCDA, TRCDA_DMPC,etc)");
-warning('off','curvefit:prepareFittingData:removingNaNAndInf')
-% if comparison with specific optical parameters has been already done. Save time
+
+
+    % Recursively search up to 5 parent directories for the comparison file
+    targetFile = fullfile("finalComparisonTRITIC", "ComparisonResults_allExps_allScans.mat");
+    mainFolderExps = "";
+    searchDir = SaveFigFolder;
+    for k = 1:6
+        if exist(fullfile(searchDir, targetFile), "file")
+            mainFolderExps = searchDir;
+            fprintf('Found comparison file in: %s\n', mainFolderExps);
+            break;
+        end
+        searchDir = fileparts(searchDir); % go one level up
+    end
+    if mainFolderExps==""    
+        mainFolderExps=uigetdir(fileparts(fileparts(SaveFigFolder)),"Select the folder which contains ALL EXPERIMENTS dirs (i.e. TRCDA, TRCDA_DMPC,etc)");
+    end
+    warning('off','curvefit:prepareFittingData:removingNaNAndInf')
+    % if comparison with specific optical parameters has been already done. Save time
     if ~exist(fullfile(mainFolderExps,"finalComparisonTRITIC","ComparisonResults_allExps_allScans.mat"),"file")
         if ~exist(fullfile(SaveFigFolder,"resultsData_6_1_allTRITIC.mat"),"file")
             fnames=fieldnames(TRITICdata);    
@@ -547,20 +563,23 @@ function numConditions=checkTRITICconditions(allScansConditionsResults)
 end
 
 function varargout=checkAndExtractFinalData(TRITICdata,metadata_NIKON,idx_selectedOpticalParameters,selectedExpTime,selectedGain,SaveFigFolder,saveFig,idxMon)
+    % copy metadata Nikon
+    metaData_NIKON_updated.BF=metadata_NIKON.BF;
     % extract definitive fluorescence
     TRITIC_Before=TRITICdata.pre{idx_selectedOpticalParameters};
     TRITIC_After=TRITICdata.post{idx_selectedOpticalParameters};
-    metaData_NIKON_updated=metadata_NIKON.TRITIC{idx_selectedOpticalParameters};
+    tmp=metadata_NIKON.TRITIC{idx_selectedOpticalParameters};
     % check if selected Gain and TimeExp coincide with those from MetadataNikon
-    if selectedGain ~= str2double(metaData_NIKON_updated.Gain) || selectedExpTime ~= metaData_NIKON_updated.ExposureTime
+    if selectedGain ~= str2double(tmp.Gain) || selectedExpTime ~= tmp.ExposureTime
         error('Selected optical parameters do not match metadata.');
     end
-    size_meterXpix=metaData_NIKON_updated.ImageHeight_umeterXpixel*metaData_NIKON_updated.pixelSizeUnit;
+    size_meterXpix=tmp.ImageHeight_umeterXpixel*tmp.pixelSizeUnit;
     % PLOT FLUORESCENCE IMAGES    
     titleImagePRE=sprintf('TRITIC Before Stimulation - timeExp: %d - gain: %d',selectedExpTime,selectedGain);
     titleImagePOST=sprintf('TRITIC After Stimulation - timeExp: %d - gain: %d',selectedExpTime,selectedGain);
     figTRITICpre=showData(idxMon,~saveFig,imadjust(TRITIC_Before),sprintf("%s - imadjusted",titleImagePRE),"","",'lenghtAxis',size_meterXpix*size(TRITIC_Before),'saveFig',false);
     figTRITICpost=showData(idxMon,~saveFig,imadjust(TRITIC_After),sprintf("%s - imadjusted",titleImagePOST),"","",'lenghtAxis',size_meterXpix*size(TRITIC_After),'saveFig',false);
+    metaData_NIKON_updated.TRITIC=tmp;
     if saveFig
         filenameND2_PRE='resultA6_4_1_TRITIC_Before_Stimulation';
         filenameND2_POST='resultA6_4_2_TRITIC_Before_Stimulation';
