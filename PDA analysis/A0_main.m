@@ -77,9 +77,9 @@ clear vers pv* pe
 idxMon=objInSecondMonitor;
 pause(1)
 
-mainPath="D:\1_mixingPCinTRCDA\AFM data\4_sampleMarch2026\TRCDA_25marchSample\1";
-%mainPath="D:\1_mixingPCinTRCDA\AFM data\4_sampleMarch2026\TRCDA_DMPC_25marchSample\1";
-%mainPath="D:\1_mixingPCinTRCDA\AFM data\4_sampleMarch2026\TRCDA_DOPC_25marchSample\1";
+%mainPath="D:\1_mixingPCinTRCDA\AFM data\4_sampleMarch2026\TRCDA_25marchSample\5";
+%mainPath="D:\1_mixingPCinTRCDA\AFM data\4_sampleMarch2026\TRCDA_DMPC_25marchSample\5";
+mainPath="D:\1_mixingPCinTRCDA\AFM data\4_sampleMarch2026\TRCDA_DOPC_25marchSample\5";
 %mainPath="D:\1_mixingPCinTRCDA\AFM data\4_sampleMarch2026\TRCDA_POPC_25marchSample\7";
 
 if ~(exist("mainPath","var") && exist(mainPath,"dir") && getValidAnswer(sprintf("Is the selected path of the scan to process correct?\n%s",mainPath),"",{"Y","N"}))   
@@ -129,7 +129,7 @@ if step2Start<1
     save(fullfile(SaveFigFolder,'resultsData_1_extractAFMdata'),"allData","otherParameters","SaveFigFolder")
 end
 clear mainHVmode
-%%
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% PROCESS AFM RAW DATA %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -139,7 +139,7 @@ if step2Start<2
     save(fullfile(SaveFigFolder,'resultsData_2_assemblyProcessAFMdata'),"AFMdata","metaData_AFM")
 end
 clear allData otherParameters HVmodesInfo mainPath
-%
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% EXTRACT/REORGANIZE/ALIGN PRE-POST BF and TRITIC IMAGES %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -187,9 +187,10 @@ if step2Start<4
     else
         TRITICdata_4_cropped=TRITICdata_3_Aligned;
     end    
-    save(fullfile(SaveFigFolder,'resultsData_4_BFbinarized'),"BF_Image_IO","TRITICdata_4_cropped")    
+    save(fullfile(SaveFigFolder,'resultsData_4_BFbinarized'),"BF_Image_IO","TRITICdata_4_cropped")   
+    clear TRITIC_After
 end
-clear TRITIC_After TRITICdata_3_Aligned BFdata
+clear TRITICdata_3_Aligned BFdata
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% ALIGNMENT AFM (IO+Data) and BF-IO IMAGES %%%
@@ -233,7 +234,7 @@ if step2Start<5
     save(fullfile(SaveFigFolder,'resultsData_5_AFM_BF_alignment.mat'),"AFM_height_IO_End","BF_Image_IO_End","AFMdata_final","TRITICdata_5_final")    
 end
 clear BF_Image_IO AFMdata fMask offset AFM_height_IO AFM_StartData_vect AFM_EndData_vect tmp* TRITICdata_4_cropped % BF_Image_IO_End is not needed anymore
-%%
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% IF MORE EXPOSURE TIME TRITIC IMAGES EXIST, BETTER ANALYSIS WITH HEIGHT-TRITIC CORRELATION %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -248,24 +249,21 @@ if step2Start<6
         disp("Interrupted. First, process all other scans so the comparison to choose optical parameter can be done.")
         return
     end
-    save(fullfile(SaveFigFolder,'resultsData_6_definitiveTRITICdata.mat'),"TRITIC_Before","TRITIC_After")
+    save(fullfile(SaveFigFolder,'resultsData_6_2_definitiveTRITICdata.mat'),"TRITIC_Before","TRITIC_After","metaData_NIKON_definitive")
 end
+clear TRITICdata_5_final metaData_NIKON mainPathOpticalData
 
-%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% CORRELATION AFM Data - FLUORESCENCE %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-if step2Start<7
-    Data_finalResults=A7_correlation_AFM_BF(AFM_data_final,AFM_height_IO_final,BF_Image_IO_final,metaData_AFM,metaData_NIKON,idxMon,SaveFigFolder,mainPathOpticalData,timeExp,'TRITIC_before',TRITIC_Before,'TRITIC_after',TRITIC_After,'innerBorderCalc',false);
+if step2Start<7                                          
+    Data_finalResults=A7_correlation_AFM_BF(AFMdata_final,AFM_height_IO_End,BF_Image_IO_End,metaData_AFM,metaData_NIKON_definitive.BF,metaData_NIKON_definitive.TRITIC,idxMon,SaveFigFolder,'TRITIC_before',TRITIC_Before,'TRITIC_after',TRITIC_After,'innerBorderCalc',false);
 end
-%Data_finalResults=A10_correlation_AFM_BF__OLDVERSION(AFM_A10_data_final,AFM_A10_IO_final,metaData_BF.ImageHeight_umeterXpixel,setpoints,secondMonitorMain,SaveFigFolder,mainPathOpticalData,timeExp,'TRITIC_before',Tritic_Mic_Image_Before,'TRITIC_after',Tritic_Mic_Image_After_aligned,'innerBorderCalc',false);
 
-clear flag* TRITIC_Before TRITIC_After AFM_A10_data_final AFM_A10_IO_final AFM_A4_HeightFittedMasked
+clear flag* TRITIC_Before TRITIC_After AFM_A10_data_final AFM_A10_IO_final AFM_A4_HeightFittedMasked step2Start
 close all
-save(fullfile(SaveFigFolder,'resultsData_END_Force_Fluorescence_Correlation'))
-disp('A10 - Correlation completed')
-% restore warning
-cleanupObj = onCleanup(@() warning(orig));  % will restore original state
+save(fullfile(SaveFigFolder,'resultsData_7_END_Force_Fluorescence_Correlation.mat'))
+fprintf('Force-Correlation Processing of the scan %s - Experiment completed"!\n\n',nameScan)
 
 
 %%
@@ -282,32 +280,30 @@ function idxLastOperation=checkExistingData(mainPath,nameExperiment,nameScan)
     filePostA2  =  'resultsData_2_assemblyProcessAFMdata.mat';
     question2   =   sprintf('(A2) Assembly - Process of AFM data (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
     options2    =   {'(A3) Run next step: prepare BF and TRITIC data','(A2) Redo Assembly-Process AFM data'};
-    % if A3_1 (prepare TRITIC and BF data)
-    filePostA3_1  =  'resultsData_3_BF_allTRITIC_extractedPreparedAligned.mat';
-    question3_1   =   sprintf('(A3) BF and TRITIC images extraction and preparation (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
-    options3_1    =   {'(A4) Run next step: Brightfield Image Binarization','(A3) Redo preparation BF-TRITIC data'};
-    % if A3_2 (binarize BF)
-    filePostA3_2 =  'resultsData_4_BFbinarized.mat';
-    question3_2  =   sprintf('(A4) BF Image Binarization (and eventually TRITIC cropping) (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
-    options3_2   =   {'(A5) Run next step: AFM-BF alignment','(A4) Redo BF binarization'};
-    % if A4 (AFM-TRITIC alignment)
-    filePostA4  =  'resultsData_5_AFM_BF_alignment.mat';
-    question4   =   sprintf('(A5) AFM-BF alignment (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
-    options4    =  {'(A6) Run next step: Choose right TRITIC Exposure Time.','(A5) AFM-TRITIC alignment'};            
-
-    
-    % if A5 (TRITIC analysis and choice exposure time)
-    filePostA5 =  'resultsData_5_TRITICexpTimeAnalysis_BFAndTRITIC_Alignment.mat';
-    question5  =   sprintf('(A5) TRITIC analysis and BF-TRITIC alignment (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
-    options5   =   {'','(A3-3) Redo TRITIC analysis'};       
-       % if A5 (Force-Fluorescence correlation) - FINAL
-    filePostA6  =  'resultsData_5_Force_Fluorescence_Correlation.mat';
-    question6   =   sprintf('(A5) Force-Fluorescence correlation (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
-    options6    =   {'(END) Stop the process!','(A5) Redo Force-Fluorescence correlationt'};            
+    % if A3 (prepare TRITIC and BF data)
+    filePostA3  =  'resultsData_3_BF_allTRITIC_extractedPreparedAligned.mat';
+    question3   =   sprintf('(A3) BF and TRITIC images extraction and preparation (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
+    options3    =   {'(A4) Run next step: Brightfield Image Binarization','(A3) Redo preparation BF-TRITIC data'};
+    % if A4 (binarize BF)
+    filePostA4 =  'resultsData_4_BFbinarized.mat';
+    question4  =   sprintf('(A4) BF Image Binarization (and eventually TRITIC cropping) (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
+    options4   =   {'(A5) Run next step: AFM-BF alignment','(A4) Redo BF binarization'};
+    % if A5 (AFM-TRITIC alignment)
+    filePostA5  =  'resultsData_5_AFM_BF_alignment.mat';
+    question5   =   sprintf('(A5) AFM-BF alignment (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
+    options5    =  {'(A6) Run next step: Choose right TRITIC Exposure Time.','(A5) AFM-TRITIC alignment'};            
+    % if A6 (TRITIC analysis and choice exposure time)
+    filePostA6 =  'resultsData_6_2_definitiveTRITICdata.mat';
+    question6  =   sprintf('(A6) TRITIC analysis - optical parameters comparison and selection - (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
+    options6   =   {'(A7_END) Run Force-Fluorescence correlation','(A6) Redo TRITIC analysis'};        
+    % if A7_END (Force-Fluorescence correlation) - FINAL          
+    filePostA7  =  'resultsData_7_END_Force_Fluorescence_Correlation.mat';
+    question7  =   sprintf('(A7_END) Force-Fluorescence correlation (Experiment %s - scan #%s) already completed.\nChoose the right option:',nameExperiment,nameScan);
+    options7    =   {'(END) Stop the process!','(A7_END) Redo Force-Fluorescence correlationt'};            
     % prepare list
-    fileList={filePostA1,filePostA2,filePostA3_1,filePostA3_2,filePostA4,filePostA5,filePostA6};
-    questList={question1,question2,question3_1,question3_2,question4,question5,question6};
-    optList={options1,options2,options3_1,options3_2,options4,options5,options6};
+    fileList={filePostA1,filePostA2,filePostA3,filePostA4,filePostA5,filePostA6,filePostA7};
+    questList={question1,question2,question3,question4,question5,question6,question7};
+    optList={options1,options2,options3,options4,options5,options6,options7};
     clear filePost* question* option*
     % find the paths of the files. If not available, the i-th step cell will be empty. Therefore, more easy to find the last file
     flagPresenceFile=cellfun(@(x) fullfile({dir(fullfile(mainPath,'Results Processing AFM and fluorescence images*',x)).folder},x), ...
@@ -315,7 +311,7 @@ function idxLastOperation=checkExistingData(mainPath,nameExperiment,nameScan)
     idxLastOperation=find(cellfun(@(x) ~isempty(x), flagPresenceFile),1,"last");
     if ~isempty(idxLastOperation)
         answ=getValidAnswer(questList{idxLastOperation},'',optList{idxLastOperation});
-        if answ==1 && idxLastOperation==6 %last step already done
+        if answ==1 && idxLastOperation==7 % last step already done
         % first option choosen (CONTINUE)
             error('Stopped by user.')            
         elseif answ==2

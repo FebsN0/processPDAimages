@@ -50,7 +50,8 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
             end
         end
     end      
-    setpoints=metadataAFM.SetP_N;
+    % extract the theoretical setpoint from metadata and convert into nN
+    setpoints=metadataAFM.SetP_N*1e9;
     % extract the required values from metadata
     timeExp=metadataTRITIC.ExposureTime;
     size_meterXpix=metadataBF.ImageHeight_umeterXpixel*metadataBF.pixelSizeUnit;
@@ -172,7 +173,7 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
         % obtain the definitive third mask (more aggressive) considering the removal of Lateral Force > 2*maxSetpoint
         % NOTE, lateral force higher than vertical force is derived not from friction phenomena but rather 
         % the collision between the tip and the surface and other instabilities.
-        limitVD=max(setpoints)*2*1e9;
+        limitVD=max(setpoints)*2;
         mask_validValues= AFM_data(idx_LD).finalData<=limitVD;          % exclude values higher than limit setpoint  
         mask_third=mask_second & mask_validValues;         % merge the mask with the previous mask  
     end
@@ -192,6 +193,7 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
         masking.mask_third_setpointLimit_99percRemoval_totElements = nnz(mask_third);        
     end
     dataResultsPlot.maskingResults = masking;
+    disp("Preparation figures of the Masks")
     % show the plots of the masks in case of normal AFM scans
     if saveMaskFig
         showData(idxMon,SeeMe,mask_AFM,{'Original Mask';'Generated from AFM-Height Binarization + modification due to registration'},folderResultsImg,'resultA7_1_1_OriginalMask','binary',true,'lenghtAxis',size_meterXpix*size(mask_first))
@@ -241,6 +243,7 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
     labelBar="Absolute fluorescence increase (A.U.)";
     size_meterXpix=metadataTRITIC.ImageHeight_umeterXpixel*metadataTRITIC.pixelSizeUnit;
     % in case of normal AFM scans (no when onlyHeat because fluorescence intensity change)
+    disp("Preparation figures of the masked AFM/Delta data")
     if ~flag_heat
         % delta BK  
         showData(idxMon,false,Delta_BK,"Delta Fluorescence Background (original AFM-IO mask)",folderResultsImg,'resultA7_2_0_DeltaFluorescenceBackground_originalMask','lenghtAxis',size_meterXpix*size(Delta),'labelBar',labelBar)  

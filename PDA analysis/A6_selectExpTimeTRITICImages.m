@@ -492,8 +492,8 @@ function varargout=A6_selectExpTimeTRITICImages(TRITICdata,BF_IO,metadata_NIKON,
             for c=1:length(nameAllExp)
                 vect=vectHeightValues_allExp{c};
                 histogram(axDistHeightAllExp,vect,'BinEdges',edges,"DisplayName",nameAllExp{c},"Normalization","percentage",'FaceAlpha',0.3,"FaceColor",globalColor(c)) 
-                perc90=prctile(vect,90);
-                xline(axDistHeightAllExp,perc90,"--","Color",globalColor(c),"LineWidth",2,"DisplayName",sprintf("90th percentile - %.2f nm",perc90))
+                avg=mean(vect); devStd=std(vect);
+                xline(axDistHeightAllExp,avg,"--","Color",globalColor(c),"LineWidth",2,"DisplayName",sprintf("Mean\x00B1Std: %.2f \x00B1 %.2f nm",avg,devStd))
             end
             legend(axDistHeightAllExp,'Interpreter','none',"Location","best",'FontSize',15);
             fig_allExpDistHeight.Visible="on";
@@ -510,7 +510,7 @@ function varargout=A6_selectExpTimeTRITICImages(TRITICdata,BF_IO,metadata_NIKON,
             end               
             nameFig=sprintf('allExpAvgCurvesCorr_gain%d_expTime%d',selectedGain,selectedExpTime);
             saveFigures_FigAndTiff(fig_allExpAvgCurvesCorr,fullfile(mainFolderExps,"finalComparisonTRITIC"),nameFig,'closeImmediately',false)
-            clear edges c vect perc90 maxh* minh* nameFig    
+            clear edges c vect avg maxh* minh* nameFig    
             % show figures of TRITIC for better help
             [fig1,fig2]=checkAndExtractFinalData(TRITICdata,metadata_NIKON,idx_selectedOpticalParameters,selectedExpTime,selectedGain,"",false,idxMon);                      
             % end while loop. decide if interrupt here or explore a different optical parameter conditions
