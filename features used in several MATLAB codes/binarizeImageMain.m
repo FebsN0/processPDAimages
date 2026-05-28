@@ -76,7 +76,8 @@ function [IO_Image,binarizationMethod]=binarization_withPythonModules(image,idxM
     modulePython=extractBinarizationPYmodule();
     % show height image for help
     titletext='Image - original';
-    ftmp=showData(idxMon,true,image,titletext,'','','normalized',true,'saveFig',false);            
+    ftmp=showData(idxMon,true,image,titletext,'','','normalized',true,'saveFig',false);   
+    pause(2)
     % NOTE, output from python function are py.numpy.ndarray, not MATLAB arrays. Therefore, take BW and corrected directly appear unusable.
     options={'Otsu','Multi-Otsu','Sauvola','Niblack','Bradley-Roth','Adaptive-Gaussian','Yen','Li','Triangle','Isodata','Watershed'};
     BW_allMethods=cell(1,length(options));

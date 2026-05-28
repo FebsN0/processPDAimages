@@ -70,7 +70,10 @@ function [closest_indices,obj] = selectRangeGInput(n_points,dimension,axFig)
     %--------------------------------------------------------------
     for j=1:n_points
         % Force focus on the axis again (in case the user interacts elsewhere)
+        figure(ancestor(axFig, 'figure'));  % focus the parent figure
         axes(axFig); %#ok<LAXES>
+        drawnow;
+        pause(0.2);
         [x_selected, y_selected] = ginput(1);
         pointSelected_all(1)=x_selected;
         pointSelected_all(2)=y_selected;

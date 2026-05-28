@@ -82,11 +82,11 @@ function varargout = percentileClipSlider(idxMon,data,titleOrig,titleTemplateCle
 
     % --- initial render
     localShowUI(ax1, data, titleOrig, labelBar, AxisLength);
-    [pLowNow, pHighNow, dataNow] = localClip2Sided(data, pLowInit, pHighInit);
+    [pLowNow, pHighNow,thLow,thHigh,dataNow] = localClip2Sided(data, pLowInit, pHighInit);
     h2 = localShowUI(ax2, dataNow, sprintf(titleTemplateClean,pLowNow, pHighNow), labelBar, AxisLength);
     
     % --- shared state
-    pChosen = [NaN NaN]; dataClean = [];
+    pChosen = [NaN NaN]; dataClean = []; thValues=[NaN NaN];
     % --- continuous update while dragging
     sldLow.ValueChangingFcn  = @(src,evt) onAnySlide(evt.Value, sldHigh.Value);
     sldHigh.ValueChangingFcn = @(src,evt) onAnySlide(sldLow.Value, evt.Value);
@@ -104,7 +104,7 @@ function varargout = percentileClipSlider(idxMon,data,titleOrig,titleTemplateCle
 
 % ---------------- nested callbacks ----------------
     function onAnySlide(pLowVal, pHighVal)
-        [pL, pH, dataClean] = localClip2Sided(data, pLowVal, pHighVal);
+        [pL, pH,thLow,thHigh,dataClean] = localClip2Sided(data, pLowVal, pHighVal);
         lblLow.Text  = sprintf('Low clip p = %.2f',  pL);
         lblHigh.Text = sprintf('High clip p = %.2f', pH);
         h2.CData = dataClean;
@@ -116,10 +116,12 @@ function varargout = percentileClipSlider(idxMon,data,titleOrig,titleTemplateCle
     end
 
     function doAccept()
-        pChosen = [sldLow.Value sldHigh.Value];
-        [~, ~, dataClean] = localClip2Sided(data, pChosen(1), pChosen(2));
+        pChosen = [sldLow.Value sldHigh.Value];        
+        [~, ~,thLow,thHigh,dataClean] = localClip2Sided(data, pChosen(1), pChosen(2));
+        thValues = [thLow,thHigh];
         varargout{1}=pChosen;        
         varargout{2}=dataClean;
+        varargout{3}=thValues;
         uiresume(fig);
     end
 
@@ -143,7 +145,7 @@ function h = localShowUI(ax, data, ttl, labelBar, AxisLength)
     axis(ax,'equal'); xlim(ax,'tight'); ylim(ax,'tight');   
 end
 
-function [pLowUse, pHighUse, dataClipped] = localClip2Sided(data, pLowUse, pHighUse)
+function [pLowUse,pHighUse,thLow,thHigh,dataClipped] = localClip2Sided(data, pLowUse, pHighUse)
     % Enforce ordering (avoid invalid states)
     if pLowUse > pHighUse
         tmp = pLowUse; pLowUse = pHighUse; pHighUse = tmp;

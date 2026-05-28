@@ -234,6 +234,9 @@ function varargout = featureRemovePortions(dataToShow1,textTitle1,idxMon,varargi
             [~, idx] = sort(arrayfun(@(ax) ax.Position(1), axAll));
             axAll = axAll(idx);
             axSelected=axAll(onWhichFigure);
+            % sometimes, drawroi get stuck. To ensure to end the program, click Enter button as double-click
+            hFig = ancestor(axSelected, 'figure');
+            hFig.KeyPressFcn = @(src,evt) cancelRoiOnEnter(src, evt);
             axes(axSelected) %#ok<LAXES>
             hold(axSelected, 'on');
             if methodRemoval == 1
@@ -255,7 +258,9 @@ function varargout = featureRemovePortions(dataToShow1,textTitle1,idxMon,varargi
                 roi=drawpolygon(axSelected,'Color','red');
                 pos = customWait(roi);
                 coordinatesSelectedArea=round(reshape(pos',[1 size(pos,1)*2]));
-            end            
+            end   
+            % clear the key callback once roi exists
+            hFig.KeyPressFcn = '';
             % in case of interruption
             if isempty(roi.Position)
                 break
@@ -333,6 +338,24 @@ end
 %%%%%%%%%%%%%%%%%
 %%% FUNCTIONS %%%
 %%%%%%%%%%%%%%%%%
+% endDraw() tells the ROI "stop collecting vertices, you're done" — exactly what a double-click does for drawpolygon,
+% and what releasing the mouse does for drawrectangle/drawline
+function cancelRoiOnEnter(src, evt)
+    if strcmp(evt.Key, 'return')
+        allChildren = findall(src);
+        for k = 1:numel(allChildren)
+            if isa(allChildren(k), 'images.roi.Line')   || isa(allChildren(k), 'images.roi.Rectangle') || isa(allChildren(k), 'images.roi.Polygon')
+                % simulate double-click to finalize
+                uiresume(src);
+                return
+            end
+        end        
+        rois = findobj(src, '-isa', 'images.roi.Base');
+        if ~isempty(rois)
+            rois(1).endDraw();   % finalizes the ROI in place, like a double-click
+        end
+    end
+end
 
 % Function to wait until completion by clicking twice. Return final pos array
 function pos = customWait(hROI)

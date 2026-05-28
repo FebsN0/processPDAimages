@@ -16,6 +16,8 @@
 %               - prevFig       = in case the figure should be plotted in an existing fig
 %               - noLabels      = when true, no texts over axis and no label to indicate other info
 %               - grayscale     = when true, show image in grascale values (white to black, for Brightfield images)
+%               - Broadcast     = it requires two values which represent the min/max pixel value ==> "scale" the image. Useful to compare multiple
+%                                 different images. For example, compare TRITIC exp1-scan4 with TRITIC exp4-scan2
 % for extra data
 %               extraData       
 %               extraNorm         
@@ -35,6 +37,7 @@ function fig=showData(idxMon,SeeMe,data1,titleData1,nameDir,nameFig,varargin)
     argName = 'labelBar';           defaultVal='';      addOptional(p,argName,defaultVal, @(x) (isstring(x) || ischar(x)))
     argName = 'noLabels';           defaultVal=false;   addOptional(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))))
     argName = 'grayscale';          defaultVal=false;   addOptional(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))))
+    argName = 'Broadcast';          defaultVal=[];      addOptional(p,argName,defaultVal, @(x) (isnumeric(x) && isvector(x)))  
     % for extra data
     argName = 'extraData';          defaultVal={};      addOptional(p,argName,defaultVal, @(x) iscell(x) || ismatrix(x))
     argName = 'extraNorm';          defaultVal={};      addOptional(p,argName,defaultVal, @(x) (iscell(x) || isnumeric(x) || islogical(x)))
@@ -59,7 +62,7 @@ function fig=showData(idxMon,SeeMe,data1,titleData1,nameDir,nameFig,varargin)
     if p.Results.noLabels,   noLabs=true; else, noLabs=false; end
     if p.Results.grayscale,  grayScale=true; else, grayScale=false; end
     if p.Results.binary,     bin1=true; else, bin1=false; end
-
+    broadcastRange=p.Results.Broadcast;
     lenghtAxis=p.Results.lenghtAxis;
     labelBar1=string(p.Results.labelBar);     
 
@@ -74,7 +77,7 @@ function fig=showData(idxMon,SeeMe,data1,titleData1,nameDir,nameFig,varargin)
     nTotal = 1 + nExtra;   % main image + extras
     % ---- SUBPLOT 1: main data ----
     ax = subplot(1,nTotal,1,'Parent',fig);
-    showSingleData(ax,data1,norm1,titleData1,labelBar1,bin1,lenghtAxis,noLabs,grayScale)
+    showSingleData(ax,data1,norm1,titleData1,labelBar1,bin1,lenghtAxis,noLabs,grayScale,broadcastRange)
     % ---- SUBPLOTS for EXTRA DATA ----
     for k = 1:nExtra
         axk = subplot(1,nTotal,k+1,'Parent',fig);
@@ -84,7 +87,7 @@ function fig=showData(idxMon,SeeMe,data1,titleData1,nameDir,nameFig,varargin)
         sizeAxisK   = getOrDefault(p.Results.extraLengthAxis,k,[]);
         titleK      = getOrDefault(p.Results.extraTitles, k, '');
         labelK      = getOrDefault(p.Results.extraLabel,  k, '');                             
-        showSingleData(axk,dataK,normK,titleK,labelK,binK,sizeAxisK,noLabs,grayScale)
+        showSingleData(axk,dataK,normK,titleK,labelK,binK,sizeAxisK,noLabs,grayScale,broadcastRange)
     end   
     % in case the fig is already opened, dont re-update the position. The user may have changed location for a more comfortable area
     if ~flagPrevFig
@@ -109,7 +112,7 @@ function fig=showData(idxMon,SeeMe,data1,titleData1,nameDir,nameFig,varargin)
     end
 end
 
-function showSingleData(ax,data, norm, titleData,labelBar,bin,AxisLength,noLabels,grayScale)   
+function showSingleData(ax,data, norm, titleData,labelBar,bin,AxisLength,noLabels,grayScale,broadcastRange)   
     %axes(ax) % Make sure plotting happens in this axes
     % Create axis vectors. In case there is no pixel size, then use meter axis
     if isempty(AxisLength)
@@ -157,6 +160,9 @@ function showSingleData(ax,data, norm, titleData,labelBar,bin,AxisLength,noLabel
             colormap(ax, flipud(gray(256)));   % white=high, black=low (brightfield)
         else
             colormap(ax, parula(256));
+        end
+        if ~isempty(broadcastRange)
+            clim([broadcastRange(1) broadcastRange(2)])
         end
         if norm
             c.Label.String = 'Normalized';
