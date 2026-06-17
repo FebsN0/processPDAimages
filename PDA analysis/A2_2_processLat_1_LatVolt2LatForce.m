@@ -6,10 +6,11 @@ function [dataForce,idxSection]=A2_2_processLat_1_LatVolt2LatForce(AFM_data,AFM_
     % invert 0->1 and 1->0 in case of normal scan. When there is friction processing, no conversion
     if modeScan==1
         AFM_height_IO=~AFM_height_IO;
-        textTitle="Distribution of Lateral Data in corrispondence of PDA";
+        typeMask="BK";
     else
-        textTitle="Distribution of Lateral Data in corrispondence of Background";
+        typeMask="PDA";
     end
+    mask=logical(AFM_height_IO);
     % prepare the idx for each section depending on the size of each section stored in the metadata to better
     % distinguish and prepare the fit for each section data. If there are multiple sections in the metadata 
     idxSection=metadata.y_scan_pixels;
@@ -19,91 +20,218 @@ function [dataForce,idxSection]=A2_2_processLat_1_LatVolt2LatForce(AFM_data,AFM_
     % correct vertical forces
     vertForce_0_entire=(vertical_Trace+vertical_ReTrace)/2;
     vertForce_0_entire=vertForce_0_entire*1e9;
-    % show vertical data
-    nameFig=nameFig_base+"_1_VerticalForce_fullData";
-    showData(idxMon,false,vertical_Trace*1e9,"Vertical Trace",saveFigPath,nameFig,"labelBar","Force [nN]",...
-        "extraData",{vertical_ReTrace*1e9,vertForce_0_entire}, ...
-        "extraTitles",{"Vertical ReTrace","Vertical Force (avg)"},...
-        "extraLabel",{"Force [nN]","Force [nN]"});
     % extract lateral data     
-    Lateral_Trace   = (AFM_data(strcmpi([AFM_data.Channel_name],'Lateral Deflection') & strcmpi([AFM_data.Trace_type],'Trace')).AFM_images_2_PostHeightProcessed);    
-    Lateral_ReTrace = (AFM_data(strcmpi([AFM_data.Channel_name],'Lateral Deflection') & strcmpi([AFM_data.Trace_type],'ReTrace')).AFM_images_2_PostHeightProcessed);
-    Delta = (Lateral_Trace + Lateral_ReTrace) / 2;
-    % Calc W (half-width loop) and then force (convert W into force (in Newton units) using alpha calibration factor and show results.
-    W = Lateral_Trace - Delta;
+    Lateral_Trace_1   = (AFM_data(strcmpi([AFM_data.Channel_name],'Lateral Deflection') & strcmpi([AFM_data.Trace_type],'Trace')).AFM_images_2_PostHeightProcessed);    
+    Lateral_ReTrace_1 = (AFM_data(strcmpi([AFM_data.Channel_name],'Lateral Deflection') & strcmpi([AFM_data.Trace_type],'ReTrace')).AFM_images_2_PostHeightProcessed);
+    % DISTRIBUTION OF VOLTAGE DATA and its statistics
+    nameFig=nameFig_base+"_1_LateralDeflection_Full_StatsResults";
+    afmDistribution_skewness_analysis(Lateral_Trace_1,Lateral_ReTrace_1,saveFigPath,nameFig,"Voltage","Full Data");    
+    %%%%%%%%%%% NOTE %%%%%%%%%%%
+    % some changes will be introduced here. In order to make a straigh comparison, keep the previous method (W=trace-delta), other than the new one
+    % i.e. shift the entire dataset by the median of BK.
+    %%% OLD METHOD: 
+    Delta = (Lateral_Trace_1 + Lateral_ReTrace_1) / 2;   
+    W_trace_old = Lateral_Trace_1 - Delta;
+    % W_retrace_old = Lateral_ReTrace_1 - Delta; ==> no reason to calc W_retrace because perfectly simmetrical to W_trace
+    %%% NEW METHOD
+    % extract lateral data of only BK trace-retrace and then calc the median axis (average of the medians of trace and retrace raw lateral deflection-BK images)
+    %Lateral_Trace_BK_1 = Lateral_Trace_1;
+    %Lateral_Trace_BK_1(~mask)=nan; % remove FR data
+    %Lateral_ReTrace_BK_1 = Lateral_ReTrace_1;
+    %Lateral_ReTrace_BK_1(~mask)=nan; % remove FR data
+    %nameFig=nameFig_base+"_2_LateralDeflection_BKonly_StatsResults";
+    %afmDistribution_skewness_analysis(Lateral_Trace_BK_1,Lateral_ReTrace_BK_1,saveFigPath,nameFig,"Voltage","BK-only");      
+    % Clean lateral deflection data removing the spikes at the edges
+    pix = 5; % number of pixels to be brutally removed at the edges
+    segmentProcess = 3; % case 1: SingleSegments, case 2: ConnectedSegment, case 3: EntireSection
+    outlierRemovalMethod = 1; % no additionalRemoval
+    % ~mask instead of mask to delete BK data
+    Lateral_Trace_2_cleared = remove_Edges_Outlier(Lateral_Trace_1,~mask,pix,segmentProcess,outlierRemovalMethod);
+    Lateral_ReTrace_2_cleared = remove_Edges_Outlier(Lateral_ReTrace_1,~mask,pix,segmentProcess,outlierRemovalMethod);
+    Lateral_Trace_BK_2_cleared=Lateral_Trace_2_cleared;
+    Lateral_Trace_BK_2_cleared(~mask)=nan; % remove FR data
+    Lateral_ReTrace_BK_2_cleared=Lateral_ReTrace_2_cleared;
+    Lateral_ReTrace_BK_2_cleared(~mask)=nan; % remove FR data
+    %nameFig=nameFig_base+"_3_LateralDeflection_BKonly_EdgesCleared_StatsResults";
+    %afmDistribution_skewness_analysis(Lateral_Trace_BK_2_cleared,Lateral_ReTrace_BK_2_cleared,saveFigPath,nameFig,"Voltage","BK-only-EdgesCleared");     
+    % find the plane over BK dataset 
+    %%%%%%%%%%%%%%%%%%%%%%---------------------------
+    %%% METHOD 1 (my method, plane fitting only)
+    planeTrace=planeFitting_N_Order(Lateral_Trace_BK_2_cleared,3);
+    planeReTrace=planeFitting_N_Order(Lateral_ReTrace_BK_2_cleared,3);
+    % not full fit correction because it shifts all the dataset towards the x-y axis ==> removing DC offset
+    Lateral_Trace_BK_3_detilt=Lateral_Trace_BK_2_cleared-(planeTrace-mean(planeTrace(:),"omitnan"));
+    Lateral_ReTrace_BK_3_detilt=Lateral_ReTrace_BK_2_cleared-(planeReTrace-mean(planeReTrace(:),"omitnan"));   
+    % save the axis median between the two distribution ==> this will be the zero axis!
+    nameFig=nameFig_base+"_2_LateralDeflection_BKonly_Detilted_StatsResults";
+    resStats=afmDistribution_skewness_analysis(Lateral_Trace_BK_3_detilt,Lateral_ReTrace_BK_3_detilt,saveFigPath,nameFig,"Voltage","BK-only");   
+    % detilting original raw data of both trace and retrace
+    Lateral_Trace_3_detilt=Lateral_Trace_1-(planeTrace-mean(planeTrace(:),"omitnan"));
+    Lateral_ReTrace_3_detilt=Lateral_ReTrace_1-(planeReTrace-mean(planeReTrace(:),"omitnan"));   
+    nameFig=nameFig_base+"_3_LateralDeflection_Full_Detilted_StatsResults";
+    afmDistribution_skewness_analysis(Lateral_Trace_3_detilt,Lateral_ReTrace_3_detilt,saveFigPath,nameFig,"Voltage","Full Detilted-Data");            
+    % Shift the dataset by mirrorAxis relative of detilted background data
+    medAxisBK=resStats.medianAxis;
+    Lateral_Trace_4_shifted=Lateral_Trace_3_detilt-medAxisBK;
+    Lateral_ReTrace_4_shifted=Lateral_ReTrace_3_detilt-medAxisBK;
+    nameFig=nameFig_base+"_4_LateralDeflection_Full_Final_StatsResults";
+    afmDistribution_skewness_analysis(Lateral_Trace_4_shifted,Lateral_ReTrace_4_shifted,saveFigPath,nameFig,"Voltage","Full Final-Data");  
+    % obtain the mirrored retrace dataset (different from trace) along medAxisBK which is now 0 because datasets are already shifted
+    Lateral_ReTrace_5_mirrored = -Lateral_ReTrace_4_shifted;
+    %%%%%%%%%%%%%%%%%%%%%%---------------------------
+    %%% METHOD 2 (Kaori method, lineXline fitting and avg)
+    baseline_lineFitTrace=lineByLineFitting_N_Order(Lateral_Trace_BK_2_cleared,3);
+    baseline_lineFitReTrace=lineByLineFitting_N_Order(Lateral_ReTrace_BK_2_cleared,3);    
+    avgBaselineT=mean(baseline_lineFitTrace);
+    avgBaselineR=mean(baseline_lineFitReTrace);
+    avgBaselineBoth = mean([avgBaselineT;avgBaselineR]);  
+    Lateral_Trace_3_shifted = Lateral_Trace_1-avgBaselineBoth;
+    Lateral_ReTrace_3_shifted = Lateral_ReTrace_1-avgBaselineBoth;
+    Lateral_ReTrace_4_mirrored = -Lateral_ReTrace_3_shifted;
+    nameFig=nameFig_base+"_4_LateralDeflection_Full_Shifted_StatsResults";
+    afmDistribution_skewness_analysis(Lateral_Trace_3_shifted,Lateral_ReTrace_3_shifted,saveFigPath,nameFig,"Voltage","Full Shifted-Data");
+    %%%%%%%%%%%%%%%%%%%%%%---------------------------
+    % convert the final data into force
     alpha=metadata.Alpha;
-    force_0_entire=W*alpha*1e9; %Convert N into nN
-    % show the data
-    nameFig=nameFig_base+"_2_LateralForce_fullData";
-    showData(idxMon,false,Lateral_Trace,"Lateral Trace",saveFigPath,nameFig,"labelBar","Volt [V]",...
-        "extraData",{Lateral_ReTrace,force_0_entire}, ...
-        "extraTitles",{"Lateral ReTrace","Lateral Force"}, ...
-        "extraLabel",{"Volt [V]","Force [nN]"});
-    % mask the data
-    mask=logical(AFM_height_IO);
-    force_1_masked=force_0_entire;
-    force_1_masked(mask)=nan;
+    % keep old approach
+    force_0_entire_old=W_trace_old*alpha*1e9; %Convert N into nN
+    % new method 1
+    force_0_entire_trace_new1=Lateral_Trace_4_shifted*alpha*1e9; %Convert N into nN
+    force_0_entire_retrace_new1=Lateral_ReTrace_5_mirrored*alpha*1e9; %Convert N into nN
+    % new method 2
+    force_0_entire_trace_new2=Lateral_Trace_3_shifted*alpha*1e9; %Convert N into nN
+    force_0_entire_retrace_new2=Lateral_ReTrace_4_mirrored*alpha*1e9; %Convert N into nN
+
+    % mask the data    
+    force_1_masked_old=force_0_entire_old;
+    force_1_masked_old(mask)=nan;
+    force_1_masked_trace1=force_0_entire_trace_new1;
+    force_1_masked_trace1(mask)=nan;
+    force_1_masked_retrace1=force_0_entire_retrace_new1;
+    force_1_masked_retrace1(mask)=nan;
+    force_1_masked_trace2=force_0_entire_trace_new2;
+    force_1_masked_trace2(mask)=nan;
+    force_1_masked_retrace2=force_0_entire_retrace_new2;
+    force_1_masked_retrace2(mask)=nan;
     vertForce_1_masked=vertForce_0_entire;
     vertForce_1_masked(mask)=nan;
+    % adjust xlim
+    allDataHistog=[force_0_entire_old(:);force_0_entire_trace_new1(:);force_0_entire_retrace_new1(:)];
+    pLow = prctile(allDataHistog, .5);
+    pHigh = prctile(allDataHistog, 99.5);    
+    figForceDist=figure;
+    for i=1:2
+        ax = nexttile;
+        hold(ax, 'on'); 
+        if i==1
+            vect_f_old=force_0_entire_old(:);
+            vect_f_tr1=force_0_entire_trace_new1(:);
+            vect_f_rt1=force_0_entire_retrace_new1(:);
+            vect_f_tr2=force_0_entire_trace_new2(:);
+            vect_f_rt2=force_0_entire_retrace_new2(:);
+            % take only FR datapoint
+        else
+            vect_f_old=force_1_masked_old(:);
+            vect_f_tr1=force_1_masked_trace1(:);
+            vect_f_rt1=force_1_masked_retrace1(:);
+            vect_f_tr2=force_1_masked_trace2(:);
+            vect_f_rt2=force_1_masked_retrace2(:);
+            vect_f_old=vect_f_old(~isnan(vect_f_old));
+            vect_f_tr1=vect_f_tr1(~isnan(vect_f_tr1));
+            vect_f_rt1=vect_f_rt1(~isnan(vect_f_rt1));
+            vect_f_tr2=vect_f_tr2(~isnan(vect_f_tr2));
+            vect_f_rt2=vect_f_rt2(~isnan(vect_f_rt2));
+        end
+        [f_old, xi_old] = ksdensity(vect_f_old);
+        [f_tr1, xi_tr1] = ksdensity(vect_f_tr1);
+        [f_rt1, xi_rt1] = ksdensity(vect_f_rt1); 
+        [f_tr2, xi_tr2] = ksdensity(vect_f_tr2);
+        [f_rt2, xi_rt2] = ksdensity(vect_f_rt2);  
+        fill_between(ax, xi_old, f_old, globalColor(1), 0.25);   
+        fill_between(ax, xi_tr1, f_tr1, globalColor(2), 0.25);     
+        fill_between(ax, xi_rt1, f_rt1, globalColor(3), 0.25);     
+        fill_between(ax, xi_tr2, f_tr2, globalColor(4), 0.25);     
+        fill_between(ax, xi_rt2, f_rt2, globalColor(5), 0.25);     
+        
+        plot(ax, xi_old,     f_old,    '-', 'Color', globalColor(1), 'LineWidth', 2.0, 'DisplayName', 'Force-Old');
+        plot(ax, xi_tr1,     f_tr1,    '-', 'Color', globalColor(2), 'LineWidth', 2.0, 'DisplayName', 'Force-Trace 1');
+        plot(ax, xi_rt1,     f_rt1,    '-', 'Color', globalColor(3), 'LineWidth', 2.0, 'DisplayName', 'Force-ReTrace 1');
+        plot(ax, xi_tr2,     f_tr2,    '-', 'Color', globalColor(4), 'LineWidth', 2.0, 'DisplayName', 'Force-Trace 2');
+        plot(ax, xi_rt2,     f_rt2,    '-', 'Color', globalColor(5), 'LineWidth', 2.0, 'DisplayName', 'Force-ReTrace 2');
+        % Mean/median lines
+        med_old = median(vect_f_old);
+        med_tr1  = median(vect_f_tr1);
+        med_rt1  = median(vect_f_rt1);
+        med_tr2  = median(vect_f_tr2);
+        med_rt2  = median(vect_f_rt2);
+        plot(ax, [med_old  med_old],  [0 max(f_old)],  ':', 'Color', globalColor(1), 'LineWidth', 2,'DisplayName',sprintf('Median: %.3g nN',med_old));
+        plot(ax, [med_tr1  med_tr1],  [0 max(f_tr1)],  ':', 'Color', globalColor(2), 'LineWidth', 2,'DisplayName',sprintf('Median: %.3g nN',med_tr1));
+        plot(ax, [med_rt1  med_rt1],  [0 max(f_rt1)],  ':', 'Color', globalColor(3), 'LineWidth', 2,'DisplayName',sprintf('Median: %.3g nN',med_rt1));     
+        plot(ax, [med_tr2  med_tr2],  [0 max(f_tr2)],  ':', 'Color', globalColor(4), 'LineWidth', 2,'DisplayName',sprintf('Median: %.3g nN',med_tr2));
+        plot(ax, [med_rt2  med_rt2],  [0 max(f_rt2)],  ':', 'Color', globalColor(5), 'LineWidth', 2,'DisplayName',sprintf('Median: %.3g nN',med_rt2));     
+      
+        legend(ax, 'AutoUpdate','off','EdgeColor',[0.3 0.3 0.3], 'Location','northeast','FontSize',14);
+        xlim(ax, [pLow, pHigh]);
+        xlabel(ax,"Lateral Force (nN)","FontSize",14),ylabel(ax,"KDE","FontSize",14)
+        if i==1
+            title(ax, 'KDE distributions of Lateral Force (full data)','FontSize', 16); grid(ax,"on")
+        else
+            title(ax, 'KDE distributions of Lateral Force (FR-only)','FontSize', 16); grid(ax,"on")
+        end
+    end
+    objInSecondMonitor(figForceDist,idxMon)
+    nameFig=nameFig_base+"_5_LateralForce_KDEcomparisons";
+    saveFigures_FigAndTiff(figForceDist,saveFigPath,nameFig)
+
+    % show the full data
+    nameFig=nameFig_base+"_6_Forces_fullData";
+    showData(idxMon,false,force_0_entire_old,"Lateral Force (OldMethod)",saveFigPath,nameFig,"labelBar","Force [nN]",...
+        "extraData",{force_0_entire_trace_new1,force_0_entire_retrace_new1}, ...
+        "extraTitles",{"Lateral Force - Trace","Lateral Force - ReTrace"}, ...
+        "extraLabel",{"Force [nN]","Force [nN]"});
+    
     % prepare the output
     dataForce.vertForce_0_entire=vertForce_0_entire;
     dataForce.vertForce_1_masked=vertForce_1_masked;
     dataForce.vertForce_2_clear=[];
-    dataForce.force_0_entire=force_0_entire;
-    dataForce.force_1_masked=force_1_masked;
-    dataForce.force_2_clear=[];
-    % show the data before starting
-    nameFig=nameFig_base+"_3_ForcesMaskedData";
-    showData(idxMon,false,vertForce_1_masked,"Vertical Force (BK-masked)",saveFigPath,nameFig,"labelBar","Force [nN]",...
-        "extraData",force_1_masked,"extraTitles","Lateral Force (BK-masked)","extraLabel","Force [nN]");
-    % show also distribution of lateral deflection trace-retrace and force into additional fig
-    figDistr=figure('Visible','on');        
-    tl = tiledlayout(1, 2, 'TileSpacing', 'compact', 'Padding', 'compact',"Parent",figDistr);
-    axDistV  = nexttile(tl);
-    axDistN = nexttile(tl);
-    sgtitle(figDistr,textTitle,'FontSize',18,'Interpreter','none');
-    % DISTRIBUTION OF VOLTAGE DATA
-    hold(axDistV,"on")
-    edges=min(min(Lateral_Trace(:)),min(Lateral_ReTrace(:))):.025:max(max(Lateral_Trace(:)),max(Lateral_ReTrace(:)));    
-    histogram(axDistV,Lateral_Trace,'BinEdges',edges,'FaceAlpha', 0.3,"DisplayName","Lateral Trace","Normalization","pdf");
-    histogram(axDistV,Lateral_ReTrace,'BinEdges',edges,'FaceAlpha', 0.3,"DisplayName","Lateral ReTrace","Normalization","pdf");
-    allDataHistog=[Lateral_Trace(:);Lateral_ReTrace(:)];
-    pLow = prctile(allDataHistog, 0.5);
-    pHigh = prctile(allDataHistog, 99.5);
-    grid(axDistV,"on"), grid(axDistV,"minor")
-    xlim(axDistV, [pLow, pHigh]); xlabel(axDistV,"Voltage [V]",'FontSize',12), ylabel(axDistV,"PDF",'FontSize',12)
-    legend(axDistV,"fontsize",13),
-    title(axDistV,"Lateral Deflection Trace-Retrace (0.5-99.5 percentile shown)",'FontSize',18)   
-    % DISTRIBUTION OF VOLTAGE DATA
-    hold(axDistN,"on")
-    edges=min(force_1_masked(:),[],"all","omitnan"):3:max(force_1_masked(:),[],"all","omitnan");    
-    h=histogram(axDistN,force_1_masked,'BinEdges',edges,'FaceAlpha',1,"Normalization","pdf");
-    h.Annotation.LegendInformation.IconDisplayStyle="off";
-    force_masked_vectCleaned=force_1_masked(~isnan(force_1_masked(:)));
-    pMean=mean(force_masked_vectCleaned);
-    pMedian = median(force_masked_vectCleaned);
-    p99 = prctile(force_masked_vectCleaned,99);
-    p90 = prctile(force_masked_vectCleaned,90);
-    p75 = prctile(force_masked_vectCleaned,75);
-    xline(axDistN,pMean,'--',"LineWidth",4,"DisplayName",sprintf("Mean: %.2f nN",pMean),"Color",globalColor(2))
-    xline(axDistN,pMedian,'--',"LineWidth",4,"DisplayName",sprintf("Median: %.2f nN",pMedian),"Color",globalColor(3))    
-    xline(axDistN,p75,'--',"LineWidth",4,"DisplayName",sprintf("75th percentile: %.2f nN",p75),"Color",globalColor(4))
-    xline(axDistN,p90,'--',"LineWidth",4,"DisplayName",sprintf("90th percentile: %.2f nN",p90),"Color",globalColor(5))
-    xline(axDistN,p99,'--',"LineWidth",4,"DisplayName",sprintf("99th percentile: %.2f nN",p99),"Color",globalColor(6))
-    xlim(axDistN,"padded"); xlabel(axDistN,"Force [nN]",'FontSize',12), ylabel(axDistN,"PDF",'FontSize',12)
-    legend(axDistN,"Fontsize",13),
-    title(axDistN,"Lateral Force",'FontSize',18)    
-    nameFig2=nameFig_base+"_4_LateralDataDistributionValues";
-    grid(axDistN,"on"), grid(axDistN,"minor")
-    objInSecondMonitor(figDistr,idxMon)
-    % apply indipently of the used method different cleaning outliers steps
-    %   first clearing: filter out anomalies among vertical data by threshold betweem trace and retrace
-    %   second clearing: filter out force with 20% more than the setpoint for the specific section
-    %   show also the lateral and vertical data after clearing
-    nameFig=nameFig_base+"_5_LateralVerticalData_postCleared";
-    [vertForce_2_clear,force_2_clear]=A2_2_processLat_1_feature_ClearAndPlotForce(vertical_Trace,vertical_ReTrace,force_1_masked,idxSection,saveFigPath,nameFig,idxMon);    
-    saveFigures_FigAndTiff(figDistr,saveFigPath,nameFig2)
+    dataForce.force_0_entire_old=force_0_entire_old;
+    dataForce.force_0_trace_entire=force_0_entire_trace_new1;
+    dataForce.force_0_retrace_entire=force_0_entire_retrace_new1;
+    dataForce.force_1_masked_old=force_1_masked_old;
+    dataForce.force_1_trace_masked=force_1_masked_trace1;    
+    dataForce.force_1_retrace_masked=force_1_masked_retrace1;
+    dataForce.force_2_clear_old=[];
+    dataForce.force_2_trace_clear=[];
+    dataForce.force_2_retrace_clear=[];
+    % show the masked data
+    nameFig=nameFig_base+"_7_Forces_MaskedData";
+    formats=["Lateral Force-old (%s-masked)";"Lateral Force - Trace (%s-masked)";"Lateral Force - ReTrace (%s-masked)"];
+    textDefinitive=compose(formats,typeMask);
+    showData(idxMon,false,force_1_masked_old,textDefinitive(1),saveFigPath,nameFig,"labelBar","Force [nN]",...
+        "extraData",{force_1_masked_trace1,force_1_masked_retrace1}, ...
+        "extraTitles",{textDefinitive(2),textDefinitive(3)}, ...
+        "extraLabel",{"Force [nN]","Force [nN]"});
+    % clean and show definitive force data
+    nameFig=nameFig_base+"_8_Forces_clearedData";
+    [vertForce_2_clear,force_2_clear_old,force_2_trace_clear,force_2_retrace_clear]=A2_2_processLat_1_feature_ClearAndPlotForce(vertical_Trace,vertical_ReTrace,force_1_masked_old,force_1_masked_trace1,force_1_masked_retrace1,idxSection,saveFigPath,nameFig,idxMon);    
+    textDefinitive=["Vertical Force (cleared)";"Lateral Force (cleared)"];
+    showData(idxMon,false,vertForce_2_clear,textDefinitive(1),saveFigPath,nameFig,"labelBar","Force [nN]",...
+        "extraData",{force_2_clear}, ...
+        "extraTitles",{textDefinitive(2)}, ...
+        "extraLabel",{"Force [nN]"}); 
+    
+    
+    
+
     % save the final data
     dataForce.vertForce_2_clear=vertForce_2_clear;
     dataForce.force_2_clear=force_2_clear;
+end
+
+
+function fill_between(ax, x, y, col, alpha)
+% Fill area under a curve.
+    p=patch(ax, [x, fliplr(x)], [y, zeros(1,numel(y))], ...
+        col, 'FaceAlpha', alpha, 'EdgeColor','none');
+    p.Annotation.LegendInformation.IconDisplayStyle="off";
 end
