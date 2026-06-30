@@ -23,8 +23,7 @@ function varargout=A3_1_prepareBFandTRITICimages(folderResultsImg,idxMon,groupEx
         patternBF= 'BF';
         matches = regexp({fileList.name}, patternBF, 'match');
         idxBF=~cellfun(@isempty,matches);
-        % in case there are no files with BF in the filename of the files, then
-        % manual selection
+        % in case there are no files with BF in the filename of the files, then manual selection
         fileMetadataOtherImage="";
         if nnz(idxBF)==0 
             i=1;
@@ -100,7 +99,10 @@ function varargout=A3_1_prepareBFandTRITICimages(folderResultsImg,idxMon,groupEx
         matches= regexp({fileList.name}, pattern, 'match');   % returns cell array, each cell may be empty or a cell array of matches
         matches = [matches{:}];                    % concatenates all matches found
         timeValues = sort(unique(str2double(matches(:))));
-        timeList = cellstr(string(timeValues));    
+        timeList = cellstr(string(timeValues));   
+        % in case there are no files with BF in the filename of the files, then manual selection
+        fileMetadataOtherImage="";
+        
         if ~isempty(timeList)
             % prepare cell array where to store image and metadata of all expTime. If postHeat, just 1 at 3rd dimention
             allMetadata_TRITIC_pre=cell(size(timeList));

@@ -12,7 +12,7 @@ function [metaData_NIKON,TRITICdata]=A3_2_checkIntensityTRITIC(metaData_NIKON,TR
         metadataTRITIC{2}=metaData_NIKON.TRITIC.post; 
         numTRITICimages=2;    % pre and post
     else
-        metadataTRITIC{1}=metaData_NIKON.TRITIC;
+        metadataTRITIC{1}=metaData_NIKON.TRITIC.pre;
         numTRITICimages=1;    % only pre
     end
     expTimeGroup_all=cell(1,numTRITICimages);
@@ -94,33 +94,40 @@ function [metaData_NIKON,TRITICdata]=A3_2_checkIntensityTRITIC(metaData_NIKON,TR
     %%%% SHOW FLUORESCENCE DISTRIBUTION OF FULL TRITIC IMAGE %%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % plot the Fluorescence distribution of entire TRITIC image.
-    fs=fieldnames(TRITICdata);
-    maxTRITIC=cell(1,2); minTRITIC=cell(1,2);
+    fs=fieldnames(TRITICdata); numConditions=numel(fs);
+    maxTRITIC=cell(1,numConditions); minTRITIC=cell(1,numConditions);
     % prepare the bin sizes so the distributions are more comparable
-    for i=1:2        
+    for i=1:numConditions   
         maxTRITIC{i}=max(cellfun(@(x) max(x(:)), TRITICdata.(fs{i})),[],'all');
         minTRITIC{i}=min(cellfun(@(x) min(x(:)), TRITICdata.(fs{i})),[],'all');
     end   
     for ithGain=1:size(TRITICdata.pre,2)            
         gain=metaData_NIKON.TRITIC{1,ithGain}.Gain;
         figDistTRITIC=figure("Visible","off");
-        tl = tiledlayout(1, 2, 'TileSpacing', 'compact', 'Padding', 'compact',"Parent",figDistTRITIC);
-        axDist{1}  = nexttile(tl);
-        axDist{2} = nexttile(tl);
-        mainText={"BEFORE AFM SCANNING","AFTER AFM SCANNING"};        
-        sgtitle(figDistTRITIC,sprintf("Distribution Fluorescence (Full TRITIC image) - Gain: %s",gain),'FontSize',18,'Interpreter','none');
+        if numConditions==2
+            tl = tiledlayout(1, 2, 'TileSpacing', 'compact', 'Padding', 'compact',"Parent",figDistTRITIC);
+            axDist{1}  = nexttile(tl);
+            axDist{2} = nexttile(tl);
+            mainText={"BEFORE AFM SCANNING","AFTER AFM SCANNING"};        
+            sgtitle(figDistTRITIC,sprintf("Distribution Fluorescence (Full TRITIC image) - Gain: %s",gain),'FontSize',18,'Interpreter','none');
+        else
+            axDist{1}=axes(figDistTRITIC);
+            title(sprintf("Distribution Fluorescence (Full TRITIC image) - Gain: %s",gain),'FontSize',18,'Interpreter','none');
+        end
         
-        for i=1:2
+        for i=1:numConditions
             hold(axDist{i},"on")
             xlabel(axDist{i},'Absolute fluorescence increase (A.U.)','FontSize',15), ylabel(axDist{i},"PDF",'FontSize',15)
-            title(axDist{i},mainText{i},"FontSize",16), legend(axDist{i},'FontSize',12)
+            if numConditions==2
+                title(axDist{i},mainText{i},"FontSize",16), legend(axDist{i},'FontSize',12)
+            end
         end               
         edges=linspace(min([minTRITIC{:}]),max([maxTRITIC{:}]),100);
         for ithTimeExp=1:size(TRITICdata.pre,1)
             % get the information about time exposure
             ithMetadataTRITIC=metaData_NIKON.TRITIC{ithTimeExp,ithGain};
             expTime=ithMetadataTRITIC.ExposureTime;
-            for i=1:2
+            for i=1:numConditions
                 ithTRITICdata=TRITICdata.(fs{i}){ithTimeExp,ithGain}; 
                 vectDelta=ithTRITICdata(:);
                 % find the percentage of saturated values
@@ -134,7 +141,7 @@ function [metaData_NIKON,TRITICdata]=A3_2_checkIntensityTRITIC(metaData_NIKON,TR
         % better show for the distribution
         figDistTRITIC.Visible="on";
         objInSecondMonitor(figDistTRITIC,idxMon); 
-        for i=1:2
+        for i=1:numConditions
             xlim(axDist{i},"padded"); ylim(axDist{i},"tight"), grid(axDist{i},"on"), grid(axDist{i},"minor")
             legend(axDist{i},"Location","best")
         end                          

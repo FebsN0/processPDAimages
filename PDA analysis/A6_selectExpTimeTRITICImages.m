@@ -128,14 +128,14 @@ function varargout=A6_selectExpTimeTRITICImages(TRITICdata,BF_IO,metadata_NIKON,
                             xlim(axDist,"padded"); ylim(axDist,"tight"), grid(axDist,"on"), grid(axDist,"minor")
                             legend(axDist,"Location","best")
                             objInSecondMonitor(figDistTRITIC_sameScan,idxMon);                    
-                            nameFig=sprintf('resultA6_2_%d_%d_DistributionFluorescenceDiffTimeExp_gain%s_%sAFM',ithGain,thTRITIC,gain,fnames{thTRITIC});
+                            nameFig=sprintf('resultA6_1_%d_%d_DistributionFluorescenceDiffTimeExp_gain%s_%sAFM',ithGain,thTRITIC,gain,fnames{thTRITIC});
                             pause(1)
                             saveFigures_FigAndTiff(figDistTRITIC_sameScan,SaveFigFolder,nameFig)
                             % better show for the correlation
                             xlim(axCorrInterp,"padded"); ylim(axCorrInterp,"padded"), grid(axCorrInterp,"on"), grid(axCorrInterp,"minor")
                             legend(axCorrInterp,"Location","best")
                             objInSecondMonitor(figCorrelFluoHeight_sameExp,idxMon);                        
-                            nameFig=sprintf('resultA6_3_%d_%d_CorrelationFluoHeightComparisonDiffTimeExp_gain%s_%sAFM',ithGain,thTRITIC,gain,fnames{thTRITIC});
+                            nameFig=sprintf('resultA6_2_%d_%d_CorrelationFluoHeightComparisonDiffTimeExp_gain%s_%sAFM',ithGain,thTRITIC,gain,fnames{thTRITIC});
                             pause(1)
                             saveFigures_FigAndTiff(figCorrelFluoHeight_sameExp,SaveFigFolder,nameFig)   
                             % sometimes, some data are corrupted causing error, to avoid to process again, save temporarily the results of this current cycle

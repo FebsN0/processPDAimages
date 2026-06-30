@@ -53,7 +53,7 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
     % extract the theoretical setpoint from metadata and convert into nN
     setpoints=metadataAFM.SetP_N*1e9;
     % extract the required values from metadata
-    timeExp=metadataTRITIC.ExposureTime;
+    timeExp=num2str(metadataTRITIC.ExposureTime);
     size_meterXpix=metadataBF.ImageHeight_umeterXpixel*metadataBF.pixelSizeUnit;
 
     % init var where store results
@@ -82,7 +82,9 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
     end
  
     % find the idx of Height and Lateral/vertical Deflection in Trace Mode
-    idx_LD = strcmp([AFM_data.Channel_name],'Lateral Force');
+    idx_LD_tr = strcmp([AFM_data.Channel_name],'Lateral Force Trace');
+    idx_LD_rt = strcmp([AFM_data.Channel_name],'Lateral Force Retrace');
+    idx_LD_mV = strcmp([AFM_data.Channel_name],'Lateral Force MaxPixelValue');
     idx_H = strcmp([AFM_data.Channel_name],'Height');
     idx_VD =  strcmp([AFM_data.Channel_name],'Vertical Force');
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -101,8 +103,13 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
     % steps. To avoid vector incompatibilities during the correlation calculation, prepare the mask before starting the additional masking
     mask_validValues= ~isnan(AFM_data(idx_H).finalData);  
     mask_AFM = mask_AFM & mask_validValues;
-    mask_validValues= ~isnan(AFM_data(idx_LD).finalData);
+    mask_validValues= ~isnan(AFM_data(idx_LD_tr).finalData);
     mask_AFM = mask_AFM & mask_validValues;
+    mask_validValues= ~isnan(AFM_data(idx_LD_rt).finalData);
+    mask_AFM = mask_AFM & mask_validValues;
+    mask_validValues= ~isnan(AFM_data(idx_LD_mV).finalData);
+    mask_AFM = mask_AFM & mask_validValues;
+    
     
     % obtain the mask from Delta if it exists. 
     if ~flag_onlyAFM     
@@ -139,7 +146,7 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
             % prepare histogram. round not work to excess but to nearest.
             xmin=floor(min(min(vectDeltaBK),min(vectDeltaFR)) * 1000) / 1000;
             xmax=ceil(max(max(vectDeltaBK),max(vectDeltaFR)) * 1000) / 1000;
-            edges=linspace(xmin,xmax,500);
+            edges=linspace(xmin,xmax,1000);
             histogram(vectDeltaBK,'BinEdges',edges,"DisplayName","Delta Background","Normalization","percentage",'FaceAlpha',0.5,"FaceColor",globalColor(1))
             histogram(vectDeltaFR,'BinEdges',edges,"DisplayName","Delta Foreground","Normalization","percentage",'FaceAlpha',0.5,"FaceColor",globalColor(2))
             xline(prctile(vectDeltaBK,90),'--','LineWidth',2,'DisplayName','90° percentile Delta Background','Color',globalColor(1));
@@ -147,17 +154,17 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
             % better show
             allData = [vectDeltaBK; vectDeltaFR];
             pLow = prctile(allData, 0.1);
-            pHigh = prctile(allData, 98);
+            pHigh = prctile(allData, 99);
             xlim([pLow, pHigh]); ylim tight, grid on, grid minor
             title(sprintf("Distribution Delta"),"FontSize",20), legend('FontSize',12)
-            subtitle(sprintf("(Data shown is within 0.1° - 98° percentile of the entire data. Used AFM-IO mask after BF-AFM registration)"),"FontSize",15)
+            subtitle(sprintf("(Data shown is within 0.1° - 99° percentile of the entire data. Used AFM-IO mask after BF-AFM registration)"),"FontSize",15)
             objInSecondMonitor(fDistDelta,idxMon);
             nameFig='resultA7_0_DistributionDelta';
             saveFigures_FigAndTiff(fDistDelta,folderResultsImg,nameFig)     
         end
     end
     %%% the next mask filtering is only for normal AFM scans. In case of heated samples, setpoint limit is meaningless.
-    idx=idx_H |idx_LD | idx_VD;
+    idx=idx_H |idx_LD_tr | idx_LD_rt | idx_VD | idx_LD_mV;
     if ~flag_heat
         % obtain the mask from each channel and ignore:
         %   - negative and zeros values
@@ -171,10 +178,9 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
         end
         mask_second=mask; 
         % obtain the definitive third mask (more aggressive) considering the removal of Lateral Force > 2*maxSetpoint
-        % NOTE, lateral force higher than vertical force is derived not from friction phenomena but rather 
-        % the collision between the tip and the surface and other instabilities.
+        % NOTE, lateral force maxPixelValue is better because already include max values between trace and retrace        
         limitVD=max(setpoints)*2;
-        mask_validValues= AFM_data(idx_LD).finalData<=limitVD;          % exclude values higher than limit setpoint  
+        mask_validValues= AFM_data(idx_LD_mV).finalData<=limitVD;          % exclude values higher than limit setpoint  
         mask_third=mask_second & mask_validValues;         % merge the mask with the previous mask  
     end
     masking = struct();
@@ -188,19 +194,19 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
     if ~flag_heat
         masking.mask_second_eachChannel = mask_second;
         masking.mask_second_eachChannel_totElements = nnz(mask_second);
-        % store mask after 99perc and <maxSetpoint
-        masking.mask_third_setpointLimit_99percRemoval = mask_third;
-        masking.mask_third_setpointLimit_99percRemoval_totElements = nnz(mask_third);        
+        % store mask after <maxSetpoint
+        masking.mask_third_setpointLimit = mask_third;
+        masking.mask_third_setpointLimit_totElements = nnz(mask_third);        
     end
     dataResultsPlot.maskingResults = masking;
     disp("Preparation figures of the Masks")
     % show the plots of the masks in case of normal AFM scans
     if saveMaskFig
-        showData(idxMon,SeeMe,mask_AFM,{'Original Mask';'Generated from AFM-Height Binarization + modification due to registration'},folderResultsImg,'resultA7_1_1_OriginalMask','binary',true,'lenghtAxis',size_meterXpix*size(mask_first))
-        showData(idxMon,SeeMe,mask_first,{'First Mask';'Original Mask + TRITIC Delta > 0'},folderResultsImg,'resultA7_1_2_FirstMask','binary',true,'lenghtAxis',size_meterXpix*size(mask_first))
+        showData(idxMon,SeeMe,mask_AFM,{'Original Mask';'Generated from AFM-Height Binarization'},folderResultsImg,'resultA7_1_1_OriginalMask','binary',true,'lenghtAxis',size_meterXpix*size(mask_first))
+        showData(idxMon,SeeMe,mask_first,{'First Mask';'TRITIC Delta > 0'},folderResultsImg,'resultA7_1_2_FirstMask','binary',true,'lenghtAxis',size_meterXpix*size(mask_first))
         if ~flag_heat
-            showData(idxMon,SeeMe,mask_second,{'Second Mask';'From any AFM channel with Positive values'},folderResultsImg,'resultA7_1_3_SecondMask','binary',true,'lenghtAxis',size_meterXpix*size(mask_second))
-            showData(idxMon,SeeMe,mask_third,{'Third Mask';'From AFM Height 99° percentile + AFM Lateral < 2*maxSetP'},folderResultsImg,'resultA7_1_4_ThirdMask','binary',true,'lenghtAxis',size_meterXpix*size(mask_third))   
+            showData(idxMon,SeeMe,mask_second,{'Second Mask';'AFM channel data > 0'},folderResultsImg,'resultA7_1_3_SecondMask','binary',true,'lenghtAxis',size_meterXpix*size(mask_second))
+            showData(idxMon,SeeMe,mask_third,{'Third Mask';'AFM Lateral (trace-retrace) < 2*maxSetP'},folderResultsImg,'resultA7_1_4_ThirdMask','binary',true,'lenghtAxis',size_meterXpix*size(mask_third))   
         end
     end
     clear masking mask_validValues     
@@ -214,7 +220,7 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
         Delta_thirdMasking(~mask_third) = NaN;
         % store the results
         DeltaData.Delta_secondMasking_eachAFM=Delta_secondMasking;
-        DeltaData.Delta_thirdMasking_99percMaxSet=Delta_thirdMasking;
+        DeltaData.Delta_thirdMasking_MaxSet=Delta_thirdMasking;
     end
     for i=1:length(idx)
         if idx(i)
@@ -234,7 +240,7 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
                 % apply third Masking (mask from 99perc + <maxSP)
                 tmp = AFM_data(i).finalData;
                 tmp(~mask_third) = NaN;
-                AFM_data(i).thirdMasking_maxVD_99perc = tmp;
+                AFM_data(i).thirdMasking_maxVD = tmp;
             end
         end
     end   
@@ -261,7 +267,7 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
     %%% EXTRACT BORDERS AND DISTINGUISH INNER AND OUTER OF THE DATA %%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
     if innerBord && ~flag_heat
-        calcBorders(AFM_data,AFM_IO,idx_H,idx_LD,idx_VD,DeltaData,flag_heat,idxMon,SeeMe,folderResultsImg)        
+        calcBorders(AFM_data,AFM_IO,idx_H,idx_LD_tr,idx_VD,DeltaData,flag_heat,idxMon,SeeMe,folderResultsImg)        
     end    
    
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -276,7 +282,7 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
         maskFields = {
             'firstMasking_Delta',                'Delta_firstMasking',              '1st mask',     '1M';
             'secondMasking_eachAFM',             'Delta_secondMasking_eachAFM',     '2nd mask',     '2M';
-            'thirdMasking_maxVD_99perc',         'Delta_thirdMasking_99percMaxSet', '3rd mask',     '3M';
+            'thirdMasking_maxVD',                'Delta_thirdMasking_MaxSet', '3rd mask',     '3M';
         };
     end
     if ~flag_heat
@@ -286,7 +292,7 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
         for i=1:size(maskFields,1)
             % use the AFM masked data
             x = AFM_data(idx_H).(maskFields{i,1})(:);
-            y = AFM_data(idx_LD).(maskFields{i,1})(:);
+            y = AFM_data(idx_LD_tr).(maskFields{i,1})(:);
             titleP = sprintf('Height VS Lateral Deflection (%s)', maskFields{i,3});
             figName = sprintf('Height_LD_%s', maskFields{i,4});            
             tmp.(['Height_LD_' maskFields{i,4}]) = A6_feature_corrForceFluorescence(x,y,idxMon,folderResultsImg,'NumberOfBins',numBins, ...
@@ -302,7 +308,7 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
         for i = 1:size(maskFields,1)
             x = AFM_data(idx_H).(maskFields{i,1})(:);
             y1 = DeltaData.(maskFields{i,2})(:); 
-            titleP = sprintf('Height Vs Fluorescence (%s - time exp %g ms)', maskFields{i,3}, timeExp);
+            titleP = sprintf('Height Vs Fluorescence (%s - time exp %s ms)', maskFields{i,3}, timeExp);
             figName = sprintf('Height_Fluo_%s', maskFields{i,4});
             tmp.(['Height_FLUO_' maskFields{i,4}]) = A6_feature_corrForceFluorescence(x,y1,idxMon,folderResultsImg,'NumberOfBins',numBins, ...
                 'xpar',1e9,'XAxL','Feature height (nm)','ypar',1,'YAyL',labelBar,'FigTitle',titleP,'FigFilename',figName,'NumFig',2,'flagHeat',flag_heat);            
@@ -311,17 +317,44 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
 
         if ~flag_heat
             % 9 - LATERAL DEFLECTION Vs FLUORESCENCE INCREASE
+            % RETRACE
             tmp=struct();
-            disp("Processing Correlation Lateral Force VS Fluorescence")
+            disp("Processing Correlation Lateral Force Trace VS Fluorescence")
             for i = 1:size(maskFields,1)
-                x = AFM_data(idx_LD).(maskFields{i,1})(:);
+                x = AFM_data(idx_LD_tr).(maskFields{i,1})(:);
                 y1 = DeltaData.(maskFields{i,2})(:); 
-                titleP = sprintf('Lateral Force Vs Fluorescence (%s - time exp %s ms)', maskFields{i,3}, timeExp); 
-                figName = sprintf('LD_Fluo_%s', maskFields{i,4});
+                titleP = sprintf('Lateral Force Trace Vs Fluorescence (%s - time exp %s ms)', maskFields{i,3}, timeExp); 
+                figName = sprintf('LD_Fluo_tr_%s', maskFields{i,4});
                 tmp.(['LD_FLUO_' maskFields{i,4}]) =        A6_feature_corrForceFluorescence(x,y1,idxMon,folderResultsImg,'NumberOfBins',2000, ...
                     'xpar',1,'XAxL','Lateral Force (nN)','ypar',1,'YAyL',labelBar,'FigTitle',titleP,'FigFilename',figName,'NumFig',3);            
             end
-            dataResultsPlot.LD_FLUO=tmp;
+            dataResultsPlot.LD_FLUO_tr=tmp;
+
+            % RETRACE
+            tmp=struct();
+            disp("Processing Correlation Lateral Force Retrace VS Fluorescence")
+            for i = 1:size(maskFields,1)
+                x = AFM_data(idx_LD_rt).(maskFields{i,1})(:);
+                y1 = DeltaData.(maskFields{i,2})(:); 
+                titleP = sprintf('Lateral Force Retrace Vs Fluorescence (%s - time exp %s ms)', maskFields{i,3}, timeExp); 
+                figName = sprintf('LD_Fluo_rt_%s', maskFields{i,4});
+                tmp.(['LD_FLUO_' maskFields{i,4}]) =        A6_feature_corrForceFluorescence(x,y1,idxMon,folderResultsImg,'NumberOfBins',2000, ...
+                    'xpar',1,'XAxL','Lateral Force (nN)','ypar',1,'YAyL',labelBar,'FigTitle',titleP,'FigFilename',figName,'NumFig',4);            
+            end
+            dataResultsPlot.LD_FLUO_tr=tmp;
+
+            % MaxPixelValue
+            tmp=struct();
+            disp("Processing Correlation Lateral Force MaxPixelValue VS Fluorescence")
+            for i = 1:size(maskFields,1)
+                x = AFM_data(idx_LD_mV).(maskFields{i,1})(:);
+                y1 = DeltaData.(maskFields{i,2})(:); 
+                titleP = sprintf('Lateral Force MaxPixelValue Vs Fluorescence (%s - time exp %s ms)', maskFields{i,3}, timeExp); 
+                figName = sprintf('LD_Fluo_mV_%s', maskFields{i,4});
+                tmp.(['LD_FLUO_' maskFields{i,4}]) =        A6_feature_corrForceFluorescence(x,y1,idxMon,folderResultsImg,'NumberOfBins',2000, ...
+                    'xpar',1,'XAxL','Lateral Force (nN)','ypar',1,'YAyL',labelBar,'FigTitle',titleP,'FigFilename',figName,'NumFig',4);            
+            end
+            dataResultsPlot.LD_FLUO_tr=tmp;
            
             % 10 - VERTICAL FORCE VS FLUORESCENCE INCREASE
             tmp=struct();
@@ -332,7 +365,7 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
                 titleP = sprintf('Vertical Force Vs Fluorescence (%s - time exp %s ms)', maskFields{i,3}, timeExp); 
                 figName = sprintf('VD_Fluo_%s', maskFields{i,4});
                 tmp.(['VD_FLUO_' maskFields{i,4}]) =        A6_feature_corrForceFluorescence(x,y1,idxMon,folderResultsImg,'setpoints',setpoints, ...
-                    'xpar',1,'XAxL','Vertical Force (nN)','ypar',1,'YAyL',labelBar,'FigTitle',titleP,'FigFilename',figName,'NumFig',4);            
+                    'xpar',1,'XAxL','Vertical Force (nN)','ypar',1,'YAyL',labelBar,'FigTitle',titleP,'FigFilename',figName,'NumFig',5);            
             end
             dataResultsPlot.VD_FLUO=tmp;
         end
@@ -343,11 +376,11 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
         disp("Processing Correlation Vertical Force VS Lateral Force")
         for i=1:size(maskFields,1)
             x = AFM_data(idx_VD).(maskFields{i,1})(:);
-            y = AFM_data(idx_LD).(maskFields{i,1})(:); 
+            y = AFM_data(idx_LD_tr).(maskFields{i,1})(:); 
             titleP = sprintf('Vertical Force VS Lateral Force (%s)', maskFields{i,3});
             figName = sprintf('VD_LD_%s', maskFields{i,4});
             tmp.(['VD_LD_' maskFields{i,4}]) = A6_feature_corrForceFluorescence(x,y,idxMon,folderResultsImg,'setpoints',setpoints, ...
-                'xpar',1,'XAxL','Vertical Force (nN)','ypar',1,'YAyL','Lateral Force (nN)','FigTitle',titleP,'FigFilename',figName,'NumFig',5);
+                'xpar',1,'XAxL','Vertical Force (nN)','ypar',1,'YAyL','Lateral Force (nN)','FigTitle',titleP,'FigFilename',figName,'NumFig',6);
         end
         dataResultsPlot.VD_LD=tmp;
     end    
