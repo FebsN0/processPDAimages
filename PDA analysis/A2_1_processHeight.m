@@ -383,8 +383,10 @@ function varargout=A2_1_processHeight(data,idxMon,SaveFigFolder,modeScan,varargi
         % background from foreground, therefore a better plane-baseline fitting can be made, thus a more accurate AFM height image 
         % can be obtained directly from original AFM height image
         heightRaw_masked=height_1_original;
-        heightRaw_masked(AFM_height_IO_corr==1)=NaN;        
-        heightRaw_masked(isnan(removedAreas))=nan;
+        heightRaw_masked(AFM_height_IO_corr==1)=NaN;       
+        if exist("removedAreas","var")
+            heightRaw_masked(isnan(removedAreas))=nan;
+        end
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%% FORTH FITTING: FIRST ORDER PLANE FITTING ON MASKED DATA %%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -412,12 +414,7 @@ function varargout=A2_1_processHeight(data,idxMon,SaveFigFolder,modeScan,varargi
         BK_7_definitive_LineFit=height_9_LineFitOnFinalMaskBK;
         BK_7_definitive_LineFit(AFM_height_IO_corr==1)=NaN;
                
-        % there may be still some anomalies. If so, permamently remove them from the height image
-        textTitle={'Optimixed Height Image';'Check if there some parts to transform into NaN in the foreground. The resulting image will be definitive for the current iteration.'};
-        [~,height_10_corr] = featureRemovePortions(height_9_LineFitOnFinalMaskBK*1e9,textTitle,idxMon,'normalize',false);       
-        close all
-        height_10_corr=height_10_corr/factor;
-        
+          
         % Display and save result
         titleData1={'Post PlaneFit';'(Data after fitPlane then masked again)'};
         titleData2='Post LineByLineFit Masked Height';
@@ -428,14 +425,28 @@ function varargout=A2_1_processHeight(data,idxMon,SaveFigFolder,modeScan,varargi
                 'extraTitles',{titleData2,titleData3},...
                 'extraLabel',{labelHeight,labelHeight});
         
+        % there may be still some anomalies. If so, permamently remove them from the height image
+        textTitle={'Optimixed Height Image';'Check if there some parts to transform into NaN in the foreground. The resulting image will be definitive for the current iteration.'};
+        [~,height_10_corr] = featureRemovePortions(height_9_LineFitOnFinalMaskBK*1e9,textTitle,idxMon,'normalize',false);       
+        close all
+        height_10_corr=height_10_corr/factor;
+     
+        
+         
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%% HEIGHT CHANNEL PROCESSING TERMINATED. CHECK IF CONTINUE FOR BETTER MASK AND DATA %%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        % stop the iteration of the mask and height channel generation and keep
-        % those have been generated in the last iteration    
+        % stop the iteration of the mask and height channel generation and keep those have been generated in the last iteration    
+        % show finak height and mask o decide if they are ok       
+        titleData1 = 'Definitive Height Image';
+        titleData2="Definitive Mask Height Image";
+        showData(idxMon,true,height_10_corr*factor,titleData1,"","",'labelBar',"Height (nm)",'lenghtAxis',lengthAxis,'SaveFig',false,...
+            'extraData',AFM_height_IO_corr,'extraBinary',true,'extraLengthAxis',lengthAxis,'extraTitles',titleData2);        
         question={"Satisfied of the definitive Height image and mask?";"If not, repeat again the process with the last height image to generate again a new mask.";"NOTE: ImageSegmenter Toolbox (Manual Binarization) is available from the second iteration\nso it can perform better with already optimized height image."};
         if getValidAnswer(question,'',{'y','n'},1)
             titleData1 = 'Definitive Height Image';
+            % decided to keep the data rather than excluding 
+            %{
             titleTemplate = 'Definitive Height Image - clipped above %.2fth percentile';
             % REMOVE th percentile from height channel through slider (not in the AFM-IO because it will be used later and it is informative keep it as it is
             [th,dataClean] = percentileClipSlider(idxMon, height_10_corr*factor, ...
@@ -456,7 +467,11 @@ function varargout=A2_1_processHeight(data,idxMon,SaveFigFolder,modeScan,varargi
                 height_FINAL=height_11_prctile;
                 subtext=sprintf('Removed <%.2f° and >%.2f° from the data',th(1),th(2));
                 titleData1={titleData1;sprintf('%s',subtext)};
-            end        
+            end    
+            %}
+            height_FINAL = height_10_corr;
+            nameFile='resultA2_8_HeightFINAL';
+            nameFileMask='resultA2_8_maskFINAL';
             % save final height
             showData(idxMon,false,height_FINAL*factor,titleData1,SaveFigFolder,nameFile,'labelBar',"Height (nm)",'lenghtAxis',lengthAxis);
             % save mask            
@@ -488,8 +503,8 @@ function varargout=A2_1_processHeight(data,idxMon,SaveFigFolder,modeScan,varargi
             height_1_original=height_10_corr;
             AFM_height_IO=AFM_height_IO_corr;
         end 
+        close all
     end
-    close all
 end
 
 %%%%%%%%%%%%%%%%%

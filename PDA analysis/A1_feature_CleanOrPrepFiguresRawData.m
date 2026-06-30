@@ -73,25 +73,33 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
         allTitles={sprintf('Height (measured) channel (%s - %s)',textTypeData,imageType)};
         allNameFig={sprintf('resultA%s_1_%s_HeightChannel_%s',stepProcess,textTypeData,imageType)};
         allLabelBar={sprintf('Height [nm]')};
-        if flagPostProcessed     
-            fieldToUse={'AFM_images_2_PostLateralProcessed_0_entire','AFM_images_2_PostLateralProcessed_1_mask','AFM_images_2_PostLateralProcessed_2_clear'};
-            blockAllData=cell(1,1+length(fieldToUse)*2);
+        if flagPostProcessed    
+            fieldToUse="AFM_images_2_PostProcessed";
+            blockAllData=cell(1,5); % height + vertForce_avg + LF_tr + LF_rt + LF_maxPixel
             AFM_height_IO=data(strcmp([data.Channel_name],'Height (measured)')).AFMmask_heightIO;
-            AFM_height_IO_cleared=data(strcmp([data.Channel_name],'Height (measured)')).AFMmask_heightIO_cleared;
-            data_Height=data(strcmp([data.Channel_name],'Height (measured)')).AFM_images_2_PostHeightProcessed;
-            blockAllData{1}=data_Height; j=1;     
-            for i=2:2:length(blockAllData)
-                blockAllData{i}=data(strcmp([data.Channel_name],'Vertical Force')).(fieldToUse{j});
-                tmp=strsplit(fieldToUse{j},'_');
-                allTitles{i}=sprintf('Vertical Force %s (%s - %s)',tmp{end},textTypeData,imageType);
-                allNameFig{i}=sprintf('resultA%s_%d_%s_VertForce_%s_%s',stepProcess,i,textTypeData,tmp{end},imageType);
-                allLabelBar{i}='Force [nN]';
-                blockAllData{i+1}=data(strcmp([data.Channel_name],'Lateral Force')).(fieldToUse{j});
-                allTitles{i+1}=sprintf('Lateral Force %s (%s - %s)',tmp{end},textTypeData,imageType);
-                allNameFig{i+1}=sprintf('resultA%s_%d_%s_LatForce_%s_%s',stepProcess,i+1,textTypeData,tmp{end},imageType);
-                allLabelBar{i+1}='Force [nN]';
-                j=j+1;
-            end
+            % take height channel
+            data_Height=data(strcmp([data.Channel_name],'Height (measured)')).(fieldToUse);
+            blockAllData{1}=data_Height;
+            % take vertical channel
+            blockAllData{2}=data(strcmp([data.Channel_name],'Vertical Force')).(fieldToUse);
+            allTitles{2}=sprintf('Vertical Force PostProcessed (%s - %s)',textTypeData,imageType);
+            allNameFig{2}=sprintf('resultA%s_2_%s_VertForcePostProcessed_%s',stepProcess,textTypeData,imageType);
+            allLabelBar{2}='Force [nN]';
+            % take force trace channel
+            blockAllData{3}=data(strcmp([data.Channel_name],'Lateral Force') & strcmp([data.Trace_type],'Trace')).(fieldToUse);
+            allTitles{3}=sprintf('Lateral Force Trace PostProcessed (%s - %s)',textTypeData,imageType);
+            allNameFig{3}=sprintf('resultA%s_3_%s_LatForcePostProcessed_%s',stepProcess,textTypeData,imageType);
+            allLabelBar{3}='Force [nN]';
+            % take force retrace channel
+            blockAllData{4}=data(strcmp([data.Channel_name],'Lateral Force') & strcmp([data.Trace_type],'ReTrace')).(fieldToUse);
+            allTitles{4}=sprintf('Lateral Force ReTrace PostProcessed (%s - %s)',textTypeData,imageType);
+            allNameFig{4}=sprintf('resultA%s_4_%s_LatForcePostProcessed_%s',stepProcess,textTypeData,imageType);
+            allLabelBar{4}='Force [nN]';
+            % take force maxPixel channel
+            blockAllData{5}=data(strcmp([data.Channel_name],'Lateral Force') & strcmp([data.Trace_type],'MaxPixelValue')).(fieldToUse);
+            allTitles{5}=sprintf('Lateral Force MaxPixelValue PostProcessed (%s - %s)',textTypeData,imageType);
+            allNameFig{5}=sprintf('resultA%s_5_%s_LatForcePostProcessed_%s',stepProcess,textTypeData,imageType);
+            allLabelBar{5}='Force [nN]';
             factor=[1e9,1,1,1,1,1,1];
         else
             fieldToUse='AFM_images_1_original';                        
@@ -106,12 +114,12 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
             allTitles{3}=sprintf('Vertical Deflection Retrace channel (%s - %s)',textTypeData,imageType);
             allNameFig{3}=sprintf('resultA%s_3_%s_VDChannel_retrace_%s',stepProcess,textTypeData,imageType);
             allLabelBar{3}='Force [nN]';
-            % LD retrace
+            % LD trace
             data_LD_trace=  data(strcmp([data.Channel_name],'Lateral Deflection') & strcmp([data.Trace_type],'Trace')).(fieldToUse);            
             allTitles{4}=sprintf('Lateral Deflection Trace channel (%s - %s)',textTypeData,imageType);
             allNameFig{4}=sprintf('resultA%s_4_%s_LDChannel_trace_%s',stepProcess,textTypeData,imageType);
             allLabelBar{4}='Voltage [V]';  
-            % LD retrace
+            % LD retrace 
             data_LD_retrace=data(strcmp([data.Channel_name],'Lateral Deflection') & strcmp([data.Trace_type],'ReTrace')).(fieldToUse);
             allTitles{5}=sprintf('Lateral Deflection ReTrace channel (%s - %s)',textTypeData,imageType);
             allNameFig{5}=sprintf('resultA%s_5_%s_LDChannel_retrace_%s',stepProcess,textTypeData,imageType);
@@ -250,14 +258,70 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
                 xlabel(sprintf('Feature height [nm]'),'FontSize',15), ylabel('Percentage %','FontSize',15), grid minor, grid on
                 title("Distribution PostProcessed Height",'FontSize',20)
                 objInSecondMonitor(f_heightDistribution,idxMon);     
-                saveFigures_FigAndTiff(f_heightDistribution,folderSaveFig,'resultA2_10_OptHeightDistribution_FR_BK')
+                saveFigures_FigAndTiff(f_heightDistribution,folderSaveFig,'resultA2_9_OptHeightDistribution_FR_BK')
                 % Since now there is the assembled mask
                 titleData='Final Binary AFM IO Image';
                 nameFig='resultA2_8_finalMask';
-                showData(idxMon,SeeMe,AFM_height_IO,titleData,folderSaveFig,nameFig,'binary',true); 
-                titleData='Final Binary AFM IO Image (cleared)';
-                nameFig='resultA2_9_finalMask_cleared';
-                showData(idxMon,SeeMe,AFM_height_IO_cleared,titleData,folderSaveFig,nameFig,'binary',true);                 
+                showData(idxMon,SeeMe,AFM_height_IO,titleData,folderSaveFig,nameFig,'binary',true);                
+
+                % DISTRIBUTION OF FORCE AFTER CLEARING
+                % mask the data, take only FR 
+                force_masked_trace=blockAllData{3};
+                force_masked_trace(~AFM_height_IO)=nan;
+                force_masked_retrace=blockAllData{4};
+                force_masked_retrace(~AFM_height_IO)=nan;
+                force_masked_maxPixelValue=blockAllData{5};
+                force_masked_maxPixelValue(~AFM_height_IO)=nan;
+                % adjust xlim
+                allDataHistog=[blockAllData{3}(:);blockAllData{4}(:)];
+                pLow = prctile(allDataHistog, .5);
+                pHigh = prctile(allDataHistog, 99.5);    
+                figForceDist=figure(Visible="off");
+                for i=1:2
+                    ax = nexttile;
+                    hold(ax, 'on'); 
+                    if i==1
+                        % take only all datapoint
+                        vect_f_tr=blockAllData{3}(:);
+                        vect_f_rt=blockAllData{4}(:);  
+                        vect_f_maxV=blockAllData{5}(:);
+                    else           
+                        % exclude nan
+                        vect_f_tr=force_masked_trace(:);
+                        vect_f_rt=force_masked_retrace(:);
+                        vect_f_maxV=force_masked_maxPixelValue(:);
+                    end
+                    vect_f_tr=vect_f_tr(~isnan(vect_f_tr));
+                    vect_f_rt=vect_f_rt(~isnan(vect_f_rt));   
+                    vect_f_maxV=vect_f_maxV(~isnan(vect_f_maxV));
+                    [f_tr, xi_tr] = ksdensity(vect_f_tr);
+                    [f_rt, xi_rt] = ksdensity(vect_f_rt); 
+                    [f_mV, xi_mV] = ksdensity(vect_f_maxV); 
+                    fill_between(ax, xi_tr, f_tr, globalColor(1), 0.25);     
+                    fill_between(ax, xi_rt, f_rt, globalColor(2), 0.25);
+                    fill_between(ax, xi_mV, f_mV, globalColor(3), 0.25); 
+                    plot(ax, xi_tr,     f_tr,    '-', 'Color', globalColor(1), 'LineWidth', 2.0, 'DisplayName', 'Force-Trace');
+                    plot(ax, xi_rt,     f_rt,    '-', 'Color', globalColor(2), 'LineWidth', 2.0, 'DisplayName', 'Force-ReTrace');
+                    plot(ax, xi_mV,     f_mV,    '--', 'Color', globalColor(3), 'LineWidth', 1.0, 'DisplayName', 'Force-ReTrace');
+                    % Mean/median lines
+                    med_tr  = median(vect_f_tr);
+                    med_rt  = median(vect_f_rt);
+                    med_mV  = median(vect_f_maxV);
+                    plot(ax, [med_tr  med_tr],  [0 max(f_tr)],  ':', 'Color', globalColor(1), 'LineWidth', 2,'DisplayName',sprintf('Median: %.3g nN',med_tr));
+                    plot(ax, [med_rt  med_rt],  [0 max(f_rt)],  ':', 'Color', globalColor(2), 'LineWidth', 2,'DisplayName',sprintf('Median: %.3g nN',med_rt));            
+                    plot(ax, [med_mV  med_mV],  [0 max(f_mV)],  ':', 'Color', globalColor(3), 'LineWidth', 1,'DisplayName',sprintf('Median: %.3g nN',med_mV));            
+                    legend(ax, 'AutoUpdate','off','EdgeColor',[0.3 0.3 0.3], 'Location','northeast','FontSize',14);
+                    xlim(ax, [pLow, pHigh]);
+                    xlabel(ax,"Lateral Force (nN)","FontSize",14),ylabel(ax,"KDE","FontSize",14)
+                    if i==1
+                        title(ax, 'KDE distributions of Lateral Force (full data)','FontSize', 16); grid(ax,"on")
+                    else
+                        title(ax, 'KDE distributions of Lateral Force (FR-only)','FontSize', 16); grid(ax,"on")
+                    end
+                end
+                objInSecondMonitor(figForceDist,idxMon)
+                nameFig="resultA2_10_LateralForce_KDEcomparisons";
+                saveFigures_FigAndTiff(figForceDist,folderSaveFig,nameFig)
             end
         end
     end

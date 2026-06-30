@@ -1,10 +1,10 @@
 %%%%%%%% CLEARING STEPS %%%%%%%%      
-function [vertForce_forthClearing,force_forthClearing]=A2_2_processLat_1_feature_ClearAndPlotForce(vert_tr,vert_rt,force_old,force_tr,force_rt,idxSection,newFolder,nameFig,idxMon)
+function [vertForce_thirdClearing,force_tr_thirdClearing,force_rt_thirdClearing,numRemovedElements_allSteps]=A2_2_processLat_1_feature_ClearAndPlotForce(vert_tr,vert_rt,force_tr,force_rt,mask,idxMon)
 % NOTE: doesnt matter the used method. Its just the mask applying and removal of common outliers
 % Remove outliers among Vertical Deflection data using a defined threshold of 4nN 
 % ==> trace and retrace in vertical deflection should be almost the same.
 % This threshold is used as max acceptable difference between trace and retrace of vertical data      
-    totElementsBeforeClearing=nnz(~isnan(force_old));
+    totElementsBeforeClearing=nnz(~isnan(force_tr));
     %---------------------------%
     %%%%%% FIRST CLEARING %%%%%%%
     %---------------------------%
@@ -19,12 +19,14 @@ function [vertForce_forthClearing,force_forthClearing]=A2_2_processLat_1_feature
         warning('Performed First clearing - presence of outliers among vertical fast scan lines')
     end        
     % using this idx (1 ok, 0 not ok), substitute entire lines in the lateral data with zero
-    force_firstClearing = force_old;    force_firstClearing(:,Idx==0)=NaN;
-    numRemovedElements_1=totElementsBeforeClearing-nnz(~isnan(force_firstClearing));
+    force_tr_firstClearing = force_tr;    force_tr_firstClearing(:,Idx==0)=NaN;
+    force_rt_firstClearing = force_rt;    force_rt_firstClearing(:,Idx==0)=NaN;
+    % update the counter of removed elements
+    numRemovedElements_1=totElementsBeforeClearing-nnz(~isnan(force_tr_firstClearing));
     numRemovedElements_1=numRemovedElements_1/totElementsBeforeClearing*100;
     % using this idx (1 ok, 0 not ok), substitute entire lines in the vertical data with zero and average
     % trace and retrace vertical data
-    vertForceT=vert_tr;      vertForceT(:,Idx==0)=0;
+    vertForceT=vert_tr;    vertForceT(:,Idx==0)=0;
     vertForceR=vert_rt;    vertForceR(:,Idx==0)=0;
     vertForce_firstClearing = ((vertForceT + vertForceR) / 2)*1e9;    
     %----------------------------%
@@ -33,67 +35,48 @@ function [vertForce_forthClearing,force_forthClearing]=A2_2_processLat_1_feature
     % remove outliers. NOTE: such a function consider outliers line by line. Therefore, transform force as single vector rather than matrix
     % for better statistics ==> single massive cycle
     vertForce_secondClearing=vertForce_firstClearing;
-    force_vector=reshape(force_firstClearing,1,[]);
-    [numRemovedElements_2,force_secondClearing_vector]=dynamicOutliersRemoval(force_vector');
-    force_secondClearing=reshape(force_secondClearing_vector',size(force_firstClearing));
-    vertForce_secondClearing(isnan(force_secondClearing))=nan;
-    numRemovedElements_2=numRemovedElements_2/totElementsBeforeClearing*100;
+    force_rt_secondClearing=force_rt_firstClearing;
+    % find outliers in force_trace (Foreground data only, to save time, since the background will be removed)
+    disp("Running outliers removal of Force-Trace")
+    tmp=force_tr_firstClearing;
+    tmp(~mask)=nan;
+    force_vector=reshape(tmp,1,[]);
+    [numRemovedElements_2_1,force_secondClearing_vector]=dynamicOutliersRemoval(force_vector');
+    force_tr_secondClearing=reshape(force_secondClearing_vector',size(force_tr_firstClearing));
+    % restore BK data
+    force_tr_secondClearing(~mask)= force_tr_firstClearing(~mask);
+    % propagate nan in other datasets
+    vertForce_secondClearing(isnan(force_tr_secondClearing))=nan;
+    force_rt_secondClearing(isnan(force_tr_secondClearing))=nan;
+    % process retrace
+    disp("Running outliers removal of Force-ReTrace")
+    tmp=force_rt_secondClearing;
+    tmp(~mask)=nan;
+    force_vector=reshape(tmp,1,[]);
+    [numRemovedElements_2_2,force_secondClearing_vector]=dynamicOutliersRemoval(force_vector');
+    force_rt_secondClearing=reshape(force_secondClearing_vector',size(force_rt_firstClearing));
+    % restore BK data
+    force_rt_secondClearing(~mask)= force_rt_firstClearing(~mask);
+    % propagate nan in other datasets
+    vertForce_secondClearing(isnan(force_rt_secondClearing))=nan;
+    force_tr_secondClearing(isnan(force_rt_secondClearing))=nan;
+    numRemovedElements_2=(numRemovedElements_2_1+numRemovedElements_2_2)/totElementsBeforeClearing*100;
     %---------------------------%
     %%%%%% THIRD CLEARING %%%%%%%
     %---------------------------%
-    % aggressive cleaning. Therefore, let the user choose if it is good idea to clear
-    force_thirdClearing=force_secondClearing;
-    vertForce_thirdClearing=vertForce_secondClearing;
-    tmp=nnz(~isnan(force_secondClearing));
-    numRemovedElements_3=0;
-    labelText="Force [nN]";
-    ftmp=showData(idxMon,true,force_thirdClearing,"Lateral Force after second clearing","","","labelBar",labelText,"saveFig",false);
-    if getValidAnswer("Third Lateral Force clearing step.\nDo you want to perform a more aggressive clearing which remove values higher than a user-defined percentile?\n" + ...
-            "NOTE: there is a very similar process after assembly where it is possible to iteratively check how a percentile value affects the final clearing.",'',{"Y","N"},2)
-        while true
-            perc = str2double(inputdlg('Enter a percentile value to exclude lateral force data above that threshold. Use the distribution data for better guidance.','',[1 50],"90"));
-            if any(isnan(perc)) || perc <= 0 || perc >= 100
-                questdlg('Invalid input! Please enter a numeric value','','OK','OK');
-            else
-                break
-            end
-        end        
-        for i=1:size(idxSection,2)
-            startIdx=idxSection(1,i);
-            lastIdx=idxSection(2,i);                      
-            force_tmp=force_thirdClearing(:,startIdx:lastIdx);
-            maxlimit=prctile(force_tmp(:),perc);
-            force_tmp(force_tmp>maxlimit)=nan;
-            force_thirdClearing(:,startIdx:lastIdx)=force_tmp;     
-        end
-        vertForce_thirdClearing(isnan(force_thirdClearing))=nan;
-        numRemovedElements_3=tmp-nnz(~isnan(force_thirdClearing));
-        numRemovedElements_3=numRemovedElements_3/totElementsBeforeClearing*100;
-    end
-    close(ftmp), clear ftmp
-    %%%%%% FORTH CLEARING %%%%%%%
     % remove manually regions
-    tmp=nnz(~isnan(force_thirdClearing));
-    [~,force_forthClearing]=featureRemovePortions(force_thirdClearing,"Lateral Force\nAfter automatic clearing",idxMon, ...
-        'additionalImagesToShow',force_old,'additionalImagesTitleToShow','Lateral Force\nBefore clearing process','originalDataIndex',2,'normalize',false);
-    vertForce_forthClearing=vertForce_thirdClearing;
-    vertForce_forthClearing(isnan(force_forthClearing))=nan;
-    numRemovedElements_4=tmp-nnz(~isnan(force_forthClearing));
-    numRemovedElements_4=numRemovedElements_4/totElementsBeforeClearing*100;
+    tmp=nnz(~isnan(force_tr_secondClearing));
+    [~,force_tr_thirdClearing,force_rt_thirdClearing]=featureRemovePortions(force_tr_secondClearing,"Lateral Force Trace",idxMon, ...
+        'additionalImagesToShow',force_rt_secondClearing,'additionalImagesTitleToShow','Lateral Force Retrace','originalDataIndex',2,'normalize',false);
+    vertForce_thirdClearing=vertForce_secondClearing;
+    vertForce_thirdClearing(isnan(force_tr_thirdClearing))=nan;
+    numRemovedElements_3=tmp-nnz(~isnan(force_tr_thirdClearing));
+    numRemovedElements_3=numRemovedElements_3/totElementsBeforeClearing*100;
     %----------- final part ------------%
     % for some reasons, the measurements in HV off can be oddly totally wrong when the voltage is positive
-    restClearing=nnz(~isnan(force_forthClearing));
+    restClearing=nnz(~isnan(force_tr_thirdClearing));
     if restClearing < 5*totElementsBeforeClearing/100
         warndlg(sprintf("ALARM: after clearing, background lateral/vertical data have less than 5%% (%d) of the total elements before cleaning (%d).\nSomething wrong in the data!",restClearing,totElementsBeforeClearing))
-    end            
-    titleData1="Lateral Force - raw";
-    titleData2={"Lateral Force - 1st+2nd clearing";sprintf("VD-4nN (%.2f%%), LD outliers (%.2f%%)",numRemovedElements_1,numRemovedElements_2)};
-    if exist("perc","var") && isnumeric(perc)
-        titleData3={"Lateral Force - 3rd+4th clearing";sprintf("Removed %.2fth percentile (%.2f%%); manualRemoval (%.2f%%)",perc,numRemovedElements_3,numRemovedElements_4)};    
-    else
-        titleData3={"Lateral Force - 3rd+4th clearing";sprintf("No 3rd clearing; manualRemoval (%.2f%%)",numRemovedElements_4)};    
-    end        
-    showData(idxMon,false,force_old,titleData1,newFolder,nameFig,"labelBar",labelText,...
-        "extraData",{force_secondClearing,force_forthClearing},...
-        "extraTitles",{titleData2,titleData3},"extraLabel",{labelText,labelText});
+    end      
+    numRemovedElements_allSteps=[numRemovedElements_1,numRemovedElements_2,numRemovedElements_3];   
 end

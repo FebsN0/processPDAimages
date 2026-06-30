@@ -124,18 +124,23 @@ function varargout=A2_0_main_processAFMdata(allData,otherParameters,mainPath,Sav
                 else
                     if strcmp(HVmodesInfo.mainData,"OFF")
                         nameFig_base="resultA3";
-                        dataFinal=A2_2_processLat_1_LatVolt2LatForce(AFMdata_postHeightFit,AFM_height_IO,metaData_AFM,SaveFigIthSectionFolder,nameFig_base,idxMon,modeScan);                        
+                        dataFinal=A2_2_processLat_1_LatVolt2LatForce(AFMdata_postHeightFit,AFM_height_IO,metaData_AFM,SaveFigIthSectionFolder,nameFig_base,idxMon);                        
                         tmp=AFMdata_postHeightFit;      
                         tmp(end+1).Channel_name="Vertical Force"; %#ok<AGROW>
-                        tmp(end).Trace_type="none";
+                        tmp(end).Trace_type="Avg";
                         tmp(strcmpi([tmp.Channel_name],'Vertical Force')).AFM_images_3_PostLatProcessed_0_entire=dataFinal.vertForce_0_entire;
-                        tmp(strcmpi([tmp.Channel_name],'Vertical Force')).AFM_images_3_PostLatProcessed_1_mask=dataFinal.vertForce_1_masked;
-                        tmp(strcmpi([tmp.Channel_name],'Vertical Force')).AFM_images_3_PostLatProcessed_2_cleared=dataFinal.vertForce_2_clear;
+                        % LAT FORCE TRACE
                         tmp(end+1).Channel_name="Lateral Force"; %#ok<AGROW>
-                        tmp(end).Trace_type="none";
-                        tmp(strcmpi([tmp.Channel_name],'Lateral Force')).AFM_images_3_PostLatProcessed_0_entire=dataFinal.force_0_entire;
-                        tmp(strcmpi([tmp.Channel_name],'Lateral Force')).AFM_images_3_PostLatProcessed_1_mask=dataFinal.force_1_masked;
-                        tmp(strcmpi([tmp.Channel_name],'Lateral Force')).AFM_images_3_PostLatProcessed_2_cleared=dataFinal.force_2_clear;
+                        tmp(end).Trace_type="Trace";
+                        tmp(end).AFM_images_3_PostLatProcessed_0_entire=dataFinal.force_0_trace_entire;
+                        % LAT FORCE RETRACE
+                        tmp(end+1).Channel_name="Lateral Force"; %#ok<AGROW>
+                        tmp(end).Trace_type="ReTrace";                        
+                        tmp(end).AFM_images_3_PostLatProcessed_0_entire=dataFinal.force_0_retrace_entire;
+                        % LAT FORCE MAX PIXEL
+                        tmp(end+1).Channel_name="Lateral Force"; %#ok<AGROW>
+                        tmp(end).Trace_type="MaxPixelValue";
+                        tmp(end).AFM_images_3_PostLatProcessed_0_entire=dataFinal.force_0_entire_PixelmaxValue;                        
                         AFMdata_final=tmp;
                         allData(i).metadata.frictionCoeff_Used="No FC calculation. Lateral Force directly from data.";
                     else
@@ -155,7 +160,7 @@ function varargout=A2_0_main_processAFMdata(allData,otherParameters,mainPath,Sav
                 end
                 allData(i).AFMImage_PostProcess=AFMdata_final;
                 allData(i).AFMmask_heightIO=AFM_height_IO;     
-                save(fullfile(SaveFigIthSectionFolder,sprintf("%s_lateralChannelProcessed.mat",nameSection)),"allData","FitOrder_Height","FitOrder_Height","FitOrder_Lat") 
+                save(fullfile(SaveFigIthSectionFolder,sprintf("%s_lateralChannelProcessed.mat",nameSection)),"allData","FitOrder_Height","FitOrder_Lat") 
                 close all            
             end
             % processing any single section completed
@@ -188,24 +193,21 @@ function varargout=A2_0_main_processAFMdata(allData,otherParameters,mainPath,Sav
             'idxMon',idxMon,'folderSaveFig',SaveFigFolder,'SeeMe',false, ...
             'imageType','Assembled','Normalization',norm,'postProcessed',false)
             AFM_images_final=AFM_images_assembled;
-        end
-        % prepare also the definitive mask which include the excluded pixels from cleared Height and Force channels
-        tmpH=AFM_images_final(strcmp([AFM_images_final.Channel_name],"Height (measured)")).AFM_images_2_PostHeightProcessed;    
-        mask_cleared_H=~isnan(tmpH); % no original corrected height channel ==> already includes excluded pixels but fews so not problematic
-        if  modeScan==1
-            tmpClearedPixels=AFM_images_final(strcmp([AFM_images_final.Channel_name],"Lateral Force")).AFM_images_2_PostLateralProcessed_2_clear;    
-            mask_cleared_LF=~isnan(tmpClearedPixels); % no necessary for VF since same masking and clearing
-            % merge the definitive mask
-            AFM_height_IO_cleared=~(~mask_cleared_H|~mask_cleared_LF);
-        else
-            AFM_height_IO_cleared=mask_cleared_H;
-        end
-        % save the definitive mask
-        AFM_images_final(strcmp([AFM_images_final.Channel_name],"Height (measured)")).AFMmask_heightIO_cleared=AFM_height_IO_cleared;
+        end 
         % show results post processing. Common for both processing type (singleSection or postAssembly)
         A1_feature_CleanOrPrepFiguresRawData(AFM_images_final,'metadata',metaData, ...
             'idxMon',idxMon,'folderSaveFig',SaveFigFolder,'SeeMe',false, ...
             'imageType','Assembled','Normalization',norm,'postProcessed',true)
+        % show and save fig for better visual (height and force)
+        lengthAxis=[metaData.x_scan_length_m,metaData.y_scan_length_m];
+        height_final=AFM_images_final(strcmp([AFM_images_final.Channel_name],"Height (measured)")).AFM_images_2_PostProcessed;
+        [pValues,height_finalVisual] = percentileClipSlider(idxMon,height_final*1e9, ...
+                "Original Image", "Image within selected percentile data", "Height (nm)", lengthAxis,'pLowMax',50, 'pHighMin', 50);       
+        showData(idxMon,false,height_finalVisual,sprintf("Height Image - Data Shown %.2g-%.2g Percentile",pValues),SaveFigFolder,"resultA2_6_HeightBetterVisual",'labelBar',"Height (nm)","lenghtAxis",lengthAxis);
+        force_final=AFM_images_final(strcmp([AFM_images_final.Channel_name],"Lateral Force") & strcmp([AFM_images_final.Trace_type],"MaxPixelValue")).AFM_images_2_PostProcessed;
+        [pValues,force_finalVisual] = percentileClipSlider(idxMon,force_final*1e9, ...
+                "Original Image", "Image within selected percentile data", "Force (nN)", lengthAxis,'pLowMax',50, 'pHighMin', 50);       
+        showData(idxMon,false,force_finalVisual,sprintf("Force (maxPixValue) Image - Data Shown %.2g-%.2g Percentile",pValues),SaveFigFolder,"resultA2_7_ForceBetterVisual",'labelBar',"Force (nN)","lenghtAxis",lengthAxis);
     else
         % in case of single file
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -219,7 +221,9 @@ function varargout=A2_0_main_processAFMdata(allData,otherParameters,mainPath,Sav
             dataPreProcess=allData.AFMImage_Raw;
             metaDataPreProcess=allData.metadata;                                
             [AFMdata_postHeightFit,AFM_height_IO]=A2_feature_1_processHeightChannel(dataPreProcess,idxMon,SaveFigFolder,modeScan,'imageType','Entire','metadata',metaDataPreProcess,'SeeMe',false);                            
-            save(fullfile(pathfile,"heightChannelProcessed.mat"),"AFMdata_postHeightFit","AFM_height_IO","metaDataPreProcess")                
+            save(fullfile(pathfile,"heightChannelProcessed.mat" + ...
+                "" + ...
+                "                "),"AFMdata_postHeightFit","AFM_height_IO","metaDataPreProcess")                
         end
         % in case of frictionScan, stop here the processing. No needed the lateral processing for friction scans
         if modeScan==2 
@@ -228,6 +232,8 @@ function varargout=A2_0_main_processAFMdata(allData,otherParameters,mainPath,Sav
             return
         end
         % continue lateral processing
+        % to be introduced
+        %%%% 
     end
     % return outputs
     varargout{1}=AFM_images_final;
@@ -242,7 +248,7 @@ end
 %%%%%%% FUNCTION %%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%
 
-function typeProcessChoice=askTypeProcess(varargin)    
+function typeProcessChoice=askTypeProcess(varargin)     
     mainPath=varargin{1};
     HVmode=varargin{3};
     startPathResults=fullfile(mainPath,HVmode,"Results singleSectionProcessing");
