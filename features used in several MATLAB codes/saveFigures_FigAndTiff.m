@@ -15,6 +15,7 @@ function saveFigures_FigAndTiff(fig,nameDir,nameFig,varargin)
     if isMatlabDarkMode()
         forceLightTheme(fig);
     end
+    pause(2)
     % remove interactive icons on the axis
     ax_all = findall(fig, 'Type', 'axes');
     for k = 1:numel(ax_all)
@@ -67,6 +68,9 @@ function forceLightTheme(fig)
     tl = findall(fig, 'Type', 'tiledlayout');
     if ~isempty(tl)
          tl(1).Title.Color = 'black';
+         if ~isempty(tl(1).Subtitle)
+            tl(1).Subtitle.Color = 'black';
+         end
     else
         sg = findall(fig, 'Type', 'text', 'Tag', 'suptitle');
         if ~isempty(sg)

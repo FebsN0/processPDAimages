@@ -38,11 +38,12 @@ function fig=showData(idxMon,SeeMe,data1,titleData1,nameDir,nameFig,varargin)
     argName = 'noLabels';           defaultVal=false;   addOptional(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))))
     argName = 'grayscale';          defaultVal=false;   addOptional(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))))
     argName = 'Broadcast';          defaultVal=[];      addOptional(p,argName,defaultVal, @(x) (isnumeric(x) && isvector(x)))  
+    argName = 'bigTitle';           defaultVal=[];      addOptional(p,argName,defaultVal, @(x) isstring(x))  
     % for extra data
     argName = 'extraData';          defaultVal={};      addOptional(p,argName,defaultVal, @(x) iscell(x) || ismatrix(x))
     argName = 'extraNorm';          defaultVal={};      addOptional(p,argName,defaultVal, @(x) (iscell(x) || isnumeric(x) || islogical(x)))
     argName = 'extraBinary';        defaultVal={};      addOptional(p,argName,defaultVal, @(x) (iscell(x) || isnumeric(x) || islogical(x)))    
-    argName = 'extraLengthAxis';    defaultVal={};      addOptional(p,argName,defaultVal, @(x) iscell(x))
+    argName = 'extraLengthAxis';    defaultVal={};      addOptional(p,argName,defaultVal, @(x) (iscell(x) || isnumeric(x) || islogical(x)))
     argName = 'extraTitles';        defaultVal={};      addOptional(p,argName,defaultVal, @(x) iscell(x) || isstring(x))
     argName = 'extraLabel';         defaultVal={};      addOptional(p,argName,defaultVal, @(x) iscell(x) || isstring(x)) 
     % in case the fig already exist and the user just want to update the internal figures
@@ -62,25 +63,38 @@ function fig=showData(idxMon,SeeMe,data1,titleData1,nameDir,nameFig,varargin)
     if p.Results.noLabels,   noLabs=true; else, noLabs=false; end
     if p.Results.grayscale,  grayScale=true; else, grayScale=false; end
     if p.Results.binary,     bin1=true; else, bin1=false; end
-    broadcastRange=p.Results.Broadcast;
-    lenghtAxis=p.Results.lenghtAxis;
-    labelBar1=string(p.Results.labelBar);     
-
     % -------------------------------
     % Count number of datasets
     % -------------------------------
-    if iscell(p.Results.extraData)
+    if iscell(p.Results.extraData)        
         nExtra = numel(p.Results.extraData);
+    elseif ~isempty(p.Results.extraData)
+        nExtra = 1;        
     else
-        nExtra=1;
+        nExtra=0;
+    end       
+    tl = tiledlayout(1,nExtra+1, 'TileSpacing', 'compact', 'Padding', 'loose');
+    tl.OuterPosition(2) = 0;          % anchor to bottom
+    tl.OuterPosition(4) = 0.99;       % leave ~2% at top for the supertitle
+    if ~isempty(p.Results.bigTitle)
+        annotation('textbox', [0, 0.91, 1, 0.14], ...
+        'String', p.Results.bigTitle, ...
+        'Color','black',...
+        'FontSize', 18, ...
+        'FontWeight', 'bold', ...
+        'HorizontalAlignment', 'center', ...
+        'VerticalAlignment', 'middle', ...
+        'EdgeColor', 'none');
     end
-    nTotal = 1 + nExtra;   % main image + extras
+    broadcastRange=p.Results.Broadcast;
+    lenghtAxis=p.Results.lenghtAxis;
+    labelBar1=string(p.Results.labelBar);         
     % ---- SUBPLOT 1: main data ----
-    ax = subplot(1,nTotal,1,'Parent',fig);
+    ax = nexttile;
     showSingleData(ax,data1,norm1,titleData1,labelBar1,bin1,lenghtAxis,noLabs,grayScale,broadcastRange)
     % ---- SUBPLOTS for EXTRA DATA ----
     for k = 1:nExtra
-        axk = subplot(1,nTotal,k+1,'Parent',fig);
+        axk = nexttile;
         dataK       = getOrDefault(p.Results.extraData,k,[]);
         normK       = getOrDefault(p.Results.extraNorm,k,false); 
         binK        = getOrDefault(p.Results.extraBinary,k,false);
@@ -184,10 +198,10 @@ function showSingleData(ax,data, norm, titleData,labelBar,bin,AxisLength,noLabel
         parts=titleData;
     end
     if length(parts) > 1
-        title(parts{1}, 'FontSize', 14, 'Units', 'normalized', 'Position', [0.5, 1.045, 0],'Interpreter','none'); % move upward
-        subtitle(parts{2},'FontSize',11,'Units', 'normalized', 'Position', [0.5, 1.01, 0],'Interpreter','none')
+        title(ax,parts{1}, 'FontSize', 14, 'Units', 'normalized', 'Position', [0.5, 1.045, 0],'Interpreter','none'); % move upward
+        subtitle(ax,parts{2},'FontSize',11,'Units', 'normalized', 'Position', [0.5, 1.01, 0],'Interpreter','none')
     else
-        title(parts{1}, 'FontSize', 17,'Units', 'normalized', 'Position', [0.5, 1.02, 0],'Interpreter','none');
+        title(ax,parts{1}, 'FontSize', 17,'Units', 'normalized', 'Position', [0.5, 1.02, 0],'Interpreter','none');
     end
 
     if size(data,2)<size(data,1)/3

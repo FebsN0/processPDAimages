@@ -12,8 +12,10 @@ function [countOutliers,cleanData]=dynamicOutliersRemoval(data)
         firstIt=true;
         while firstIt || any(pos_outlier)
             firstIt=false;
-            [pos_outlier] = isoutlier(yData, 'gesd');
-            countOutliers=countOutliers+length(find(pos_outlier));
+            validMask = ~isnan(yData);
+            pos_outlier = false(size(yData));
+            pos_outlier(validMask) = isoutlier(yData(validMask), 'gesd');
+            countOutliers = countOutliers + sum(pos_outlier);
             yData(pos_outlier) = NaN;            
         end
         tmp(:,i) = yData;

@@ -22,14 +22,14 @@ function varargout = percentileClipSlider(idxMon,data,titleOrig,titleTemplateCle
 
 % --- parse options
     p = inputParser;
-    addParameter(p, 'pInit', 99, @(x) isnumeric(x) && isscalar(x));
-    addParameter(p, 'pMin',  95, @(x) isnumeric(x) && isscalar(x));
-    addParameter(p, 'pMax', 100, @(x) isnumeric(x) && isscalar(x));
+    addParameter(p, 'pHighInit', 99, @(x) isnumeric(x) && isscalar(x));
+    addParameter(p, 'pHighMin',  95, @(x) isnumeric(x) && isscalar(x));
+    addParameter(p, 'pHighMax', 100, @(x) isnumeric(x) && isscalar(x));
     addParameter(p, 'pLowInit',  1, @(x) isnumeric(x) && isscalar(x));
     addParameter(p, 'pLowMin',   0, @(x) isnumeric(x) && isscalar(x));
     addParameter(p, 'pLowMax',   5, @(x) isnumeric(x) && isscalar(x));
     parse(p,varargin{:});
-    pHighInit = p.Results.pInit;    pHighMin = p.Results.pMin;      pHighMax = p.Results.pMax;
+    pHighInit = p.Results.pHighInit;    pHighMin = p.Results.pHighMin;      pHighMax = p.Results.pHighMax;
     pLowInit = p.Results.pLowInit;  pLowMin = p.Results.pLowMin;    pLowMax = p.Results.pLowMax;
     % --- UI Figure
     fig = uifigure('Name','Percentile clip (interactive)');
