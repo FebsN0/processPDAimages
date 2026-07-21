@@ -48,6 +48,7 @@ function [dataForce,idxSection]=A2_2_processLat_1_LatVolt2LatForce(AFM_data,AFM_
     force_0_entire_trace=Lateral_Trace_3_shifted*alpha*1e9; %Convert N into nN
     force_0_entire_retrace=Lateral_ReTrace_4_mirrored*alpha*1e9; %Convert N into nN
     force_0_entire_PixelmaxValue=max(force_0_entire_trace,force_0_entire_retrace);
+    force_0_entire_average=(force_0_entire_trace+force_0_entire_retrace)./2;
     % mask the data, take only FR 
     force_1_masked_trace=force_0_entire_trace;
     force_1_masked_trace(~mask)=nan;
@@ -55,6 +56,8 @@ function [dataForce,idxSection]=A2_2_processLat_1_LatVolt2LatForce(AFM_data,AFM_
     force_1_masked_retrace(~mask)=nan;
     force_1_masked_PixelmaxValue=force_0_entire_PixelmaxValue;
     force_1_masked_PixelmaxValue(~mask)=nan;
+    force_1_masked_average=force_0_entire_average;
+    force_1_masked_average(~mask)=nan;    
     % adjust xlim
     allDataHistog=[force_0_entire_trace(:);force_0_entire_retrace(:)];
     pLow = prctile(allDataHistog, .5);
@@ -67,32 +70,40 @@ function [dataForce,idxSection]=A2_2_processLat_1_LatVolt2LatForce(AFM_data,AFM_
             % take only all datapoint
             vect_f_tr=force_0_entire_trace(:);
             vect_f_rt=force_0_entire_retrace(:);        
-            vect_f_max=force_0_entire_PixelmaxValue(:);        
+            vect_f_max=force_0_entire_PixelmaxValue(:); 
+            vect_f_avg=force_0_entire_average(:); 
         else           
             % exclude nan
             vect_f_tr=force_1_masked_trace(:);
             vect_f_rt=force_1_masked_retrace(:);
             vect_f_max=force_1_masked_PixelmaxValue(:);
+            vect_f_avg=force_1_masked_average(:); 
             vect_f_tr=vect_f_tr(~isnan(vect_f_tr));
             vect_f_rt=vect_f_rt(~isnan(vect_f_rt)); 
             vect_f_max=vect_f_max(~isnan(vect_f_max));
+            vect_f_avg=vect_f_avg(~isnan(vect_f_avg));
         end
         [f_tr, xi_tr] = ksdensity(vect_f_tr);
         [f_rt, xi_rt] = ksdensity(vect_f_rt); 
         [f_max, xi_max] = ksdensity(vect_f_max);
-        fill_between(ax, xi_tr, f_tr, globalColor(1), 0.25);     
-        fill_between(ax, xi_rt, f_rt, globalColor(2), 0.25);
-        fill_between(ax, xi_max, f_max, globalColor(3), 0.25);
+        [f_avg, xi_avg] = ksdensity(vect_f_avg);
+        fill_between(ax, xi_tr, f_tr, globalColor(1), 0.2);     
+        fill_between(ax, xi_rt, f_rt, globalColor(2), 0.2);
+        fill_between(ax, xi_max, f_max, globalColor(4), 0.2);
+        fill_between(ax, xi_avg, f_avg, globalColor(5), 0.2);
         plot(ax, xi_tr,     f_tr,    '-', 'Color', globalColor(1), 'LineWidth', 2.0, 'DisplayName', 'Force-Trace');
         plot(ax, xi_rt,     f_rt,    '-', 'Color', globalColor(2), 'LineWidth', 2.0, 'DisplayName', 'Force-ReTrace');
-        plot(ax, xi_max,    f_max,   ':', 'Color', globalColor(3), 'LineWidth', 1.0, 'DisplayName', 'Force-MaxPixel');
-        % Mean/median lines
+        plot(ax, xi_max,    f_max,   ':', 'Color', globalColor(4), 'LineWidth', 1.0, 'DisplayName', 'Force-MaxPixelValue');
+        plot(ax, xi_avg,    f_avg,   ':', 'Color', globalColor(5), 'LineWidth', 1.0, 'DisplayName', 'Force-Avg');
+        % Mean/median lines 
         med_tr  = median(vect_f_tr);
         med_rt  = median(vect_f_rt);
         med_max = median(vect_f_max);
+        med_avg = median(vect_f_avg);
         plot(ax, [med_tr  med_tr],  [0 max(f_tr)],  ':', 'Color', globalColor(1), 'LineWidth', 2,'DisplayName',sprintf('Median: %.3g nN',med_tr));
         plot(ax, [med_rt  med_rt],  [0 max(f_rt)],  ':', 'Color', globalColor(2), 'LineWidth', 2,'DisplayName',sprintf('Median: %.3g nN',med_rt));            
-        plot(ax, [med_rt  med_max], [0 max(f_max)], ':', 'Color', globalColor(3), 'LineWidth', 2,'DisplayName',sprintf('Median: %.3g nN',med_max));
+        plot(ax, [med_max  med_max], [0 max(f_max)], ':', 'Color', globalColor(4), 'LineWidth', 2,'DisplayName',sprintf('Median: %.3g nN',med_max));
+        plot(ax, [med_avg  med_avg], [0 max(f_avg)], ':', 'Color', globalColor(5), 'LineWidth', 2,'DisplayName',sprintf('Median: %.3g nN',med_avg));
         legend(ax, 'AutoUpdate','off','EdgeColor',[0.3 0.3 0.3], 'Location','northeast','FontSize',14);
         xlim(ax, [pLow, pHigh]);
         xlabel(ax,"Lateral Force (nN)","FontSize",14),ylabel(ax,"KDE","FontSize",14)
@@ -107,19 +118,23 @@ function [dataForce,idxSection]=A2_2_processLat_1_LatVolt2LatForce(AFM_data,AFM_
     saveFigures_FigAndTiff(figForceDist,saveFigPath,nameFig)
 
     % show the full data
+    % make in a way that force images are comparable
+    imgs={force_0_entire_trace,force_0_entire_retrace,force_0_entire_PixelmaxValue,force_0_entire_average};
+    imgs_adjusted=imadjustMultiple(imgs);
+
     nameFig=nameFig_base+"_4_Forces_fullData";
     showData(idxMon,false,vertForce_0_entire,"Vertical Force",saveFigPath,nameFig,"labelBar","Force [nN]",...
-        "extraData",{force_0_entire_trace,force_0_entire_retrace,force_0_entire_PixelmaxValue}, ...
-        "extraTitles",{"Lateral Force - Trace","Lateral Force - ReTrace","Lateral Force - MaxPixelV"}, ...
-        "extraLabel",{"Force [nN]","Force [nN]","Force [nN]"},...
-        "bigTitle","Force Distribution");    
+        "extraData",imgs_adjusted, ...  
+        "extraTitles",{"Lateral Force - Trace","Lateral Force - ReTrace","Lateral Force - MaxPixelV","Lateral Force - Average"}, ...
+        "extraLabel",{"Force [nN]","Force [nN]","Force [nN]","Force [nN]"},...
+        "bigTitle","Force Distribution (LF adjusted contrast)");    
     
     % prepare the output
     dataForce.vertForce_0_entire=vertForce_0_entire;   
     dataForce.force_0_trace_entire=force_0_entire_trace;
     dataForce.force_0_retrace_entire=force_0_entire_retrace;   
     dataForce.force_0_entire_PixelmaxValue=force_0_entire_PixelmaxValue;  
-    
+    dataForce.force_0_entire_average=force_0_entire_average;  
     % in order to preserve the data after alignment with BF IO image, better to not exclude values... But only in the end, after assembly and
     % alignment, before the Force-Fluorescence correlation
     

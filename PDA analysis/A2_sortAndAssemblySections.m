@@ -1,4 +1,4 @@
-function varargout = A2_sortAndAssemblySections(allData,otherParameters,flag_processSingleSection,modeScan)
+function varargout = A2_sortAndAssemblySections(allData,otherParameters,flag_processSingleSection)
 % First part is sorting in function of the y-position of the sections
 % Second part is assembling the sections
     numFiles=length(allData);

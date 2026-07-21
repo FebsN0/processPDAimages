@@ -1,4 +1,4 @@
-function varargout=A2_0_main_processAFMdata(allData,otherParameters,mainPath,SaveFigFolder,HVmodesInfo,idxMon,varargin)
+    function varargout=A2_0_main_processAFMdata(allData,otherParameters,mainPath,SaveFigFolder,HVmodesInfo,idxMon,varargin)
     % suppress some annoying warnings
     warning('off','MATLAB:polyfit:RepeatedPointsOrRescale');
     warning('off','curvefit:fit:IterationLimitReached');            
@@ -39,128 +39,131 @@ function varargout=A2_0_main_processAFMdata(allData,otherParameters,mainPath,Sav
         clear typeProcessChoice
         % if single section processing, process first the i-th section, then assembly. The assembly part is same for both methods (yes/no single section processing)
         if flag_processSingleSection
-            for i=1:numFiles
-                if i==1
-                    FitOrder_Height='';
-                    FitOrder_Lat='';
-                end
-                % take the info regarding Fit Order used in the first section
-                if i~=1 && isempty(FitOrder_Height)
-                    firstFileHeight=dir(fullfile(startPathSingleSectionFolder,"section_1","*_heightChannelProcessed.mat"));
-                    load(fullfile(firstFileHeight.folder,firstFileHeight.name),"FitOrder_Height");
-                    if ~strcmp(HVmodesInfo.mainData,"OFF") && exist(dir(fullfile(startPathSingleSectionFolder,"section_1","*_lateralChannelProcessed.mat")),'file')
-                        load(fullfile(firstFileLat.folder,firstFileLat.name),"FitOrder_Lat");
-                    end
-                end
-                % if not processed, keep true, otherwise false
-                flagProcHeight=true;
+            for i=1:numFiles    
                 % check if results of a specific section were already made.
                 [~,nameSection,~]=fileparts(allData(i).filenameSection);
                 SaveFigIthSectionFolder=fullfile(startPathSingleSectionFolder,sprintf("section_%d",i)); 
-                % pathfile of processed height
-                fileName1=fullfile(SaveFigIthSectionFolder,sprintf("%s_heightChannelProcessed.mat",nameSection));   
                 % in case of normal scan, check if Lateral Channel has already processed ==> load
+                answSkipLat=2; % 1 = skip, 2 = process   
                 if modeScan==1 && exist(fullfile(SaveFigIthSectionFolder,sprintf("%s_lateralChannelProcessed.mat",nameSection)),"file") 
                     question=sprintf("PostLateralChannel file .mat for the section %d already exists. Take it?",i);
                     if getValidAnswer(question,"",{'y','n'})
                         % each section has allData updated to the relative section.
                         fileName2=fullfile(SaveFigIthSectionFolder,sprintf("%s_lateralChannelProcessed.mat",nameSection));
-                        load(fileName2,"allData")
+                        load(fileName2,"AFMdata_final","AFM_height_IO","infoFC")
+                        answSkipLat=1;
+                    end
+                end
+                if answSkipLat~=1
+                    FitOrder_Height='';
+                    % take the info regarding Fit Order used in the first section
+                    if i~=1 && isempty(FitOrder_Height)
+                        firstFileHeight=dir(fullfile(startPathSingleSectionFolder,"section_1","*_heightChannelProcessed.mat"));
+                        load(fullfile(firstFileHeight.folder,firstFileHeight.name),"FitOrder_Height");
+                    end
+                    % if not processed, keep true, otherwise false
+                    flagProcHeight=true;
+                    
+                    % pathfile of processed height
+                    fileName1=fullfile(SaveFigIthSectionFolder,sprintf("%s_heightChannelProcessed.mat",nameSection));   
+                    % in any scan type, check if Height Channel has already processed ==> load
+                    if exist(fileName1,"file")
+                        question=sprintf("PostHeightChannel file .mat for the section %d - %s - already exists. Take it?",i,mainHVmode);
+                        if getValidAnswer(question,"",{'y','n'})
+                            if i==1
+                                load(fileName1,"AFMdata_postHeightFit","AFM_height_IO","FitOrder_Height")
+                            else
+                                load(fileName1,"AFMdata_postHeightFit","AFM_height_IO")
+                            end
+                            % skip height processing. In case of normal scan, start lateral processing
+                            flagProcHeight=false;
+                        end
+                    end            
+                    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                    %%%%%%%% PROCESS HEIGHT CHANNEL AND GENERATE MASK %%%%%%%%
+                    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%               
+                    if flagProcHeight
+                        fprintf("\n$$$$$-----------------------------------$$$$\n$$ PROCESSING HEIGHT CHANNEL OF SECTION %d $$\n$$$$$-----------------------------------$$$$\n",i)                    
+                        % First, given the ith-section, create subfolder where store figures for each section and results                
+                        if ~exist(SaveFigIthSectionFolder,'dir')
+                            mkdir(SaveFigIthSectionFolder)
+                        end
+                        % extract the data
+                        dataPreProcess=allData(i).AFMImage_Raw;
+                        metaDataPreProcess=allData(i).metadata;                                
+                        % note: setpointsList = [] because the function is processing single sections
+                        [AFMdata_postHeightFit,AFM_height_IO,FitOrder_Height]=A2_1_processHeight(dataPreProcess,idxMon,SaveFigIthSectionFolder,modeScan,'fitOrder',FitOrder_Height,'imageType',"SingleSection",'metadata',metaDataPreProcess,'SeeMe',false);                
+                        % save the results for the specific section, to avoid to perform manual binarization
+                        save(fullfile(SaveFigIthSectionFolder,sprintf("%s_heightChannelProcessed.mat",nameSection)),"AFMdata_postHeightFit","AFM_height_IO","FitOrder_Height")                
+                    end
+                    clear question fileName*
+                    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                    %%%%%%%% PROCESS LATERAL DEFLECTION CHANNEL (in case of HOVER MODE ON DATA) %%%%%%%%
+                    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%                           
+                    metaData_AFM=allData(i).metadata; 
+                    % if data for normal scan is from HVmodeOFF, not required to extract friction coeff ==> just trace-retrace data and it doesnt matter
+                    % if single section processing or after assembling since V->N conversion is pixelXpixel operation, therefore no planeFit.                           
+                    if strcmp(HVmodesInfo.mainData,"ON") && modeScan==1 && i==1
+                    % if processing HV mode ON (main) and OFF (friction) exist
+                        question=sprintf("Both HoverModeON and HoverModeOFF exist.\nChoose one of the following options to decide how to process lateral deflection data.\nQuestion skipped from next section while same operation is repeated depending on the previously choosen option.");                                   
+                        additionaltext="\nNOTE: Friction Coefficients will be separately extracted from the same single section and applied as baseline to the lateral data of the relative section.";       
+                        options={"Skip Lateral Deflection processing of single sections.\nFirst, process Height Image of any section and assembly, then processing entire image Lateral deflection.",...
+                            sprintf("Process Lateral Deflection for each single section, independently from other sections.%s",additionaltext)};
+                        answSkipLat=getValidAnswer(question,'',options);                 
+                    elseif modeScan==3
+                    % In case of postHeated samples, skip the lateral processing 
+                        answSkipLat=1;
+                    end                
+                    fprintf("\n%%%%%%%%%%%%%%%%%%------------------------%%%%%%%%%%%%%%%%%%\n%%%% PROCESSING LATERAL CHANNEL SECTION %d %%%%\n%%%%%%%%%%%%%%%%%%------------------------%%%%%%%%%%%%%%%%%%\n",i)                                
+                    if answSkipLat == 1
                         continue
-                    end
-                end
-                % in any scan type, check if Height Channel has already processed ==> load
-                if exist(fileName1,"file")
-                    question=sprintf("PostHeightChannel file .mat for the section %d - %s - already exists. Take it?",i,mainHVmode);
-                    if getValidAnswer(question,"",{'y','n'})
-                        if i==1
-                            load(fileName1,"AFMdata_postHeightFit","AFM_height_IO","FitOrder_Height")
-                        else
-                            load(fileName1,"AFMdata_postHeightFit","AFM_height_IO")
-                        end
-                        % skip height processing. In case of normal scan, start lateral processing
-                        flagProcHeight=false;
-                    end
-                end            
-                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                %%%%%%%% PROCESS HEIGHT CHANNEL AND GENERATE MASK %%%%%%%%
-                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%               
-                if flagProcHeight
-                    fprintf("\n$$$$$-----------------------------------$$$$\n$$ PROCESSING HEIGHT CHANNEL OF SECTION %d $$\n$$$$$-----------------------------------$$$$\n",i)                    
-                    % First, given the ith-section, create subfolder where store figures for each section and results                
-                    if ~exist(SaveFigIthSectionFolder,'dir')
-                        mkdir(SaveFigIthSectionFolder)
-                    end
-                    % extract the data
-                    dataPreProcess=allData(i).AFMImage_Raw;
-                    metaDataPreProcess=allData(i).metadata;                                
-                    % note: setpointsList = [] because the function is processing single sections
-                    [AFMdata_postHeightFit,AFM_height_IO,FitOrder_Height]=A2_1_processHeight(dataPreProcess,idxMon,SaveFigIthSectionFolder,modeScan,'fitOrder',FitOrder_Height,'imageType',"SingleSection",'metadata',metaDataPreProcess,'SeeMe',false);                
-                    % save the results for the specific section, to avoid to perform manual binarization
-                    save(fullfile(SaveFigIthSectionFolder,sprintf("%s_heightChannelProcessed.mat",nameSection)),"AFMdata_postHeightFit","AFM_height_IO","FitOrder_Height")                
-                end
-                clear question fileName*
-                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                %%%%%%%% PROCESS LATERAL DEFLECTION CHANNEL (in case of HOVER MODE ON DATA) %%%%%%%%
-                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%                           
-                metaData_AFM=allData(i).metadata; 
-                % if data for normal scan is from HVmodeOFF, not required to extract friction coeff ==> just trace-retrace data and it doesnt matter
-                % if single section processing or after assembling since V->N conversion is pixelXpixel operation, therefore no planeFit.
-                answSkipLat=2; % 1 = skip, 2 = process               
-                if strcmp(HVmodesInfo.mainData,"ON") && modeScan==1 && i==1
-                % if processing HV mode ON (main) and OFF (friction) exist
-                    question=sprintf("Both HoverModeON and HoverModeOFF exist.\nChoose one of the following options to decide how to process lateral deflection data.\nQuestion skipped from next section while same operation is repeated depending on the previously choosen option.");                                   
-                    additionaltext="\nNOTE: Friction Coefficients will be separately extracted from the same single section and applied as baseline to the lateral data of the relative section.";       
-                    options={"Skip Lateral Deflection processing of single sections.\nFirst, process Height Image of any section and assembly, then processing entire image Lateral deflection.",...
-                        sprintf("Process Lateral Deflection for each single section, independently from other sections.%s",additionaltext)};
-                    answSkipLat=getValidAnswer(question,'',options);                 
-                elseif modeScan==3
-                % In case of postHeated samples, skip the lateral processing 
-                    answSkipLat=1;
-                end                
-                fprintf("\n%%%%%%%%%%%%%%%%%%------------------------%%%%%%%%%%%%%%%%%%\n%%%% PROCESSING LATERAL CHANNEL SECTION %d %%%%\n%%%%%%%%%%%%%%%%%%------------------------%%%%%%%%%%%%%%%%%%\n",i)                                
-                if answSkipLat == 1
-                    continue
-                else
-                    if strcmp(HVmodesInfo.mainData,"OFF")
-                        nameFig_base="resultA3";
-                        dataFinal=A2_2_processLat_1_LatVolt2LatForce(AFMdata_postHeightFit,AFM_height_IO,metaData_AFM,SaveFigIthSectionFolder,nameFig_base,idxMon);                        
-                        tmp=AFMdata_postHeightFit;      
-                        tmp(end+1).Channel_name="Vertical Force"; %#ok<AGROW>
-                        tmp(end).Trace_type="Avg";
-                        tmp(strcmpi([tmp.Channel_name],'Vertical Force')).AFM_images_3_PostLatProcessed_0_entire=dataFinal.vertForce_0_entire;
-                        % LAT FORCE TRACE
-                        tmp(end+1).Channel_name="Lateral Force"; %#ok<AGROW>
-                        tmp(end).Trace_type="Trace";
-                        tmp(end).AFM_images_3_PostLatProcessed_0_entire=dataFinal.force_0_trace_entire;
-                        % LAT FORCE RETRACE
-                        tmp(end+1).Channel_name="Lateral Force"; %#ok<AGROW>
-                        tmp(end).Trace_type="ReTrace";                        
-                        tmp(end).AFM_images_3_PostLatProcessed_0_entire=dataFinal.force_0_retrace_entire;
-                        % LAT FORCE MAX PIXEL
-                        tmp(end+1).Channel_name="Lateral Force"; %#ok<AGROW>
-                        tmp(end).Trace_type="MaxPixelValue";
-                        tmp(end).AFM_images_3_PostLatProcessed_0_entire=dataFinal.force_0_entire_PixelmaxValue;                        
-                        AFMdata_final=tmp;
-                        allData(i).metadata.frictionCoeff_Used="No FC calculation. Lateral Force directly from data.";
                     else
-                        [AFMdata_final,metricsPlane,metricsLine,FitOrder_Lat,FitOrder_Height,avg_fc]=A2_feature_2_processLateralChannel(AFMdata_postHeightFit,AFM_height_IO,metaData_AFM,idxMon,SaveFigIthSectionFolder,mainPath, ...
-                            'FitOrderHVON_Lat',FitOrder_Lat,'FitOrderHVOFF_Height',FitOrder_Height,'SeeMe',false,'idxSectionHVon',i,'flagSingleSectionProcess',true);
-                        allData(i).metadata.frictionCoeff_Used=avg_fc;
-                  
-                        % prepare the info about the used fitting
-                        if ~isempty(metricsLine)
-                            infoLine=" - LineByLineFit";
+                        if strcmp(HVmodesInfo.mainData,"OFF")
+                            nameFig_base="resultA3";
+                            dataFinal=A2_2_processLat_1_LatVolt2LatForce(AFMdata_postHeightFit,AFM_height_IO,metaData_AFM,SaveFigIthSectionFolder,nameFig_base,idxMon);                        
+                            tmp=AFMdata_postHeightFit;      
+                            tmp(end+1).Channel_name="Vertical Force"; %#ok<AGROW>
+                            tmp(end).Trace_type="Avg";
+                            tmp(strcmpi([tmp.Channel_name],'Vertical Force')).AFM_images_3_PostLatProcessed_0_entire=dataFinal.vertForce_0_entire;
+                            % LAT FORCE TRACE
+                            tmp(end+1).Channel_name="Lateral Force"; %#ok<AGROW>
+                            tmp(end).Trace_type="Trace";
+                            tmp(end).AFM_images_3_PostLatProcessed_0_entire=dataFinal.force_0_trace_entire;
+                            % LAT FORCE RETRACE
+                            tmp(end+1).Channel_name="Lateral Force"; %#ok<AGROW>
+                            tmp(end).Trace_type="ReTrace";                        
+                            tmp(end).AFM_images_3_PostLatProcessed_0_entire=dataFinal.force_0_retrace_entire;
+                            % LAT FORCE MAX PIXEL
+                            tmp(end+1).Channel_name="Lateral Force"; %#ok<AGROW>
+                            tmp(end).Trace_type="MaxPixelValue";
+                            tmp(end).AFM_images_3_PostLatProcessed_0_entire=dataFinal.force_0_entire_PixelmaxValue;     
+                             % LAT FORCE MAX PIXEL
+                            tmp(end+1).Channel_name="Lateral Force"; %#ok<AGROW>
+                            tmp(end).Trace_type="Average";
+                            tmp(end).AFM_images_3_PostLatProcessed_0_entire=dataFinal.force_0_entire_average;                        
+                            % store final data
+                            AFMdata_final=tmp;
+                            infoFC="No FC calculation. Lateral Force directly from data.";
+                            save(fullfile(SaveFigIthSectionFolder,sprintf("%s_lateralChannelProcessed.mat",nameSection)),"AFMdata_final","AFM_height_IO","infoFC") 
                         else
-                            infoLine="";
+                            [AFMdata_final,metricsPlane,metricsLine,FitOrder_Lat,FitOrder_Height,avg_fc]=A2_feature_2_processLateralChannel(AFMdata_postHeightFit,AFM_height_IO,metaData_AFM,idxMon,SaveFigIthSectionFolder,mainPath, ...
+                                'FitOrderHVON_Lat',FitOrder_Lat,'FitOrderHVOFF_Height',FitOrder_Height,'SeeMe',false,'idxSectionHVon',i,'flagSingleSectionProcess',true);
+                            allData(i).metadata.frictionCoeff_Used=avg_fc;
+                      
+                            % prepare the info about the used fitting
+                            if ~isempty(metricsLine)
+                                infoLine=" - LineByLineFit";
+                            else
+                                infoLine="";
+                            end
+                            infoPlane=metricsPlane.fitOrder;
+                            allData(i).metadata.fittingInfo=sprintf("PlaneFit: %s%s",infoPlane,infoLine);
                         end
-                        infoPlane=metricsPlane.fitOrder;
-                        allData(i).metadata.fittingInfo=sprintf("PlaneFit: %s%s",infoPlane,infoLine);
                     end
                 end
                 allData(i).AFMImage_PostProcess=AFMdata_final;
-                allData(i).AFMmask_heightIO=AFM_height_IO;     
-                save(fullfile(SaveFigIthSectionFolder,sprintf("%s_lateralChannelProcessed.mat",nameSection)),"allData","FitOrder_Height","FitOrder_Lat") 
+                allData(i).AFMmask_heightIO=AFM_height_IO;   
+                allData(i).metadata.frictionCoeff_Used=infoFC;                
                 close all            
             end
             % processing any single section completed
@@ -172,7 +175,7 @@ function varargout=A2_0_main_processAFMdata(allData,otherParameters,mainPath,Sav
             end            
         end
         % ASSEMBLY!
-        [AFM_images_assembled,metaData] = A2_sortAndAssemblySections(allData,otherParameters,flag_processSingleSection,modeScan);             
+        [AFM_images_assembled,metaData] = A2_sortAndAssemblySections(allData,otherParameters,flag_processSingleSection);             
         % in case of no single section processing, now process the assembled image
         if ~flag_processSingleSection
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -200,16 +203,18 @@ function varargout=A2_0_main_processAFMdata(allData,otherParameters,mainPath,Sav
             'imageType','Assembled','Normalization',norm,'postProcessed',true)
         % show and save fig for better visual (height and force)
         lengthAxis=[metaData.x_scan_length_m,metaData.y_scan_length_m];
-        height_final=AFM_images_final(strcmp([AFM_images_final.Channel_name],"Height (measured)")).AFM_images_2_PostProcessed;
+        height_final=AFM_images_final(strcmp([AFM_images_final.Channel_name],"Height (measured)")).AFM_images_2_PostProcessed;       
+        waitfor(warndlg(sprintf("The next step is only for creating a better visual of the HEIGHT IMAGE through the percentile range selection.\nNOTE: Original data is not altered.")))
         [pValues,height_finalVisual] = percentileClipSlider(idxMon,height_final*1e9, ...
-                "Original Image", "Image within selected percentile data", "Height (nm)", lengthAxis,'pLowMax',50, 'pHighMin', 50);       
-        showData(idxMon,false,height_finalVisual,sprintf("Height Image - Data Shown %.2g-%.2g Percentile",pValues),SaveFigFolder,"resultA2_6_HeightBetterVisual",'labelBar',"Height (nm)","lenghtAxis",lengthAxis);
+                "Original Image", "Image within selected percentile data", "Height (nm)", lengthAxis,'pLowMax',50, 'pHighMin', 50,"Contrast",true);  
+        showData(idxMon,false,height_finalVisual,sprintf("Height Image - Contrast %.2f-%.2f Percentile",pValues),SaveFigFolder,"resultA2_1_Z_HeightBetterVisual",'labelBar',"Height (nm)","lenghtAxis",lengthAxis);              
         force_final=AFM_images_final(strcmp([AFM_images_final.Channel_name],"Lateral Force") & strcmp([AFM_images_final.Trace_type],"MaxPixelValue")).AFM_images_2_PostProcessed;
-        [pValues,force_finalVisual] = percentileClipSlider(idxMon,force_final*1e9, ...
-                "Original Image", "Image within selected percentile data", "Force (nN)", lengthAxis,'pLowMax',50, 'pHighMin', 50);       
-        showData(idxMon,false,force_finalVisual,sprintf("Force (maxPixValue) Image - Data Shown %.2g-%.2g Percentile",pValues),SaveFigFolder,"resultA2_7_ForceBetterVisual",'labelBar',"Force (nN)","lenghtAxis",lengthAxis);
+        waitfor(warndlg(sprintf("The next step is only for creating a better visual of the LATERAL FORCE IMAGE (AVG) through the percentile range selection.\nNOTE: Original data is not altered.")))
+        [pValues,force_finalVisual] = percentileClipSlider(idxMon,force_final, ...
+                "Original Image", "Image within selected percentile data", "Force (nN)", lengthAxis,'pLowMax',50, 'pHighMin', 50,"Contrast",true);       
+        showData(idxMon,false,force_finalVisual,sprintf("Force (AVG) Image - Data Shown %.2f-%.2f Percentile",pValues),SaveFigFolder,"resultA2_6_Z_ForceBetterVisual",'labelBar',"Force (nN)","lenghtAxis",lengthAxis);
     else
-        % in case of single file
+        % in case of single file (TO BE COMPLETED!)
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%%%%%%% HEIGHT PROCESSING %%%%%%%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -221,9 +226,7 @@ function varargout=A2_0_main_processAFMdata(allData,otherParameters,mainPath,Sav
             dataPreProcess=allData.AFMImage_Raw;
             metaDataPreProcess=allData.metadata;                                
             [AFMdata_postHeightFit,AFM_height_IO]=A2_feature_1_processHeightChannel(dataPreProcess,idxMon,SaveFigFolder,modeScan,'imageType','Entire','metadata',metaDataPreProcess,'SeeMe',false);                            
-            save(fullfile(pathfile,"heightChannelProcessed.mat" + ...
-                "" + ...
-                "                "),"AFMdata_postHeightFit","AFM_height_IO","metaDataPreProcess")                
+            save(fullfile(pathfile,"heightChannelProcessed.mat"),"AFMdata_postHeightFit","AFM_height_IO","metaDataPreProcess")                
         end
         % in case of frictionScan, stop here the processing. No needed the lateral processing for friction scans
         if modeScan==2 

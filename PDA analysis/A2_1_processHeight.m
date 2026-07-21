@@ -497,6 +497,7 @@ function varargout=A2_1_processHeight(data,idxMon,SaveFigFolder,modeScan,varargi
                 varargout{4}=metadata;
                 varargout{5}=offset_HVon_HVoff;
             end
+            close all
             break
         else
             iterationMain=iterationMain+1;
