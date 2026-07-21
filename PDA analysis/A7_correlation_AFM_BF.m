@@ -85,6 +85,7 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
     idx_LD_tr = strcmp([AFM_data.Channel_name],'Lateral Force Trace');
     idx_LD_rt = strcmp([AFM_data.Channel_name],'Lateral Force Retrace');
     idx_LD_mV = strcmp([AFM_data.Channel_name],'Lateral Force MaxPixelValue');
+    idx_LD_avg = strcmp([AFM_data.Channel_name],'Lateral Force Average');
     idx_H = strcmp([AFM_data.Channel_name],'Height');
     idx_VD =  strcmp([AFM_data.Channel_name],'Vertical Force');
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -108,6 +109,8 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
     mask_validValues= ~isnan(AFM_data(idx_LD_rt).finalData);
     mask_AFM = mask_AFM & mask_validValues;
     mask_validValues= ~isnan(AFM_data(idx_LD_mV).finalData);
+    mask_AFM = mask_AFM & mask_validValues;
+    mask_validValues= ~isnan(AFM_data(idx_LD_avg).finalData);
     mask_AFM = mask_AFM & mask_validValues;
     
     
@@ -164,7 +167,7 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
         end
     end
     %%% the next mask filtering is only for normal AFM scans. In case of heated samples, setpoint limit is meaningless.
-    idx=idx_H |idx_LD_tr | idx_LD_rt | idx_VD | idx_LD_mV;
+    idx=idx_H |idx_LD_tr | idx_LD_rt | idx_VD | idx_LD_mV | idx_LD_avg;
     if ~flag_heat
         % obtain the mask from each channel and ignore:
         %   - negative and zeros values
@@ -317,7 +320,7 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
 
         if ~flag_heat
             % 9 - LATERAL DEFLECTION Vs FLUORESCENCE INCREASE
-            % RETRACE
+            % TRACE
             tmp=struct();
             disp("Processing Correlation Lateral Force Trace VS Fluorescence")
             for i = 1:size(maskFields,1)
@@ -341,7 +344,7 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
                 tmp.(['LD_FLUO_' maskFields{i,4}]) =        A6_feature_corrForceFluorescence(x,y1,idxMon,folderResultsImg,'NumberOfBins',2000, ...
                     'xpar',1,'XAxL','Lateral Force (nN)','ypar',1,'YAyL',labelBar,'FigTitle',titleP,'FigFilename',figName,'NumFig',4);            
             end
-            dataResultsPlot.LD_FLUO_tr=tmp;
+            dataResultsPlot.LD_FLUO_rt=tmp;
 
             % MaxPixelValue
             tmp=struct();
@@ -352,9 +355,22 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
                 titleP = sprintf('Lateral Force MaxPixelValue Vs Fluorescence (%s - time exp %s ms)', maskFields{i,3}, timeExp); 
                 figName = sprintf('LD_Fluo_mV_%s', maskFields{i,4});
                 tmp.(['LD_FLUO_' maskFields{i,4}]) =        A6_feature_corrForceFluorescence(x,y1,idxMon,folderResultsImg,'NumberOfBins',2000, ...
-                    'xpar',1,'XAxL','Lateral Force (nN)','ypar',1,'YAyL',labelBar,'FigTitle',titleP,'FigFilename',figName,'NumFig',4);            
+                    'xpar',1,'XAxL','Lateral Force (nN)','ypar',1,'YAyL',labelBar,'FigTitle',titleP,'FigFilename',figName,'NumFig',5);            
             end
-            dataResultsPlot.LD_FLUO_tr=tmp;
+            dataResultsPlot.LD_FLUO_maxPixelV=tmp;
+
+            % AVG
+            tmp=struct();
+            disp("Processing Correlation Lateral Force Average VS Fluorescence")
+            for i = 1:size(maskFields,1)
+                x = AFM_data(idx_LD_avg).(maskFields{i,1})(:);
+                y1 = DeltaData.(maskFields{i,2})(:); 
+                titleP = sprintf('Lateral Force Average Vs Fluorescence (%s - time exp %s ms)', maskFields{i,3}, timeExp); 
+                figName = sprintf('LD_Fluo_mV_%s', maskFields{i,4});
+                tmp.(['LD_FLUO_' maskFields{i,4}]) =        A6_feature_corrForceFluorescence(x,y1,idxMon,folderResultsImg,'NumberOfBins',2000, ...
+                    'xpar',1,'XAxL','Lateral Force (nN)','ypar',1,'YAyL',labelBar,'FigTitle',titleP,'FigFilename',figName,'NumFig',6);            
+            end
+            dataResultsPlot.LD_FLUO_avg=tmp;
            
             % 10 - VERTICAL FORCE VS FLUORESCENCE INCREASE
             tmp=struct();
@@ -365,7 +381,7 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
                 titleP = sprintf('Vertical Force Vs Fluorescence (%s - time exp %s ms)', maskFields{i,3}, timeExp); 
                 figName = sprintf('VD_Fluo_%s', maskFields{i,4});
                 tmp.(['VD_FLUO_' maskFields{i,4}]) =        A6_feature_corrForceFluorescence(x,y1,idxMon,folderResultsImg,'setpoints',setpoints, ...
-                    'xpar',1,'XAxL','Vertical Force (nN)','ypar',1,'YAyL',labelBar,'FigTitle',titleP,'FigFilename',figName,'NumFig',5);            
+                    'xpar',1,'XAxL','Vertical Force (nN)','ypar',1,'YAyL',labelBar,'FigTitle',titleP,'FigFilename',figName,'NumFig',7);            
             end
             dataResultsPlot.VD_FLUO=tmp;
         end
@@ -380,7 +396,7 @@ function dataResultsPlot=A7_correlation_AFM_BF(AFM_data,AFM_IO,BF_IO,metadataAFM
             titleP = sprintf('Vertical Force VS Lateral Force (%s)', maskFields{i,3});
             figName = sprintf('VD_LD_%s', maskFields{i,4});
             tmp.(['VD_LD_' maskFields{i,4}]) = A6_feature_corrForceFluorescence(x,y,idxMon,folderResultsImg,'setpoints',setpoints, ...
-                'xpar',1,'XAxL','Vertical Force (nN)','ypar',1,'YAyL','Lateral Force (nN)','FigTitle',titleP,'FigFilename',figName,'NumFig',6);
+                'xpar',1,'XAxL','Vertical Force (nN)','ypar',1,'YAyL','Lateral Force (nN)','FigTitle',titleP,'FigFilename',figName,'NumFig',8);
         end
         dataResultsPlot.VD_LD=tmp;
     end    
