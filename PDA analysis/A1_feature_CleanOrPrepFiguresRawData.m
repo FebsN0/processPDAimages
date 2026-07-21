@@ -100,7 +100,12 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
             allTitles{5}=sprintf('Lateral Force MaxPixelValue PostProcessed (%s - %s)',textTypeData,imageType);
             allNameFig{5}=sprintf('resultA%s_5_%s_LatForcePostProcessed_%s',stepProcess,textTypeData,imageType);
             allLabelBar{5}='Force [nN]';
-            factor=[1e9,1,1,1,1,1,1];
+            % take force average channel
+            blockAllData{6}=data(strcmp([data.Channel_name],'Lateral Force') & strcmp([data.Trace_type],'Average')).(fieldToUse);
+            allTitles{6}=sprintf('Lateral Force Average PostProcessed (%s - %s)',textTypeData,imageType);
+            allNameFig{6}=sprintf('resultA%s_6_%s_LatForcePostProcessed_%s',stepProcess,textTypeData,imageType);
+            allLabelBar{6}='Force [nN]';
+            factor=[1e9,1,1,1,1,1,1,1];
         else
             fieldToUse='AFM_images_1_original';                        
             data_Height=    data(strcmp([data.Channel_name],'Height (measured)')).(fieldToUse);            
@@ -258,10 +263,10 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
                 xlabel(sprintf('Feature height [nm]'),'FontSize',15), ylabel('Percentage %','FontSize',15), grid minor, grid on
                 title("Distribution PostProcessed Height",'FontSize',20)
                 objInSecondMonitor(f_heightDistribution,idxMon);     
-                saveFigures_FigAndTiff(f_heightDistribution,folderSaveFig,'resultA2_9_OptHeightDistribution_FR_BK')
+                saveFigures_FigAndTiff(f_heightDistribution,folderSaveFig,'resultA2_8_OptHeightDistribution_FR_BK')
                 % Since now there is the assembled mask
                 titleData='Final Binary AFM IO Image';
-                nameFig='resultA2_8_finalMask';
+                nameFig='resultA2_7_finalMask';
                 showData(idxMon,SeeMe,AFM_height_IO,titleData,folderSaveFig,nameFig,'binary',true);                
 
                 % DISTRIBUTION OF FORCE AFTER CLEARING
@@ -320,7 +325,7 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
                     end
                 end
                 objInSecondMonitor(figForceDist,idxMon)
-                nameFig="resultA2_10_LateralForce_KDEcomparisons";
+                nameFig="resultA2_9_LateralForce_KDEcomparisons";
                 saveFigures_FigAndTiff(figForceDist,folderSaveFig,nameFig)
             end
         end

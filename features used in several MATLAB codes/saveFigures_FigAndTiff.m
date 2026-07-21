@@ -9,20 +9,23 @@ function saveFigures_FigAndTiff(fig,nameDir,nameFig,varargin)
     if ~exist(fullfile(nameDir,"figImages"),"dir")
         mkdir(fullfile(nameDir,"figImages"))
     end
+    % eventually convert : into _
+    nameFig = strrep(nameFig, ':', '_');
     fullnameTif=fullfile(nameDir,"tiffImages",nameFig+".tif");
     fullnameFig=fullfile(nameDir,"figImages",nameFig+".fig");
     % --- Save only the content of the axes ---
     if isMatlabDarkMode()
         forceLightTheme(fig);
     end
-    pause(2)
+    pause(1)
     % remove interactive icons on the axis
     ax_all = findall(fig, 'Type', 'axes');
     for k = 1:numel(ax_all)
         axtoolbar(ax_all(k),'visible','off');
     end    
+    pause(.5)
     exportgraphics(fig,fullnameTif,'Resolution',300,'ContentType','image','Padding', 100);
-    pause(2)
+    pause(1)
     saveas(fig,fullnameFig)
     if p.Results.closeImmediately
         close(fig)
@@ -38,6 +41,7 @@ end
 function forceLightTheme(fig)
     % 1) Force figure background
     set(fig, 'Color', 'white');
+    pause(1)
     % 2) Force axes appearance (background + ticks)
     ax = findall(fig, 'Type', 'axes');
     for k = 1:numel(ax)
@@ -52,13 +56,15 @@ function forceLightTheme(fig)
         ax(k).XLabel.Color = 'black';
         ax(k).YLabel.Color = 'black';
         ax(k).ZLabel.Color = 'black';
-    end    
+    end 
+    pause(1)
     % 3) Force **legend** text to black
     lgd = findall(fig, 'Type', 'legend');
     for k = 1:numel(lgd)
         lgd(k).TextColor = 'black';
         lgd(k).Color     = 'white';   % Legend box background
     end
+    pause(.5)
     % 4) Force **colorbar** labels to black 
     cb = findall(fig, 'Type', 'colorbar');
     for k = 1:numel(cb)
@@ -77,4 +83,5 @@ function forceLightTheme(fig)
             [sg.Color] = deal('black');
         end
     end
+    pause(.5)
 end
