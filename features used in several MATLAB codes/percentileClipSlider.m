@@ -28,9 +28,12 @@ function varargout = percentileClipSlider(idxMon,data,titleOrig,titleTemplateCle
     addParameter(p, 'pLowInit',  1, @(x) isnumeric(x) && isscalar(x));
     addParameter(p, 'pLowMin',   0, @(x) isnumeric(x) && isscalar(x));
     addParameter(p, 'pLowMax',   5, @(x) isnumeric(x) && isscalar(x));
+    addParameter(p, 'Contrast', false, @(x) islogical(x) && isscalar(x));  
     parse(p,varargin{:});
     pHighInit = p.Results.pHighInit;    pHighMin = p.Results.pHighMin;      pHighMax = p.Results.pHighMax;
     pLowInit = p.Results.pLowInit;  pLowMin = p.Results.pLowMin;    pLowMax = p.Results.pLowMax;
+    contrastMode = p.Results.Contrast;                                      
+
     % --- UI Figure
     fig = uifigure('Name','Percentile clip (interactive)');
     objInSecondMonitor(fig, idxMon);
@@ -82,7 +85,7 @@ function varargout = percentileClipSlider(idxMon,data,titleOrig,titleTemplateCle
 
     % --- initial render
     localShowUI(ax1, data, titleOrig, labelBar, AxisLength);
-    [pLowNow, pHighNow,thLow,thHigh,dataNow] = localClip2Sided(data, pLowInit, pHighInit);
+    [pLowNow, pHighNow,thLow,thHigh,dataNow] = localClip2Sided(data, pLowInit, pHighInit, contrastMode);  % <-- pass mode
     h2 = localShowUI(ax2, dataNow, sprintf(titleTemplateClean,pLowNow, pHighNow), labelBar, AxisLength);
     
     % --- shared state
@@ -104,7 +107,7 @@ function varargout = percentileClipSlider(idxMon,data,titleOrig,titleTemplateCle
 
 % ---------------- nested callbacks ----------------
     function onAnySlide(pLowVal, pHighVal)
-        [pL, pH,thLow,thHigh,dataClean] = localClip2Sided(data, pLowVal, pHighVal);
+        [pL, pH,thLow,thHigh,dataClean] = localClip2Sided(data, pLowVal, pHighVal, contrastMode);  % <-- pass mode
         lblLow.Text  = sprintf('Low clip p = %.2f',  pL);
         lblHigh.Text = sprintf('High clip p = %.2f', pH);
         h2.CData = dataClean;
@@ -117,7 +120,7 @@ function varargout = percentileClipSlider(idxMon,data,titleOrig,titleTemplateCle
 
     function doAccept()
         pChosen = [sldLow.Value sldHigh.Value];        
-        [~, ~,thLow,thHigh,dataClean] = localClip2Sided(data, pChosen(1), pChosen(2));
+        [~, ~,thLow,thHigh,dataClean] = localClip2Sided(data, pChosen(1), pChosen(2), contrastMode);  % <-- pass mode
         thValues = [thLow,thHigh];
         varargout{1}=pChosen;        
         varargout{2}=dataClean;
@@ -145,7 +148,7 @@ function h = localShowUI(ax, data, ttl, labelBar, AxisLength)
     axis(ax,'equal'); xlim(ax,'tight'); ylim(ax,'tight');   
 end
 
-function [pLowUse,pHighUse,thLow,thHigh,dataClipped] = localClip2Sided(data, pLowUse, pHighUse)
+function [pLowUse,pHighUse,thLow,thHigh,dataClipped] = localClip2Sided(data, pLowUse, pHighUse, contrastMode)
     % Enforce ordering (avoid invalid states)
     if pLowUse > pHighUse
         tmp = pLowUse; pLowUse = pHighUse; pHighUse = tmp;
@@ -153,13 +156,21 @@ function [pLowUse,pHighUse,thLow,thHigh,dataClipped] = localClip2Sided(data, pLo
     v = data(:); v = v(~isnan(v));
     if isempty(v)
         dataClipped = data;
+        thLow = NaN; thHigh = NaN;
         return;
     end
     thLow  = prctile(v, pLowUse);
     thHigh = prctile(v, pHighUse);
     dataClipped = data;
-    dataClipped(dataClipped < thLow)  = NaN;
-    dataClipped(dataClipped > thHigh) = NaN;
+    if contrastMode
+        % Saturate: keep numeric values, just clamp to threshold
+        dataClipped(dataClipped < thLow)  = thLow;
+        dataClipped(dataClipped > thHigh) = thHigh;
+    else
+        % Original behavior: mask out-of-range values
+        dataClipped(dataClipped < thLow)  = NaN;
+        dataClipped(dataClipped > thHigh) = NaN;
+    end
 end
 
 function [x,y] = localAxisVectors(data, AxisLength)

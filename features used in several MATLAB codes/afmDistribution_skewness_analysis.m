@@ -103,7 +103,7 @@ function resStatistics=afmDistribution_skewness_analysis(trace,retrace,saveFigPa
     % ── Panel 1: KDE overlay ─────────────────────────────────────────────────
     ax1 = nexttile;
     hold(ax1, 'on');     
-    [f_tr, xi_tr] = ksdensity(trace);
+    [f_tr, xi_tr] = ksdensity(trace); % data-#points
     [f_rt, xi_rt] = ksdensity(retrace);     
     % Also show reflected retrace for visual mirror check
     [f_mirror, xi_mirror] = ksdensity(retrace_mirror);     
