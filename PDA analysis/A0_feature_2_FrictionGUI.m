@@ -15,12 +15,12 @@
 %   method 3 (development) INPUT: background ONLY ==>  simplest method
 %
 % INPUT:    - vertForce : vertical forces (mean trace-retrace)
-%           - force     : lateral forces
+%           - force     : lateral forces (masked)
 %           - idxSection: indexes of the sections (matrix). (1,i) = startIdx, (2,i) = endIdx
 %           - filePathResultsFriction : folder where to save plots and results
 % OUTPUT:   - results
 
-function results = featureFrictionCalc2_FrictionGUI(vertForce,force,mask,idxSection,idxMon,filePathResultsFriction)
+function results = A0_feature_2_FrictionGUI(vertForce,force,mask,idxSection,idxMon,filePathResultsFriction)
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)    
     % Default values
@@ -95,7 +95,6 @@ function results = featureFrictionCalc2_FrictionGUI(vertForce,force,mask,idxSect
     % ==== AXES FOR RESULT PLOT ====
     hAx_plot = axes('Parent',hFig,'Units','normalized', ...
                'Position',[0.4 0.10 0.55 0.8]);
-    
     title(hAx_plot,'Resulting Lateral Forces will appear here');
 
     % ==== AXES FOR PIXEL TREND ====
@@ -309,13 +308,13 @@ function results = featureFrictionCalc2_FrictionGUI(vertForce,force,mask,idxSect
     origEnable = get(allUI,'Enable');
     % Disable all controls
     set(allUI,'Enable','off');
-       
-    fileName="resultA3_friction_4_resultingLateralForce";
+    
+    fileName=sprintf("result_friction_1_resultingLateralForce_method%d_%s_%s",method,segmentType_text,outlierRemovalMethod_text);
     exportAndSaveAxes(hAx_plot,idxMon,filePathResultsFriction,fileName)
-    fileName="resultA3_friction_5_fit_exp_curves_PLots";
+    fileName=sprintf("result_friction_2_fit_exp_curves_PLots_method%d_%s_%s",method,segmentType_text,outlierRemovalMethod_text);
     exportAndSaveAxes(hAx_fitResults,idxMon,filePathResultsFriction,fileName)
     if ~strcmp(results.method,"1")
-        fileName="resultA3_friction_6_pixReductionTrend";
+        fileName=sprintf("result_friction_3_pixReductionTrend_method%d_%s_%s",method,segmentType_text,outlierRemovalMethod_text);
         exportAndSaveAxes(hAx_pixTrend,idxMon,filePathResultsFriction,fileName)
     end
     close(hFig);
@@ -439,6 +438,8 @@ function plotFitResults(resultsMethod,idxSection,ax)
 % NOTE: not inside method1 function because it needs the axis where to show the fitting curve                    
     % clear old plot
     cla(ax)
+    ax.Color = [1 1 1];              % axes background    
+    ax.GridColor = [0.8 0.8 0.8];    % light grid
     % separate the data into sections using idxSection
     numSections=size(idxSection,2);
     LF_sections_avg=zeros(1,numSections);
@@ -453,8 +454,9 @@ function plotFitResults(resultsMethod,idxSection,ax)
         resultsMethod.method, ...
         resultsMethod.resFit.fc, ...
         stats(1),stats(2),stats(3)*100); % relScatter, k, inliers in percentage
-    legend(ax), xlabel(ax,'Vertical Forces [nN]','FontSize',12), ylabel(ax,'Lateral Forces [nN]','FontSize',12)
+    xlabel(ax,'Vertical Forces [nN]','FontSize',12), ylabel(ax,'Lateral Forces [nN]','FontSize',12)
     title(ax,titleAX,'FontSize',14)
+    grid(ax,"on")
     for i=1:numSections
         startIdx=idxSection(1,i);
         lastIdx=idxSection(2,i);
@@ -467,7 +469,7 @@ function plotFitResults(resultsMethod,idxSection,ax)
         LF_sections_std(i)=std(LF_section,"omitnan");
         VF_sections_avg(i)=mean(VF_section,"omitnan");
         VF_sections_std(i)=std(VF_section,"omitnan");
-    end
+    end    
     if numSections==1
         % in case of single section, show better the x axis
         xlim(ax,[VF_sections_avg-VF_sections_avg*1/100, VF_sections_avg+VF_sections_avg*1/100])
@@ -481,8 +483,8 @@ function plotFitResults(resultsMethod,idxSection,ax)
     VF_sections_avg=flip(VF_sections_avg);
     VF_sections_std=flip(VF_sections_std);
     errorbar(ax,VF_sections_avg,LF_sections_avg,LF_sections_std,"-s",...
-        'Linewidth',1.3,'capsize',15,'Color',globalColor(2),...
-        'markerFaceColor',globalColor(2),'markerEdgeColor',globalColor(2),'MarkerSize',10,...
+        'Linewidth',1.3,'capsize',15,'Color','k',...
+        'markerFaceColor','k','markerEdgeColor','k','MarkerSize',10,...
         'DisplayName','Mean-Std LatForce');
     if numSections>1
         slope=resultsMethod.resFit.fc;
@@ -492,7 +494,8 @@ function plotFitResults(resultsMethod,idxSection,ax)
         yfit=xfit*slope+offset;
         plot(ax,xfit, yfit, '-.','color',globalColor(1),'DisplayName','Fitted curve','LineWidth',2);    
     end
-    hold(ax,"off")    
+    hold(ax,"off")  
+    legend(ax,'FontSize',12,'Location','best',Color='white',TextColor='black')
 end
 
 function exportAndSaveAxes(hAx_plot,idxMon,dirName,fileName)
@@ -530,23 +533,12 @@ function exportAndSaveAxes(hAx_plot,idxMon,dirName,fileName)
         end
     end
     if ~isempty(lgdOld)
-        labelsOld = lgdOld.String;   
-        % Important: PlotChildren is commonly reverse of displayed legend order
-        plotsOld  = flipud(lgdOld.PlotChildren);  
-        % Map old plot handles -> new copied handles
-        [tf, idx] = ismember(plotsOld, hOldChildren);
-        plotsNew  = hNewChildren(idx(tf));
-        labelsNew = labelsOld(tf);    
-        if ~isempty(plotsNew)
-            lgdNew = legend(axNew, plotsNew, labelsNew, ...
-                'Location', lgdOld.Location,'FontSize',20);   
-            % preserve some appearance settings
-            lgdNew.FontSize    = lgdOld.FontSize;
-            lgdNew.Orientation = lgdOld.Orientation;
-            lgdNew.Box         = lgdOld.Box;
-        end
+        legend(axNew,'FontSize',20)     
     end
-
+    % ---- GRID (axes-specific) ----
+    if hAx_plot.XGrid=="on" && hAx_plot.YGrid=="on"
+        grid(axNew,"on")
+    end
 
     % Copy colorbar if present
     cb = hAx_plot.Colorbar;
@@ -561,157 +553,6 @@ function exportAndSaveAxes(hAx_plot,idxMon,dirName,fileName)
     end
     objInSecondMonitor(figNew,idxMon)
     saveFigures_FigAndTiff(figNew,dirName,fileName)
-end
-
-function data_filtered = remove_Edges_Outlier(data,data_mask,pix,segmentProcess,outlierRemovalMethod) 
-%%%%%%%% OUTLIER REMOVAL FOR THE GIVEN FAST SCAN LINE %%%%%%%%
-% Delete edges data by searching non-zero data area (segmentLineDataFilt) and put NaN in both edges of the segment
-% INPUT:    - data: if segmentProcess=1/2, single fast scan line. If segmentProcess=3, section (matrix)
-%           - data_mask: since the data has been previously cleared, there may be areas that can be confused as edges.
-%                        Therefore, instead of using directly the data, use the mask to identify the 0/1 changes as true BK/FR changes, therefore, true edges
-%           - pix: number of pixels to be removed at both edges of a segment.
-%           - segmentProcess: mode of outlier removal:
-%               0: No outlier removal.
-%               1: Apply outlier removal to each segment after pixel reduction.
-%               2: Apply outlier removal to one large connected segment after pixel reduction.
-% OUTPUT:   - line_filtered : line without edges and outliers.
-%                             Note: the output/filtered line has same size as the input line
-% for each element:
-%   1) if ~= 0 ==> DETECTION NEW SEGMENT 
-%           ==> update StartPos
-%           ==> find the end of the segment (first zero value)
-%           ==> build the segment and remove outliers
-%           ==> skip to end+1 element which is zero and detect a new segment
-%   2) if == 0 ==> nothing happens, skip to next iteration    
-
-% check the type of the provided data
-    if ((segmentProcess==1 || segmentProcess==2) && ~isvector(data)) || (segmentProcess==3 && isvector(data))
-        error("The type of the data does not match with the type of segment")
-    end
-
-    
-    % trasform the section into vector
-    if ismatrix(data)
-        data_vector=reshape(data,[],1);
-        mask_vector=reshape(data_mask,[],1);
-        % track the border of each fast scan line so also the borders will be subjected to removal
-        idxBorders=1:size(data,1):length(data_vector);
-        idxCurrentFastLine=1;
-    else
-        data_vector=data;
-        mask_vector=data_mask;
-    end
-
-    % init
-    SegPosList_StartPos = [];
-    SegPosList_EndPos = [];
-    ConnectedSegment = [];
-    Cnt = 1;
-    data_filtered_vector = data_vector;
-    processSingleSegment=true; i=1;
-    while processSingleSegment
-    % DETECTION NEW SEGMENT AS BACKGROUND
-        if mask_vector(i) == 0
-            StartPos = i;   
-            % find the idx of the only first zero element from startpos idx. Then the result is the idx of the nonzero
-            % element just before the previously found idx of zero element
-            EndPos=StartPos+find(mask_vector(StartPos:end)==1,1)-2;
-            % the previous operation will return NaN when the last element is non-zero, thus manage it
-            if isempty(EndPos)
-                EndPos=length(mask_vector);
-                processSingleSegment=false;                
-            end
-            % in case of section, to avoid that the right border of i-th line is merged with the left border of i+1-th line and interpreted as segment,
-            % additional check. If so, treat them separately as two segment
-            if segmentProcess==3 && idxCurrentFastLine<=length(idxBorders)
-                if StartPos<idxBorders(idxCurrentFastLine) && EndPos>idxBorders(idxCurrentFastLine)
-                    EndPos=idxBorders(idxCurrentFastLine)-1;
-                elseif any(StartPos==idxBorders)
-                    idxCurrentFastLine=idxCurrentFastLine+1;
-                end
-            end            
-            % Extract the segment from the data (note: it is BACKGROUND data)
-            Segment = data_vector(StartPos:EndPos);
-            % if the length of segment is less than 4, it is very likely to be a random artefact. 
-            % Also, not really realiable when filloutliers is used because few sample
-            % remove such values and put 0
-            if length(Segment)<4
-                data_filtered_vector(StartPos:EndPos) = nan;
-            else
-                % save the indexes of start and end segment
-                SegPosList_StartPos(Cnt) = StartPos;                    %#ok<AGROW>
-                SegPosList_EndPos(Cnt) = EndPos;                        %#ok<AGROW>
-                Cnt = Cnt + 1;
-                % if first iteration, do nothing and use as reference
-                if pix > 0
-                    % if the half-segment is longer than pix window, then reset first and last part with size = pix
-                    % in order to remove edges in both sides (the tip encounters the edges of a single PDA crystal 
-                    % twice: trace and in retrace)
-                    if ceil(length(Segment)/2) >=pix
-                        Segment(1:pix) = nan;                
-                        Segment(end-pix+1:end) = nan;
-                    else
-                    % if the segment is shorter, then reset entire segment
-                        Segment(:) = nan;
-                    end
-                end                
-                % PROCESS THE SEGMENT IN ONE OF THREE POSSIBLE WAYS (Detect and replace outliers in data with NaN) 
-                % way 1: do nothing. Dont remove outliers. They may be already removed by pixel reduction.
-                % way 2: Median findmethod is default: Outliers are defined as elements more than three scaled MAD from the median (robust
-                % when there are lot of data, but sometime aggressive and not suitable when BK contains "more" type of BK
-                % way 3; remove 99 percentile (NOTE: since single segments already contains few elements, no good to use percentile threshold method)
-                if segmentProcess == 1
-                    if outlierRemovalMethod == 2
-                        Segment = filloutliers(Segment,nan,'percentiles',[0 99]);
-                    elseif outlierRemovalMethod == 3
-                        Segment = filloutliers(Segment,nan);
-                    end
-                    data_filtered_vector(StartPos:EndPos) = Segment;
-                else
-                % method 2 or 3: attach the current segment to the previous found one to build a single large connected segment
-                    ConnectedSegment = [ConnectedSegment; Segment];          %#ok<AGROW>
-                end   
-            end
-            % skip to find the next segment
-            i=EndPos+1;
-        else
-            % if the last element=1, break the while loop 
-            if i>=length(mask_vector)
-                break
-            end    
-            % if the element=1 (FR), do nothing and move to the next element           
-            if segmentProcess==3 && (any(i==(idxBorders)))
-                idxCurrentFastLine=idxCurrentFastLine+1;
-            end
-            i=i+1;
-        end
-    end
-    % Process one large connected segment. Note that if mode = 2 or 3, connected segment lacks of resetted edges of the previous part.
-    % Here, ConnectedSegment is just the concatenation of each nonFiltered segments previously found.
-    % in this way, the function filloutliers has more data to process so the result should be more consistent. Mehtod of finding outliers is
-    % with percentile threshold. Exclude 99 Percentile
-    if segmentProcess == 2 || segmentProcess == 3
-        if outlierRemovalMethod==2
-            ConnectedSegment = filloutliers(ConnectedSegment, nan,'percentiles',[0 99]);
-        elseif outlierRemovalMethod==3
-            ConnectedSegment = filloutliers(ConnectedSegment, nan);
-        end
-        % substitute the pieces of connectedSegment with the corresponding part of original fast scan line
-        Cnt2 = 1;
-        for i=1:length(SegPosList_StartPos)
-            % coincide with the number of elements of original segment
-            Len = SegPosList_EndPos(i) - SegPosList_StartPos(i) +1;
-            data_filtered_vector(SegPosList_StartPos(i):SegPosList_EndPos(i)) = ConnectedSegment(Cnt2:Cnt2+Len-1);
-            % start with the next segment
-            Cnt2 = Cnt2 + Len;  
-        end
-    end
-    % in case of section data, restore the size
-    if ismatrix(data)
-        data_filtered=reshape(data_filtered_vector,size(data));
-    else
-        data_filtered=data_filtered_vector;
-    end
 end
 
 %%%------- METHOD 1 -------%%%

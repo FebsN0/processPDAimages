@@ -75,7 +75,7 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
         allLabelBar={sprintf('Height [nm]')};
         if flagPostProcessed    
             fieldToUse="AFM_images_2_PostProcessed";
-            blockAllData=cell(1,5); % height + vertForce_avg + LF_tr + LF_rt + LF_maxPixel
+            blockAllData=cell(1,6); % height + vertForce_avg + LF_tr + LF_rt + LF_maxPixel
             AFM_height_IO=data(strcmp([data.Channel_name],'Height (measured)')).AFMmask_heightIO;
             % take height channel
             data_Height=data(strcmp([data.Channel_name],'Height (measured)')).(fieldToUse);
@@ -277,6 +277,9 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
                 force_masked_retrace(~AFM_height_IO)=nan;
                 force_masked_maxPixelValue=blockAllData{5};
                 force_masked_maxPixelValue(~AFM_height_IO)=nan;
+                force_masked_avg=blockAllData{6};
+                force_masked_avg(~AFM_height_IO)=nan;
+                
                 % adjust xlim
                 allDataHistog=[blockAllData{3}(:);blockAllData{4}(:)];
                 pLow = prctile(allDataHistog, .5);
@@ -290,31 +293,39 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
                         vect_f_tr=blockAllData{3}(:);
                         vect_f_rt=blockAllData{4}(:);  
                         vect_f_maxV=blockAllData{5}(:);
+                        vect_f_avg=blockAllData{6}(:);
                     else           
                         % exclude nan
                         vect_f_tr=force_masked_trace(:);
                         vect_f_rt=force_masked_retrace(:);
                         vect_f_maxV=force_masked_maxPixelValue(:);
+                        vect_f_avg=force_masked_avg(:);
                     end
                     vect_f_tr=vect_f_tr(~isnan(vect_f_tr));
                     vect_f_rt=vect_f_rt(~isnan(vect_f_rt));   
                     vect_f_maxV=vect_f_maxV(~isnan(vect_f_maxV));
+                    vect_f_avg=vect_f_avg(~isnan(vect_f_avg));
                     [f_tr, xi_tr] = ksdensity(vect_f_tr);
                     [f_rt, xi_rt] = ksdensity(vect_f_rt); 
                     [f_mV, xi_mV] = ksdensity(vect_f_maxV); 
+                    [f_avg, xi_avg] = ksdensity(vect_f_avg);
                     fill_between(ax, xi_tr, f_tr, globalColor(1), 0.25);     
                     fill_between(ax, xi_rt, f_rt, globalColor(2), 0.25);
-                    fill_between(ax, xi_mV, f_mV, globalColor(3), 0.25); 
+                    fill_between(ax, xi_mV, f_mV, globalColor(4), 0.25); 
+                    fill_between(ax, xi_avg, f_avg, globalColor(5), 0.25); 
                     plot(ax, xi_tr,     f_tr,    '-', 'Color', globalColor(1), 'LineWidth', 2.0, 'DisplayName', 'Force-Trace');
                     plot(ax, xi_rt,     f_rt,    '-', 'Color', globalColor(2), 'LineWidth', 2.0, 'DisplayName', 'Force-ReTrace');
-                    plot(ax, xi_mV,     f_mV,    '--', 'Color', globalColor(3), 'LineWidth', 1.0, 'DisplayName', 'Force-ReTrace');
+                    plot(ax, xi_mV,     f_mV,    '--', 'Color', globalColor(4), 'LineWidth', 1.0, 'DisplayName', 'Force-maxPixelValue');
+                    plot(ax, xi_avg,     f_avg,    '--', 'Color', globalColor(5), 'LineWidth', 1.0, 'DisplayName', 'Force-average');
                     % Mean/median lines
                     med_tr  = median(vect_f_tr);
                     med_rt  = median(vect_f_rt);
                     med_mV  = median(vect_f_maxV);
+                    med_avg  = median(vect_f_avg);
                     plot(ax, [med_tr  med_tr],  [0 max(f_tr)],  ':', 'Color', globalColor(1), 'LineWidth', 2,'DisplayName',sprintf('Median: %.3g nN',med_tr));
                     plot(ax, [med_rt  med_rt],  [0 max(f_rt)],  ':', 'Color', globalColor(2), 'LineWidth', 2,'DisplayName',sprintf('Median: %.3g nN',med_rt));            
-                    plot(ax, [med_mV  med_mV],  [0 max(f_mV)],  ':', 'Color', globalColor(3), 'LineWidth', 1,'DisplayName',sprintf('Median: %.3g nN',med_mV));            
+                    plot(ax, [med_mV  med_mV],  [0 max(f_mV)],  ':', 'Color', globalColor(4), 'LineWidth', 1,'DisplayName',sprintf('Median: %.3g nN',med_mV));            
+                    plot(ax, [med_avg  med_avg],  [0 max(f_avg)],  ':', 'Color', globalColor(5), 'LineWidth', 1,'DisplayName',sprintf('Median: %.3g nN',med_avg));            
                     legend(ax, 'AutoUpdate','off','EdgeColor',[0.3 0.3 0.3], 'Location','northeast','FontSize',14);
                     xlim(ax, [pLow, pHigh]);
                     xlabel(ax,"Lateral Force (nN)","FontSize",14),ylabel(ax,"KDE","FontSize",14)

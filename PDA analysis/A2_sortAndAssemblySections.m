@@ -60,7 +60,9 @@ function varargout = A2_sortAndAssemblySections(allData,otherParameters,flag_pro
     metaDataAssembled.Baseline_V=arrayfun(@(s) s.metadata.Baseline_V, allDataOrdered);
     metaDataAssembled.Baseline_N=round(arrayfun(@(s) s.metadata.Baseline_N, allDataOrdered),12);
     % in case of processing single sections before assembly, additional field in the data (friction used for each section)
-    if ismember("frictionCoeff_Used",fieldnames(metaDataAssembled))
+    flag_friction=false;
+    if ~contains(metaDataAssembled.frictionCoeff_Used,"No FC calculation")
+        flag_friction=true;
         metaDataAssembled.frictionCoeff_Used=arrayfun(@(s) s.metadata.frictionCoeff_Used, allDataOrdered);
     end
     clear y_scan_lengthAllScans y_OriginAllScans idx    
@@ -84,6 +86,9 @@ function varargout = A2_sortAndAssemblySections(allData,otherParameters,flag_pro
         [dataAssembled.AFM_images_1_original]=deal(zeros(0,1));   
         [dataAssembled.AFM_images_2_PostProcessed]=deal(zeros(0,1));
         [dataAssembled.AFMmask_heightIO]=deal(zeros(0,1));  
+        if flag_friction
+            [dataAssembled.AFM_images_3_ForceBK_Friction]=deal(zeros(0,1));  
+        end
         % in case of already processed single section, the masks of each section are already ready to be assembled. Metadata is required
         % to build a zero matrix with final size
     end            
@@ -101,7 +106,9 @@ function varargout = A2_sortAndAssemblySections(allData,otherParameters,flag_pro
             if th_channel==1
                 concatenatedMask=zeros(xpix_total, ypix_total);
             end
-
+            if flag_friction
+                concatenatedData_AFM_image_friction=zeros(xpix_total, ypix_total);
+            end
         end
         colStart = 1;
         % start the assembly of the i-th channel
@@ -121,6 +128,9 @@ function varargout = A2_sortAndAssemblySections(allData,otherParameters,flag_pro
                 else
                     tmp_post=tmp(th_channel).AFM_images_3_PostLatProcessed_0_entire;
                 end
+                if flag_friction
+                    tmp_friction=allDataOrdered(th_section).AFMImage_ForceBK_Friction;
+                end
             end            
             yLen = metaDataAssembled.y_scan_pixels(2,th_section)-metaDataAssembled.y_scan_pixels(1,th_section)+1;
             colEnd=colStart+yLen-1;
@@ -135,6 +145,9 @@ function varargout = A2_sortAndAssemblySections(allData,otherParameters,flag_pro
                 % manage the mask only once
                 if th_channel==1
                     concatenatedMask(:,colStart:colEnd)=tmp_mask;
+                end
+                if flag_friction && ~isempty(tmp_friction) && nnz(tmp_friction)~=0
+                    concatenatedData_AFM_image_friction(:,colStart:colEnd)=tmp_friction;
                 end
             end
             colStart=colEnd+1;
@@ -152,6 +165,9 @@ function varargout = A2_sortAndAssemblySections(allData,otherParameters,flag_pro
             if th_channel==1
                 dataAssembled(th_channel).AFMmask_heightIO=concatenatedMask;
             end   
+            if flag_friction && strcmp(dataAssembled(th_channel).Channel_name,"Lateral Force") && strcmp(dataAssembled(th_channel).Trace_type,"Average")
+                dataAssembled(th_channel).AFM_images_3_ForceBK_Friction=concatenatedData_AFM_image_friction;
+            end
         end
     end
     varargout{1}=dataAssembled;    

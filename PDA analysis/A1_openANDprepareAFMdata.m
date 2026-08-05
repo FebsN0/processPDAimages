@@ -10,15 +10,13 @@
 %           (2) otherParameters
 %           (3) SaveFigFolder
 
-function varargout = A1_openANDprepareAFMdata(varargin)
-    
-        
+function varargout = A1_openANDprepareAFMdata(varargin)            
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)    
     %init instance of inputParser
     p=inputParser();
     argName = 'filePath';                   defaultVal = '';        addParameter(p,argName,defaultVal, @(x) (ischar(x) || isstring(x)));
-    argName = 'frictionData';               defaultVal = 'No';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'No','Yes'}));
+    argName = 'frictionData';               defaultVal = false;     addParameter(p,argName,defaultVal, @(x) islogical(x));
     % validate and parse the inputs
     parse(p,varargin{:});
     if isempty(p.Results.filePath)
@@ -27,7 +25,7 @@ function varargout = A1_openANDprepareAFMdata(varargin)
         filePath=p.Results.filePath;
     end
     % select the files from the specific experiment, sample and scan
-    if strcmp(p.Results.frictionData,'Yes')
+    if p.Results.frictionData
         [fileNameSections, filePathData] = uigetfile({'*.jpk'},'Select the .jpk AFM image to extract background friction coefficient',filePath,'MultiSelect', 'on');
     else
         [fileNameSections, filePathData] = uigetfile({'*.jpk'},'Select a .jpk AFM image',filePath,'MultiSelect', 'on');       
@@ -47,32 +45,36 @@ function varargout = A1_openANDprepareAFMdata(varargin)
 
     %%% establish the name of >>>> nameSaveFigFolder <<<< to save the useful figures into a directory    
         % adjust name folder depending of which type of data is processing (HVon ==> normal, HVoff ==> friction)
-    if ~strcmp(p.Results.frictionData,'Yes')       
-        nameDir='Results Processing AFM and fluorescence images';    
-        if numFiles>1
-            nameDir=sprintf("%s - Assembled",nameDir);        
+    if p.Results.frictionData
+        nameDir='Results Friction calcs'; 
+    else
+        nameDir='Results Processing AFM and fluorescence images'; 
+    end
+    if numFiles>1
+        nameDir=sprintf("%s - Assembled",nameDir);        
+    else
+        [~,nameDir]=sprintf("%s - %s",nameDir,fileparts(fileNameSections));
+    end    
+
+    % define the entire path of the directory where to save all figures
+    [upperFolder,~,~]=fileparts(fileparts(filePathData));
+    SaveFigFolder = fullfile(upperFolder,nameDir);
+    % check if dir already exists
+    if exist(SaveFigFolder, 'dir')
+        question= sprintf('Directory already exists and it may already contain previous results.\nDo you want to overwrite it or create new directory?');
+        options= {'Overwrite the existing dir','Create a new dir'};
+        if getValidAnswer(question,'',options) == 1
+            rmdir(SaveFigFolder, 's');
         else
-            [~,nameDir]=sprintf("%s - %s",nameDir,fileparts(fileNameSections));
-        end       
-        % define the entire path of the directory where to save all figures
-        [upperFolder,~,~]=fileparts(fileparts(filePathData));
-        SaveFigFolder = fullfile(upperFolder,nameDir);
-        % check if dir already exists
-        if exist(SaveFigFolder, 'dir')
-            question= sprintf('Directory already exists and it may already contain previous results.\nDo you want to overwrite it or create new directory?');
-            options= {'Overwrite the existing dir','Create a new dir'};
-            if getValidAnswer(question,'',options) == 1
-                rmdir(SaveFigFolder, 's');
-            else
-                % create new directory with different name
-                nameSaveFigFolder = inputdlg('Enter the name new folder','',[1 80]);
-                SaveFigFolder = fullfile(upperFolder,nameSaveFigFolder{1});
-            end
+            % create new directory with different name
+            nameSaveFigFolder = inputdlg('Enter the name new folder','',[1 80]);
+            SaveFigFolder = fullfile(upperFolder,nameSaveFigFolder{1});
         end
-        mkdir(SaveFigFolder);
-        clear question options argName defaultVal upperFolder nameSaveFigFolder nameDir varargin
-        varargout{3}=SaveFigFolder;
-    end   
+    end    
+    mkdir(SaveFigFolder);
+    clear question options argName defaultVal upperFolder nameSaveFigFolder nameDir varargin
+    varargout{3}=SaveFigFolder;
+
     % init OUTPUT vars
     allData=struct();
     otherParameters=struct();
@@ -80,8 +82,7 @@ function varargout = A1_openANDprepareAFMdata(varargin)
     x_scan_lengthAllScans=zeros(1,numFiles);
     x_scan_pixelsAllScans=zeros(1,numFiles);
     alphaAllScans=zeros(1,numFiles);
-    setpointN=zeros(1,numFiles);
-    
+    setpointN=zeros(1,numFiles);    
     prevV_flag=false;
     answAnomalyVertParameters=1;
     % start to extract data from each file/section

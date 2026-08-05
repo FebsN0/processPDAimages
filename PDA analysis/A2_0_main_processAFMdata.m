@@ -7,18 +7,12 @@
     p=inputParser(); 
     argName = 'SeeMe';                  defaultVal = true;            addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
     argName = 'Normalization';          defaultVal = false;           addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
-    argName = 'modeScan';               defaultVal = 'normal';    addParameter(p,argName,defaultVal, @(x) ismember(string(x),modesScan));
+    argName = 'modeScan';               defaultVal = 1;               addParameter(p,argName,defaultVal, @(x) (isnumeric(x) && ismember(x,[1 2 3])));
     parse(p,varargin{:});
     SeeMe=p.Results.SeeMe;
     norm=p.Results.Normalization;
     % define type of experiment
-    if strcmp(p.Results.modeScan,modesScan{1})
-        modeScan=1;        % normal
-    elseif strcmp(p.Results.modeScan,modesScan{2})
-        modeScan=2;        % friction
-    else
-        modeScan=3;        % afterHeat
-    end
+    modeScan=p.Results.modeScan;
     % clarify type of dataset
     if modeScan ==1 || modeScan == 3
         mainHVmode = HVmodesInfo.(sprintf('dir%s', HVmodesInfo.mainData)){1};       
@@ -45,7 +39,7 @@
                 SaveFigIthSectionFolder=fullfile(startPathSingleSectionFolder,sprintf("section_%d",i)); 
                 % in case of normal scan, check if Lateral Channel has already processed ==> load
                 answSkipLat=2; % 1 = skip, 2 = process   
-                if modeScan==1 && exist(fullfile(SaveFigIthSectionFolder,sprintf("%s_lateralChannelProcessed.mat",nameSection)),"file") 
+                if exist(fullfile(SaveFigIthSectionFolder,sprintf("%s_lateralChannelProcessed.mat",nameSection)),"file") 
                     question=sprintf("PostLateralChannel file .mat for the section %d already exists. Take it?",i);
                     if getValidAnswer(question,"",{'y','n'})
                         % each section has allData updated to the relative section.
@@ -167,11 +161,11 @@
                 close all            
             end
             % processing any single section completed
-            if ~strcmp(HVmodesInfo.mainData,"OFF")
-                uiwait(warndlg("The HeightChannel processing of every section has terminated. Continue with Friction Calculation script for the same scan"))
-                A0_main_friction(mainPath,idxMon,2)
-                uiwait(warndlg("Friction main code completed. One ore more friction coefficients are ready to be used. Restart A0_main.m code and reply 'No' in the skipping lateral postprocessing"))
-                error("Current running Code ends here! Restart A0_main.m")
+            if modeScan==2
+                uiwait(warndlg("The Height/Lateral Channel processing of every section has completed. Continuing with Friction Calculation"))
+                A0_feature_1_FrictionCoefficientCalc(allData,otherParameters,SaveFigFolder,idxMon)
+                uiwait(warndlg("Friction main code completed. One ore more friction coefficients are ready to be used."))
+                error("Current running Code ends here! Restart A0_main.m and change options/scan")
             end            
         end
         % ASSEMBLY!
@@ -192,12 +186,14 @@
         else
             % show and save figures post assembly BEFORE processing in case of singleSection processing.
             % In case of processing after assembling, it will be done already inside A2_feature_1_processHeightChannel
+            fprintf("\nPreparation of assembled pre-processed images.\n\n")
             A1_feature_CleanOrPrepFiguresRawData(AFM_images_assembled,'metadata',metaData, ...
             'idxMon',idxMon,'folderSaveFig',SaveFigFolder,'SeeMe',false, ...
             'imageType','Assembled','Normalization',norm,'postProcessed',false)
             AFM_images_final=AFM_images_assembled;
         end 
         % show results post processing. Common for both processing type (singleSection or postAssembly)
+        fprintf("\nPreparation of assembled post-processed images.\n\n")
         A1_feature_CleanOrPrepFiguresRawData(AFM_images_final,'metadata',metaData, ...
             'idxMon',idxMon,'folderSaveFig',SaveFigFolder,'SeeMe',false, ...
             'imageType','Assembled','Normalization',norm,'postProcessed',true)
@@ -212,7 +208,7 @@
         waitfor(warndlg(sprintf("The next step is only for creating a better visual of the LATERAL FORCE IMAGE (AVG) through the percentile range selection.\nNOTE: Original data is not altered.")))
         [pValues,force_finalVisual] = percentileClipSlider(idxMon,force_final, ...
                 "Original Image", "Image within selected percentile data", "Force (nN)", lengthAxis,'pLowMax',50, 'pHighMin', 50,"Contrast",true);       
-        showData(idxMon,false,force_finalVisual,sprintf("Force (AVG) Image - Data Shown %.2f-%.2f Percentile",pValues),SaveFigFolder,"resultA2_6_Z_ForceBetterVisual",'labelBar',"Force (nN)","lenghtAxis",lengthAxis);
+        showData(idxMon,false,force_finalVisual,sprintf("Force (AVG) Image - Data Shown %.2f-%.2f Percentile",pValues),SaveFigFolder,"resultA2_6_Z1_ForceBetterVisual",'labelBar',"Force (nN)","lenghtAxis",lengthAxis);
     else
         % in case of single file (TO BE COMPLETED!)
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -238,6 +234,19 @@
         % to be introduced
         %%%% 
     end
+    % all LD together with same scale bar
+    force_0_entire_trace=AFM_images_final(7).AFM_images_2_PostProcessed;
+    force_0_entire_retrace=AFM_images_final(8).AFM_images_2_PostProcessed;
+    force_0_entire_PixelmaxValue=AFM_images_final(9).AFM_images_2_PostProcessed;
+    force_0_entire_average=AFM_images_final(10).AFM_images_2_PostProcessed;
+    imgs={force_0_entire_trace,force_0_entire_retrace,force_0_entire_PixelmaxValue,force_0_entire_average};
+    imgs_adjusted=imadjustMultiple(imgs);
+    showData(idxMon,false,imgs_adjusted{1},"Lateral Force - Trace",SaveFigFolder,"resultA2_6_Z2_ForceBetterVisual","labelBar","Force [nN]",...
+        "extraData",imgs_adjusted(2:4), ...  
+        "extraTitles",{"Lateral Force - ReTrace","Lateral Force - MaxPixelV","Lateral Force - Average"}, ...
+        "extraLabel",{"Force [nN]","Force [nN]","Force [nN]"},...
+        "bigTitle","Force Distribution (LF adjusted contrast)");    
+
     % return outputs
     varargout{1}=AFM_images_final;
     varargout{2}=metaData;
