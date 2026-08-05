@@ -54,7 +54,11 @@ function [outputme] = A6_feature_corrForceFluorescence(X_Data,Y_Data,idxMon,newF
     for i=1:length(x_bin_start)-1
         clear flag_Array
         % find value above a specific element of X data
-        a=find((DataOI(:,1)>x_bin_start(i)));
+        if i==1
+            a=find((DataOI(:,1)>=x_bin_start(i)));   % include the true minimum in bin 1
+        else
+            a=find((DataOI(:,1)>x_bin_start(i)));
+        end
         b=find((DataOI(:,1)<=x_bin_start(i+1)));
         % returns the data common to both A and B, with no repetitions. The middle part
         flag_Array(:,1)=DataOI(intersect(a,b),1);
@@ -80,8 +84,7 @@ function [outputme] = A6_feature_corrForceFluorescence(X_Data,Y_Data,idxMon,newF
             BinCenetr_V=setpointN(i);
         else
             BinCenetr_V=mean(flag_Array(:,1),'omitnan');
-        end
-            
+        end            
         outputme(i).BinStart=x_bin_start(i);
         outputme(i).BinEnd=x_bin_start(i+1);
         outputme(i).BinCenter=BinCenetr_V;
@@ -112,7 +115,7 @@ function [outputme] = A6_feature_corrForceFluorescence(X_Data,Y_Data,idxMon,newF
             xlim padded
         end
         if(~isempty(p.Results.Ylimit))
-            xlim(p.Results.Ylimit)
+            ylim(p.Results.Ylimit)
         else
             ylim padded
         end    
