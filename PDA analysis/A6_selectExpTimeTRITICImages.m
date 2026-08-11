@@ -582,7 +582,7 @@ function varargout=checkAndExtractFinalData(TRITICdata,metadata_NIKON,idx_select
     metaData_NIKON_updated.TRITIC=tmp;
     if saveFig
         filenameND2_PRE='resultA6_4_1_TRITIC_Before_Stimulation';
-        filenameND2_POST='resultA6_4_2_TRITIC_Before_Stimulation';
+        filenameND2_POST='resultA6_4_2_TRITIC_After_Stimulation';
         saveFigures_FigAndTiff(figTRITICpre,SaveFigFolder,filenameND2_PRE)
         saveFigures_FigAndTiff(figTRITICpost,SaveFigFolder,filenameND2_POST)
         varargout{1}=TRITIC_Before;
