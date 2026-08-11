@@ -5,17 +5,17 @@ function data_filtered = remove_Edges_Outlier(data,data_mask,pix,segmentProcess,
 %           - data_mask: since the data has been previously cleared, there may be areas that can be confused as edges.
 %                        Therefore, instead of using directly the data, use the mask to identify the 0/1 changes as true BK/FR changes, therefore, true edges
 %           - pix: number of pixels to be removed at both edges of a segment.
-%           - segmentProcess: mode of outlier removal:
-%               0: No outlier removal.
-%               1: Apply outlier removal to each segment after pixel reduction.
-%               2: Apply outlier removal to one large connected segment after pixel reduction.
+%           - segmentProcess: how to process the segments before outlier removal:
+%               1: outliers over Single Segments
+%               2: outliers over a Connected Segment (assembled single segment, corrisponding with a single fast scan line)
+%               3: outliers over entire section (heavy method, sometime too aggressive) 
 %           - outlierRemovalMethod: Detect and replace outliers in the line (segment|connectedSegment|connectedAllSegments) with NaN in 3 possible ways:
-                % way 1: do nothing. Dont remove outliers. They may be already removed by pixel reduction.
-                % way 2; remove 99 percentile (NOTE: since single segments already contains few elements, no good to use percentile threshold method)
-                % way 3: Median findmethod is default: Outliers are defined as elements more than three scaled MAD from the median (robust
-                % when there are lot of data, but sometime aggressive and not suitable when BK contains "more" type of BK
-               
-           
+%               1: do nothing. Dont remove outliers. They may be already removed by pixel reduction.
+%               2: remove 0.5 and 99.5 percentile (NOTE: since single segments already contains few elements, no good to use percentile threshold method)
+%               3: MAD findmethod is default: Outliers are defined as elements more than three scaled MAD from the median (robust
+%                % when there are lot of data, but sometime aggressive and not suitable when BK contains "more" type of BK           
+% NOTE: when outlierRemovalMethod=1, segmentProcess doesnt really matter
+%
 % OUTPUT:   - line_filtered : line without edges and outliers.
 %                             Note: the output/filtered line has same size as the input line
 % for each element:
@@ -28,12 +28,14 @@ function data_filtered = remove_Edges_Outlier(data,data_mask,pix,segmentProcess,
 
 % check the type of the provided data
     if ((segmentProcess==1 || segmentProcess==2) && ~isvector(data)) || (segmentProcess==3 && isvector(data))
-        error("The type of the data does not match with the type of segment")
+        error("The type of the data does not match with the type of segment. If you want to use ConnectedSegment (segmentProcess=2) over entire section/matrix, you need to provide single fast scan line")
     end
-
     
-    % trasform the section into vector
-    if ismatrix(data)
+    % transform the section into vector
+    % NOTE: vectors are technically matrices in MATLAB (ismatrix(v)==true), so we
+    % explicitly test ~isvector(data) here to distinguish "section" (segmentProcess==3)
+    % from "single fast scan line" (segmentProcess==1/2) inputs.
+    if ~isvector(data)
         data_vector=reshape(data,[],1);
         mask_vector=reshape(data_mask,[],1);
         % track the border of each fast scan line so also the borders will be subjected to removal
@@ -97,17 +99,9 @@ function data_filtered = remove_Edges_Outlier(data,data_mask,pix,segmentProcess,
                         Segment(:) = nan;
                     end
                 end                
-                % PROCESS THE SEGMENT IN ONE OF THREE POSSIBLE WAYS (Detect and replace outliers in data with NaN) 
-                % way 1: do nothing. Dont remove outliers. They may be already removed by pixel reduction.
-                % way 2: Median findmethod is default: Outliers are defined as elements more than three scaled MAD from the median (robust
-                % when there are lot of data, but sometime aggressive and not suitable when BK contains "more" type of BK
-                % way 3; remove 99 percentile (NOTE: since single segments already contains few elements, no good to use percentile threshold method)
+                % PROCESS THE SEGMENT (Detect and replace outliers in data with NaN) - see applyOutlierRemoval() below
                 if segmentProcess == 1
-                    if outlierRemovalMethod == 2
-                        Segment = filloutliers(Segment,nan,'percentiles',[0 99]);
-                    elseif outlierRemovalMethod == 3
-                        Segment = filloutliers(Segment,nan);
-                    end
+                    Segment = applyOutlierRemoval(Segment, outlierRemovalMethod);
                     data_filtered_vector(StartPos:EndPos) = Segment;
                 else
                 % method 2 or 3: attach the current segment to the previous found one to build a single large connected segment
@@ -130,14 +124,9 @@ function data_filtered = remove_Edges_Outlier(data,data_mask,pix,segmentProcess,
     end
     % Process one large connected segment. Note that if mode = 2 or 3, connected segment lacks of resetted edges of the previous part.
     % Here, ConnectedSegment is just the concatenation of each nonFiltered segments previously found.
-    % in this way, the function filloutliers has more data to process so the result should be more consistent. Mehtod of finding outliers is
-    % with percentile threshold. Exclude 99 Percentile
+    % in this way, the function filloutliers has more data to process so the result should be more consistent.
     if segmentProcess == 2 || segmentProcess == 3
-        if outlierRemovalMethod==2
-            ConnectedSegment = filloutliers(ConnectedSegment, nan,'percentiles',[0 99]);
-        elseif outlierRemovalMethod==3
-            ConnectedSegment = filloutliers(ConnectedSegment, nan);
-        end
+        ConnectedSegment = applyOutlierRemoval(ConnectedSegment, outlierRemovalMethod);
         % substitute the pieces of connectedSegment with the corresponding part of original fast scan line
         Cnt2 = 1;
         for i=1:length(SegPosList_StartPos)
@@ -149,9 +138,24 @@ function data_filtered = remove_Edges_Outlier(data,data_mask,pix,segmentProcess,
         end
     end
     % in case of section data, restore the size
-    if ismatrix(data)
+    if ~isvector(data)
         data_filtered=reshape(data_filtered_vector,size(data));
     else
         data_filtered=data_filtered_vector;
+    end
+end
+
+function seg = applyOutlierRemoval(seg, outlierRemovalMethod)
+% Detect and replace outliers in seg with NaN, per outlierRemovalMethod:
+%   1: do nothing (already handled by pixel-edge removal upstream)
+%   2: remove values outside the 0.5-99.5 percentile range
+%   3: MAD method (default filloutliers) - elements more than three scaled
+%      MAD from the median
+    switch outlierRemovalMethod
+        case 2
+            seg = filloutliers(seg, nan, 'percentiles', [0.5 99.5]);
+        case 3
+            seg = filloutliers(seg, nan);
+        % case 1 (or anything else): leave seg unchanged
     end
 end

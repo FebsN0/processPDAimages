@@ -23,9 +23,8 @@ function saveFigures_FigAndTiff(fig,nameDir,nameFig,varargin)
     for k = 1:numel(ax_all)
         axtoolbar(ax_all(k),'visible','off');
     end    
-    pause(.5)
+    drawnow
     exportgraphics(fig,fullnameTif,'Resolution',300,'ContentType','image','Padding', 100);
-    pause(1)
     saveas(fig,fullnameFig)
     if p.Results.closeImmediately
         close(fig)
@@ -39,9 +38,14 @@ function isDark = isMatlabDarkMode()
 end
 
 function forceLightTheme(fig)
-    % 1) Force figure background
+    % Force the figure's theme itself — this is what exportgraphics reads
+    if isprop(fig, 'Theme')
+        fig.Theme = 'light';
+        drawnow
+    end
+    % 1) Force figure background   
     set(fig, 'Color', 'white');
-    pause(1)
+    drawnow
     % 2) Force axes appearance (background + ticks)
     ax = findall(fig, 'Type', 'axes');
     for k = 1:numel(ax)
@@ -57,14 +61,15 @@ function forceLightTheme(fig)
         ax(k).YLabel.Color = 'black';
         ax(k).ZLabel.Color = 'black';
     end 
-    pause(1)
+    drawnow
     % 3) Force **legend** text to black
     lgd = findall(fig, 'Type', 'legend');
     for k = 1:numel(lgd)
         lgd(k).TextColor = 'black';
+        lgd(k).EdgeColor = 'black';
         lgd(k).Color     = 'white';   % Legend box background
     end
-    pause(.5)
+    drawnow
     % 4) Force **colorbar** labels to black 
     cb = findall(fig, 'Type', 'colorbar');
     for k = 1:numel(cb)
@@ -83,5 +88,5 @@ function forceLightTheme(fig)
             [sg.Color] = deal('black');
         end
     end
-    pause(.5)
+    drawnow
 end
