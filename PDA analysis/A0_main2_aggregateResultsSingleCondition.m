@@ -234,7 +234,7 @@ for expTh=1:nExps
             adjustPlot(ax_LD_FLUO_sameScan,[],idxMon)   
             saveFigures_FigAndTiff(fig_LD_FLUO_sameScan,SaveFigFolder,'resultEND_9_comparisonLDtypes')    
         end
-        clear dataPlot tmp fig_LD_FLUO_sameScan ax_LD_FLUO_sameScan
+        clear dataPlot tmp fig_LD_FLUO_sameScan ax_LD_FLUO_sameScan SaveFigFolder
         if typeShow == 1
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             %%%%%% extract the data Height VS fluorescence %%%%%%%
@@ -277,10 +277,11 @@ for expTh=1:nExps
         allAFMdata(cntDelta+i).LatForce_tr=AFMdata(strcmp([AFMdata.Channel_name],"Lateral Force") & strcmp([AFMdata.Trace_type],"Trace")).(field); 
         allAFMdata(cntDelta+i).LatForce_rt=AFMdata(strcmp([AFMdata.Channel_name],"Lateral Force") & strcmp([AFMdata.Trace_type],"ReTrace")).(field);
         allAFMdata(cntDelta+i).LatForce_mV=AFMdata(strcmp([AFMdata.Channel_name],"Lateral Force") & strcmp([AFMdata.Trace_type],"MaxPixelValue")).(field);
-        allAFMdata(cntDelta+i).LatForce_avg=AFMdata(strcmp([AFMdata.Channel_name],"Lateral Force") & strcmp([AFMdata.Trace_type],"Average")).(field);      
+        allAFMdata(cntDelta+i).LatForce_avg=AFMdata(strcmp([AFMdata.Channel_name],"Lateral Force") & strcmp([AFMdata.Trace_type],"Average")).(field); 
+        allAFMdata(cntDelta+i).VertForce_avg=AFMdata(strcmp([AFMdata.Channel_name],"Vertical Force") & strcmp([AFMdata.Trace_type],"Avg")).(field); 
+        
     end
     % END ALL SCANS PROCESSING WITHIN SAME EXPERIMENT
-
     %%%% TRACE
     % choose the upper limit to fit the data below and plot it. Use the same range for all experiments
     if ~exist("xrange","var")
@@ -323,7 +324,7 @@ for expTh=1:nExps
         arrayXlegend_fitLine_3M_ForceFluorescence.mpv=hp_mpv;
     end                 
 end
-clear fullDataXfitting_* fnames ans          
+clear AFMdata fullDataXfitting_* fnames ans xlabelText ylabelText allAFMdata_pathfile          
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%% ADJUST ESTHETIC PART OF THE PLOTTING AND SAVE  %%%%%%%
@@ -434,7 +435,7 @@ textSubTitle={subtitleText{8};textSubTitle_pt2_mpv};
 adjustPlot(ax_LD_FLUO{8},arrayXlegend_fitLine_3M_ForceFluorescence.mpv,idxMon,textTitleLD_FLUO,textSubTitle)
 
 % adjust the limits of full data
-ax_LD_FLUO_full={ax_LD_FLUO{1:2:8}};
+ax_LD_FLUO_full=ax_LD_FLUO(1:2:8);
 xlimNew=[min(cellfun(@(x) min(x.XLim(1)), ax_LD_FLUO_full)) max(cellfun(@(x) max(x.XLim(2)), ax_LD_FLUO_full))];
 ylimNew=[min(cellfun(@(x) min(x.YLim(1)), ax_LD_FLUO_full)) max(cellfun(@(x) max(x.YLim(2)), ax_LD_FLUO_full))];
 for i=1:2:8
@@ -443,9 +444,9 @@ for i=1:2:8
     saveFigures_FigAndTiff(fig_LD_FLUO{i},folderSaveComparison,eval(sprintf("filename%d",i)),'closeImmediately',false)  
 end
 close(fig_LD_FLUO{1},fig_LD_FLUO{3},fig_LD_FLUO{5},fig_LD_FLUO{7})
-clear ax_LD_FLUO_full arrayX*
+clear ax_LD_FLUO_full arrayX* nameData
 
-ax_LD_FLUO_cut={ax_LD_FLUO{2:2:8}};
+ax_LD_FLUO_cut=ax_LD_FLUO(2:2:8);
 % adjust the limits of cleared data
 for i=1:numel(ax_LD_FLUO_cut)
     fig_tmp=get(ax_LD_FLUO_cut{i}, 'Parent');
@@ -463,39 +464,31 @@ end
 clear text_dataSlope_trace n fitResults_all_* saveFolderAdditionalText textSubTitle_pt2_trace array* ax* fig* 
 clear filename* slope* metaData_AFM metaData_BF metaData_NIKON_definitive clr cntDelta Data_finalResults firstPlot expTh hf hl_* hp_* i
 clear idxLineSample j allResultsData_pathfile baseline_nN text* tmp xlimNew ylimNew xrange field* subtitleText hother fullDataXfitting_avg
-%%
 % complete the height distribution comparison
 plotAFMHeightHistograms(allAFMdata,folderSaveComparison,idxMon)
-%%
+% extract friction coefficients
+frictionCoeff_fromVertLatCalc(allAFMdata,folderSaveComparison,subfolder_allscanFolder,idxMon,typeShow)
 clc, close all
 
 if getValidAnswer("Do want to imadjust and propagate the TRITIC images so they can be visually comparable?\nNOTE: the operation requires some time, especially in case of multiple experiments.",'',{"Y","N"})
     % in order to have fluorescence image scaled in the same way for better representation, lets find the max and mix values of all the scans and propagate all over images
-    allDelta={allDelta_original,allDelta_1M,allDelta_3M};
-    allDelta_text={"whole","1stMasked","3rdMasked"};
-    clear allDelta_original allDelta_1M allDelta_3M 
+    allDelta={allDelta_original,allDelta_1M,allDelta_3M};    
+    allDelta_text={"Whole Image","1stMasked","3rdMasked"};
+    if norm
+        textNormColorbar="Delta Fluorescence (normalized)";
+        tmp="norm";
+    else
+        textNormColorbar="Absolute Delta Fluorescence";
+        tmp="notNorm";
+    end    
     for j=1:3
-        % find global range across all images. Show data inside the percentile range for better visual
-        all_values = cellfun(@(x) x(:), allDelta{j}, 'UniformOutput', false);
-        all_values = vertcat(all_values{:});    
-        shared_min = prctile(all_values, 0.35);   % robust, mimics ImageJ auto
-        shared_max = prctile(all_values, 99.65);  
-        rangeScale= [shared_min,shared_max];
-        for i=1:length(allDelta{j})
-            if typeShow == 1
-                filename=sprintf('resultEND_%d_FluorescencePDA_scaled_onEveryScanSingleExp',5+j);
-                titleD1=sprintf("DELTA-%s (pixel-scaled over scans)",allDelta_text{j});
-            else
-                filename=sprintf('resultEND_%d_FluorescencePDA_scaled_onEveryExp',8+j);
-                titleD1=sprintf("DELTA-%s (pixel-scaled over samples)",allDelta_text{j});
-            end    
-            Delta=allDelta{j}{i};
-            singleFolder=subfolder_allscanFolder{i};
-            showData(idxMon,false,Delta,titleD1,singleFolder,filename,'lenghtAxis',allDelta_pixScale(i,:),'Broadcast',rangeScale)
-        end
+        filename=sprintf('resultEND_13_%d_%s_%s_FluorescencePDA',j,tmp,allDelta_text{j});
+        titleText=sprintf("ΔFluorescence - %s",allDelta_text{j});
+        sameColorBarScale(allDelta{j},filename,titleText,subfolder_allscanFolder,textNormColorbar,allDelta_pixScale(1,:)*1e-6,typeShow,idxMon,true)
     end
 end
-clear allValues filename titleD1 labelBar singleFolder rangeScale allDelta_pixScale Delta ans subfolder_allscanFolder
+clear allDelta_original allDelta_1M allDelta_3M nameData nExps norm nScans  
+clear allValues filename titleD1 labelBar singleFolder rangeScale allDelta_pixScale Delta ans subfolder_allscanFolder j typeShow titleText textNormColorbar
 %%
 %%%%%%%%%%%%%%%%%%%%%%%
 %%%%%% FUNCTIONS %%%%%%
@@ -736,11 +729,180 @@ function plotAFMHeightHistograms(allAFMdata,folderSaveFig,idxMon)
         subtitleStr = 'Shown Data within 0.5-99.5 Percentile. Each exp represents all scans together';
     end
     subtitle(axDistHeight,subtitleStr,'FontSize',13)
-    legend(axDistHeight,'FontSize',15)
+    legend(axDistHeight,'FontSize',15,'Interpreter','none')
     singleVect=vertcat(vect{:});  
     pLow = prctile(singleVect, .5);
     pHigh = prctile(singleVect, 99.5); 
     xlim(axDistHeight, [pLow, pHigh]);
     objInSecondMonitor(f_heightDistribution,idxMon);     
     saveFigures_FigAndTiff(f_heightDistribution,folderSaveFig,'heightDistributionComparison')           
+end
+
+function frictionCoeff_fromVertLatCalc(allAFMdata,folderSaveFig,subfolder_allscanFolder,idxMon,typeShow)
+    expNames   = {allAFMdata.nameExp};
+    uniqueExps = unique(expNames, 'stable');
+    if isscalar(uniqueExps)
+        flag_singleExp = true;
+        % --- Single experiment: group by ScanID ---
+        scanIDs     = unique({allAFMdata.scanID},'stable');
+        groupLabels = unique(scanIDs, 'stable');
+        groupIdx    = cellfun(@(s) strcmp(scanIDs, s), groupLabels, 'UniformOutput', false);
+        titleStr    = sprintf("Box-and-Whisker Plot of Friction Coefficient of every scans of the experiment %s",uniqueExps{1});       
+    else
+        % --- Multiple experiments: merge all scans per experiment ---
+        flag_singleExp = false;
+        groupLabels = uniqueExps;
+        groupIdx    = cellfun(@(e) strcmp(expNames, e), uniqueExps, 'UniformOutput', false);
+        titleStr    = 'Box-and-Whisker Plot of Friction Coefficient of every scans/experiments';        
+    end
+    f_boxWhisker=figure('Visible','off'); axBoxWhisker=axes(f_boxWhisker);
+    hold(axBoxWhisker,"on")
+    ylabel(axBoxWhisker,'Friction Coefficient Value','FontSize',15)
+    axBoxWhisker.YGrid="on"; axBoxWhisker.YMinorGrid="on";
+    % copy all children of source figure into new figure    
+    f_boxWhisker_unfilt=figure('Visible','off'); axBoxWhisker_unfilt=axes(f_boxWhisker_unfilt);
+    hold(axBoxWhisker_unfilt,"on")
+    ylabel(axBoxWhisker_unfilt,'Friction Coefficient Value','FontSize',15)
+    axBoxWhisker_unfilt.YGrid="on"; axBoxWhisker_unfilt.YMinorGrid="on";    
+
+    % --- Build merged Height vector per group first ---
+    nGroups = numel(groupLabels);
+    vects_FC    = cell(nGroups, 1);
+    vects_FC_unfilt = vects_FC;
+    vects_name = cell(nGroups, 1);
+    count=1;
+    FC_all=cell(1,length(allAFMdata));
+    LF_avg_all=cell(1,length(allAFMdata));
+    Height_all=cell(1,length(allAFMdata));
+    for i = 1:nGroups
+        FC_vec_clean=[];
+        FC_vec_unfiltered=[];
+        entries     = allAFMdata(groupIdx{i});
+        % when it is single experiment, it's just one entry
+        for j=1:length(entries)
+            LatForce=entries(j).LatForce_avg;
+            VertForce=entries(j).VertForce_avg;
+            HeightSingle=entries(j).Height;
+            mask=logical(entries(j).Mask);
+            LatForce_BK=LatForce;
+            LatForce_BK(mask)=nan;
+            VertForce_BK=VertForce;
+            VertForce_BK(mask)=nan;
+            LatForce_BK_clear=zeros(size(LatForce_BK));
+            VertForce_BK_clear=LatForce_BK_clear;
+            % remove edge and outliers: 5 pixels from the edges, MAD method for outlier removal over connectedSegment   
+            % since it is an entire block made of multiple section, SegmentProcess=3 is not effective. Need to process each fast scan line
+            for lineId=1:size(LatForce_BK,2)
+                LF_Line=LatForce_BK(:,lineId);
+                VF_Line=VertForce_BK(:,lineId);
+                mask_Line=mask(:,lineId);
+                % start the edge removal depending on the i-th pixel size and then remove outliers
+                LF_Line_cleared = remove_Edges_Outlier(LF_Line,mask_Line,5,2,3); 
+                VF_Line_cleared=VF_Line;
+                VF_Line_cleared(isnan(LF_Line_cleared))=nan;
+                LatForce_BK_clear(:,lineId)=LF_Line_cleared;
+                VertForce_BK_clear(:,lineId)=VF_Line_cleared;                
+            end 
+            FC=LatForce_BK_clear./VertForce_BK_clear;
+            FC_all{count}=FC;
+            LF_avg_all{count}=LatForce;
+            Height_all{count}=HeightSingle*1e9;
+            count=count+1;
+            %showData(idxMon,false,FC,sprintf("Friction Coefficient Background - %s - %s",entries.nameExp,entries.scanID),fullfile(folderSaveFig,"FC_images"),sprintf("FCimage_%s_%s",entries.nameExp,entries.scanID))
+            tmp_clean=reshape(FC,1,[]);
+            tmp_clean=tmp_clean(~isnan(tmp_clean));
+            FC_vec_clean=[FC_vec_clean tmp_clean];
+            % calc unfiltered FC too
+            tmp=LatForce_BK./VertForce_BK;
+            tmp_unfiltered=tmp(~isnan(tmp));
+            FC_vec_unfiltered=[FC_vec_unfiltered; tmp_unfiltered];            
+        end          
+        vects_FC{i} = reshape(FC_vec_clean,[],1);
+        vects_FC_unfilt{i} = reshape(FC_vec_unfiltered,[],1);
+        if flag_singleExp
+            vects_name{i}=entries.scanID;
+        else
+            vects_name{i}=entries.nameExp;
+        end
+    end
+    % start the box char whisker
+    xpos=1:nGroups;
+    for i = 1:nGroups
+        xi = repmat(i, size(vects_FC{i}));  % x positions for group i
+        boxchart(axBoxWhisker, xi, vects_FC{i}, ...
+            'BoxFaceColor', globalColor(i), 'WhiskerLineColor',globalColor(i),'WhiskerLineStyle','-.',...
+            'LineWidth',1.5,'MarkerStyle','*','MarkerSize',3,...
+            'BoxEdgeColor', globalColor(i),...
+            'DisplayName',sprintf("%s",vects_name{i}));   % adjust other colors as needed
+        xi_unf = repmat(i, size(vects_FC_unfilt{i}));  % x positions for group i
+        boxchart(axBoxWhisker_unfilt, xi_unf, vects_FC_unfilt{i}, ...
+            'BoxFaceColor', globalColor(i), 'WhiskerLineColor',globalColor(i),'WhiskerLineStyle','-.',...
+            'LineWidth',1.5,'MarkerStyle','*','MarkerSize',3,...
+            'BoxEdgeColor', globalColor(i),...
+            'DisplayName',sprintf("%s",vects_name{i}));   % adjust other colors as needed    
+        drawnow;
+        % show the median value
+        medVal = median(vects_FC{i}, 'omitnan');
+        medVal_unfilt = median(vects_FC_unfilt{i}, 'omitnan');
+        if isnan(medVal), continue; end     
+        
+        boxOffset = 0.33;  % adjust based on your boxchart width (default BoxWidth is 0.5, i.e. half-width 0.25)
+        text(axBoxWhisker, xpos(i)+boxOffset, medVal, sprintf('%.2f', medVal), ...
+            'HorizontalAlignment', 'center', ...
+            'VerticalAlignment', 'middle', ...
+            'Color', 'w', ...            % change if white not visible
+            'BackgroundColor', 'k', ...  % optional contrast box
+            'Margin', 2, ...
+            'FontSize', 14,'FontWeight', 'bold');
+        text(axBoxWhisker_unfilt, xpos(i)+boxOffset, medVal_unfilt, sprintf('%.2f', medVal_unfilt), ...
+            'HorizontalAlignment', 'center', ...
+            'VerticalAlignment', 'middle', ...
+            'Color', 'w', ...            % change if white not visible
+            'BackgroundColor', 'k', ...  % optional contrast box
+            'Margin', 2, ...
+            'FontSize', 14,'FontWeight', 'bold');
+        % now shift it down by half its own height so it's centered on medVal
+    end
+    xlim(axBoxWhisker,"padded"); ylim(axBoxWhisker,"padded");
+    axBoxWhisker.XTick = 1:numel(vects_name);
+    axBoxWhisker.XTickLabel = vects_name;           % cell array of names
+    axBoxWhisker.TickLabelInterpreter = 'none';     % apply to X/Y tick labels
+    axBoxWhisker.FontSize = 15;    
+    title(axBoxWhisker,sprintf("%s\nFC post Edge-Removal Algorithm",titleStr),'FontSize',20)  
+    objInSecondMonitor(f_boxWhisker,idxMon);     
+    saveFigures_FigAndTiff(f_boxWhisker,folderSaveFig,'boxChartWhisker_FCvalues_postEdgeOutlierAlg')    
+
+    xlim(axBoxWhisker_unfilt,"padded"); ylim(axBoxWhisker_unfilt,"padded");
+    axBoxWhisker_unfilt.XTick = 1:numel(vects_name);
+    axBoxWhisker_unfilt.XTickLabel = vects_name;           % cell array of names
+    axBoxWhisker_unfilt.TickLabelInterpreter = 'none';     % apply to X/Y tick labels
+    axBoxWhisker_unfilt.FontSize = 15;    
+    title(axBoxWhisker_unfilt,sprintf("%s (Raw FC)",titleStr),'FontSize',20)  
+    objInSecondMonitor(f_boxWhisker_unfilt,idxMon);     
+    saveFigures_FigAndTiff(f_boxWhisker_unfilt,folderSaveFig,'boxChartWhisker_FCvalues_RAW')  
+    % obtain figure with same colorbar
+    sameColorBarScale(FC_all,'resultEND_10_FrictionCoeffValue_matrix',"Friction Coefficients Pixel-By-Pixel",subfolder_allscanFolder,"Friction Coefficient Value",[],typeShow,idxMon,false)
+    sameColorBarScale(LF_avg_all,'resultEND_11_LateralForce_AVG',"Lateral Force (AVG)",subfolder_allscanFolder,"Force [nN]",[],typeShow,idxMon,false)    
+    sameColorBarScale(Height_all,'resultEND_12_Height',"Height Channel",subfolder_allscanFolder,"Height [nm]",[],typeShow,idxMon,false)       
+end
+
+function sameColorBarScale(data,filename,titleText,allSaveFigFolder,labelBarText,pixScale,typeShow,idxMon,scaleBar)
+    % find global range across all FC images. Show data inside the percentile range for better visual
+    all_values = cellfun(@(x) x(:), data, 'UniformOutput', false);
+    all_values = vertcat(all_values{:});    
+    shared_min = prctile(all_values, 1);   % robust, mimics ImageJ auto
+    shared_max = prctile(all_values, 99);  
+    rangeScale= [shared_min,shared_max];
+    if typeShow == 1
+        filename=sprintf('%s_onEveryScanSingleExp',filename);
+        titleText=sprintf("%s\nNOTE: Images with shared colorbar across scans and contrast-adjusted to the 1st–99th percentiles.",titleText);
+    else
+        filename=sprintf('%s_onEveryScanEveryExp',filename);
+        titleText=sprintf("%s\nNOTE: Images with shared colorbar across scans and experiments and contrast-adjusted to the 1st–99th percentiles",titleText);
+    end
+    for i=1:length(data)        
+        tmp=data{i};
+        singleSaveFigFolder=allSaveFigFolder{i};
+        showData(idxMon,false,tmp,titleText,singleSaveFigFolder,filename,'Broadcast',rangeScale,"labelBar",labelBarText,'lenghtAxis',pixScale,'addScaleBar',scaleBar);
+    end
 end
