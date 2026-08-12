@@ -7,9 +7,8 @@ function [BFdata_aligned,TRITICdata_Aligned] = A3_3_alignBFandTRITIC(BFdata,TRIT
     Image_TRITIC_PRE=TRITICdata.pre{1,end}; 
     Image_TRITIC_POST=TRITICdata.post{1,end};
     % show not aligned images
-    showOverlappedImages(Image_BF_PRE,Image_TRITIC_PRE,SaveFigFolder,'BF preAFM and TRITIC preAFM','resultA3_5_1_BFpre_TRITICpre',idxMon) 
-    showOverlappedImages(Image_TRITIC_PRE,Image_TRITIC_POST,SaveFigFolder,'TRITIC preAFM and TRITIC postAFM - Not Aligned','resultA3_6_1_TRITIC_prePost_NotAligned',idxMon)
-    showOverlappedImages(Image_BF_PRE,Image_TRITIC_POST,SaveFigFolder,'BF preAFM and TRITIC postAFM - Not Aligned','resultA3_7_1_BFpre_TRITICpost_NotAligned',idxMon)
+    showOverlappedImages(Image_BF_PRE,Image_TRITIC_PRE,SaveFigFolder,'BF preAFM and TRITIC preAFM','resultA3_4_1_BFpre_TRITICpre',idxMon) 
+    showOverlappedImages(Image_TRITIC_PRE,Image_TRITIC_POST,SaveFigFolder,'TRITIC preAFM and TRITIC postAFM - Not Aligned','resultA3_5_1_TRITIC_prePost_NotAligned',idxMon)
     % if there are BFpre and BFpost, alignment on these two only because significantly easier to align. Then shift TRITIC_post with the obtained offset.       
     flagAlign_BFWithTRITIC=false;
     flag_BF_prepost=all(cellfun(@(x) ismember(x,{'pre','post'}), fieldnames(BFdata)));
@@ -17,11 +16,11 @@ function [BFdata_aligned,TRITICdata_Aligned] = A3_3_alignBFandTRITIC(BFdata,TRIT
         if ~flagAlign_BFWithTRITIC && flag_BF_prepost
             Image_BF_POST=BFdata.post;        
             % show before BF images alignment
-            showOverlappedImages(Image_BF_PRE,Image_BF_POST,SaveFigFolder,'BF preAFM and BF postAFM - Not Aligned','resultA3_8_1_BF_prePost_NotAligned',idxMon)                       
+            showOverlappedImages(Image_BF_PRE,Image_BF_POST,SaveFigFolder,'BF preAFM and BF postAFM - Not Aligned','resultA3_6_1_BF_prePost_NotAligned',idxMon)                       
             % Required Image_BF_PRE_adjusted because of cutting borders of BF_ImagePOST_aligned for alignment 
             [Image_BF_POST_aligned,Image_BF_PRE_aligned,offset]=alignBinarizedImages(Image_BF_POST,Image_BF_PRE,idxMon,'Brightfield','Yes');
             % show after BF images alignment
-            showOverlappedImages(Image_BF_PRE_aligned,Image_BF_POST_aligned,SaveFigFolder,'BF preAFM and BF postAFM - Aligned','resultA3_8_2_BF_prePost_Aligned',idxMon)                        
+            showOverlappedImages(Image_BF_PRE_aligned,Image_BF_POST_aligned,SaveFigFolder,'BF preAFM and BF postAFM - Aligned','resultA3_6_2_BF_prePost_Aligned',idxMon)                        
             % fix TRITICpost to BFpre
             fnames=(fieldnames(TRITICdata));
             TRITICdata_Aligned=struct();
@@ -51,7 +50,7 @@ function [BFdata_aligned,TRITICdata_Aligned] = A3_3_alignBFandTRITIC(BFdata,TRIT
         % check TRITIC images alignment to further check
         Image_TRITIC_PRE=TRITICdata_Aligned.pre{1,end}; 
         Image_TRITIC_POST=TRITICdata_Aligned.post{1,end};
-        showOverlappedImages(Image_TRITIC_PRE,Image_TRITIC_POST,SaveFigFolder,'TRITIC preAFM and TRITIC postAFM - Aligned','resultA3_6_2_TRITIC_prePost_Aligned',idxMon,'closeImmediately',false)     
+        showOverlappedImages(Image_TRITIC_PRE,Image_TRITIC_POST,"",'TRITIC preAFM and TRITIC postAFM - Aligned',"",idxMon,'closeImmediately',false,'saveFig',false)     
         if any(size(Image_TRITIC_POST)~=size(Image_BF_POST_aligned))
             uiwait(msgbox('Something wrong in the correction matrix of TRITICpost because its matrix size is not the same as BFpost. Repeat the alignment using TRITICpre and TRITICpost','Warning','warn'));
         elseif getValidAnswer(sprintf('Is the registration of TRITICpre and TRITICpost postAlign ok?'),'',{'Yes','No'})
@@ -66,13 +65,14 @@ function [BFdata_aligned,TRITICdata_Aligned] = A3_3_alignBFandTRITIC(BFdata,TRIT
         end
         close all
     end    
-    showOverlappedImages(Image_BF_PRE_aligned,Image_TRITIC_POST,SaveFigFolder,'TRITIC preAFM and TRITIC postAFM - Aligned','resultA3_7_2_TRITIC_prePost_Aligned',idxMon)         
+    showOverlappedImages(Image_BF_PRE_aligned,Image_TRITIC_POST,SaveFigFolder,'TRITIC preAFM and TRITIC postAFM - Aligned','resultA3_5_2_TRITIC_prePost_Aligned',idxMon)         
 end
 
 % SHOW FUSED IMAGES (used to overlap BFpre with BFpost, as well TRITICpre-TRITICpost etc)
 function showOverlappedImages(image1,image2,folderResultsImg,titleText,fileText,idxMon,varargin)
     p=inputParser();
     argName = 'closeImmediately';   defaultVal = true;      addParameter(p, argName, defaultVal);
+    argName = 'saveFig';            defaultVal = true;      addParameter(p, argName, defaultVal);
     parse(p,varargin{:})    
     if p.Results.closeImmediately
         f2=figure('Visible','off');
@@ -82,7 +82,9 @@ function showOverlappedImages(image1,image2,folderResultsImg,titleText,fileText,
     imshow(imfuse(imadjust(image1),imadjust(image2)))
     title(titleText,'FontSize',15)
     objInSecondMonitor(f2,idxMon);
-    saveFigures_FigAndTiff(f2,folderResultsImg,fileText,'closeImmediately',p.Results.closeImmediately)
+    if p.Results.saveFig
+        saveFigures_FigAndTiff(f2,folderResultsImg,fileText,'closeImmediately',p.Results.closeImmediately)
+    end
 end
 
 function [moving_adj,fixed_adj,offset]=alignBinarizedImages(moved,fixed,idxMon,varargin)

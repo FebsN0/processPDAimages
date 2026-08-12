@@ -8,7 +8,7 @@
 % 
 % INPUT: OUTPUT of A1_open_JPK (single struct data)
 
-function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
+function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,metadata,varargin)
            
     %init instance of inputParser
     p=inputParser();
@@ -19,8 +19,8 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
     argName = 'SeeMe';          defaultVal = false;     addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
     argName = 'imageType';      defaultVal = 'Entire';  addParameter(p,argName,defaultVal, @(x) ismember(x,{'Entire','SingleSection','Assembled'}));
     argName = 'Normalization';  defaultVal = false;     addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
-    argName = 'metadata';       defaultVal = [];        addParameter(p,argName,defaultVal);
     argName = 'postProcessed';  defaultVal = false;     addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
+    argName = 'HVmode';         defaultVal = 'HoverMode_ON';      addParameter(p,argName,defaultVal, @(x) ismember(x,{'HoverMode_ON','HoverMode_OFF'}));
     % validate and parse the inputs
     parse(p,data,varargin{:});
 
@@ -32,10 +32,8 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
         idxMon=p.Results.idxMon;
         folderSaveFig=p.Results.folderSaveFig;
         imageType=p.Results.imageType;
+        HVmode=p.Results.HVmode;
         if p.Results.Normalization; norm=1; else, norm=0; end
-        if ~strcmp(imageType,"SingleSection")
-            metadata=p.Results.metadata;        
-        end
         if p.Results.postProcessed
             flagPostProcessed=true;
             textTypeData='PostProcessed';
@@ -45,6 +43,14 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
             stepProcess='1';
             textTypeData='Raw';
         end
+        if strcmp(imageType,'Assembled')
+            tot_pixel=metadata.y_scan_pixels(end);            
+        elseif strcmp(imageType,'SingleSection')
+            tot_pixel=metadata.y_scan_pixels(2)-metadata.y_scan_pixels(1)+1;
+        else
+            tot_pixel=metadata.y_scan_pixels;
+        end
+        umeterXpixel=[metadata.x_scan_length_m/metadata.x_scan_pixels metadata.y_scan_length_m/tot_pixel];
     end
     clearvars argName defaultVal p
 
@@ -75,7 +81,11 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
         allLabelBar={sprintf('Height [nm]')};
         if flagPostProcessed    
             fieldToUse="AFM_images_2_PostProcessed";
-            blockAllData=cell(1,6); % height + vertForce_avg + LF_tr + LF_rt + LF_maxPixel
+            if strcmp(HVmode,"HoverMode_OFF")
+                blockAllData=cell(1,6); % height + vertForce_avg + LF_tr + LF_rt + LF_avg + LF_maxPixel
+            else
+                blockAllData=cell(1,3); % height + vertForce_avg + LateralForce
+            end
             AFM_height_IO=data(strcmp([data.Channel_name],'Height (measured)')).AFMmask_heightIO;
             % take height channel
             data_Height=data(strcmp([data.Channel_name],'Height (measured)')).(fieldToUse);
@@ -85,27 +95,38 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
             allTitles{2}=sprintf('Vertical Force PostProcessed (%s - %s)',textTypeData,imageType);
             allNameFig{2}=sprintf('resultA%s_2_%s_VertForcePostProcessed_%s',stepProcess,textTypeData,imageType);
             allLabelBar{2}='Force [nN]';
-            % take force trace channel
-            blockAllData{3}=data(strcmp([data.Channel_name],'Lateral Force') & strcmp([data.Trace_type],'Trace')).(fieldToUse);
-            allTitles{3}=sprintf('Lateral Force Trace PostProcessed (%s - %s)',textTypeData,imageType);
-            allNameFig{3}=sprintf('resultA%s_3_%s_LatForcePostProcessed_%s',stepProcess,textTypeData,imageType);
-            allLabelBar{3}='Force [nN]';
-            % take force retrace channel
-            blockAllData{4}=data(strcmp([data.Channel_name],'Lateral Force') & strcmp([data.Trace_type],'ReTrace')).(fieldToUse);
-            allTitles{4}=sprintf('Lateral Force ReTrace PostProcessed (%s - %s)',textTypeData,imageType);
-            allNameFig{4}=sprintf('resultA%s_4_%s_LatForcePostProcessed_%s',stepProcess,textTypeData,imageType);
-            allLabelBar{4}='Force [nN]';
-            % take force maxPixel channel
-            blockAllData{5}=data(strcmp([data.Channel_name],'Lateral Force') & strcmp([data.Trace_type],'MaxPixelValue')).(fieldToUse);
-            allTitles{5}=sprintf('Lateral Force MaxPixelValue PostProcessed (%s - %s)',textTypeData,imageType);
-            allNameFig{5}=sprintf('resultA%s_5_%s_LatForcePostProcessed_%s',stepProcess,textTypeData,imageType);
-            allLabelBar{5}='Force [nN]';
-            % take force average channel
-            blockAllData{6}=data(strcmp([data.Channel_name],'Lateral Force') & strcmp([data.Trace_type],'Average')).(fieldToUse);
-            allTitles{6}=sprintf('Lateral Force Average PostProcessed (%s - %s)',textTypeData,imageType);
-            allNameFig{6}=sprintf('resultA%s_6_%s_LatForcePostProcessed_%s',stepProcess,textTypeData,imageType);
-            allLabelBar{6}='Force [nN]';
-            factor=[1e9,1,1,1,1,1,1,1];
+            % if data is from HV_OFF
+            if strcmp(HVmode,"HoverMode_OFF")
+                % take force trace channel
+                blockAllData{3}=data(strcmp([data.Channel_name],'Lateral Force') & strcmp([data.Trace_type],'Trace')).(fieldToUse);
+                allTitles{3}=sprintf('Lateral Force Trace PostProcessed (%s - %s)',textTypeData,imageType);
+                allNameFig{3}=sprintf('resultA%s_3_%s_LatForcePostProcessed_%s',stepProcess,textTypeData,imageType);
+                allLabelBar{3}='Force [nN]';
+                % take force retrace channel
+                blockAllData{4}=data(strcmp([data.Channel_name],'Lateral Force') & strcmp([data.Trace_type],'ReTrace')).(fieldToUse);
+                allTitles{4}=sprintf('Lateral Force ReTrace PostProcessed (%s - %s)',textTypeData,imageType);
+                allNameFig{4}=sprintf('resultA%s_4_%s_LatForcePostProcessed_%s',stepProcess,textTypeData,imageType);
+                allLabelBar{4}='Force [nN]';
+                % take force maxPixel channel
+                blockAllData{5}=data(strcmp([data.Channel_name],'Lateral Force') & strcmp([data.Trace_type],'MaxPixelValue')).(fieldToUse);
+                allTitles{5}=sprintf('Lateral Force MaxPixelValue PostProcessed (%s - %s)',textTypeData,imageType);
+                allNameFig{5}=sprintf('resultA%s_5_%s_LatForcePostProcessed_%s',stepProcess,textTypeData,imageType);
+                allLabelBar{5}='Force [nN]';
+                % take force average channel
+                blockAllData{6}=data(strcmp([data.Channel_name],'Lateral Force') & strcmp([data.Trace_type],'Average')).(fieldToUse);
+                allTitles{6}=sprintf('Lateral Force Average PostProcessed (%s - %s)',textTypeData,imageType);
+                allNameFig{6}=sprintf('resultA%s_6_%s_LatForcePostProcessed_%s',stepProcess,textTypeData,imageType);
+                allLabelBar{6}='Force [nN]';
+                factor=[1e9,1,1,1,1,1];
+                countImg=7;
+            else
+                blockAllData{3}=data(strcmp([data.Channel_name],'Lateral Force') & strcmp([data.Trace_type],'FromFCmethod')).(fieldToUse);
+                allTitles{3}=sprintf('Lateral Force from FC method PostProcessed (%s - %s)',textTypeData,imageType);
+                allNameFig{3}=sprintf('resultA%s_3_%s_LatForcePostProcessed_%s',stepProcess,textTypeData,imageType);
+                allLabelBar{3}='Force [nN]';
+                factor=[1e9,1,1];
+                countImg=4;
+            end
         else
             fieldToUse='AFM_images_1_original';                        
             data_Height=    data(strcmp([data.Channel_name],'Height (measured)')).(fieldToUse);            
@@ -137,7 +158,12 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
         % show results
         for i=1:length(blockAllData)
             data_tmp=blockAllData{i}*factor(i);
-            showData(idxMon,SeeMe,data_tmp,allTitles{i},folderSaveFig,allNameFig{i},'normalized',norm,'labelBar',allLabelBar{i});
+            if strcmp(imageType,'SingleSection')
+                addScaleBar=false;
+            else
+                addScaleBar=true;
+            end
+            showData(idxMon,SeeMe,data_tmp,allTitles{i},folderSaveFig,allNameFig{i},'normalized',norm,'labelBar',allLabelBar{i},'lenghtAxis',umeterXpixel,'addScaleBar',addScaleBar);
         end         
         %%%%% perform the following step ONLY after assembly %%%%%
         if ~strcmp(imageType,"SingleSection")
@@ -201,7 +227,7 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
                     verticalForceSingleSection(verticalForceSingleSection<th)=NaN;
                     vertForceAVG(i)=mean(mean(verticalForceSingleSection),'omitnan');
                     avgN{i}=xline(axes1,vertForceAVG(i),'--','LineWidth',2,'DisplayName',textLabel_avg,'Color',colors{i});
-                    h{i}=histogram(axes1,verticalForceSingleSection,200,'DisplayName',textLabel_raw,'FaceColor',colors{i},'Normalization','pdf');
+                    h{i}=histogram(axes1,verticalForceSingleSection,100,'DisplayName',textLabel_raw,'FaceColor',colors{i},'Normalization','pdf');
                 end
                 legend1 = legend('FontSize',15);
                 set(legend1,'Location','bestoutside'); ylim padded                
@@ -244,6 +270,11 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
             %%% HEIGHT DISTRIBUTION POST PROCESSING %%%
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             % Once the postProcessing is done, masking the height is now possible, therefore, better distinction between Foreground and Background.
+                % Since now there is the assembled mask
+                titleData='Final Binary AFM IO Image';
+                nameFig=sprintf('resultA2_%d_finalMask',countImg);
+                countImg=countImg+1;
+                showData(idxMon,SeeMe,AFM_height_IO,titleData,folderSaveFig,nameFig,'binary',true);                 
                 if SeeMe
                     f_heightDistribution=figure('Visible','on');
                 else
@@ -263,25 +294,33 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
                 xlabel(sprintf('Feature height [nm]'),'FontSize',15), ylabel('Percentage %','FontSize',15), grid minor, grid on
                 title("Distribution PostProcessed Height",'FontSize',20)
                 objInSecondMonitor(f_heightDistribution,idxMon);     
-                saveFigures_FigAndTiff(f_heightDistribution,folderSaveFig,'resultA2_8_OptHeightDistribution_FR_BK')
-                % Since now there is the assembled mask
-                titleData='Final Binary AFM IO Image';
-                nameFig='resultA2_7_finalMask';
-                showData(idxMon,SeeMe,AFM_height_IO,titleData,folderSaveFig,nameFig,'binary',true);                
-
+                nameFig=sprintf('resultA2_%d_OptHeightDistribution_FR_BK',countImg);
+                countImg=countImg+1;
+                saveFigures_FigAndTiff(f_heightDistribution,folderSaveFig,nameFig)                              
                 % DISTRIBUTION OF FORCE AFTER CLEARING
                 % mask the data, take only FR 
-                force_masked_trace=blockAllData{3};
-                force_masked_trace(~AFM_height_IO)=nan;
-                force_masked_retrace=blockAllData{4};
-                force_masked_retrace(~AFM_height_IO)=nan;
-                force_masked_maxPixelValue=blockAllData{5};
-                force_masked_maxPixelValue(~AFM_height_IO)=nan;
-                force_masked_avg=blockAllData{6};
-                force_masked_avg(~AFM_height_IO)=nan;
-                
-                % adjust xlim
-                allDataHistog=[blockAllData{3}(:);blockAllData{4}(:)];
+                if strcmp(HVmode,"HoverMode_OFF")
+                    forcesDistribution_full={blockAllData{3}(:),blockAllData{4}(:),blockAllData{5}(:).blockAllData{6}(:)};
+                    textName={'Force-Trace','Force-ReTrace','Force-maxPixelValue','Force-average'};
+                    force_masked_trace=blockAllData{3};
+                    force_masked_trace(~AFM_height_IO)=nan;
+                    force_masked_retrace=blockAllData{4};
+                    force_masked_retrace(~AFM_height_IO)=nan;
+                    force_masked_maxPixelValue=blockAllData{5};
+                    force_masked_maxPixelValue(~AFM_height_IO)=nan;
+                    force_masked_avg=blockAllData{6};
+                    force_masked_avg(~AFM_height_IO)=nan;
+                    forcesDistribution_mask={force_masked_trace(:),force_masked_retrace(:),force_masked_maxPixelValue(:),force_masked_avg(:)};
+                    allDataHistog=[blockAllData{3}(:);blockAllData{4}(:)];
+                else
+                    forcesDistribution_full={blockAllData{3}(:)};
+                    textName={'Force-FromFCmethod'};
+                    force_masked_fromFC=blockAllData{3};
+                    force_masked_fromFC(~AFM_height_IO)=nan;
+                    forcesDistribution_mask={force_masked_fromFC(:)};
+                    allDataHistog=[blockAllData{3}(:)];
+                end
+                % adjust xlim                
                 pLow = prctile(allDataHistog, .5);
                 pHigh = prctile(allDataHistog, 99.5);    
                 figForceDist=figure(Visible="off");
@@ -289,43 +328,22 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
                     ax = nexttile;
                     hold(ax, 'on'); 
                     if i==1
-                        % take only all datapoint
-                        vect_f_tr=blockAllData{3}(:);
-                        vect_f_rt=blockAllData{4}(:);  
-                        vect_f_maxV=blockAllData{5}(:);
-                        vect_f_avg=blockAllData{6}(:);
+                        data=forcesDistribution_full; % take all datapoint
                     else           
-                        % exclude nan
-                        vect_f_tr=force_masked_trace(:);
-                        vect_f_rt=force_masked_retrace(:);
-                        vect_f_maxV=force_masked_maxPixelValue(:);
-                        vect_f_avg=force_masked_avg(:);
+                        data=forcesDistribution_mask; % take only Foreground datapoint
                     end
-                    vect_f_tr=vect_f_tr(~isnan(vect_f_tr));
-                    vect_f_rt=vect_f_rt(~isnan(vect_f_rt));   
-                    vect_f_maxV=vect_f_maxV(~isnan(vect_f_maxV));
-                    vect_f_avg=vect_f_avg(~isnan(vect_f_avg));
-                    [f_tr, xi_tr] = ksdensity(vect_f_tr);
-                    [f_rt, xi_rt] = ksdensity(vect_f_rt); 
-                    [f_mV, xi_mV] = ksdensity(vect_f_maxV); 
-                    [f_avg, xi_avg] = ksdensity(vect_f_avg);
-                    fill_between(ax, xi_tr, f_tr, globalColor(1), 0.25);     
-                    fill_between(ax, xi_rt, f_rt, globalColor(2), 0.25);
-                    fill_between(ax, xi_mV, f_mV, globalColor(4), 0.25); 
-                    fill_between(ax, xi_avg, f_avg, globalColor(5), 0.25); 
-                    plot(ax, xi_tr,     f_tr,    '-', 'Color', globalColor(1), 'LineWidth', 2.0, 'DisplayName', 'Force-Trace');
-                    plot(ax, xi_rt,     f_rt,    '-', 'Color', globalColor(2), 'LineWidth', 2.0, 'DisplayName', 'Force-ReTrace');
-                    plot(ax, xi_mV,     f_mV,    '--', 'Color', globalColor(4), 'LineWidth', 1.0, 'DisplayName', 'Force-maxPixelValue');
-                    plot(ax, xi_avg,     f_avg,    '--', 'Color', globalColor(5), 'LineWidth', 1.0, 'DisplayName', 'Force-average');
-                    % Mean/median lines
-                    med_tr  = median(vect_f_tr);
-                    med_rt  = median(vect_f_rt);
-                    med_mV  = median(vect_f_maxV);
-                    med_avg  = median(vect_f_avg);
-                    plot(ax, [med_tr  med_tr],  [0 max(f_tr)],  ':', 'Color', globalColor(1), 'LineWidth', 2,'DisplayName',sprintf('Median: %.3g nN',med_tr));
-                    plot(ax, [med_rt  med_rt],  [0 max(f_rt)],  ':', 'Color', globalColor(2), 'LineWidth', 2,'DisplayName',sprintf('Median: %.3g nN',med_rt));            
-                    plot(ax, [med_mV  med_mV],  [0 max(f_mV)],  ':', 'Color', globalColor(4), 'LineWidth', 1,'DisplayName',sprintf('Median: %.3g nN',med_mV));            
-                    plot(ax, [med_avg  med_avg],  [0 max(f_avg)],  ':', 'Color', globalColor(5), 'LineWidth', 1,'DisplayName',sprintf('Median: %.3g nN',med_avg));            
+                    for j=1:length(data)
+                        tmp=data{j};
+                        tmp=tmp(~isnan(tmp));
+                        [f,xi] = ksdensity(tmp);
+                        if j>=3, col=globalColor(j+1); else, col=globalColor(j); end
+                        if j==1 || j ==2,style='-'; linWid=2; else,style='--';linWid=1;end
+                        fill_between(ax,xi,f,col,0.25);                          
+                        plot(ax,xi,f,style,'Color',col,'LineWidth',linWid,'DisplayName',textName{j});
+                        % median lines
+                        med=median(tmp);
+                        plot(ax, [med med],  [0 max(f)],':','Color',col, 'LineWidth',linWid,'DisplayName',sprintf('Median: %.3g nN',med));
+                    end
                     legend(ax, 'AutoUpdate','off','EdgeColor',[0.3 0.3 0.3], 'Location','northeast','FontSize',14);
                     xlim(ax, [pLow, pHigh]);
                     xlabel(ax,"Lateral Force (nN)","FontSize",14),ylabel(ax,"KDE","FontSize",14)
@@ -336,7 +354,8 @@ function [varargout]=A1_feature_CleanOrPrepFiguresRawData(data,varargin)
                     end
                 end
                 objInSecondMonitor(figForceDist,idxMon)
-                nameFig="resultA2_9_LateralForce_KDEcomparisons";
+                
+                nameFig=sprintf("resultA2_%d_LateralForce_KDEcomparisons",countImg);
                 saveFigures_FigAndTiff(figForceDist,folderSaveFig,nameFig)
             end
         end

@@ -1,4 +1,4 @@
-function varargout=A2_1_processHeight(data,idxMon,SaveFigFolder,modeScan,varargin)
+function varargout=A2_1_processHeight(data,metadata,idxMon,SaveFigFolder,modeScan,varargin)
 % The function extracts Images from the experiments.
 % It removes baseline and extracts foreground from the AFM image.
 %
@@ -31,12 +31,10 @@ function varargout=A2_1_processHeight(data,idxMon,SaveFigFolder,modeScan,varargi
     argName = 'imageType';          defaultVal = "Entire";          addParameter(p,argName,defaultVal, @(x) ismember(string(x),typeProcesses));
     argName = 'Normalization';      defaultVal = false;             addParameter(p,argName,defaultVal, @(x) (islogical(x) || (isnumeric(x) && ismember(x,[0 1]))));
     argName = 'fitOrder';           defaultVal = '';                addParameter(p, argName, defaultVal, @(x) (ismember(x, {'Low', 'Medium', 'High'}) || isempty(x)));
-    argName = 'metadata';           defaultVal = [];                addParameter(p,argName,defaultVal);
     argName = 'offset_HVon_HVoff';  defaultVal = [];                addParameter(p,argName,defaultVal);
     argName = 'BackgroundOnly';     defaultVal = [];                addParameter(p,argName,defaultVal, @(x) ismember(x,{'backgroundOnly','background_PDA'}));
     % validate and parse the inputs
     parse(p,data,varargin{:});
-    metadata=p.Results.metadata;
     SeeMe=p.Results.SeeMe;
     norm=p.Results.Normalization;
     % define var to express format of the data to process
@@ -57,7 +55,14 @@ function varargout=A2_1_processHeight(data,idxMon,SaveFigFolder,modeScan,varargi
     end
     if norm, labelHeight=""; factor=1; else, labelHeight="Height (nm)"; factor=1e9; end    
     % pixelSize calc
-    lengthAxis=[metadata.x_scan_length_m,metadata.y_scan_length_m];
+    if typeProcess==1
+        tot_pixel=metadata.y_scan_pixels(end);            
+    elseif typeProcess==2
+        tot_pixel=metadata.y_scan_pixels(2)-metadata.y_scan_pixels(1)+1;
+    else
+        tot_pixel=metadata.y_scan_pixels;
+    end
+    umeterXpixel=[metadata.x_scan_length_m/metadata.x_scan_pixels metadata.y_scan_length_m/tot_pixel];
     % for the first time or first section, request the max fitOrder
     if isempty(p.Results.fitOrder)
         question=sprintf("Choose the level of the maxFitOrder for AFM Height Channel Background Data (Mode Image: %s).",modesScan{modeScan});
@@ -104,7 +109,7 @@ function varargout=A2_1_processHeight(data,idxMon,SaveFigFolder,modeScan,varargi
                     'AFM_images_1_original', tmp_img_1);
     end        
     % show the data prior the height processing
-    A1_feature_CleanOrPrepFiguresRawData(AFM_Images,'idxMon',idxMon,'folderSaveFig',SaveFigFolder,'metadata',metadata,'imageType',typeProcesses{typeProcess},'SeeMe',false,'Normalization',norm);
+    A1_feature_CleanOrPrepFiguresRawData(AFM_Images,metadata,'idxMon',idxMon,'folderSaveFig',SaveFigFolder,'imageType',typeProcesses{typeProcess},'SeeMe',false,'Normalization',norm);
     clear tmp* data
     % Extract the height channel
     height_1_original=AFM_Images(strcmp([AFM_Images.Channel_name],'Height (measured)')).AFM_images_1_original;
@@ -224,7 +229,6 @@ function varargout=A2_1_processHeight(data,idxMon,SaveFigFolder,modeScan,varargi
                     clear foldHVON
                 end
             end
-
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             close all
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -315,7 +319,7 @@ function varargout=A2_1_processHeight(data,idxMon,SaveFigFolder,modeScan,varargi
                 titleData1 = 'Height Image';
                 titleTemplate = 'Height Image - clipped above %.2fth percentile';
                 [~,height_7_forBinarization_betterVisual,thValues] = percentileClipSlider(idxMon,height_7_forBinarization*factor, ...
-                titleData1, titleTemplate, "Height (nm)", lengthAxis,'pLowMax',10, 'pMin', 90, 'pMax', 100);                   
+                titleData1, titleTemplate, "Height (nm)", umeterXpixel,'pLowMax',10, 'pHighMin', 90, 'pHighMax', 100,'Contrast',true);   
                 disp('Processing now the binarization of Height channel after LineByLine Fitting with Butterworth-filtered Height')
                 [AFM_height_IO,binarizationMethod]=binarizeImageMain(height_7_forBinarization_betterVisual,idxMon,'Height',iterationMain); 
                 % restore the pixel previously removed.
@@ -440,55 +444,27 @@ function varargout=A2_1_processHeight(data,idxMon,SaveFigFolder,modeScan,varargi
         % show finak height and mask o decide if they are ok       
         titleData1 = 'Definitive Height Image';
         titleData2="Definitive Mask Height Image";
-        showData(idxMon,true,height_10_corr*factor,titleData1,"","",'labelBar',"Height (nm)",'lenghtAxis',lengthAxis,'SaveFig',false,...
-            'extraData',AFM_height_IO_corr,'extraBinary',true,'extraLengthAxis',lengthAxis,'extraTitles',titleData2);        
+        showData(idxMon,true,height_10_corr*factor,titleData1,"","",'labelBar',"Height (nm)",'lenghtAxis',umeterXpixel,'SaveFig',false,...
+            'extraData',AFM_height_IO_corr,'extraBinary',true,'extraLengthAxis',umeterXpixel,'extraTitles',titleData2);        
         question={"Satisfied of the definitive Height image and mask?";"If not, repeat again the process with the last height image to generate again a new mask.";"NOTE: ImageSegmenter Toolbox (Manual Binarization) is available from the second iteration\nso it can perform better with already optimized height image."};
         if getValidAnswer(question,'',{'y','n'},1)
             titleData1 = 'Definitive Height Image';
-            % decided to keep the data rather than excluding 
-            %{
-            titleTemplate = 'Definitive Height Image - clipped above %.2fth percentile';
-            % REMOVE th percentile from height channel through slider (not in the AFM-IO because it will be used later and it is informative keep it as it is
-            [th,dataClean] = percentileClipSlider(idxMon, height_10_corr*factor, ...
-                titleData1, titleTemplate, "Height (nm)", lengthAxis,'pInit', 99, 'pMin', 95, 'pMax', 100);            
-            % User cancelled
-            if isnan(th)
-                height_FINAL = height_10_corr;
-                nameFile='resultA2_8_HeightFINAL';
-                nameFileMask='resultA2_8_maskFINAL';
-                titleData1={titleData1;'No prctile thresholding'}; %#ok<*AGROW>
-            else
-                % Convert back to unscaled if you want the raw stored:
-                height_11_prctile=dataClean/factor;
-                nameFile="resultA2_8_HeightBeforePrctileTH";
-                showData(idxMon,false,height_10_corr*factor,"Definitive Height before threshold",SaveFigFolder,nameFile,'labelBar',"Height (nm)",'lenghtAxis',lengthAxis);
-                nameFile='resultA2_9_HeightFINAL';  
-                nameFileMask='resultA2_9_maskFINAL';              
-                height_FINAL=height_11_prctile;
-                subtext=sprintf('Removed <%.2f° and >%.2f° from the data',th(1),th(2));
-                titleData1={titleData1;sprintf('%s',subtext)};
-            end    
-            %}
             height_FINAL = height_10_corr;
             nameFile='resultA2_8_HeightFINAL';
             nameFileMask='resultA2_8_maskFINAL';
             % save final height
-            showData(idxMon,false,height_FINAL*factor,titleData1,SaveFigFolder,nameFile,'labelBar',"Height (nm)",'lenghtAxis',lengthAxis);
+            showData(idxMon,false,height_FINAL*factor,titleData1,SaveFigFolder,nameFile,'labelBar',"Height (nm)",'lenghtAxis',umeterXpixel);
             % save mask            
             titleData1='Definitive Mask Height Image';
             mask_FINAL=AFM_height_IO_corr;
-            showData(idxMon,false,mask_FINAL,titleData1,SaveFigFolder,nameFileMask,'binary',true,'lenghtAxis',lengthAxis) 
+            showData(idxMon,false,mask_FINAL,titleData1,SaveFigFolder,nameFileMask,'binary',true,'lenghtAxis',umeterXpixel) 
             % substitutes to the original height image with the new opt fitted heigh
             AFM_Images_final=AFM_Images;            
             for i=1:length(AFM_Images_final)
                 if strcmp(AFM_Images_final(i).Channel_name,"Height (measured)")
                     % The height channel will be changed with the new optimized final height previosuly obtained.
-                    % The height will keep the size. Therefore, if HV OFF and resizing, the height is ok. But for the other channels, they
-                    % have been already copied!
-                    AFM_Images_final(i).AFM_images_2_PostHeightProcessed=height_FINAL;
-                elseif ~strcmp(binarizationMethod,"Extracted from HV ON mask") 
-                    % Copy the the original data as new column except height. 
-                    AFM_Images_final(i).AFM_images_2_PostHeightProcessed=AFM_Images_final(i).AFM_images_1_original; 
+                    % The height will keep the size. Therefore, if HV OFF and resizing, the height is ok. no copy other channels
+                    AFM_Images_final(i).AFM_images_2_PostHeightProcessed=height_FINAL;                
                 end
             end
             varargout{1}=AFM_Images_final;

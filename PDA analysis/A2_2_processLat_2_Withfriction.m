@@ -4,55 +4,61 @@
 % Check manually the processed image afterwards and compare with the AFM VD
 % image!
 
-function varargout=A2_2_processLat_2_Withfriction(AFM_data,AFM_height_IO,metadata,idxMon,SaveFigFolder,mainPath,varargin)
+function varargout=A2_2_processLat_2_Withfriction(AFM_data,AFM_height_IO,metadata,imageType,idxMon,SaveFigFolder,mainPath,varargin)
     % in case of code error, the waitbar won't be removed. So the following command force its closure
     warning ('off','all'); 
     allWaitBars = findall(0,'type','figure','tag','TMWWaitbar');
     delete(allWaitBars)       
-
-    lengthAxis=[metadata.x_scan_length_m,metadata.y_scan_length_m];
     alpha=metadata.Alpha;
     p=inputParser();    %init instance of inputParser
     %Add default parameters. When call the function, use 'argName' as well you use 'LineStyle' in plot! And
     %then the values
-    argName = 'FitOrderHVON_Lat';           defaultVal = '';     addOptional(p,argName,defaultVal, @(x) (ismember(x,{'Low','Medium','High'}) || isempty(x)));
-    argName = 'FitOrderHVOFF_Height';       defaultVal = '';     addOptional(p,argName,defaultVal, @(x) (ismember(x,{'Low','Medium','High'}) || isempty(x)));
+    argName = 'FitOrderHVON_Lat';           defaultVal = '';        addOptional(p,argName,defaultVal, @(x) (ismember(x,{'Low','Medium','High'}) || isempty(x)));
+    argName = 'FitOrderHVOFF_Height';       defaultVal = '';        addOptional(p,argName,defaultVal, @(x) (ismember(x,{'Low','Medium','High'}) || isempty(x)));
     argName = 'SeeMe';                      defaultVal = true;      addOptional(p,argName,defaultVal, @(x) islogical(x));
     argName = 'Normalization';              defaultVal = false;     addOptional(p,argName,defaultVal, @(x) islogical(x));
     argName = 'flagSingleSectionProcess';   defaultVal = false;     addOptional(p,argName,defaultVal, @(x) islogical(x));
     argName = 'idxSectionHVon';             defaultVal = [];        addOptional(p,argName,defaultVal);
-
     parse(p,varargin{:});
+    if strcmp(imageType,'Assembled')
+            tot_pixel=metadata.y_scan_pixels(end);            
+    elseif strcmp(imageType,'SingleSection')
+        tot_pixel=metadata.y_scan_pixels(2)-metadata.y_scan_pixels(1)+1;
+    else
+        tot_pixel=metadata.y_scan_pixels;
+    end
+    umeterXpixel=[metadata.x_scan_length_m/metadata.x_scan_pixels metadata.y_scan_length_m/tot_pixel];
     % setup optional input
     if p.Results.SeeMe; SeeMe=1; else, SeeMe=0; end    
     if p.Results.Normalization, norm=1; unitDataLabel="" ;else, norm=0; unitDataLabel='Voltage [V]'; end
     unitDataLabel=string(unitDataLabel);
     if p.Results.flagSingleSectionProcess, flagSingleSectionProcess=1; else, flagSingleSectionProcess=0; end
-    if ~isempty(p.Results.idxSectionHVon), idxSectionHVon=p.Results.idxSectionHVon; end  
-    
-    % for the first time or first section, request the max fitOrder
-    if isempty(p.Results.FitOrderHVON_Lat)
-        question="Choose the level of the maxFitOrder for AFM Lateral Channel Background Data (HVon)";
-        FitOrderHVON_Lat=chooseAccuracy(question);
-    else
-        FitOrderHVON_Lat=p.Results.FitOrderHVON_Lat;
-    end
-    if strcmp(FitOrderHVON_Lat,'Low')
-        limitPlaneFit=3; 
-        limitLineFit=1;
-    elseif strcmp(FitOrderHVON_Lat,'Medium')
-        limitPlaneFit=6;
-        limitLineFit=2;
-    else
-        limitPlaneFit=9;
-        limitLineFit=3;
-    end   
-    FitOrderHVOFF_Height=p.Results.FitOrderHVOFF_Height;
-    clearvars argName defaultVal p varargin    
-    if ~exist(fullfile(SaveFigFolder,'TMP_DATA_3_LATERAL_PART.mat'),'file')
+    idxSectionHVon=p.Results.idxSectionHVon;
+      
+    if ~exist(fullfile(SaveFigFolder,'tmp_resultData_2_LateralProcessing.mat'),'file')
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%%% PREPARE THE PLOTTING OF THE LATERAL DATA PROCESSING %%%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        
+        % for the first time or first section, request the max fitOrder
+        if isempty(p.Results.FitOrderHVON_Lat)
+            question="Choose the level of the maxFitOrder for AFM Lateral Channel Background Data (HVon)";
+            FitOrderHVON_Lat=chooseAccuracy(question);
+        else
+            FitOrderHVON_Lat=p.Results.FitOrderHVON_Lat;
+        end
+        if strcmp(FitOrderHVON_Lat,'Low')
+            limitPlaneFit=3; 
+            limitLineFit=1;
+        elseif strcmp(FitOrderHVON_Lat,'Medium')
+            limitPlaneFit=6;
+            limitLineFit=2;
+        else
+            limitPlaneFit=9;
+            limitLineFit=3;
+        end   
+        FitOrderHVOFF_Height=p.Results.FitOrderHVOFF_Height;
+        clearvars argName defaultVal p varargin  
         % select a single line manually to check the LD
         fLineChoose=figure; axFig=axes('Parent',fLineChoose); imagesc(AFM_height_IO), axis equal, xlim tight, ylim tight, objInSecondMonitor(fLineChoose,idxMon)
         title('Select two points on the mask to analyze two different single fast scan lines','FontSize',16);
@@ -62,7 +68,10 @@ function varargout=A2_2_processLat_2_Withfriction(AFM_data,AFM_height_IO,metadat
         % GOAL: exclude FOREGROUND data to have BACKGROUND data for which perform the fitting so the original Lateral data can be adjusted
         % extract data (lateral deflection Trace + vertical deflection Trace)
         Lateral_Image_1_Raw   = (AFM_data(strcmpi([AFM_data.Channel_name],'Lateral Deflection') & strcmpi([AFM_data.Trace_type],'Trace')).AFM_images_1_original);
-        vertical_Trace  = (AFM_data(strcmpi([AFM_data.Channel_name],'Vertical Deflection') & strcmpi([AFM_data.Trace_type],'Trace')).AFM_images_1_original);            
+        vertical_Trace  = (AFM_data(strcmpi([AFM_data.Channel_name],'Vertical Deflection') & strcmpi([AFM_data.Trace_type],'Trace')).AFM_images_1_original); 
+        vertical_ReTrace  = (AFM_data(strcmpi([AFM_data.Channel_name],'Vertical Deflection') & strcmpi([AFM_data.Trace_type],'ReTrace')).AFM_images_1_original); 
+        vertical_Force = (vertical_Trace+vertical_ReTrace)/2;
+        vertical_Force=vertical_Force*1e9;
         Lateral_BK_1= Lateral_Image_1_Raw;
         Lateral_BK_1(AFM_height_IO==1)=NaN;        
         Lateral_FR_1 = Lateral_Image_1_Raw;
@@ -70,9 +79,9 @@ function varargout=A2_2_processLat_2_Withfriction(AFM_data,AFM_height_IO,metadat
         %%%%---------------------%%%%%
         %%%%%------- plot -------%%%%%
         %%%%---------------------%%%%%
-        titleData1="Raw Background Lateral Deflection";
-        titleData2="Raw Lateral Deflection";    
-        nameFig='resultA2_9_RawLateralData_BackgroundNoOutliers';
+        titleData1="Raw Background Lateral Deflection (HV ON)";
+        titleData2="Raw Lateral Deflection (HV ON)";    
+        nameFig='resultA2_FCcalFromHVOFF_1_RawLateralData_BackgroundNoOutliers';
         showData(idxMon,false,Lateral_BK_1,titleData1,SaveFigFolder,nameFig,'normalized',norm,'labelBar',unitDataLabel, ...
             'extraData',{Lateral_Image_1_Raw},'extraTitles',{titleData2},'extraNorm',{norm},'extraLabel',{unitDataLabel});
         % check distribution of the LD data between FR and BK
@@ -102,8 +111,8 @@ function varargout=A2_2_processLat_2_Withfriction(AFM_data,AFM_height_IO,metadat
         %%%%%------- plot -------%%%%%
         %%%%---------------------%%%%%      
         titleData1='Plane Fitted Background';
-        titleData2={'Lateral Deflection'; 'After PlaneFit correction'};
-        nameFig='resultA2_10_planeBKfit_LateralDeflectionCorr';    
+        titleData2={'Lateral Deflection (HV ON)'; 'After PlaneFit correction'};
+        nameFig='resultA2_FCcalFromHVOFF_2_planeBKfit_LateralDeflectionCorr';    
         figTmp=showData(idxMon,true,correction_plane,titleData1,SaveFigFolder,nameFig,'normalized',norm,'labelBar',unitDataLabel, ...
             'extraData',{Lateral_Image_2_planeFit},'extraTitle',{titleData2},'extraNorm',{norm},'extraLabel',{unitDataLabel});    
         % check distribution of the LD data between FR and BK
@@ -152,9 +161,9 @@ function varargout=A2_2_processLat_2_Withfriction(AFM_data,AFM_height_IO,metadat
                 figDistr=figDistrTmp;
                 figSingleLine=figSingleLineTmp;
                 titleData1='Line x Line Fitted Background'; titleData2={"Lateral Deflection";"Plane+LineByLine Fitted"};
-                nameFig='resultA2_11_LineBKfit_LateralDeflection';
+                nameFig='resultA2_FCcalFromHVOFF_3_LineBKfit_LateralDeflection';
                 showData(idxMon,false,baselineFit,titleData1,SaveFigFolder,nameFig,'normalized',norm,'labelBar',unitDataLabel, ...
-                    'extraData',{Lateral_Image_3_lineFit},'extraTitle',{titleData2},'extraNorm',{norm},'extraLabel',{unitDataLabel});
+                    'extraData',Lateral_Image_3_lineFit,'extraTitle',titleData2,'extraNorm',norm,'extraLabel',unitDataLabel);
                 noFitLine=false;        
             end            
         end
@@ -173,15 +182,19 @@ function varargout=A2_2_processLat_2_Withfriction(AFM_data,AFM_height_IO,metadat
         xlim(ax, [min(allData)-abs(pLow), pHigh]); ylim(ax,"padded");
         clear allData pLow pHigh ax hList
         % save distribution and singleLine
-        nameResults='resultA2_12_DistributionLD_eachCorrectionStep';
+        nameResults='resultA2_FCcalFromHVOFF_4_DistributionLD_eachCorrectionStep';
         saveFigures_FigAndTiff(figDistr,SaveFigFolder,nameResults)
-        nameResults='resultA2_13_singleFastScanLineLD_eachCorrectionStep';
+        nameResults='resultA2_FCcalFromHVOFF_5_singleFastScanLineLD_eachCorrectionStep';
         saveFigures_FigAndTiff(figSingleLine,SaveFigFolder,nameResults)
         close all
         clear nameResults titleData* noFitLine
-        save(fullfile(SaveFigFolder,'TMP_DATA_3_LATERAL_PART'),"Lateral_Image_3_lineFit","idxLine",'vertical_Trace','metricsBestPlaneFit','metricsBestLineFit');
+        metricsBest.lineFit=metricsBestLineFit;
+        metricsBest.paneFit=metricsBestPlaneFit;
+        fitOrder.FitOrderHVOFF_Height=FitOrderHVOFF_Height;
+        fitOrder.FitOrderHVON_Lat=FitOrderHVON_Lat;
+        save(fullfile(SaveFigFolder,'tmp_resultData_2_LateralProcessing'),"Lateral_Image_3_lineFit","idxLine",'vertical_Force','metricsBest','fitOrder');
     else
-        load(fullfile(SaveFigFolder,'TMP_DATA_3_LATERAL_PART.mat'),'Lateral_Image_3_lineFit','idxLine','vertical_Trace','metricsBestPlaneFit','metricsBestLineFit')
+        load(fullfile(SaveFigFolder,'tmp_resultData_2_LateralProcessing.mat'),'Lateral_Image_3_lineFit','idxLine','vertical_Force','metricsBest','fitOrder')
     end
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%%%%%%--------- CONVERSION LATERAL DEFLECTIO [V] ==> LATERAL FORCE [N] ---------%%%%%%%%%
@@ -218,6 +231,7 @@ function varargout=A2_2_processLat_2_Withfriction(AFM_data,AFM_height_IO,metadat
                 if ~exist(fullfile(mainPath,'HoverMode_OFF'),"dir")
                     error('The directory HoverMode_OFF doesn''t exist. Select another option')
                 end
+                error("This part of the code need to be implemented. featureFrictionCalc0_FromSameScanHVOFF has been deleted because of significant changes")
                 [avg_fc,FitOrderHVOFF_Height] = featureFrictionCalc0_FromSameScanHVOFF(idxMon,mainPath,flagSingleSectionProcess,'idxSectionHVon',idxSectionHVon,'FitOrderHVOFF_Height',FitOrderHVOFF_Height);
                 if isempty(avg_fc)
                     fprintf('For some reasons, the scan in HoverMode OFF is messed up. Choose a standard value if possible')
@@ -227,62 +241,38 @@ function varargout=A2_2_processLat_2_Withfriction(AFM_data,AFM_height_IO,metadat
         break
     end
     clear choice question options wb   
-    % Friction force = friction coefficient * Normal Force
-    Baseline_Friction_Force= vertical_Trace*avg_fc;
-    figSingleLineForce=plotSingleLineCheck(idxMon,Baseline_Friction_Force*1e9,idxLine,'mask',AFM_height_IO,'typeData','force','nameLine','OFFSET (VD*fc)');
-    
-    % Friction force = calibration coefficient * Lateral Trace (V)
-    Lateral_Trace_Force= Lateral_Image_3_lineFit*alpha;
-    figSingleLineForce=plotSingleLineCheck(idxMon,Lateral_Trace_Force*1e9,idxLine,'prevFig',figSingleLineForce,'nameLine','F=Deflection*Alpha');
+    % Friction force = friction coefficient * Normal Force , convert into nN
+    Baseline_Friction_Force= vertical_Force*avg_fc;
+    figSingleLineForce=plotSingleLineCheck(idxMon,Baseline_Friction_Force,idxLine,'mask',AFM_height_IO,'typeData','force','nameLine','OFFSET (VD*fc)');    
+    % Friction force = calibration coefficient * Lateral Trace (V), convert into nN
+    Lateral_Force_Trace= Lateral_Image_3_lineFit*alpha*1e9;
+    figSingleLineForce=plotSingleLineCheck(idxMon,Lateral_Force_Trace,idxLine,'prevFig',figSingleLineForce,'nameLine','F=Deflection*Alpha');
     
     % To read the baseline friction, to obtain the processed image:
-    Corrected_LD_Trace= Lateral_Trace_Force + Baseline_Friction_Force;
-    figSingleLineForce=plotSingleLineCheck(idxMon,Corrected_LD_Trace*1e9,idxLine,'prevFig',figSingleLineForce,'nameLine','Corrected Force (F+OFFSET)');       
+    LatForce_corrected_1= Lateral_Force_Trace + Baseline_Friction_Force;
+    figSingleLineForce=plotSingleLineCheck(idxMon,LatForce_corrected_1,idxLine,'prevFig',figSingleLineForce,'nameLine','Corrected Force (F+OFFSET)');       
     % save results force lines
-    nameFig='resultA2_14_singleFastScanLineLD_FORCE';
+    nameFig='resultA2_FCcalFromHVOFF_6_singleFastScanLineLD_FORCE';
     saveFigures_FigAndTiff(figSingleLineForce,SaveFigFolder,nameFig)
     % plot the definitive corrected lateral force. Normalized and not
     titleData={"Definitive Lateral Force";"Full, no outliers removal"};
-    nameFig='resultA2_15_ResultsDefinitiveLateralDeflectionsNewton';
+    nameFig='resultA2_FCcalFromHVOFF_7_ResultsDefinitiveLateralDeflectionsNewton';
     labelFig='Force [nN]';
-    showData(idxMon,SeeMe,Corrected_LD_Trace*1e9,titleData,SaveFigFolder,nameFig,'labelBar',labelFig)
+    showData(idxMon,SeeMe,LatForce_corrected_1,titleData,SaveFigFolder,nameFig,'labelBar',labelFig)
     % there may be still some anomalies. If so, permamently remove them from the height image
     textTitle={'Corrected Lateral Force';'Check if there some parts to transform into NaN in the foreground.'};
-    [~,Corrected_LD_Trace_corr] = featureRemovePortions(Corrected_LD_Trace,textTitle,idxMon,'normalize',false);       
-
-    
+    [~,LatForce_corrected_2] = featureRemovePortions(LatForce_corrected_1,textTitle,idxMon,'normalize',false);       
 
     % finalize the process by checking if removing outliers makes everything better
     % remove outliers from lateral image ==> DEFINITIVE LATERAL DATA!!!!!!
-    percentile=99;
-    th=prctile(Corrected_LD_Trace_corr(:),percentile);
-    Corrected_LD_Trace_clean99perc=Corrected_LD_Trace_corr;
-    Corrected_LD_Trace_clean99perc(Corrected_LD_Trace_corr>th)=nan;
-
-    nameFile='resultA2_16_HeightFINAL';
-    titleData1='Definitive Lateral Image';
-    titleData2='Definitive Lateral Image - 99°percentile removed';
-    ftmp=showData(idxMon,true,Corrected_LD_Trace_corr*1e9,titleData1,'','','labelBar',"Force (nN)",'lenghtAxis',lengthAxis,'saveFig',false,...
-        'extraData',{Corrected_LD_Trace_clean99perc*1e9},'extraTitles',{titleData2},'extraLabel',"Force (nN)",'extraLengthAxis',{lengthAxis});
-    if getValidAnswer("99° percentile removed. Keep the first or the second lateral force as definitive lateral force image?",'',{'First','Second (99°percentile removed)'},1)
-        lateral_FINAL=Corrected_LD_Trace_corr;
-    else
-        lateral_FINAL=Corrected_LD_Trace_clean99perc;
-    end
-    close(ftmp)
+    [~,LatForce_FINAL]=percentileClipSlider(idxMon,LatForce_corrected_2,"Full Lateral Image","Definitive Lateral Image","Force (nN)",umeterXpixel);
+   
+    nameFile='resultA2_FCcalFromHVOFF_8_HeightFINAL';
     % save final lateral
-    showData(idxMon,false,lateral_FINAL*1e9,titleData1,SaveFigFolder,nameFile,'labelBar',"Force (nN)",'lenghtAxis',lengthAxis);
+    showData(idxMon,false,LatForce_FINAL,"Definitive Lateral Image",SaveFigFolder,nameFile,'labelBar',"Force (nN)",'lenghtAxis',umeterXpixel);
       
-    % ONLY FOR VISUAL
-    % remove outliers - big values only to show better the data which is difficult to notice even when normalized
-    Corrected_LD_Trace_cleared=filloutliers(lateral_FINAL,nan,'percentile',[0 90]);
-    titleData={'Definitive Lateral Force'; "NOTE: Only for show, not used as definitive data. Removed 90° percentile."};
-    nameFig='resultA2_17_LateralDeflectionWithoutOutliers_90percSHOW';
-    labelFig='Force [nN]';
-    showData(idxMon,SeeMe,Corrected_LD_Trace_cleared*1e9,titleData,SaveFigFolder,nameFig,'labelBar',labelFig)
-
     % show background of LATERAL FORCE to see eventually something interesting
-    lateral_FINAL_BK=lateral_FINAL;
+    lateral_FINAL_BK=LatForce_FINAL;
     lateral_FINAL_BK(AFM_height_IO==1)=nan;
     % remove 90 percentile BK data
     percentile=90;
@@ -290,21 +280,35 @@ function varargout=A2_2_processLat_2_Withfriction(AFM_data,AFM_height_IO,metadat
     Corrected_LD_Trace_BK_90percSHOW=lateral_FINAL_BK;
     Corrected_LD_Trace_BK_90percSHOW(Corrected_LD_Trace_BK_90percSHOW>th)=nan;
     titleData={"Definitive Background Lateral Force"; "NOTE: Only for show, not used as definitive data. Removed 90° percentile."};
-    nameFig='resultA2_18_BackgroundLateralDeflectionWithoutOutliers_SHOW';
+    nameFig='resultA2_FCcalFromHVOFF_10_BackgroundLateralDeflectionWithoutOutliers_SHOW';
     labelFig='Force [nN]';
-    showData(idxMon,SeeMe,Corrected_LD_Trace_BK_90percSHOW*1e9,titleData,SaveFigFolder,nameFig,'labelBar',labelFig)
+    showData(idxMon,SeeMe,Corrected_LD_Trace_BK_90percSHOW,titleData,SaveFigFolder,nameFig,'labelBar',labelFig)
 
     % save the corrected lateral force into cropped AFM image
-    AFM_Elab=AFM_data;    
-    AFM_Elab(strcmpi([AFM_data.Channel_name],'Lateral Deflection') & strcmpi([AFM_data.Trace_type],'Trace')).AFM_images_2_PostProcessed=lateral_FINAL;
-    
-    
-    varargout{1}=AFM_Elab; 
-    varargout{2}=metricsBestPlaneFit;
-    varargout{3}=metricsBestLineFit;
-    varargout{4}=FitOrderHVON_Lat;
-    varargout{5}=FitOrderHVOFF_Height;
-    varargout{6}=avg_fc;
+    AFM_final=AFM_data;    
+    if strcmp(imageType,'Assembled') || strcmp(imageType,'Entire')
+        % VERT FORCE
+        AFM_final(end+1).Channel_name="Vertical Force";
+        AFM_final(end).Trace_type="Average";
+        AFM_final(end).AFM_images_2_PostProcessed=vertical_Force;  
+        % LAT FORCE
+        AFM_final(end+1).Channel_name="Lateral Force";
+        AFM_final(end).Trace_type="FromFCmethod";
+        AFM_final(end).AFM_images_2_PostProcessed=LatForce_FINAL;  
+    else
+        AFM_final(strcmpi([AFM_data.Channel_name],'Lateral Deflection') & strcmpi([AFM_data.Trace_type],'Trace')).AFM_images_3_PostLatProcessed_0_entire=LatForce_FINAL;
+        AFM_final(strcmpi([AFM_data.Channel_name],'Vertical Deflection') & strcmpi([AFM_data.Trace_type],'Trace')).AFM_images_3_PostLatProcessed_0_entire=vertical_Force;
+    end    
+    % delete TMP file
+    tmp=dir(fullfile(SaveFigFolder,"tmp_resultData_2_LateralProcessing*"));
+    files_tmp=fullfile({tmp.folder},{tmp.name});
+    if ~isempty(files_tmp)
+        delete(files_tmp{:})
+    end   
+    varargout{1}=AFM_final;
+    varargout{2}=avg_fc;    
+    varargout{3}=fitOrder;
+    varargout{4}=metricsBest;    
 end
 
 
@@ -356,7 +360,7 @@ function figDistr=checkDistributionDataLD(SeeMe,idxMon,Data,varargin)
     % prepare histogram. round not work to excess but to nearest.
     xmin=floor(min(min(DataBK(:)),min(DataFR(:))) * 1000) / 1000;
     xmax=ceil( max(max(DataBK(:)),max(DataFR(:))) * 1000) / 1000;
-    edges=(xmin:0.01:xmax);
+    edges=linspace(xmin,xmax,150);
 
     % show the original LD of BK
     DataCleaned_BK=DataBK(:); DataCleaned_BK(~isnan(DataCleaned_BK));

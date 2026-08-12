@@ -61,7 +61,7 @@ function varargout = A2_sortAndAssemblySections(allData,otherParameters,flag_pro
     metaDataAssembled.Baseline_N=round(arrayfun(@(s) s.metadata.Baseline_N, allDataOrdered),12);
     % in case of processing single sections before assembly, additional field in the data (friction used for each section)
     flag_friction=false;
-    if ~contains(metaDataAssembled.frictionCoeff_Used,"No FC calculation")
+    if isfield(metaDataAssembled,"frictionCoeff_Used") && ~contains(metaDataAssembled.frictionCoeff_Used,"No FC calculation")
         flag_friction=true;
         metaDataAssembled.frictionCoeff_Used=arrayfun(@(s) s.metadata.frictionCoeff_Used, allDataOrdered);
     end
@@ -126,7 +126,11 @@ function varargout = A2_sortAndAssemblySections(allData,otherParameters,flag_pro
                     % manage the mask only once
                     tmp_mask=allDataOrdered(th_section).AFMmask_heightIO;                    
                 else
-                    tmp_post=tmp(th_channel).AFM_images_3_PostLatProcessed_0_entire;
+                    if isfield(tmp(th_channel),"AFM_images_3_PostLatProcessed_0_entire")
+                        tmp_post=tmp(th_channel).AFM_images_3_PostLatProcessed_0_entire;
+                    else
+                        tmp_post=[];
+                    end
                 end
                 if flag_friction
                     tmp_friction=allDataOrdered(th_section).AFMImage_ForceBK_Friction;
